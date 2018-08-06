@@ -1,0 +1,5 @@
+Makefile
+tests/**
+cmake_install.cmake
+CMakeLists.txt.user
+bin/**
