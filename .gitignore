@@ -3,3 +3,4 @@ tests/**
 cmake_install.cmake
 CMakeLists.txt.user
 bin/**
+thirdparty/Sophus/build/**

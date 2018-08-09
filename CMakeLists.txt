@@ -8,6 +8,7 @@ find_package(OpenCV REQUIRED)
 include_directories(
     ${CERES_INCLUDE_DIRS}
     ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
 )
 
 set(dso_HEADER_FILES
