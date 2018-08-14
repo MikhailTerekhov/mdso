@@ -13,4 +13,7 @@ int settingInitialAdaptiveBlockSize = 25;
 int settingInterestPointsAdaptTo = 2150;
 int settingInterestPointsUsed = 2000;
 
+int settingCameraMapPolyDegree = 7;
+int settingCameraMapPolyPoints = 2000;
+
 } // namespace fishdso

@@ -12,12 +12,15 @@ include_directories(
 )
 
 set(dso_HEADER_FILES
+    ${PROJECT_SOURCE_DIR}/src/util/util.h
+    ${PROJECT_SOURCE_DIR}/src/util/types.h
     ${PROJECT_SOURCE_DIR}/src/util/defs.h
     ${PROJECT_SOURCE_DIR}/src/util/settings.h
     ${PROJECT_SOURCE_DIR}/src/frontend/frontend.h
     ${PROJECT_SOURCE_DIR}/src/system/dsosystem.h
     ${PROJECT_SOURCE_DIR}/src/system/keyframe.h
     ${PROJECT_SOURCE_DIR}/src/system/interestpoint.h
+    ${PROJECT_SOURCE_DIR}/src/system/cameramodel.h
 )
 
 set(dso_SOURCE_FILES
@@ -27,6 +30,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/src/system/dsosystem.cpp
     ${PROJECT_SOURCE_DIR}/src/system/keyframe.cpp
     ${PROJECT_SOURCE_DIR}/src/system/interestpoint.cpp
+    ${PROJECT_SOURCE_DIR}/src/system/cameramodel.cpp
     ${PROJECT_SOURCE_DIR}/src/main.cpp
 )
 

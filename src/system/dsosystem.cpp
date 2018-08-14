@@ -3,13 +3,14 @@
 
 #ifdef DEBUG
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/opencv.hpp>
 #endif
 
 namespace fishdso {
 
-DsoSystem::DsoSystem()
+DsoSystem::DsoSystem(const CameraModel &cam)
     : curFrameId(0), curPointId(0),
-      adaptiveBlockSize(settingInitialAdaptiveBlockSize) {}
+      adaptiveBlockSize(settingInitialAdaptiveBlockSize), cam(cam) {}
 
 void DsoSystem::addKf(cv::Mat frameColored) {
   keyframes[curFrameId] =
@@ -28,7 +29,14 @@ void DsoSystem::updateAdaptiveBlockSize(int curPointsDetected) {
 
 #ifdef DEBUG
 void DsoSystem::showDebug() {
-  cv::imshow("debug", keyframes.cbegin()->second->frameWithPoints);
+  cv::Mat &lastKf = keyframes.cbegin()->second->frame;
+  cv::Mat frameUndistort, smallUndistort;
+  Mat33 K;
+  K << 800, 0, 850, 0, 600, 600, 0, 0, 1;
+  cam.undistort(lastKf, frameUndistort, K);
+  cv::pyrDown(frameUndistort, smallUndistort,
+              cv::Size(frameUndistort.cols / 2, frameUndistort.rows / 2));
+  cv::imshow("debug", smallUndistort);
 }
 #else
 void DsoSystem::showDebug() {}

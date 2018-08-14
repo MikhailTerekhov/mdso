@@ -1,8 +1,10 @@
 #include "frontend/frontend.h"
+#include "system/cameramodel.h"
 #include "system/dsosystem.h"
 #include "util/defs.h"
 #include "util/settings.h"
 #include "util/util.h"
+#include <fstream>
 #include <iostream>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
@@ -14,13 +16,20 @@ using namespace fishdso;
 const std::string winname = "debug";
 
 int main(int argc, char **argv) {
+  CameraModel cam;
+  std::ifstream cams;
+  cams.open("../../tests/cam/cam0.txt", std::ifstream::in);
+  cams >> cam;
+  cam.normalize(1920, 1208);
+  cam.testMapPoly();
+  cam.testReproject();
+
   cv::namedWindow(winname, cv::WINDOW_KEEPRATIO);
   cv::resizeWindow(winname, 1280, 800);
   cv::moveWindow(winname, 200, 200);
 
-  DsoSystem dsoSystem;
-
-  for (int it = 1; it <= 1499; ++it) {
+  DsoSystem dsoSystem(cam);
+  for (int it = 7000; it <= 9000; ++it) {
     char str[200];
     // sprintf(str, "../../tests/TUM0/%05d.jpg", it);
     sprintf(str, "../../tests/cam/20180306_avm_drive/video_first/%09d.jpg", it);

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <opencv2/core.hpp>
+#define _USE_MATH_DEFINES
+#include <cmath>
 
 namespace fishdso {
 

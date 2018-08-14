@@ -1,5 +1,6 @@
 #pragma once
 
+#include "cameramodel.h"
 #include "keyframe.h"
 #include <map>
 #include <memory>
@@ -13,7 +14,7 @@ class DsoSystem {
   friend class KeyFrame;
 
 public:
-  DsoSystem();
+  DsoSystem(const CameraModel &cam);
 
   void addKf(cv::Mat frameColored);
   void removeKf();
@@ -29,6 +30,8 @@ private:
 
   // for keyframe point-of-interest detection
   int adaptiveBlockSize;
+
+  CameraModel cam;
 };
 
 } // namespace fishdso
