@@ -9,6 +9,7 @@ include_directories(
     ${CERES_INCLUDE_DIRS}
     ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
+    ${PROJECT_SOURCE_DIR}/thirdparty/relative_pose_solver
 )
 
 set(dso_HEADER_FILES
@@ -18,9 +19,11 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/src/util/settings.h
     ${PROJECT_SOURCE_DIR}/src/frontend/frontend.h
     ${PROJECT_SOURCE_DIR}/src/system/dsosystem.h
+    ${PROJECT_SOURCE_DIR}/src/system/dsoinitializer.h
     ${PROJECT_SOURCE_DIR}/src/system/keyframe.h
     ${PROJECT_SOURCE_DIR}/src/system/interestpoint.h
     ${PROJECT_SOURCE_DIR}/src/system/cameramodel.h
+    ${PROJECT_SOURCE_DIR}/src/system/stereomatcher.h
 )
 
 set(dso_SOURCE_FILES
@@ -28,12 +31,20 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/src/util/util.cpp
     ${PROJECT_SOURCE_DIR}/src/frontend/frontend.cpp
     ${PROJECT_SOURCE_DIR}/src/system/dsosystem.cpp
+    ${PROJECT_SOURCE_DIR}/src/system/dsoinitializer.cpp
     ${PROJECT_SOURCE_DIR}/src/system/keyframe.cpp
     ${PROJECT_SOURCE_DIR}/src/system/interestpoint.cpp
     ${PROJECT_SOURCE_DIR}/src/system/cameramodel.cpp
+    ${PROJECT_SOURCE_DIR}/src/system/stereomatcher.cpp
     ${PROJECT_SOURCE_DIR}/src/main.cpp
 )
 
-add_executable(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES})
+set(essietial_5pt_estimator_SOURCE_FILES
+    ${PROJECT_SOURCE_DIR}/thirdparty/relative_pose_solver/relativeposeestimator_double.cpp
+)
+
+add_executable(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES}
+    ${essietial_5pt_estimator_SOURCE_FILES}
+)
 target_compile_definitions(dso PRIVATE $<$<CONFIG:Debug>:DEBUG>)
 target_link_libraries(dso ${OpenCV_LIBS} ${CERES_LIBRARIES})

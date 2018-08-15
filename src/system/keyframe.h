@@ -10,17 +10,15 @@ namespace fishdso {
 
 class DsoSystem;
 
-class KeyFrame {
+struct KeyFrame {
   friend class DsoSystem;
 
-public:
   KeyFrame(int frameId, cv::Mat frameColored, DsoSystem *dsoSystem);
 
   int getId() const;
   int getCols() const;
   int getRows() const;
 
-private:
   void selectPoints();
 
   int frameId;

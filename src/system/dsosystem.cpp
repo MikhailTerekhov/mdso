@@ -8,13 +8,22 @@
 
 namespace fishdso {
 
-DsoSystem::DsoSystem(const CameraModel &cam)
+DsoSystem::DsoSystem(CameraModel *cam)
     : curFrameId(0), curPointId(0),
-      adaptiveBlockSize(settingInitialAdaptiveBlockSize), cam(cam) {}
+      adaptiveBlockSize(settingInitialAdaptiveBlockSize), cam(cam),
+      dsoInitializer(std::make_unique<DsoInitializer>(this)),
+      isInitialized(false) {}
+
+void DsoSystem::addFrame(const cv::Mat &frame) {
+  if (!isInitialized) {
+    isInitialized = dsoInitializer->addFrame(frame);
+  }
+}
 
 void DsoSystem::addKf(cv::Mat frameColored) {
   keyframes[curFrameId] =
       std::make_unique<KeyFrame>(curFrameId, frameColored, this);
+  curFrameId++;
 }
 
 void DsoSystem::removeKf() {
@@ -30,13 +39,11 @@ void DsoSystem::updateAdaptiveBlockSize(int curPointsDetected) {
 #ifdef DEBUG
 void DsoSystem::showDebug() {
   cv::Mat &lastKf = keyframes.cbegin()->second->frame;
-  cv::Mat frameUndistort, smallUndistort;
+  cv::Mat frameUndistort;
   Mat33 K;
   K << 800, 0, 850, 0, 600, 600, 0, 0, 1;
-  cam.undistort(lastKf, frameUndistort, K);
-  cv::pyrDown(frameUndistort, smallUndistort,
-              cv::Size(frameUndistort.cols / 2, frameUndistort.rows / 2));
-  cv::imshow("debug", smallUndistort);
+  cam->undistort<cv::Scalar>(lastKf, frameUndistort, K);
+  cv::imshow("debug", frameUndistort);
 }
 #else
 void DsoSystem::showDebug() {}

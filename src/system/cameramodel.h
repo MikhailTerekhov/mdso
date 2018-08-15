@@ -2,21 +2,22 @@
 
 #include "../util/settings.h"
 #include "../util/types.h"
+#include "../util/util.h"
 #include <Eigen/Dense>
 #include <ceres/ceres.h>
 #include <opencv2/core.hpp>
+#include <string>
 
 namespace fishdso {
 
 class CameraModel {
+
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  CameraModel();
-  CameraModel(int unmapPolyDeg, const VecX &unmapPolyCoefs, double scale,
-              double maxRadius, const Vec2 &center);
+  CameraModel(int width, int height, const std::string &calibFileName);
 
-  template <typename T> Eigen::Matrix<T, 3, 1> unmap(const T *point) {
+  template <typename T> Eigen::Matrix<T, 3, 1> unmap(const T *point) const {
     typedef Eigen::Matrix<T, 3, 1> Vec3t;
     typedef Eigen::Matrix<T, 2, 1> Vec2t;
     typedef Eigen::Matrix<T, Eigen::Dynamic, 1> VecXt;
@@ -51,7 +52,7 @@ public:
     return res;
   }
 
-  template <typename T> Eigen::Matrix<T, 2, 1> map(const T *point) {
+  template <typename T> Eigen::Matrix<T, 2, 1> map(const T *point) const {
     typedef Eigen::Matrix<T, 3, 1> Vec3t;
     typedef Eigen::Matrix<T, 2, 1> Vec2t;
     typedef Eigen::Matrix<T, Eigen::Dynamic, 1> VecXt;
@@ -99,21 +100,60 @@ public:
 #endif
   }
 
-  friend std::istream &operator>>(std::istream &is, CameraModel &cc);
-
-  void normalize(int imgWidth, int imgHeight);
-
+  template <typename T>
   void undistort(const cv::Mat &img, cv::Mat &result,
-                 const Mat33 &cameraMatrix);
+                 const Mat33 &cameraMatrix) const {
+    result = cv::Mat::zeros(img.rows, img.cols, img.type());
+    double pnt[] = {0, 0};
+    for (int y = 0; y < img.rows; ++y)
+      for (int x = 0; x < img.cols; ++x) {
+        pnt[0] = x;
+        pnt[1] = y;
+        Vec3 newPixelD = cameraMatrix * unmap(pnt);
+        int newX = int(newPixelD[0] / newPixelD[2]);
+        int newY = int(newPixelD[1] / newPixelD[2]);
+        if (newPixelD[2] > 0 && newX >= 0 && newX < result.cols && newY >= 0 &&
+            newY < result.rows)
+          result.at<T>(newY, newX) = img.at<T>(y, x);
+      }
+    fillBlackPixels<T>(result);
+  }
 
-  void testMapPoly();
+  int getWidth() const;
+  int getHeight() const;
+
+  void getRectByAngle(double observeAngle, int &width, int &height) const;
+
+  void setMapPolyCoefs();
+
+  void testMapPoly() const;
   void testReproject();
 
 private:
-  EIGEN_STRONG_INLINE double calcUnmapPoly(double r);
-  EIGEN_STRONG_INLINE double calcMapPoly(double funcVal);
-  void setMapPolyCoefs();
+  friend std::istream &operator>>(std::istream &is, CameraModel &cc);
 
+  EIGEN_STRONG_INLINE double calcUnmapPoly(double r) const {
+    double rN = r * r;
+    double res = unmapPolyCoefs[0];
+    for (int i = 1; i < unmapPolyDeg; ++i) {
+      res += unmapPolyCoefs[i] * rN;
+      rN *= r;
+    }
+    return res;
+  }
+  EIGEN_STRONG_INLINE double calcMapPoly(double funcVal) const {
+    double funcValN = funcVal;
+    double res = mapPolyCoefs[0];
+    for (int i = 1; i < mapPolyCoefs.rows(); ++i) {
+      res += mapPolyCoefs[i] * funcValN;
+      funcValN *= funcVal;
+    }
+    return res;
+  }
+
+  void normalize();
+
+  int width, height;
   int unmapPolyDeg;
   VecX unmapPolyCoefs;
   Vec2 center;
@@ -123,8 +163,6 @@ private:
   double maxAngle;
 
   VecX mapPolyCoefs;
-
-  bool isNormalized;
 };
 
 } // namespace fishdso

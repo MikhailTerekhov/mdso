@@ -1,6 +1,13 @@
 #include "util.h"
-#include <opencv2/core.hpp>
+#include "settings.h"
+#include <Eigen/Eigen>
+#include <RelativePoseEstimator.h>
+#include <algorithm>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/opencv.hpp>
+#include <sophus/se3.hpp>
+#include <sophus/sim3.hpp>
+#include <utility>
 
 namespace fishdso {
 

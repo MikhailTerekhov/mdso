@@ -11,4 +11,7 @@ namespace fishdso {
 #define CV_BLUE cv::Scalar(255, 0, 0)
 #define CV_BLACK cv::Scalar(0, 0, 0)
 
+#define CV_BLACK_BYTE ((unsigned char)0)
+#define CV_WHITE_BYTE ((unsigned char)255)
+
 } // namespace fishdso

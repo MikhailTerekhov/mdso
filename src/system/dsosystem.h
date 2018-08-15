@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cameramodel.h"
+#include "dsoinitializer.h"
 #include "keyframe.h"
 #include <map>
 #include <memory>
@@ -8,14 +9,17 @@
 
 namespace fishdso {
 
-class KeyFrame;
+class DsoInitializer;
+struct KeyFrame;
 
 class DsoSystem {
-  friend class KeyFrame;
+  friend class DsoInitializer;
+  friend struct KeyFrame;
 
 public:
-  DsoSystem(const CameraModel &cam);
+  DsoSystem(CameraModel *cam);
 
+  void addFrame(const cv::Mat &frame);
   void addKf(cv::Mat frameColored);
   void removeKf();
 
@@ -31,7 +35,10 @@ private:
   // for keyframe point-of-interest detection
   int adaptiveBlockSize;
 
-  CameraModel cam;
+  CameraModel *cam;
+
+  std::unique_ptr<DsoInitializer> dsoInitializer;
+  bool isInitialized;
 };
 
 } // namespace fishdso
