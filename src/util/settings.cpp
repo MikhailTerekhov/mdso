@@ -17,8 +17,8 @@ int settingInterestPointsUsed = 2000;
 int settingCameraMapPolyDegree = 10;
 int settingCameraMapPolyPoints = 2000;
 
-double settingInitKeypointsObserveAngle = M_PI_4;
-double settingFeatureMatchThreshold = 4.0;
+double settingInitKeypointsObserveAngle = M_PI / 3;
+double settingFeatureMatchThreshold = 6.0;
 int settingFirstFramesSkip = 2;
 int settingEssentialMinimalSolveN = 5;
 double settingOrbInlierProb = 0.5;

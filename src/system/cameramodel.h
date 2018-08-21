@@ -15,6 +15,8 @@ class CameraModel {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
+  CameraModel(int width, int height, double scale, Vec2 center,
+              VecX unmapPolyCoefs);
   CameraModel(int width, int height, const std::string &calibFileName);
 
   template <typename T> Eigen::Matrix<T, 3, 1> unmap(const T *point) const {

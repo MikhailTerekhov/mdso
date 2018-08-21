@@ -5,6 +5,8 @@ project(dso-fisheye-ceres)
 find_package(Ceres REQUIRED)
 find_package(OpenCV REQUIRED)
 
+add_subdirectory(${PROJECT_SOURCE_DIR}/thirdparty/googletest)
+
 include_directories(
     ${CERES_INCLUDE_DIRS}
     ${PROJECT_SOURCE_DIR}/src
@@ -43,8 +45,11 @@ set(essietial_5pt_estimator_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/thirdparty/relative_pose_solver/relativeposeestimator_double.cpp
 )
 
-add_executable(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES}
+add_library(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES}
     ${essietial_5pt_estimator_SOURCE_FILES}
 )
 target_compile_definitions(dso PRIVATE $<$<CONFIG:Debug>:DEBUG>)
 target_link_libraries(dso ${OpenCV_LIBS} ${CERES_LIBRARIES})
+
+enable_testing()
+add_subdirectory(test)

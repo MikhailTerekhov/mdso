@@ -12,6 +12,14 @@
 
 namespace fishdso {
 
+CameraModel::CameraModel(int width, int height, double scale, Vec2 center,
+                         VecX unmapPolyCoefs)
+    : width(width), height(height), unmapPolyDeg(unmapPolyCoefs.rows()),
+      unmapPolyCoefs(unmapPolyCoefs), center(center), scale(scale) {
+  normalize();
+  setMapPolyCoefs();
+}
+
 CameraModel::CameraModel(int width, int height,
                          const std::string &calibFileName)
     : width(width), height(height) {

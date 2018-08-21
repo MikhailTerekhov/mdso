@@ -1,5 +1,5 @@
 Makefile
-tests/**
+test/data/**
 cmake_install.cmake
 CMakeLists.txt.user
 bin/**
