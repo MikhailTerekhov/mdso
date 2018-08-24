@@ -1,8 +1,8 @@
 #pragma once
 
-#include "cameramodel.h"
-#include "dsoinitializer.h"
-#include "keyframe.h"
+#include "system/cameramodel.h"
+#include "system/dsoinitializer.h"
+#include "system/keyframe.h"
 #include <map>
 #include <memory>
 #include <opencv2/core.hpp>
@@ -25,7 +25,7 @@ public:
 
   void updateAdaptiveBlockSize(int curPointsDetected);
 
-  void showDebug();
+  void showDebug() const;
 
 private:
   std::map<int, std::unique_ptr<KeyFrame>> keyframes;

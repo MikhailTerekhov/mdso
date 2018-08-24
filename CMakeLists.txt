@@ -26,6 +26,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/src/system/interestpoint.h
     ${PROJECT_SOURCE_DIR}/src/system/cameramodel.h
     ${PROJECT_SOURCE_DIR}/src/system/stereomatcher.h
+    ${PROJECT_SOURCE_DIR}/src/system/stereogeometryestimator.h
 )
 
 set(dso_SOURCE_FILES
@@ -38,6 +39,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/src/system/interestpoint.cpp
     ${PROJECT_SOURCE_DIR}/src/system/cameramodel.cpp
     ${PROJECT_SOURCE_DIR}/src/system/stereomatcher.cpp
+    ${PROJECT_SOURCE_DIR}/src/system/stereogeometryestimator.cpp
     ${PROJECT_SOURCE_DIR}/src/main.cpp
 )
 
@@ -50,6 +52,8 @@ add_library(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES}
 )
 target_compile_definitions(dso PRIVATE $<$<CONFIG:Debug>:DEBUG>)
 target_link_libraries(dso ${OpenCV_LIBS} ${CERES_LIBRARIES})
+
+add_subdirectory(stereo)
 
 enable_testing()
 add_subdirectory(test)

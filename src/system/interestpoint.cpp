@@ -1,4 +1,4 @@
-#include "interestpoint.h"
+#include "system/interestpoint.h"
 
 namespace fishdso {
 

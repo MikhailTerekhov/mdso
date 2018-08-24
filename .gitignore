@@ -1,4 +1,5 @@
 Makefile
+*.autosave
 test/data/**
 cmake_install.cmake
 CMakeLists.txt.user

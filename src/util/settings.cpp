@@ -17,13 +17,13 @@ int settingInterestPointsUsed = 2000;
 int settingCameraMapPolyDegree = 10;
 int settingCameraMapPolyPoints = 2000;
 
-double settingInitKeypointsObserveAngle = M_PI / 3;
-double settingFeatureMatchThreshold = 6.0;
-int settingFirstFramesSkip = 2;
-int settingEssentialMinimalSolveN = 5;
+double settingInitKeypointsObserveAngle = M_PI_2;
+float settingMatchNonMove = 9.0;
+int settingFirstFramesSkip = 0;
 double settingOrbInlierProb = 0.5;
 double settingEssentialSuccessProb = 0.999;
-double settingEssentialReprojErrThreshold = 9;
+double settingEssentialReprojErrThreshold = 4.0;
+double settingRemoveResidualsRatio = 0.5;
 
 int settingHalfFillingFilterSize = 1;
 

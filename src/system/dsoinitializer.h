@@ -1,6 +1,6 @@
 #pragma once
-#include "dsosystem.h"
-#include "stereomatcher.h"
+#include "system/dsosystem.h"
+#include "system/stereomatcher.h"
 #include <memory>
 #include <opencv2/opencv.hpp>
 

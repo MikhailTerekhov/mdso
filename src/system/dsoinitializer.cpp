@@ -1,6 +1,6 @@
-#include "dsoinitializer.h"
-#include "../util/defs.h"
-#include "../util/util.h"
+#include "system/dsoinitializer.h"
+#include "util/defs.h"
+#include "util/util.h"
 #include <algorithm>
 #include <opencv2/opencv.hpp>
 

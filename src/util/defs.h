@@ -1,8 +1,7 @@
 #pragma once
 
-#include <opencv2/core.hpp>
-#define _USE_MATH_DEFINES
 #include <cmath>
+#include <opencv2/core.hpp>
 
 namespace fishdso {
 
@@ -11,7 +10,7 @@ namespace fishdso {
 #define CV_BLUE cv::Scalar(255, 0, 0)
 #define CV_BLACK cv::Scalar(0, 0, 0)
 
-#define CV_BLACK_BYTE ((unsigned char)0)
-#define CV_WHITE_BYTE ((unsigned char)255)
+#define CV_BLACK_BYTE static_cast<unsigned char>(0)
+#define CV_WHITE_BYTE static_cast<unsigned char>(255)
 
 } // namespace fishdso

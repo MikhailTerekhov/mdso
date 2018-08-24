@@ -1,8 +1,8 @@
 #include "frontend.h"
 
-#include "../util/defs.h"
-#include "../util/settings.h"
-#include "../util/util.h"
+#include "util/defs.h"
+#include "util/settings.h"
+#include "util/util.h"
 #include <algorithm>
 #include <iostream>
 #include <opencv2/core.hpp>

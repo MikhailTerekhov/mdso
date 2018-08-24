@@ -1,94 +1,141 @@
-#include "stereomatcher.h"
-#include "../util/defs.h"
-#include "../util/settings.h"
+#include "system/stereomatcher.h"
+#include "util/defs.h"
+#include "util/settings.h"
 #include <RelativePoseEstimator.h>
 
 namespace fishdso {
 
 StereoMatcher::StereoMatcher(CameraModel *cam)
     : cam(cam), hasBaseFrame(false), orb(cv::ORB::create()),
-      descriptorMatcher(cv::DescriptorMatcher::create(
-          cv::DescriptorMatcher::BRUTEFORCE_HAMMING)) {
+      descriptorMatcher(
+          std::make_unique<cv::BFMatcher>(cv::NORM_HAMMING, true)) {
   int interestWidth, interestHeight;
   cam->getRectByAngle(settingInitKeypointsObserveAngle, interestWidth,
                       interestHeight);
-  rectOfInterest = cv::Rect((cam->getWidth() - interestWidth) / 2,
-                            (cam->getHeight() - interestHeight) / 2,
-                            interestWidth, interestHeight);
-  descriptorsMask = cv::Mat1b(cam->getHeight(), cam->getWidth(), CV_BLACK_BYTE);
-  cv::rectangle(descriptorsMask, rectOfInterest, CV_WHITE_BYTE, CV_FILLED);
+  Vec2 center = cam->getImgCenter();
+  double radius = cam->getImgRadiusByAngle(settingInitKeypointsObserveAngle);
+  descriptorsMask = cv::Mat1b(cam->getHeight(), cam->getWidth(), CV_WHITE_BYTE);
 }
 
 void fishdso::StereoMatcher::addBaseFrame(const cv::Mat &newBaseFrame) {
   baseFrame = newBaseFrame;
+
   orb->detectAndCompute(baseFrame, descriptorsMask, baseFrameKeyPoints,
                         baseFrameDescriptors);
+  if (baseFrameKeyPoints.empty()) {
+    cv::imshow("base frame", baseFrame);
+    cv::waitKey();
+    throw std::runtime_error("no keypoints detected on the base frame!");
+  }
   hasBaseFrame = true;
 }
 
-void StereoMatcher::createEstimations(const cv::Mat &frame) {
+void filterMatches(std::vector<cv::DMatch> &matches,
+                   std::vector<cv::DMatch> &stillMatches,
+                   const std::vector<cv::KeyPoint> &kp1,
+                   const std::vector<cv::KeyPoint> &kp2) {
+  stillMatches.resize(0);
+  stillMatches.reserve(matches.size());
+
+  int i = 0, j = int(matches.size()) - 1;
+  while (i <= j) {
+    cv::Point2f p1 = kp1[matches[i].trainIdx].pt;
+    cv::Point2f p2 = kp2[matches[i].trainIdx].pt;
+    cv::Point2f diff = p1 - p2;
+    float dist = diff.x * diff.x + diff.y * diff.y;
+    if (dist < settingMatchNonMove) {
+      std::swap(matches[i], matches[j]);
+      stillMatches.push_back(matches[j]);
+      --j;
+    } else {
+      ++i;
+    }
+  }
+
+  std::cout << "still matches removed = " << matches.size() - j - 1
+            << std::endl;
+
+  matches.resize(j + 1);
+}
+
+void StereoMatcher::createEstimations(const cv::Mat &frameColored) {
+  cv::Mat frame = frameColored;
+
   std::vector<cv::KeyPoint> curFrameKeyPoints;
   cv::Mat curFrameDescriptors;
-  orb->detectAndCompute(frame, descriptorsMask, curFrameKeyPoints,
+  orb->detectAndCompute(frame, cv::noArray(), curFrameKeyPoints,
                         curFrameDescriptors);
+  if (curFrameKeyPoints.empty()) {
+    std::cout << "no keypoints detected on the second frame!" << std::endl;
+    cv::imshow("frame", frame);
+  }
+
   std::vector<cv::DMatch> matches;
   descriptorMatcher->match(curFrameDescriptors, baseFrameDescriptors, matches);
 
-  std::sort(matches.begin(), matches.end());
+  if (matches.empty()) {
+    std::cout << "no matches found on these.." << std::endl;
+    cv::imshow("img1", baseFrame);
+    cv::imshow("img2", frame);
+    cv::waitKey();
+    return;
+  }
 
-  while (matches.back().distance >
+  /*while (matches.back().distance >
          settingFeatureMatchThreshold * matches.front().distance)
-    matches.pop_back();
+    matches.pop_back();*/
 
   std::cout << "total matches = " << matches.size() << std::endl;
 
-  cv::drawMatches(frame, curFrameKeyPoints, baseFrame, baseFrameKeyPoints,
-                  matches, dbg);
-  cv::Mat resizedDbg;
-  cv::resize(dbg, resizedDbg, cv::Size(), 0.5, 0.5);
-  cv::imshow("debug", resizedDbg);
+  std::vector<cv::DMatch> stillMatches;
+  filterMatches(matches, stillMatches, baseFrameKeyPoints, curFrameKeyPoints);
 
-  std::vector<std::pair<Vec3, Vec3>> rays;
-  std::vector<std::pair<Vec2, Vec2>> projectedRays;
-  rays.reserve(matches.size());
-  projectedRays.reserve(matches.size());
+  cv::Mat stillImg, stillImgHalfed;
+  cv::drawMatches(baseFrame, baseFrameKeyPoints, frame, curFrameKeyPoints,
+                  stillMatches, stillImg);
+  cv::resize(stillImg, stillImgHalfed, cv::Size(), 0.5, 0.5);
+  cv::imshow("still", stillImgHalfed);
+
+  std::vector<std::pair<Vec2, Vec2>> imgCorresps;
+  imgCorresps.reserve(matches.size());
   Vec2 baseFramePtVec, curFramePtVec;
-  Vec3 baseFrameRay, curFrameRay;
-  for (int i = 0; i < matches.size(); ++i) {
+  for (int i = 0; i < int(matches.size()); ++i) {
     cv::Point2f baseFramePt = baseFrameKeyPoints[matches[i].trainIdx].pt;
     cv::Point2f curFramePt = curFrameKeyPoints[matches[i].queryIdx].pt;
 
-    baseFramePtVec[0] = baseFramePt.x;
-    baseFramePtVec[1] = baseFramePt.y;
-    curFramePtVec[0] = curFramePt.x;
-    curFramePtVec[1] = curFramePt.y;
+    baseFramePtVec[0] = double(baseFramePt.x);
+    baseFramePtVec[1] = double(baseFramePt.y);
+    curFramePtVec[0] = double(curFramePt.x);
+    curFramePtVec[1] = double(curFramePt.y);
 
-    baseFrameRay = cam->unmap(baseFramePtVec.data());
-    curFrameRay = cam->unmap(curFramePtVec.data());
-
-    projectedRays.push_back({baseFramePtVec, curFramePtVec});
-    rays.push_back({baseFrameRay, curFrameRay});
+    imgCorresps.push_back({baseFramePtVec, curFramePtVec});
   }
 
-  std::vector<char> inliersMask;
-  SE3 motion = estimateMotion(rays, projectedRays, inliersMask);
+  geometryEstimator =
+      std::make_unique<StereoGeometryEstimator>(cam, imgCorresps);
+  SE3 motion = geometryEstimator->findPreciseMotion();
+  auto inliersMask = geometryEstimator->getInliersMask();
 
-  std::cout << "R =\n"
-            << motion.rotationMatrix()
-            << "\nt = " << motion.translation().transpose()
-            << "\nquat = " << motion.unit_quaternion().w() << " + ("
-            << motion.unit_quaternion().vec().transpose() << ")\n";
+  //  std::cout << "R =\n"
+  //            << motion.rotationMatrix()
+  //            << "\nt = " << motion.translation().transpose()
+  //            << "\nquat = " << motion.unit_quaternion().w() << " + ("
+  //            << motion.unit_quaternion().vec().transpose() << ")\n";
 
-  std::cout << "rotation angle = "
-            << 2 * std::acos((motion.unit_quaternion().w()));
+  //  std::cout << "rotation angle = "
+  //            << 2 * std::acos((motion.unit_quaternion().w()));
 
   std::vector<cv::DMatch> myGoodMatches;
   myGoodMatches.reserve(matches.size());
-  for (int i = 0; i < matches.size(); ++i)
+  for (int i = 0; i < int(matches.size()); ++i)
     if (inliersMask[i])
       myGoodMatches.push_back(matches[i]);
 
   std::cout << "inlier matches = " << myGoodMatches.size() << std::endl;
+
+  std::cout << "translation found = " << motion.translation().transpose()
+            << "\nquaternion = "
+            << motion.unit_quaternion().coeffs().transpose() << std::endl;
 
   cv::Mat myMatchesDrawn;
   cv::drawMatches(frame, curFrameKeyPoints, baseFrame, baseFrameKeyPoints,
@@ -98,157 +145,6 @@ void StereoMatcher::createEstimations(const cv::Mat &frame) {
   cv::imshow("inlier matches", myMatchesResized);
 
   cv::waitKey();
-}
-
-EIGEN_STRONG_INLINE int StereoMatcher::findInliers(
-    const Mat33 &E, const std::vector<std::pair<Vec3, Vec3>> &rays,
-    const std::vector<std::pair<Vec2, Vec2>> &projectedRays,
-    std::vector<char> &inliersMask) {
-  int result = 0;
-  Mat33 Et = E.transpose();
-  Vec3 norm1, norm2;
-  for (int i = 0; i < rays.size(); ++i) {
-    auto r = rays[i];
-    const auto &pr = projectedRays[i];
-    norm1 = Et * r.second;
-    norm2 = E * r.first;
-    if (norm1.squaredNorm() > 1e-4)
-      r.first -= (r.first.dot(norm1) / norm1.squaredNorm()) * norm1;
-    if (norm2.squaredNorm() > 1e-4)
-      r.second -= (r.second.dot(norm2) / norm2.squaredNorm()) * norm2;
-
-    double err1 = (cam->map(r.first.data()) - pr.first).squaredNorm();
-    double err2 = (cam->map(r.second.data()) - pr.second).squaredNorm();
-    if (std::min(err1, err2) < settingEssentialReprojErrThreshold) {
-      ++result;
-      inliersMask[i] = true;
-    } else {
-      inliersMask[i] = false;
-    }
-  }
-  return result;
-}
-
-EIGEN_STRONG_INLINE SE3 StereoMatcher::extractMotion(
-    const Mat33 &E, const std::vector<std::pair<Vec3, Vec3>> &rays,
-    std::vector<char> &inliersMask, int &newInliers) {
-  Eigen::JacobiSVD<Mat33> svdE(E, Eigen::ComputeFullU | Eigen::ComputeFullV);
-  Mat33 U = svdE.matrixU();
-  Mat33 V = svdE.matrixV();
-
-  U *= U.determinant();
-  V *= V.determinant();
-
-  Vec3 t = U.block<3, 1>(0, 2);
-  Mat33 W;
-  W << 0, -1, 0, 1, 0, 0, 0, 0, 1;
-
-  Mat33 R1 = U * W * V.transpose();
-  Mat33 R2 = U * W.transpose() * V.transpose();
-
-  SE3 solutions[4] = {SE3(R1, t), SE3(R1, -t), SE3(R2, t), SE3(R2, -t)};
-
-  Mat33 tCross;
-  tCross << 0, -t[2], t[1], t[2], 0, -t[0], -t[1], t[0], 0;
-
-  int bestFrontPointsNum = 0;
-  SE3 bestSol;
-  std::vector<char> bestInliersMask(inliersMask.size());
-  std::vector<char> curInliersMask(inliersMask.size());
-  for (SE3 sol : solutions) {
-    int curFrontPointsNum = 0;
-    for (int i = 0; i < rays.size(); ++i) {
-      if (!inliersMask[i])
-        continue;
-      Mat32 A;
-      A.block<3, 1>(0, 0) = sol.so3() * rays[i].first;
-      A.block<3, 1>(0, 1) = -rays[i].second;
-
-      Vec2 coefs = A.fullPivHouseholderQr().solve(-sol.translation());
-      //      std::cout << "err = " << (A * coefs + sol.translation()).norm()
-      //                << std::endl;
-      if (coefs[0] > 0 && coefs[1] > 0) {
-        ++curFrontPointsNum;
-        curInliersMask[i] = true;
-      } else {
-        curInliersMask[i] = false;
-      }
-    }
-    if (curFrontPointsNum > bestFrontPointsNum) {
-      bestFrontPointsNum = curFrontPointsNum;
-      bestSol = sol;
-      std::swap(curInliersMask, bestInliersMask);
-    }
-  }
-  std::swap(inliersMask, bestInliersMask);
-  newInliers = bestFrontPointsNum;
-  return bestSol;
-}
-
-SE3 StereoMatcher::estimateMotion(
-    std::vector<std::pair<Vec3, Vec3>> &rays,
-    const std::vector<std::pair<Vec2, Vec2>> &projectedRays,
-    std::vector<char> &inliersMask) {
-
-  static relative_pose::GeneralizedCentralRelativePoseEstimator<double> est;
-  const int N = settingEssentialMinimalSolveN;
-  const double p = settingEssentialSuccessProb;
-  double q = settingOrbInlierProb;
-
-  SE3 bestMotion;
-
-  int hypotesisInd[N];
-  std::pair<Vec3 *, Vec3 *> hypotesis[N];
-  Mat33 results[10];
-  int bestInliers = -1;
-  int iterNum = int(std::log(1 - p) / std::log(1 - std::pow(q, N)));
-  for (int it = 0; it < iterNum; ++it) {
-    for (int i = 0; i < N; ++i)
-      hypotesisInd[i] = rand() % rays.size();
-    std::sort(hypotesisInd, hypotesisInd + N);
-    bool isRepeated = false;
-    for (int i = 0; i + 1 < N; ++i)
-      if (hypotesisInd[i] == hypotesisInd[i + 1])
-        isRepeated = true;
-    if (isRepeated)
-      continue;
-    for (int i = 0; i < N; ++i)
-      hypotesis[i] = std::make_pair<Vec3 *, Vec3 *>(
-          &rays[hypotesisInd[i]].first, &rays[hypotesisInd[i]].second);
-
-    int foundN = est.estimate(hypotesis, N, results);
-    int maxInliers = 0, maxInliersInd = 0;
-
-    //    std::cout << "resulting norms = ";
-    //    for (int i = 0; i < foundN; ++i)
-    //      std::cout << results[i].norm() << ' ';
-    //    std::cout << std::endl;
-
-    std::vector<char> curInliersMask(rays.size()), bestInliersMask(rays.size());
-    for (int i = 0; i < foundN; ++i) {
-      int inliers =
-          findInliers(results[i], rays, projectedRays, curInliersMask);
-      if (inliers > maxInliers) {
-        maxInliers = inliers;
-        maxInliersInd = i;
-        std::swap(bestInliersMask, curInliersMask);
-      }
-    }
-    SE3 curMotion = extractMotion(results[maxInliersInd], rays, bestInliersMask,
-                                  maxInliers);
-    if (bestInliers < maxInliers) {
-      bestInliers = maxInliers;
-      bestMotion = curMotion;
-      std::swap(inliersMask, bestInliersMask);
-    }
-
-    if (q < double(maxInliers) / rays.size()) {
-      q = double(maxInliers) / rays.size();
-      iterNum = int(std::log(1 - p) / std::log(1 - std::pow(q, N)));
-    }
-  }
-
-  return bestMotion;
 }
 
 } // namespace fishdso

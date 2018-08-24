@@ -1,5 +1,5 @@
-#include "dsosystem.h"
-#include "../util/settings.h"
+#include "system/dsosystem.h"
+#include "util/settings.h"
 
 #ifdef DEBUG
 #include <opencv2/highgui/highgui.hpp>
@@ -20,24 +20,13 @@ void DsoSystem::addFrame(const cv::Mat &frame) {
   }
 }
 
-void DsoSystem::addKf(cv::Mat frameColored) {
-  keyframes[curFrameId] =
-      std::make_unique<KeyFrame>(curFrameId, frameColored, this);
-  curFrameId++;
-}
-
-void DsoSystem::removeKf() {
-  if (!keyframes.empty())
-    keyframes.erase(keyframes.begin());
-}
-
 void DsoSystem::updateAdaptiveBlockSize(int curPointsDetected) {
-  adaptiveBlockSize *=
-      std::sqrt((double)curPointsDetected / settingInterestPointsAdaptTo);
+  adaptiveBlockSize *= std::sqrt(static_cast<double>(curPointsDetected) /
+                                 settingInterestPointsAdaptTo);
 }
 
 #ifdef DEBUG
-void DsoSystem::showDebug() {
+void DsoSystem::showDebug() const {
   cv::Mat &lastKf = keyframes.cbegin()->second->frame;
   cv::Mat frameUndistort;
   Mat33 K;
@@ -46,7 +35,7 @@ void DsoSystem::showDebug() {
   cv::imshow("debug", frameUndistort);
 }
 #else
-void DsoSystem::showDebug() {}
+void DsoSystem::showDebug() const {}
 #endif
 
 } // namespace fishdso

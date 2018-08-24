@@ -1,9 +1,9 @@
-#include "keyframe.h"
-#include "../frontend/frontend.h"
-#include "../util/defs.h"
-#include "../util/settings.h"
-#include "../util/util.h"
-#include "interestpoint.h"
+#include "system/keyframe.h"
+#include "frontend/frontend.h"
+#include "system/interestpoint.h"
+#include "util/defs.h"
+#include "util/settings.h"
+#include "util/util.h"
 #include <opencv2/opencv.hpp>
 
 namespace fishdso {
@@ -29,22 +29,23 @@ void KeyFrame::selectPoints() {
   int i1 = 0, i2 = 0, i3 = 0, i = 0;
   int &curPointId = dsoSystem->curPointId;
   while (i < settingInterestPointsUsed) {
-    if (i1 < cands1.size()) {
+    if (i1 < int(cands1.size())) {
       interestPoints[curPointId++] =
           std::make_unique<InterestPoint>(cands1[i1++]);
       i++;
     }
-    if (i2 < cands2.size() && i < settingInterestPointsUsed) {
+    if (i2 < int(cands2.size()) && i < settingInterestPointsUsed) {
       interestPoints[curPointId++] =
           std::make_unique<InterestPoint>(cands2[i2++]);
       i++;
     }
-    if (i3 < cands3.size() && i < settingInterestPointsUsed) {
+    if (i3 < int(cands3.size()) && i < settingInterestPointsUsed) {
       interestPoints[curPointId++] =
           std::make_unique<InterestPoint>(cands3[i3++]);
       i++;
     }
-    if (i1 == cands1.size() && i2 == cands2.size() && i3 == cands3.size())
+    if (i1 == int(cands1.size()) && i2 == int(cands2.size()) &&
+        i3 == int(cands3.size()))
       break;
   }
 

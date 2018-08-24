@@ -1,7 +1,7 @@
 #pragma once
 
-#include "dsosystem.h"
-#include "interestpoint.h"
+#include "system/dsosystem.h"
+#include "system/interestpoint.h"
 #include <map>
 #include <memory>
 #include <opencv2/core.hpp>

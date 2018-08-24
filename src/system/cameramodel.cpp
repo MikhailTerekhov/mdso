@@ -1,7 +1,7 @@
-#include "cameramodel.h"
-#include "../util/defs.h"
-#include "../util/settings.h"
-#include "../util/types.h"
+#include "system/cameramodel.h"
+#include "util/defs.h"
+#include "util/settings.h"
+#include "util/types.h"
 #include <algorithm>
 #include <ceres/ceres.h>
 #include <fstream>
@@ -13,34 +13,44 @@
 namespace fishdso {
 
 CameraModel::CameraModel(int width, int height, double scale, Vec2 center,
-                         VecX unmapPolyCoefs)
-    : width(width), height(height), unmapPolyDeg(unmapPolyCoefs.rows()),
-      unmapPolyCoefs(unmapPolyCoefs), center(center), scale(scale) {
+                         VecX unmapPolyCoeffs)
+    : width(width), height(height), unmapPolyDeg(unmapPolyCoeffs.rows()),
+      unmapPolyCoeffs(unmapPolyCoeffs), center(center), scale(scale) {
   normalize();
-  setMapPolyCoefs();
+  setMapPolyCoeffs();
 }
 
 CameraModel::CameraModel(int width, int height,
                          const std::string &calibFileName)
     : width(width), height(height) {
   std::ifstream ifs(calibFileName, std::ifstream::in);
+  if (!ifs.is_open()) {
+    throw std::runtime_error("camera model file could not be open!");
+  }
   ifs >> *this;
   normalize();
-  setMapPolyCoefs();
+  setMapPolyCoeffs();
 }
 
 int CameraModel::getWidth() const { return width; }
 
 int CameraModel::getHeight() const { return height; }
 
+Vec2 CameraModel::getImgCenter() const { return center * scale; }
+
 void CameraModel::normalize() {
-  double newScale = std::hypot(width, height) / 2;
+  double wd = width, hd = height;
+  Vec2 imcenter = center * scale;
+  double cornersDist[] = {
+      (Vec2(0, 0) - imcenter).norm(), (Vec2(wd, 0) - imcenter).norm(),
+      (Vec2(0, hd) - imcenter).norm(), (Vec2(wd, hd) - imcenter).norm()};
+  double newScale = *std::max_element(cornersDist, cornersDist + 4);
   double s = newScale / scale;
   double sK = scale / newScale;
-  unmapPolyCoefs[0] *= sK;
+  unmapPolyCoeffs[0] *= sK;
   sK = s;
   for (int i = 1; i < unmapPolyDeg; ++i) {
-    unmapPolyCoefs[i] *= sK;
+    unmapPolyCoeffs[i] *= sK;
     sK *= s;
   }
   center /= s;
@@ -51,15 +61,15 @@ void CameraModel::normalize() {
   maxAngle = std::atan2(maxRadius, minZUnnorm);
 }
 
+double CameraModel::getImgRadiusByAngle(double observeAngle) const {
+  return scale * calcMapPoly(observeAngle);
+}
+
 void CameraModel::getRectByAngle(double observeAngle, int &retWidth,
                                  int &retHeight) const {
-#if CAMERA_MAP_TYPE == CAMERA_MAP_POLYNOMIAL_ANGLE
   double r = calcMapPoly(observeAngle);
   retWidth = int(r * width / maxRadius);
   retHeight = int(r * height / maxRadius);
-#else
-  thow std::runtime_error("getRectByAngle with wrong map type!");
-#endif
 }
 
 std::istream &operator>>(std::istream &is, CameraModel &cc) {
@@ -69,10 +79,10 @@ std::istream &operator>>(std::istream &is, CameraModel &cc) {
     throw std::runtime_error("Invalid camera type");
 
   is >> cc.scale >> cc.center[0] >> cc.center[1] >> cc.unmapPolyDeg;
-  cc.unmapPolyCoefs.resize(cc.unmapPolyDeg, 1);
+  cc.unmapPolyCoeffs.resize(cc.unmapPolyDeg, 1);
 
   for (int i = 0; i < cc.unmapPolyDeg; ++i)
-    is >> cc.unmapPolyCoefs[i];
+    is >> cc.unmapPolyCoeffs[i];
 
   cc.maxRadius = 2;
   double minZUnnorm = cc.calcUnmapPoly(cc.maxRadius);
@@ -80,7 +90,7 @@ std::istream &operator>>(std::istream &is, CameraModel &cc) {
   return is;
 }
 
-void CameraModel::setMapPolyCoefs() {
+void CameraModel::setMapPolyCoeffs() {
   // points of type (\tilde{z}, r), where r stands for scaled radius of a point
   // in the image and \tilde{z} stands for z-coordinate of the normalized
   // unprojected ray
@@ -91,27 +101,6 @@ void CameraModel::setMapPolyCoefs() {
   std::mt19937 gen;
   std::uniform_real_distribution<> distr(0, maxRadius);
 
-#if CAMERA_MAP_TYPE == CAMERA_MAP_POLYNOMIAL_Z
-  for (int it = 0; it < nPnts; ++it) {
-    double r = distr(gen);
-    // double r = maxRadius;
-    double z = calcUnmapPoly(r);
-
-    double abs = std::hypot(r, z);
-    if (abs > 1e-3)
-      funcGraph.push_back(Vec2(r, z / abs));
-    else
-      funcGraph.push_back(Vec2(0, 1));
-  }
-
-  std::sort(funcGraph.begin(), funcGraph.end(),
-            [](Vec2 a, Vec2 b) { return a[0] < b[0]; });
-
-  for (int i = 0; i < funcGraph.size() - 1; ++i)
-    if (funcGraph[i][1] < funcGraph[i + 1][1])
-      throw std::runtime_error(
-          "the camera unmapping polynomial (r -> zNorm) is not decreasing!");
-#elif CAMERA_MAP_TYPE == CAMERA_MAP_POLYNOMIAL_ANGLE
   for (int it = 0; it < nPnts; ++it) {
     double r = distr(gen);
     // double r = maxRadius;
@@ -123,11 +112,10 @@ void CameraModel::setMapPolyCoefs() {
   std::sort(funcGraph.begin(), funcGraph.end(),
             [](Vec2 a, Vec2 b) { return a[0] < b[0]; });
 
-  for (int i = 0; i < funcGraph.size() - 1; ++i)
+  for (int i = 0; i < int(funcGraph.size()) - 1; ++i)
     if (funcGraph[i][1] > funcGraph[i + 1][1])
       throw std::runtime_error(
           "the camera unmapping polynomial (r -> angle) is not increasing!");
-#endif
 
   // solving linear least-squares to approximate func^(-1) with a polynomial
   MatXX A(nPnts, deg + 1);
@@ -147,61 +135,11 @@ void CameraModel::setMapPolyCoefs() {
   //  std::ofstream fb("b" + std::to_string(deg) + ".bin");
   //  fb.write((const char *)b.data(), b.rows() * b.cols() * sizeof(double));
 
-  mapPolyCoefs = A.fullPivHouseholderQr().solve(b);
+  mapPolyCoeffs = A.fullPivHouseholderQr().solve(b);
 
   //  std::ofstream fx("x" + std::to_string(deg) + ".bin");
-  //  fx.write((const char *)mapPolyCoefs.data(),
-  //           mapPolyCoefs.rows() * mapPolyCoefs.cols() * sizeof(double));
-}
-
-void CameraModel::testMapPoly() const {
-  const int testnum = 200;
-  double sqErr = 0.0;
-  std::mt19937 gen;
-  std::uniform_real_distribution<> distr(0, maxRadius);
-
-#if CAMERA_MAP_TYPE == CAMERA_MAP_POLYNOMIAL_Z
-  for (int i = 0; i < testnum; ++i) {
-    double r = distr(gen);
-    double zUnnorm = calcUnmapPoly(r);
-    double z = zUnnorm / std::hypot(r, zUnnorm);
-    double rBack = calcMapPoly(z);
-    sqErr += (r - rBack) * (r - rBack);
-  }
-#elif CAMERA_MAP_TYPE == CAMERA_MAP_POLYNOMIAL_ANGLE
-  for (int i = 0; i < testnum; ++i) {
-    double r = distr(gen);
-    double zUnnorm = calcUnmapPoly(r);
-    double angle = std::atan2(r, zUnnorm);
-    double rBack = calcMapPoly(angle);
-    sqErr += (r - rBack) * (r - rBack);
-  }
-#endif
-  std::cout << std::sqrt(sqErr / testnum) << " coefs = ";
-  for (int i = 0; i < mapPolyCoefs.rows(); ++i)
-    std::cout << mapPolyCoefs[i] << ' ';
-  std::cout << std::endl;
-}
-
-void CameraModel::testReproject() {
-  const int testnum = 2000;
-  int width = 1920, height = 1208;
-  double sqErr = 0.0;
-
-  for (int i = 0; i < testnum; ++i) {
-    Vec2 pnt(double(rand() % width), double(rand() % height));
-    Vec3 ray = unmap(pnt.data());
-    ray *= 10.5;
-
-    Vec2 pntBack = map(ray.data());
-    sqErr += (pnt - pntBack).squaredNorm();
-  }
-  //  std::cout << "reproject rmse (pix) = " << std::sqrt(sqErr / testnum)
-  //            << std::endl;
-  std::cout << std::sqrt(sqErr / testnum) << "; coefs = ";
-  for (int i = 0; i < mapPolyCoefs.rows(); ++i)
-    std::cout << mapPolyCoefs[i] << ' ';
-  std::cout << std::endl;
+  //  fx.write((const char *)mapPolyCoeffs.data(),
+  //           mapPolyCoeffs.rows() * mapPolyCoeffs.cols() * sizeof(double));
 }
 
 } // namespace fishdso
