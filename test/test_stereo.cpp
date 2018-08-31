@@ -102,9 +102,7 @@ TEST_F(StereoPositioningTest, RandomPointsCoarse) {
     //              std::endl;
     double transErrAngle = std::acos(
         mot.translation().normalized().dot(result.translation().normalized()));
-    double relRotAngle =
-        2 *
-        std::acos((mot.so3().inverse() * result.so3()).unit_quaternion().w());
+    double relRotAngle = (mot.so3().inverse() * result.so3()).log().norm();
     relRotAngle = std::min(relRotAngle, 2 * M_PI - relRotAngle);
     std::cout << "errs = " << transErrAngle * (180.0 / M_PI) << ' '
               << relRotAngle * (180.0 / M_PI) << "; "
@@ -207,9 +205,7 @@ TEST_F(StereoPositioningTest, RandomPointsPrecise) {
     //              std::endl;
     double transErrAngle = std::acos(
         mot.translation().normalized().dot(result.translation().normalized()));
-    double relRotAngle =
-        2 *
-        std::acos((mot.so3().inverse() * result.so3()).unit_quaternion().w());
+    double relRotAngle = (mot.so3().inverse() * result.so3()).log().norm();
     relRotAngle = std::min(relRotAngle, 2 * M_PI - relRotAngle);
     //    std::cout << "errs = " << transErrAngle * (180.0 / M_PI) << ' '
     //              << relRotAngle * (180.0 / M_PI) << ' '

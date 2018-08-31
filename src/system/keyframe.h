@@ -1,36 +1,32 @@
 #pragma once
 
-#include "system/dsosystem.h"
 #include "system/interestpoint.h"
-#include <map>
+#include "util/settings.h"
 #include <memory>
 #include <opencv2/core.hpp>
+#include <vector>
 
 namespace fishdso {
 
-class DsoSystem;
-
 struct KeyFrame {
-  friend class DsoSystem;
+  static constexpr int L = settingInterestPointLayers;
+  static int adaptiveBlockSize;
 
-  KeyFrame(int frameId, cv::Mat frameColored, DsoSystem *dsoSystem);
+  KeyFrame(const cv::Mat &frameColored);
 
-  int getId() const;
-  int getCols() const;
-  int getRows() const;
-
-  void selectPoints();
-
-  int frameId;
   cv::Mat frame;
   cv::Mat frameColored;
   cv::Mat gradX, gradY, gradNorm;
-  DsoSystem *dsoSystem;
-  std::map<int, std::unique_ptr<InterestPoint>> interestPoints;
+  std::vector<InterestPoint> interestPoints;
 
 #ifdef DEBUG
   cv::Mat frameWithPoints;
 #endif
+
+private:
+  static void updateAdaptiveBlockSize(int pointsFound);
+
+  void selectPoints();
 };
 
 } // namespace fishdso

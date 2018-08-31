@@ -1,28 +1,36 @@
 #pragma once
-#include "system/dsosystem.h"
+#include "system/keyframe.h"
 #include "system/stereomatcher.h"
 #include <memory>
 #include <opencv2/opencv.hpp>
 
 namespace fishdso {
 
-class DsoSystem;
 class CameraModel;
 
 class DsoInitializer {
 public:
-  DsoInitializer(DsoSystem *dsoSystem);
+  enum InterpolationType { NORMAL, PLAIN };
+  enum DebugOutputType { NO_DEBUG, SPARSE_DEPTHS, FILLED_DEPTHS };
+
+  DsoInitializer(CameraModel *cam);
 
   // returns true if initialization is completed
   bool addFrame(const cv::Mat &frame);
 
+  std::vector<KeyFrame> createKeyFrames(DebugOutputType debugOutputType);
+
 private:
   void addFirstFrame(const cv::Mat &frame);
+  std::vector<KeyFrame>
+  createKeyFramesFromStereo(InterpolationType interpolationType,
+                            DebugOutputType debugOutputType);
 
-  DsoSystem *dsoSystem;
-  std::unique_ptr<StereoMatcher> stereoMatcher;
+  CameraModel *cam;
+  StereoMatcher stereoMatcher;
   bool hasFirstFrame;
   int framesSkipped;
+  cv::Mat frames[2];
 };
 
 } // namespace fishdso

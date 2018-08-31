@@ -13,6 +13,8 @@ public:
   SE3 findPreciseMotion();
 
   const std::vector<char> &getInliersMask() const;
+  const std::vector<std::pair<double, double>> &depths();
+  int getInliersNum();
 
 private:
   struct ReprojectionResidual {
@@ -70,19 +72,20 @@ private:
     Vec2 pMapped, qMapped;
   };
 
-  int findInliers(const Mat33 &E, std::vector<char> &inliersMask);
+  int findInliersEssential(const Mat33 &E, std::vector<char> &inliersMask);
+  int findInliersMotion(const SE3 &motion, std::vector<char> &inliersMask);
+
   SE3 extractMotion(const Mat33 &E, std::vector<char> &inliersMask,
                     int &newInliers);
-
-  SE3 estimateMotion();
 
   CameraModel *cam;
   std::vector<std::pair<Vec2, Vec2>> imgCorresps;
   std::vector<std::pair<Vec3, Vec3>> rays;
+  std::vector<std::pair<double, double>> _depths;
   std::vector<char> inliersMask;
   SE3 motion;
   int inliersNum;
-  bool coarseFound, preciseFound;
+  bool coarseFound, preciseFound, depthsEvaluated;
 };
 
 } // namespace fishdso

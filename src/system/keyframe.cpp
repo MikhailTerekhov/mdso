@@ -1,6 +1,4 @@
 #include "system/keyframe.h"
-#include "frontend/frontend.h"
-#include "system/interestpoint.h"
 #include "util/defs.h"
 #include "util/settings.h"
 #include "util/util.h"
@@ -8,8 +6,9 @@
 
 namespace fishdso {
 
-KeyFrame::KeyFrame(int frameId, cv::Mat frameColored, DsoSystem *dsoSystem)
-    : frameId(frameId), frameColored(frameColored), dsoSystem(dsoSystem) {
+int KeyFrame::adaptiveBlockSize = settingInitialAdaptiveBlockSize;
+
+KeyFrame::KeyFrame(const cv::Mat &frameColored) : frameColored(frameColored) {
 
   cv::cvtColor(frameColored, frame, cv::COLOR_BGR2GRAY);
   grad(frame, gradX, gradY, gradNorm);
@@ -17,63 +16,66 @@ KeyFrame::KeyFrame(int frameId, cv::Mat frameColored, DsoSystem *dsoSystem)
   selectPoints();
 }
 
-void KeyFrame::selectPoints() {
-  std::vector<cv::Point> cands1, cands2, cands3;
-  selectCandidatePoints(gradNorm, dsoSystem->adaptiveBlockSize, cands1, cands2,
-                        cands3);
-  dsoSystem->updateAdaptiveBlockSize(cands1.size() + cands2.size() +
-                                     cands3.size());
-  std::random_shuffle(cands1.begin(), cands1.end());
-  std::random_shuffle(cands2.begin(), cands2.end());
-  std::random_shuffle(cands3.begin(), cands3.end());
-  int i1 = 0, i2 = 0, i3 = 0, i = 0;
-  int &curPointId = dsoSystem->curPointId;
-  while (i < settingInterestPointsUsed) {
-    if (i1 < int(cands1.size())) {
-      interestPoints[curPointId++] =
-          std::make_unique<InterestPoint>(cands1[i1++]);
-      i++;
-    }
-    if (i2 < int(cands2.size()) && i < settingInterestPointsUsed) {
-      interestPoints[curPointId++] =
-          std::make_unique<InterestPoint>(cands2[i2++]);
-      i++;
-    }
-    if (i3 < int(cands3.size()) && i < settingInterestPointsUsed) {
-      interestPoints[curPointId++] =
-          std::make_unique<InterestPoint>(cands3[i3++]);
-      i++;
-    }
-    if (i1 == int(cands1.size()) && i2 == int(cands2.size()) &&
-        i3 == int(cands3.size()))
-      break;
-  }
-
-#ifdef DEBUG
-  char msg[500];
-  sprintf(msg,
-          "total pnt = %lu, 1's = %lu, 2's = %lu, 3's = %lu; block size = %i",
-          cands1.size() + cands2.size() + cands3.size(), cands1.size(),
-          cands2.size(), cands3.size(), dsoSystem->adaptiveBlockSize);
-  cands1.resize(i1);
-  cands2.resize(i2);
-  cands3.resize(i3);
-  frameWithPoints = frameColored.clone();
-  cv::putText(frameWithPoints, msg, cv::Point(200, 200),
-              cv::FONT_HERSHEY_SIMPLEX, 1, CV_BLACK, 3);
-  for (cv::Point p : cands1)
-    putDot(frameWithPoints, p, CV_GREEN);
-  for (cv::Point p : cands2)
-    putDot(frameWithPoints, p, CV_BLUE);
-  for (cv::Point p : cands3)
-    putDot(frameWithPoints, p, CV_RED);
-#endif
+void KeyFrame::updateAdaptiveBlockSize(int pointsFound) {
+  adaptiveBlockSize *= std::sqrt(static_cast<double>(pointsFound) /
+                                 settingInterestPointsAdaptTo);
 }
 
-int KeyFrame::getId() const { return frameId; }
+void selectInterestPointsInternal(const cv::Mat &gradNorm, int selBlockSize,
+                                  double threshold,
+                                  std::vector<cv::Point> &res) {
+  for (int i = 0; i + selBlockSize < gradNorm.rows; i += selBlockSize)
+    for (int j = 0; j + selBlockSize < gradNorm.cols; j += selBlockSize) {
+      cv::Mat block = gradNorm(cv::Range(i, i + selBlockSize),
+                               cv::Range(j, j + selBlockSize));
+      double avg = cv::sum(block)[0] / (selBlockSize * selBlockSize);
+      double mx = 0;
+      cv::Point maxLoc = cv::Point(0, 0);
+      cv::minMaxLoc(block, NULL, &mx, NULL, &maxLoc);
+      if (mx > avg + threshold)
+        res.push_back(cv::Point(j, i) + maxLoc);
+    }
+}
 
-int KeyFrame::getCols() const { return frame.cols; }
+void KeyFrame::selectPoints() {
+  std::vector<cv::Point> pointsOverThres[L];
+  std::vector<cv::Point> pointsAll;
 
-int KeyFrame::getRows() const { return frame.rows; }
+  for (int i = 0; i < L; ++i)
+    pointsOverThres[i].reserve(settingInterestPointsAdaptTo);
+
+  for (int i = 0; i < L; ++i) {
+    selectInterestPointsInternal(gradNorm,
+                                 (1 << i) * settingInitialAdaptiveBlockSize,
+                                 settingGradThreshold[i], pointsOverThres[i]);
+    std::random_shuffle(pointsOverThres[i].begin(), pointsOverThres[i].end());
+  }
+
+  int foundTotal = std::accumulate(
+      pointsOverThres, pointsOverThres + L, pointsOverThres[0].size(),
+      [](int accumulated, const std::vector<cv::Point> &b) {
+        return accumulated + b.size();
+      });
+
+  if (foundTotal > settingInterestPointsUsed) {
+    int sz = 0;
+    for (int i = 1; i < L; ++i) {
+      pointsOverThres[i].resize(pointsOverThres[i].size() *
+                                settingInterestPointsUsed / foundTotal);
+      sz += pointsOverThres[i].size();
+    }
+    pointsOverThres[0].resize(settingInterestPointsUsed - sz);
+  }
+
+  for (int curL = 0; curL < L; ++curL)
+    for (cv::Point p : pointsOverThres[curL]) {
+      InterestPoint newIP;
+      newIP.p = toVec2(p);
+      newIP.depth = -1;
+      interestPoints.push_back(newIP);
+    }
+
+  updateAdaptiveBlockSize(foundTotal);
+}
 
 } // namespace fishdso

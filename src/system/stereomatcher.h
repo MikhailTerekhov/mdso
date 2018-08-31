@@ -2,6 +2,7 @@
 
 #include "system/cameramodel.h"
 #include "system/stereogeometryestimator.h"
+#include "system/terrain.h"
 #include "util/types.h"
 #include <opencv2/opencv.hpp>
 #include <vector>
@@ -12,20 +13,18 @@ class StereoMatcher {
 public:
   StereoMatcher(CameraModel *cam);
 
-  void addBaseFrame(const cv::Mat &newBaseFrame);
-  void createEstimations(const cv::Mat &frame);
+  SE3 match(cv::Mat frames[2], std::vector<Vec2> resPoints[2],
+            std::vector<double> resDepths[2]);
+
+  std::shared_ptr<Terrain> getBaseTerrain();
 
 private:
+  void createEstimations(const std::vector<cv::KeyPoint> keyPoints[2],
+                         const cv::Mat decriptors[2]);
   CameraModel *cam;
-
-  std::unique_ptr<StereoGeometryEstimator> geometryEstimator;
-  cv::Mat baseFrame;
-  bool hasBaseFrame;
+  cv::Mat descriptorsMask;
   cv::Ptr<cv::ORB> orb;
   std::unique_ptr<cv::DescriptorMatcher> descriptorMatcher;
-  std::vector<cv::KeyPoint> baseFrameKeyPoints;
-  cv::Mat baseFrameDescriptors;
-  cv::Mat descriptorsMask;
 };
 
 } // namespace fishdso

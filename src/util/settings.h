@@ -2,31 +2,35 @@
 
 namespace fishdso {
 
-#define settingEssentialMinimalSolveN 5
-
-// for candidate point selection
-extern double settingGradThreshold1;
-extern double settingGradThreshold2;
-extern double settingGradThreshold3;
-
+// candidate point selection
+constexpr int settingInterestPointLayers = 3;
+extern double settingGradThreshold[settingInterestPointLayers];
 extern int settingInitialAdaptiveBlockSize;
 extern int settingInterestPointsAdaptTo;
 extern int settingInterestPointsUsed;
 
-// parameters of the catadioptric camera projection algorithm
+// catadioptric camera projection algorithm
 extern int settingCameraMapPolyDegree;
 extern int settingCameraMapPolyPoints;
 
-// parameters of the orb-keypoints-based initialization
+// orb-keypoints-based initialization
+extern int settingKeyPointsCount;
+extern int settingRansacMaxIter;
 extern double settingInitKeypointsObserveAngle;
 extern float settingMatchNonMove;
 extern int settingFirstFramesSkip;
-extern double settingOrbInlierProb;
+constexpr int settingEssentialMinimalSolveN = 5;
 extern double settingEssentialSuccessProb;
 extern double settingEssentialReprojErrThreshold;
 extern double settingRemoveResidualsRatio;
 
-// used for undistortion
+// undistortion
 extern int settingHalfFillingFilterSize;
+
+// triangulation
+extern double settingEpsPointIsOnSegment;
+extern double settingEpsSamePoints;
+
+extern double settingTriangulationDrawPadding;
 
 } // namespace fishdso

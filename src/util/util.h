@@ -1,7 +1,7 @@
 #pragma once
 
-#include "settings.h"
-#include "types.h"
+#include "util/settings.h"
+#include "util/types.h"
 #include <opencv2/opencv.hpp>
 #include <vector>
 
@@ -14,6 +14,12 @@ void putDot(cv::Mat &img, cv::Point const &pos, cv::Scalar const &col);
 
 void grad(cv::Mat const &img, cv::Mat &gradX, cv::Mat &gradY,
           cv::Mat &gradNorm);
+
+cv::Scalar depthCol(double d, double mind, double maxd);
+
+void insertDepths(cv::Mat &img, const std::vector<Vec2> &points,
+                  const std::vector<double> &depths, double minDepth,
+                  double maxDepth, bool areSolidPnts);
 
 template <typename TT> struct accum_type { typedef TT type; };
 template <> struct accum_type<unsigned char> { typedef int type; };
@@ -42,4 +48,10 @@ template <typename T> void fillBlackPixels(cv::Mat &img) {
       }
 }
 
+Vec2 toVec2(cv::Point p);
+cv::Point toCvPoint(Vec2 vec);
+cv::Point toCvPoint(const Vec2 &vec, double scaleX, double scaleY,
+                    cv::Point shift);
+
+cv::Vec3b toCvVec3bDummy(cv::Scalar scalar);
 } // namespace fishdso

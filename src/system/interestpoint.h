@@ -1,15 +1,16 @@
 #pragma once
 
+#include "util/types.h"
+#include <Eigen/Core>
 #include <opencv2/core.hpp>
 
 namespace fishdso {
 
-class InterestPoint {
-public:
-  InterestPoint(cv::Point p);
+struct InterestPoint {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-private:
-  int x, y;
+  Vec2 p;
+  double depth;
 };
 
 } // namespace fishdso

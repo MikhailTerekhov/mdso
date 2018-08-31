@@ -1,4 +1,3 @@
-#include "frontend/frontend.h"
 #include "system/cameramodel.h"
 #include "system/dsosystem.h"
 #include "util/defs.h"

@@ -7,8 +7,8 @@ namespace fishdso {
 StereoGeometryEstimator::StereoGeometryEstimator(
     CameraModel *cam, const std::vector<std::pair<Vec2, Vec2>> &imgCorresps)
     : cam(cam), imgCorresps(imgCorresps), rays(imgCorresps.size()),
-      inliersMask(imgCorresps.size(), false), coarseFound(false),
-      preciseFound(false) {
+      _depths(imgCorresps.size()), inliersMask(imgCorresps.size(), false),
+      coarseFound(false), preciseFound(false) {
   for (int i = 0; i < int(imgCorresps.size()); ++i) {
     rays[i].first = cam->unmap(imgCorresps[i].first.data()).normalized();
     rays[i].second = cam->unmap(imgCorresps[i].second.data()).normalized();
@@ -19,8 +19,36 @@ const std::vector<char> &StereoGeometryEstimator::getInliersMask() const {
   return inliersMask;
 }
 
-int StereoGeometryEstimator::findInliers(const Mat33 &E,
-                                         std::vector<char> &inliersMask) {
+EIGEN_STRONG_INLINE Vec2 calcDepthsInCorresp(
+    const SE3 &motion, const std::pair<Vec3, Vec3> &rayCorresp) {
+  Mat32 A;
+  A.block<3, 1>(0, 0) = motion.so3() * rayCorresp.first;
+  A.block<3, 1>(0, 1) = -rayCorresp.second;
+
+  return A.fullPivHouseholderQr().solve(-motion.translation());
+}
+
+const std::vector<std::pair<double, double>> &
+StereoGeometryEstimator::depths() {
+  if (!depthsEvaluated) {
+    depthsEvaluated = true;
+
+    for (int i = 0; i < rays.size(); ++i) {
+      if (!inliersMask[i])
+        continue;
+      Vec2 curDepths = calcDepthsInCorresp(motion, rays[i]);
+      _depths[i].first = curDepths[0];
+      _depths[i].second = curDepths[1];
+    }
+  }
+
+  return _depths;
+}
+
+int StereoGeometryEstimator::getInliersNum() { return inliersNum; }
+
+int StereoGeometryEstimator::findInliersEssential(
+    const Mat33 &E, std::vector<char> &inliersMask) {
   int result = 0;
   Mat33 Et = E.transpose();
   Vec3 norm1, norm2;
@@ -36,6 +64,7 @@ int StereoGeometryEstimator::findInliers(const Mat33 &E,
 
     double err1 = (cam->map(r.first.data()) - pr.first).squaredNorm();
     double err2 = (cam->map(r.second.data()) - pr.second).squaredNorm();
+
     if (std::min(err1, err2) < settingEssentialReprojErrThreshold) {
       ++result;
       inliersMask[i] = true;
@@ -46,13 +75,20 @@ int StereoGeometryEstimator::findInliers(const Mat33 &E,
   return result;
 }
 
-EIGEN_STRONG_INLINE Vec2 calcDepthsInCorresp(
-    const SE3 &motion, const std::pair<Vec3, Vec3> &rayCorresp) {
-  Mat32 A;
-  A.block<3, 1>(0, 0) = motion.so3() * rayCorresp.first;
-  A.block<3, 1>(0, 1) = -rayCorresp.second;
+int StereoGeometryEstimator::findInliersMotion(const SE3 &motion,
+                                               std::vector<char> &inliersMask) {
+  int result = 0;
+  for (int i = 0; i < int(rays.size()); ++i) {
+    if (!inliersMask[i])
+      continue;
+    Vec2 depths = calcDepthsInCorresp(motion, rays[i]);
+    if (depths[0] <= 0 || depths[1] <= 0)
+      inliersMask[i] = false;
 
-  return A.fullPivHouseholderQr().solve(-motion.translation());
+    result += int(inliersMask[i]);
+  }
+
+  return result;
 }
 
 SE3 StereoGeometryEstimator::extractMotion(const Mat33 &E,
@@ -82,20 +118,9 @@ SE3 StereoGeometryEstimator::extractMotion(const Mat33 &E,
   std::vector<char> bestInliersMask(inliersMask.size());
   std::vector<char> curInliersMask(inliersMask.size());
   for (SE3 sol : solutions) {
-    int curFrontPointsNum = 0;
-    for (int i = 0; i < int(rays.size()); ++i) {
-      if (!inliersMask[i])
-        continue;
+    curInliersMask = inliersMask;
+    int curFrontPointsNum = findInliersMotion(sol, curInliersMask);
 
-      Vec2 depths = calcDepthsInCorresp(sol, rays[i]);
-
-      if (depths[0] > 0 && depths[1] > 0) {
-        ++curFrontPointsNum;
-        curInliersMask[i] = true;
-      } else {
-        curInliersMask[i] = false;
-      }
-    }
     if (curFrontPointsNum > bestFrontPointsNum) {
       bestFrontPointsNum = curFrontPointsNum;
       bestSol = sol;
@@ -114,7 +139,6 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
   static relative_pose::GeneralizedCentralRelativePoseEstimator<double> est;
   constexpr int N = settingEssentialMinimalSolveN;
   const double p = settingEssentialSuccessProb;
-  double q = settingOrbInlierProb;
 
   SE3 bestMotion;
 
@@ -125,7 +149,8 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
   std::pair<Vec3 *, Vec3 *> hypotesis[N];
   Mat33 results[10];
   int bestInliers = -1;
-  int iterNum = int(std::log(1 - p) / std::log(1 - std::pow(q, N)));
+  long long iterNum = settingRansacMaxIter;
+  double q = std::pow(1.0 - std::pow(1 - p, 1.0 / iterNum), 1.0 / N);
   for (int it = 0; it < iterNum; ++it) {
     for (int i = 0; i < N; ++i)
       hypotesisInd[i] = inds(mt);
@@ -174,7 +199,7 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
 
     std::vector<char> curInliersMask(rays.size()), bestInliersMask(rays.size());
     for (int i = 0; i < foundN; ++i) {
-      int inliers = findInliers(results[i], curInliersMask);
+      int inliers = findInliersEssential(results[i], curInliersMask);
       if (inliers > maxInliers) {
         maxInliers = inliers;
         maxInliersInd = i;
@@ -189,11 +214,15 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
       std::swap(inliersMask, bestInliersMask);
     }
 
-    if (q < double(maxInliers) / rays.size()) {
-      q = double(maxInliers) / rays.size();
-      iterNum = int(std::log(1 - p) / std::log(1 - std::pow(q, N)));
+    double curQ = double(maxInliers) / rays.size();
+    if (curQ > q) {
+      q = curQ;
+      double newIterNum = std::log(1 - p) / std::log(1 - std::pow(curQ, N));
+      iterNum = static_cast<long long>(newIterNum);
     }
   }
+
+  std::cout << "iterNum = " << iterNum << std::endl;
 
   coarseFound = true;
   inliersNum = bestInliers;
@@ -352,8 +381,9 @@ SE3 StereoGeometryEstimator::findPreciseMotion() {
   //            << std::sqrt(summary.final_cost / summary.num_residuals)
   //            << std::endl;
 
-  inliersNum = findInliers(
-      SO3::hat(motion.translation()) * motion.rotationMatrix(), inliersMask);
+  findInliersEssential(SO3::hat(motion.translation()) * motion.rotationMatrix(),
+                       inliersMask);
+  inliersNum = findInliersMotion(motion, inliersMask);
 
   preciseFound = true;
   return motion;
