@@ -126,7 +126,7 @@ TEST_F(StereoPositioningTest, RandomPointsPrecise) {
   const double cameraMapNoise = 1.0;
   std::vector<Vec3> points(npoints);
 
-  std::mt19937 mt(12352345);
+  std::mt19937 mt;
   std::uniform_real_distribution<double> xdistr(-10, 10);
   std::uniform_real_distribution<double> ydistr(-10, 10);
   std::uniform_real_distribution<double> zdistr(10, 20);

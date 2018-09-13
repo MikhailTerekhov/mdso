@@ -5,7 +5,6 @@
 
 namespace fishdso {
 
-// Point-of-interest detector
 double settingGradThreshold[settingInterestPointLayers] = {30.0, 6.0, 3.0};
 
 int settingInitialAdaptiveBlockSize = 25;

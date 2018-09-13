@@ -7,20 +7,18 @@
 using namespace fishdso;
 
 int main() {
-  unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
   const int segmentsCount = 10;
   const int onSegmCount = 5;
-  const double width = 100, height = 100;
   std::vector<Vec2> pnt;
 
-  std::mt19937 mt(seed);
+  std::random_device rd;
   std::uniform_real_distribution<double> d(0, 100);
   std::uniform_real_distribution<double> d01(0, 1);
 
   for (int i = 0; i < segmentsCount; ++i) {
-    Vec2 a(d(mt), d(mt)), b(d(mt), d(mt));
+    Vec2 a(d(rd), d(rd)), b(d(rd), d(rd));
     for (int j = 0; j < onSegmCount; ++j) {
-      double alpha = d01(mt);
+      double alpha = d01(rd);
       pnt.push_back(alpha * a + (1 - alpha) * b);
     }
   }

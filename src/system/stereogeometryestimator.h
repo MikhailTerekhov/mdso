@@ -12,9 +12,9 @@ public:
   SE3 findCoarseMotion();
   SE3 findPreciseMotion();
 
-  const std::vector<char> &getInliersMask() const;
+  const std::vector<int> &inliersInds() const;
   const std::vector<std::pair<double, double>> &depths();
-  int getInliersNum();
+  int inliersNum();
 
 private:
   struct ReprojectionResidual {
@@ -72,19 +72,24 @@ private:
     Vec2 pMapped, qMapped;
   };
 
-  int findInliersEssential(const Mat33 &E, std::vector<char> &inliersMask);
-  int findInliersMotion(const SE3 &motion, std::vector<char> &inliersMask);
+  static EIGEN_STRONG_INLINE std::vector<int> reservedVector() {
+    std::vector<int> res;
+    res.reserve(settingKeyPointsCount);
+    return res;
+  }
 
-  SE3 extractMotion(const Mat33 &E, std::vector<char> &inliersMask,
+  int findInliersEssential(const Mat33 &E, std::vector<int> &_inliersInds);
+  int findInliersMotion(const SE3 &motion, std::vector<int> &_inliersInds);
+
+  SE3 extractMotion(const Mat33 &E, std::vector<int> &_inliersInds,
                     int &newInliers);
 
   CameraModel *cam;
   std::vector<std::pair<Vec2, Vec2>> imgCorresps;
   std::vector<std::pair<Vec3, Vec3>> rays;
   std::vector<std::pair<double, double>> _depths;
-  std::vector<char> inliersMask;
+  std::vector<int> _inliersInds;
   SE3 motion;
-  int inliersNum;
   bool coarseFound, preciseFound, depthsEvaluated;
 };
 
