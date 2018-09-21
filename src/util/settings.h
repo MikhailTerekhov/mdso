@@ -17,7 +17,7 @@ extern int settingCameraMapPolyPoints;
 extern int settingKeyPointsCount;
 extern int settingRansacMaxIter;
 extern double settingInitKeypointsObserveAngle;
-extern float settingMatchNonMove;
+extern double settingMatchNonMove;
 extern int settingFirstFramesSkip;
 constexpr int settingEssentialMinimalSolveN = 5;
 extern double settingEssentialSuccessProb;
@@ -32,5 +32,9 @@ extern double settingEpsPointIsOnSegment;
 extern double settingEpsSamePoints;
 
 extern double settingTriangulationDrawPadding;
+
+// frame tracking
+constexpr int settingPyrLevels = 5;
+constexpr int settingPyrBoxFilterSide = 2;
 
 } // namespace fishdso

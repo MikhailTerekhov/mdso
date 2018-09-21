@@ -88,4 +88,32 @@ cv::Point toCvPoint(const Vec2 &vec, double scaleX, double scaleY,
                    int(vec[1] * scaleY) + shift.y);
 }
 
+template cv::Mat boxFilterPyrUp<unsigned char>(const cv::Mat &img);
+template cv::Mat boxFilterPyrUp<cv::Vec3b>(const cv::Mat &img);
+
+cv::Mat pyrNUpDepth(const cv::Mat1f &integralWeightedDepths,
+                    const cv::Mat1f &integralWeights, int levelNum) {
+  cv::Mat1f res = cv::Mat1f((integralWeightedDepths.rows - 1) >> levelNum,
+                            (integralWeightedDepths.cols - 1) >> levelNum);
+  int d = (1 << levelNum);
+
+  for (int y = 0; y < res.rows; ++y)
+    for (int x = 0; x < res.cols; ++x) {
+      int origX = x << levelNum, origY = y << levelNum;
+      float depthsSum = integralWeightedDepths(origY + d, origX + d) -
+                        integralWeightedDepths(origY, origX + d) -
+                        integralWeightedDepths(origY + d, origX) +
+                        integralWeightedDepths(origY, origX);
+      float weightsSum = integralWeights(origY + d, origX + d) -
+                         integralWeights(origY, origX + d) -
+                         integralWeights(origY + d, origX) +
+                         integralWeights(origY, origX);
+      if (std::abs(weightsSum) > 1e-8)
+        res(y, x) = depthsSum / weightsSum;
+      else
+        res(y, x) = -1;
+    }
+  return res;
+}
+
 } // namespace fishdso

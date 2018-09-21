@@ -17,7 +17,6 @@ const std::string winname = "debug";
 
 int main(int, char **) {
   CameraModel cam(1920, 1208, "../../test/data/cam/cam0.txt");
-
   //  for (int i = 17; i <= 19; ++i) {
   //    settingCameraMapPolyDegree = i;
   //    {

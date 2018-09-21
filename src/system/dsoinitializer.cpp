@@ -19,6 +19,7 @@ bool DsoInitializer::addFrame(const cv::Mat &frame) {
       ++framesSkipped;
       return false;
     }
+
     frames[1] = frame;
     return true;
   }
@@ -48,12 +49,14 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
   if (interpolationType == PLAIN) {
     Terrain kpTerrains[2] = {Terrain(cam, keyPoints[0], depths[0]),
                              Terrain(cam, keyPoints[1], depths[1])};
-    for (int i = 0; i < 2; ++i)
+    for (int i = 0; i < 2; ++i) {
       for (InterestPoint &ip : keyFrames[i].interestPoints) {
         double depth;
         if (kpTerrains[i](ip.p, depth))
           ip.depth = depth;
       }
+      keyFrames[i].setDepthPyrs();
+    }
   } else if (interpolationType == NORMAL) {
     std::vector<Vec3> depthedRays[2];
     for (int kfInd = 0; kfInd < 2; ++kfInd) {
@@ -77,8 +80,8 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
       auto it = std::remove_if(keyFrames[i].interestPoints.begin(),
                                keyFrames[i].interestPoints.end(),
                                [](InterestPoint p) { return p.depth < 0; });
-      keyFrames[i].interestPoints.resize(it -
-                                         keyFrames[i].interestPoints.begin());
+      keyFrames[i].interestPoints.erase(it, keyFrames[i].interestPoints.end());
+      keyFrames[i].setDepthPyrs();
     }
 
     if (debugOutputType != NO_DEBUG) {
@@ -91,12 +94,14 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
       std::sort(keyPairs.begin(), keyPairs.end(),
                 [](auto a, auto b) { return a.second < b.second; });
 
-      int padding = int(0.3 * keyPairs.size());
-      double minDepth = keyPairs[0].second, maxDepth = keyPairs[padding].second;
+      int paddingLeft = 0;
+      int paddingRight = int(0.4 * keyPairs.size());
+      double minDepth = keyPairs[paddingLeft].second,
+             maxDepth = keyPairs[paddingRight].second;
 
       insertDepths(img, keyPoints[1], depths[1], minDepth, maxDepth, true);
 
-      // cv::circle(img, cv::Point(850, 250), 7, CV_BLACK, 2);
+      cv::circle(img, cv::Point(1800, 450), 7, CV_BLACK, 2);
 
       std::vector<InterestPoint> &ip = keyFrames[1].interestPoints;
       std::vector<Vec2> pnts(ip.size());
@@ -117,8 +122,8 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
       if (debugOutputType == SPARSE_DEPTHS) {
         insertDepths(img, pnts, d, minDepth, maxDepth, false);
 
-        for (auto ip : keyFrames[1].interestPoints)
-          kpTerrains[1].checkAllSectors(cam->unmap(ip.p.data()), cam, img);
+        // for (auto ip : keyFrames[1].interestPoints)
+        // kpTerrains[1].checkAllSectors(cam->unmap(ip.p.data()), cam, img);
 
       } else if (debugOutputType == FILLED_DEPTHS) {
         //        if (interpolationType == PLAIN)
@@ -126,21 +131,44 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
         // KpTerrains[1].draw(img, CV_BLACK);
       }
 
-      cv::imwrite("../../../../test/data/maps/badtri_removed/frame7005.jpg",
-                  img);
-
       cv::Mat tangImg = kpTerrains[1].drawTangentTri(800, 800);
       //      cv::imwrite("../../../../test/data/maps/badtri/frame505tangentTriang.jpg",
       //                  tangImg);
 
-      cv::Mat img2;
-      cv::resize(img, img2, cv::Size(), 0.5, 0.5);
+      //      kpTerrains[1].fillUncovered(img, cam, CV_BLACK);
 
-      cv::imshow("tangent", tangImg);
+      //      cv::Mat img3;
+      //      cv::Mat maskb = stereoMatcher.getMask();
+      //      cv::Mat mask;
+      //      cv::cvtColor(maskb, mask, cv::COLOR_GRAY2BGR);
+      //      cv::addWeighted(mask, 0.5, img, 0.5, 0, img3, img.depth());
+      // cv::imshow("masked", img3);
+      //      cv::imwrite("../../../../test/data/maps/badtri_removed/frame5Masked.jpg",
+      //                  img3);
+
+      // cv::imshow("first frame", keyFrames[0].frameColored);
+
+      // cv::imwrite("../../../../test/data/maps/uncovered/frame5.jpg", img);
+      // cv::imshow("tangent", tangImg);
       cv::imshow("interpolated", img);
+
+      int pyrDW = frames[1].cols / 2, pyrDH = frames[1].rows / 2;
+      for (int pi = 0; pi < settingPyrLevels; ++pi) {
+        cv::Mat pyrD = keyFrames[1].drawDepthedFrame(pi, minDepth, maxDepth);
+        cv::Mat sizedPyrD;
+        cv::resize(pyrD, sizedPyrD, cv::Size(pyrDW, pyrDH), 0, 0, cv::INTER_NEAREST);
+
+        cv::imshow("pyr " + std::to_string(pi) + " depths", sizedPyrD);
+
+        cv::Mat img2;
+        cv::resize(img, img2, cv::Size(), 0.5, 0.5);
+      }
+
       cv::waitKey();
     }
   }
+
+  return keyFrames;
 }
 
 } // namespace fishdso

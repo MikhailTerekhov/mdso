@@ -18,11 +18,14 @@ public:
 
   std::shared_ptr<Terrain> getBaseTerrain();
 
+  cv::Mat getMask();
+
 private:
   void createEstimations(const std::vector<cv::KeyPoint> keyPoints[2],
                          const cv::Mat decriptors[2]);
   CameraModel *cam;
   cv::Mat descriptorsMask;
+  cv::Mat altMask;
   cv::Ptr<cv::ORB> orb;
   std::unique_ptr<cv::DescriptorMatcher> descriptorMatcher;
 };

@@ -9,7 +9,7 @@ namespace fishdso {
 
 Triangulation::Triangulation(const std::vector<Vec2> &newPoints)
     : indicesInv(newPoints.size()) {
-  _vertices.reserve(newPoints.size() + 3);
+  //_vertices.reserve(newPoints.size() + 3);
 
   double minx = std::numeric_limits<double>::infinity(),
          miny = std::numeric_limits<double>::infinity(),

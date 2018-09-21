@@ -24,6 +24,8 @@ private:
 
   DsoInitializer dsoInitializer;
   bool isInitialized;
+
+  std::map<int, KeyFrame> keyFrames;
 };
 
 } // namespace fishdso

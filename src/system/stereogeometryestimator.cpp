@@ -47,6 +47,7 @@ int StereoGeometryEstimator::inliersNum() { return _inliersInds.size(); }
 
 int StereoGeometryEstimator::findInliersEssential(
     const Mat33 &E, std::vector<int> &inliersInds) {
+  inliersInds.resize(0);
   int result = 0;
   Mat33 Et = E.transpose();
   Vec3 norm1, norm2;
@@ -203,9 +204,6 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
 
     static std::vector<int> curInliersInds = reservedVector(),
                             bestInliersInds = reservedVector();
-    curInliersInds.resize(0);
-    bestInliersInds.resize(0);
-
     for (int i = 0; i < foundN; ++i) {
       int inliers = findInliersEssential(results[i], curInliersInds);
       if (inliers > maxInliers) {
@@ -231,7 +229,6 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
   }
 
   std::cout << "iterNum = " << iterNum << std::endl;
-
   coarseFound = true;
   motion = bestMotion;
 

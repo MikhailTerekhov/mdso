@@ -140,6 +140,39 @@ void SphericalTriangulation::checkAllSectors(Vec3 ray, CameraModel *cam,
   }
 }
 
+void SphericalTriangulation::fillUncovered(cv::Mat &img, CameraModel *cam,
+                                           cv::Scalar fillCol) {
+  const int step = 10;
+  double pnt[2];
+  int it = 0;
+  std::cout << "start finding uncovered pixels" << std::endl;
+  for (int y = 0; y < img.rows; y += step)
+    for (int x = 0; x < img.cols; x += step) {
+      std::cout << x << ' ' << y << ' '
+                << 100 * (double((it++) * step * step) / (img.rows * img.cols))
+                << "%" << std::endl;
+      pnt[0] = x;
+      pnt[1] = y;
+      if (isInConvexDummy(cam->unmap(pnt)))
+        cv::rectangle(img, cv::Point(x, y), cv::Point(x + step, y + step),
+                      fillCol, cv::FILLED);
+    }
+}
+
+bool SphericalTriangulation::isInConvexDummy(Vec3 ray) {
+  Vec3 *secRays[3];
+  for (auto &r0 : _rays)
+    for (auto &r1 : _rays)
+      for (auto &r2 : _rays) {
+        secRays[0] = &r0;
+        secRays[1] = &r1;
+        secRays[2] = &r2;
+        if (isInSector(ray, secRays))
+          return true;
+      }
+  return false;
+}
+
 cv::Mat SphericalTriangulation::drawTangentTri(int imWidth, int imHeight) {
   return tangentTriang.draw(imWidth, imHeight);
 }

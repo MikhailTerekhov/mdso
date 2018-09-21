@@ -1,4 +1,7 @@
 Makefile
+compile_commands.json
+.clang-format
+*.sh
 *.autosave
 test/data/**
 cmake_install.cmake

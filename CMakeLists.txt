@@ -30,6 +30,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/src/system/cameramodel.h
     ${PROJECT_SOURCE_DIR}/src/system/stereomatcher.h
     ${PROJECT_SOURCE_DIR}/src/system/stereogeometryestimator.h
+    ${PROJECT_SOURCE_DIR}/src/system/frametracker.h
 )
 
 set(dso_SOURCE_FILES
@@ -45,6 +46,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/src/system/cameramodel.cpp
     ${PROJECT_SOURCE_DIR}/src/system/stereomatcher.cpp
     ${PROJECT_SOURCE_DIR}/src/system/stereogeometryestimator.cpp
+    ${PROJECT_SOURCE_DIR}/src/system/frametracker.cpp
     ${PROJECT_SOURCE_DIR}/src/main.cpp
 )
 

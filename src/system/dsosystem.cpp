@@ -18,6 +18,8 @@ void DsoSystem::addFrame(const cv::Mat &frame) {
     if (isInitialized) {
       std::vector<KeyFrame> kf =
           dsoInitializer.createKeyFrames(DsoInitializer::SPARSE_DEPTHS);
+      for (int i = 0; i < int(kf.size()); ++i)
+        keyFrames.insert(std::pair<int, KeyFrame>(i, kf[i]));
     }
   }
 }

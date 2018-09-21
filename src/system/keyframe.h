@@ -9,24 +9,30 @@
 namespace fishdso {
 
 struct KeyFrame {
-  static constexpr int L = settingInterestPointLayers;
+  static constexpr int LI = settingInterestPointLayers;
+  static constexpr int PL = settingPyrLevels;
   static int adaptiveBlockSize;
 
   KeyFrame(const cv::Mat &frameColored);
+  
+  void setDepthPyrs();
 
-  cv::Mat frame;
+  cv::Mat1f depths[PL];
+
+  cv::Mat framePyr[PL];
   cv::Mat frameColored;
   cv::Mat gradX, gradY, gradNorm;
   std::vector<InterestPoint> interestPoints;
 
-#ifdef DEBUG
-  cv::Mat frameWithPoints;
-#endif
+  cv::Mat drawDepthedFrame(int pyrLevel, double minDepth, double maxDepth);
 
 private:
   static void updateAdaptiveBlockSize(int pointsFound);
 
   void selectPoints();
+  void setImgPyrs();
+
+  bool areDepthsSet;
 };
 
 } // namespace fishdso

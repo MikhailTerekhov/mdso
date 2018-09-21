@@ -17,6 +17,7 @@ public:
   void draw(cv::Mat &img, CameraModel *cam, cv::Scalar edgeCol, double minDepth,
             double maxDepth);
 
+  void fillUncovered(cv::Mat &img, CameraModel *cam, cv::Scalar fillCol);
   cv::Mat drawTangentTri(int imWidth, int imHeight);
 
 private:

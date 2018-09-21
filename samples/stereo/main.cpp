@@ -28,6 +28,13 @@ img1 and img2 name files with two frames to track.)abacaba";
     return 0;
   }
 
+  //  cv::Mat ds = boxFilterPyrUp<cv::Vec3b>(frame1);
+  //  cv::imshow("original", frame1);
+  //  cv::imshow("downsampled", ds);
+
+  //  cv::waitKey();
+  //  return 0;
+
   sys.addFrame(frame1);
   sys.addFrame(frame2);
 }

@@ -10,6 +10,8 @@ namespace fishdso {
 
 class Triangulation {
 public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
   struct Vertex;
   struct Edge;
   struct Triangle;
