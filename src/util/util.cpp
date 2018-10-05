@@ -13,9 +13,16 @@
 namespace fishdso {
 
 cv::Mat dbg;
+double minDepth = 0, maxDepth = 0;
 
-void putDot(cv::Mat &img, cv::Point const &pos, cv::Scalar const &col) {
+void putDot(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col) {
   cv::circle(img, pos, 4, col, cv::FILLED);
+}
+
+void putCross(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col,
+              int size, int thikness) {
+  cv::line(img, pos - cv::Point(size, size), pos + cv::Point(size, size), col, thikness);
+  cv::line(img, pos + cv::Point(-size, size), pos + cv::Point(size, -size), col, thikness);
 }
 
 void grad(cv::Mat const &img, cv::Mat &gradX, cv::Mat &gradY,
@@ -43,25 +50,13 @@ cv::Scalar depthCol(double d, double mind, double maxd) {
                  : CV_RED * ((mid - d) / dist) + CV_GREEN * ((d - mind) / dist);
 }
 
-void insertDepths(cv::Mat &img, const std::vector<Vec2> &points,
+void insertDepths(cv::Mat &img, const stdvectorVec2 &points,
                   const std::vector<double> &depths, double minDepth,
                   double maxDepth, bool areSolidPnts) {
   if (points.size() != depths.size())
     throw std::runtime_error("insertDepths error!");
   if (points.empty())
     return;
-  //  int padding = int(double(depths.size()) * 0.05);
-
-  //  std::vector<std::pair<Vec2, double>> pd(points.size());
-
-  //  for (int i = 0; i < int(points.size()); ++i)
-  //    pd[i] = {points[i], depths[i]};
-
-  //  std::sort(pd.begin(), pd.end(),
-  //            [](auto a, auto b) { return a.second < b.second; });
-
-  //  double minDepth = pd[padding].second;
-  //  double maxDepth = pd[int(pd.size()) - padding].second;
 
   std::cout << "mind, maxd = " << minDepth << ' ' << maxDepth << std::endl;
   for (int i = 0; i < int(points.size()); ++i) {
@@ -91,9 +86,9 @@ cv::Point toCvPoint(const Vec2 &vec, double scaleX, double scaleY,
 template cv::Mat boxFilterPyrUp<unsigned char>(const cv::Mat &img);
 template cv::Mat boxFilterPyrUp<cv::Vec3b>(const cv::Mat &img);
 
-cv::Mat pyrNUpDepth(const cv::Mat1f &integralWeightedDepths,
-                    const cv::Mat1f &integralWeights, int levelNum) {
-  cv::Mat1f res = cv::Mat1f((integralWeightedDepths.rows - 1) >> levelNum,
+cv::Mat pyrNUpDepth(const cv::Mat1d &integralWeightedDepths,
+                    const cv::Mat1d &integralWeights, int levelNum) {
+  cv::Mat1d res = cv::Mat1d((integralWeightedDepths.rows - 1) >> levelNum,
                             (integralWeightedDepths.cols - 1) >> levelNum);
   int d = (1 << levelNum);
 
@@ -113,6 +108,18 @@ cv::Mat pyrNUpDepth(const cv::Mat1f &integralWeightedDepths,
       else
         res(y, x) = -1;
     }
+  return res;
+}
+
+cv::Mat drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
+                         double minDepth, double maxDepth) {
+  int w = frame.cols, h = frame.rows;
+  cv::Mat3b res(h, w);
+  cv::cvtColor(frame, res, cv::COLOR_GRAY2BGR);
+  for (int y = 0; y < h; ++y)
+    for (int x = 0; x < w; ++x)
+      if (depths(y, x) > 0)
+        res(y, x) = toCvVec3bDummy(depthCol(depths(y, x), minDepth, maxDepth));
   return res;
 }
 

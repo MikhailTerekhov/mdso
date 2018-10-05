@@ -43,17 +43,17 @@ TEST_F(StereoPositioningTest, RandomPointsCoarse) {
   //  SO3 rotations[] = {SO3::rotX(angle(mt)),
   //                     SO3::rotX(angle(mt)) * SO3::rotY(angle(mt))};
 
-  std::vector<SO3> rotations = {SO3(),
-                                SO3::rotX(angle(mt)),
-                                SO3::rotZ(angle(mt)),
-                                SO3::rotX(angle(mt)) * SO3::rotY(angle(mt)),
-                                SO3::rotX(angle(mt)) * SO3::rotZ(angle(mt)),
-                                SO3::rotX(angle(mt)) * SO3::rotY(angle(mt)) *
-                                    SO3::rotZ(angle(mt))};
+  stdvectorSO3 rotations = {SO3(),
+                            SO3::rotX(angle(mt)),
+                            SO3::rotZ(angle(mt)),
+                            SO3::rotX(angle(mt)) * SO3::rotY(angle(mt)),
+                            SO3::rotX(angle(mt)) * SO3::rotZ(angle(mt)),
+                            SO3::rotX(angle(mt)) * SO3::rotY(angle(mt)) *
+                                SO3::rotZ(angle(mt))};
   std::vector<Vec3> translations = {Vec3(0, 0, 10), Vec3(0, 0, -10),
                                     Vec3(0, 10, 0), Vec3(0, -10, 0),
                                     Vec3(10, 0, 0), Vec3(-10, 0, 0)};
-  std::vector<SE3> motions;
+  stdvectorSE3 motions;
   for (const SO3 &rot : rotations)
     for (const Vec3 &trans : translations)
       motions.push_back(SE3(rot, trans));
@@ -73,7 +73,7 @@ TEST_F(StereoPositioningTest, RandomPointsCoarse) {
     //    Mat33 E = tCross * mot.rotationMatrix();
     //    std::cout << "[t]x =\n" << tCross << "\nE =\n" << E << std::endl;
 
-    std::vector<std::pair<Vec2, Vec2>> imgCorresps;
+    stdvectorStdpairVec2Vec2 imgCorresps;
     imgCorresps.reserve((int(npoints * (1 + outlierPart))));
     for (int i = 0; i < npoints; ++i) {
       Vec3 p(xdistr(mt), ydistr(mt), zdistr(mt));
@@ -108,12 +108,12 @@ TEST_F(StereoPositioningTest, RandomPointsCoarse) {
               << relRotAngle * (180.0 / M_PI) << "; "
               << int(100.0 * (it + 1) / motions.size()) << "% motions processed"
               << std::endl;
-    EXPECT_TRUE(transErrAngle < 5 * (M_PI / 180.0) &&
-                relRotAngle < 5 * (M_PI / 180.0))
+    EXPECT_LT(transErrAngle, 5 * (M_PI / 180.0))
         << "too big error!"
         << "\ntotal points = " << imgCorresps.size()
         << "\nrot ind = " << it / int(translations.size())
         << " trans ind = " << it % int(translations.size()) << std::endl;
+    EXPECT_LT(relRotAngle, 5 * (M_PI / 180.0));
 
     ++it;
   }
@@ -139,17 +139,17 @@ TEST_F(StereoPositioningTest, RandomPointsPrecise) {
   //  SO3 rotations[] = {SO3::rotX(angle(mt)),
   //                     SO3::rotX(angle(mt)) * SO3::rotY(angle(mt))};
 
-  std::vector<SO3> rotations = {SO3(),
-                                SO3::rotX(angle(mt)),
-                                SO3::rotZ(angle(mt)),
-                                SO3::rotX(angle(mt)) * SO3::rotY(angle(mt)),
-                                SO3::rotX(angle(mt)) * SO3::rotZ(angle(mt)),
-                                SO3::rotX(angle(mt)) * SO3::rotY(angle(mt)) *
-                                    SO3::rotZ(angle(mt))};
+  stdvectorSO3 rotations = {SO3(),
+                            SO3::rotX(angle(mt)),
+                            SO3::rotZ(angle(mt)),
+                            SO3::rotX(angle(mt)) * SO3::rotY(angle(mt)),
+                            SO3::rotX(angle(mt)) * SO3::rotZ(angle(mt)),
+                            SO3::rotX(angle(mt)) * SO3::rotY(angle(mt)) *
+                                SO3::rotZ(angle(mt))};
   std::vector<Vec3> translations = {Vec3(0, 0, 1), Vec3(0, 0, -1),
                                     Vec3(0, 1, 0), Vec3(0, -1, 0),
                                     Vec3(1, 0, 0), Vec3(-1, 0, 0)};
-  std::vector<SE3> motions;
+  stdvectorSE3 motions;
   for (const SO3 &rot : rotations)
     for (const Vec3 &trans : translations)
       motions.push_back(SE3(rot, trans));
@@ -168,7 +168,7 @@ TEST_F(StereoPositioningTest, RandomPointsPrecise) {
     //    Mat33 E = tCross * mot.rotationMatrix();
     //    std::cout << "[t]x =\n" << tCross << "\nE =\n" << E << std::endl;
 
-    std::vector<std::pair<Vec2, Vec2>> imgCorresps;
+    stdvectorStdpairVec2Vec2 imgCorresps;
     imgCorresps.reserve(int(npoints * (1 + outlierPart)));
 
     for (int i = 0; i < int(npoints * outlierPart); ++i)
@@ -216,12 +216,11 @@ TEST_F(StereoPositioningTest, RandomPointsPrecise) {
               << relRotAngle * (180.0 / M_PI) << "; "
               << int(100.0 * (it + 1) / motions.size()) << "% motions processed"
               << std::endl;
-    EXPECT_TRUE(transErrAngle < 0.1 * (M_PI / 180.0) &&
-                relRotAngle < 0.1 * (M_PI / 180.0))
+    EXPECT_LT(transErrAngle, 0.1 * (M_PI / 180.0))
         << "too big error!"
         << "\nrot ind = " << it / int(translations.size())
         << " trans ind = " << it % int(translations.size()) << std::endl;
-
+    EXPECT_LT(relRotAngle, 0.1 * (M_PI / 180.0));
     ++it;
   }
 }

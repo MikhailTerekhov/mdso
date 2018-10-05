@@ -7,7 +7,7 @@
 
 namespace fishdso {
 
-Triangulation::Triangulation(const std::vector<Vec2> &newPoints)
+Triangulation::Triangulation(const stdvectorVec2 &newPoints)
     : indicesInv(newPoints.size()) {
   //_vertices.reserve(newPoints.size() + 3);
 

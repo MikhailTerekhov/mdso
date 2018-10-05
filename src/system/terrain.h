@@ -9,7 +9,7 @@ class Terrain {
   using Triangle = Triangulation::Triangle;
 
 public:
-  Terrain(CameraModel *cam, const std::vector<Vec2> &points,
+  Terrain(CameraModel *cam, const stdvectorVec2 &points,
           const std::vector<double> &depths);
 
   bool hasInterpolatedDepth(Vec2 p);

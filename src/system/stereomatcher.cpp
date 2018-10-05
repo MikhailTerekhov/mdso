@@ -7,19 +7,18 @@ namespace fishdso {
 
 StereoMatcher::StereoMatcher(CameraModel *cam)
     : cam(cam),
-      descriptorsMask(cam->getHeight(), cam->getWidth(), CV_8U, CV_BLACK_BYTE),
+      descriptorsMask(cam->getHeight(), cam->getWidth(), CV_8U, CV_WHITE_BYTE),
       altMask(cam->getHeight(), cam->getWidth(), CV_8U, CV_BLACK_BYTE),
       orb(cv::ORB::create(2000)),
       descriptorMatcher(std::unique_ptr<cv::DescriptorMatcher>(
           new cv::BFMatcher(cv::NORM_HAMMING, true))) {
 
-  cv::circle(descriptorsMask, cv::Point(960, 200), 700, CV_WHITE_BYTE,
-             cv::FILLED);
-  cv::rectangle(descriptorsMask, cv::Rect(0, 200, 1920, 600), CV_WHITE_BYTE,
-                cv::FILLED);
-  cv::circle(altMask, toCvPoint(cam->getImgCenter()),
-             int(cam->getImgRadiusByAngle(M_PI_2)), CV_WHITE_BYTE, CV_FILLED);
-  // cv::imshow("mask", descriptorsMask);
+  // cv::circle(descriptorsMask, cv::Point(960, 200), 700, CV_WHITE_BYTE,
+  // cv::FILLED);
+  // cv::rectangle(descriptorsMask, cv::Rect(0, 200, 1920, 600), CV_WHITE_BYTE,
+  // cv::FILLED);
+  // cv::circle(altMask, toCvPoint(cam->getImgCenter()),
+  // int(cam->getImgRadiusByAngle(M_PI_2)), CV_WHITE_BYTE, CV_FILLED);
 }
 
 void filterOutStillMatches(std::vector<cv::DMatch> &matches,
@@ -41,13 +40,13 @@ void filterOutStillMatches(std::vector<cv::DMatch> &matches,
   std::cout << "still matches removed = " << stillMatches.size() << std::endl;
 }
 
-SE3 StereoMatcher::match(cv::Mat frames[2], std::vector<Vec2> resPoints[2],
+SE3 StereoMatcher::match(cv::Mat frames[2], stdvectorVec2 resPoints[2],
                          std::vector<double> resDepths[2]) {
-  cv::Ptr<cv::ORB> orb = cv::ORB::create(2000);
+  cv::Ptr<cv::ORB> orb = cv::ORB::create(settingKeyPointsCount);
   std::vector<cv::KeyPoint> keyPoints[2];
   cv::Mat descriptors[2];
   for (int i = 0; i < 2; ++i) {
-    orb->detectAndCompute(frames[i], descriptorsMask, keyPoints[i],
+    orb->detectAndCompute(frames[i], cv::noArray(), keyPoints[i],
                           descriptors[i]);
     if (keyPoints[i].empty())
       throw std::runtime_error(
@@ -64,13 +63,7 @@ SE3 StereoMatcher::match(cv::Mat frames[2], std::vector<Vec2> resPoints[2],
   std::vector<cv::DMatch> stillMatches;
   filterOutStillMatches(matches, stillMatches, keyPoints);
 
-  //  cv::Mat smi, smi2;
-  //  cv::drawMatches(frames[1], keyPoints[1], frames[0], keyPoints[0],
-  //                  stillMatches, smi);
-  //  cv::resize(smi, smi2, cv::Size(), 0.5, 0.5);
-  //  cv::imshow("still matches", smi2);
-
-  std::vector<std::pair<Vec2, Vec2>> corresps;
+  stdvectorStdpairVec2Vec2 corresps;
   corresps.reserve(matches.size());
   for (int i = 0; i < int(matches.size()); ++i)
     corresps.push_back({toVec2(keyPoints[0][matches[i].trainIdx].pt),
@@ -85,6 +78,17 @@ SE3 StereoMatcher::match(cv::Mat frames[2], std::vector<Vec2> resPoints[2],
             << std::endl;
   std::cout << "inlier matches = " << geometryEstimator->inliersNum()
             << std::endl;
+
+  // std::vector<cv::DMatch> inlierMatches;
+  // inlierMatches.reserve(matches.size());
+  // for (int i : geometryEstimator->inliersInds())
+    // inlierMatches.push_back(matches[i]);
+  // cv::Mat imi, imi2;
+  // cv::drawMatches(frames[1], keyPoints[1], frames[0], keyPoints[0],
+                  // inlierMatches, imi);
+  // cv::resize(imi, imi2, cv::Size(), 0.5, 0.5);
+  // cv::imshow("inlier matches", imi2);
+
   for (int frameNum = 0; frameNum < 2; ++frameNum) {
     resPoints[frameNum].resize(0);
     resPoints[frameNum].reserve(geometryEstimator->inliersNum());

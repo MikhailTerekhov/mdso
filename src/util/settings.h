@@ -34,7 +34,7 @@ extern double settingEpsSamePoints;
 extern double settingTriangulationDrawPadding;
 
 // frame tracking
-constexpr int settingPyrLevels = 5;
-constexpr int settingPyrBoxFilterSide = 2;
+constexpr int settingPyrLevels = 6;
+extern double settingOutlierIntensityDiff;
 
 } // namespace fishdso

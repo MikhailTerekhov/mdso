@@ -16,12 +16,11 @@ public:
   DsoInitializer(CameraModel *cam);
 
   // returns true if initialization is completed
-  bool addFrame(const cv::Mat &frame);
+  bool addFrame(const cv::Mat &frame, int globalFrameNum);
 
   std::vector<KeyFrame> createKeyFrames(DebugOutputType debugOutputType);
 
 private:
-  void addFirstFrame(const cv::Mat &frame);
   std::vector<KeyFrame>
   createKeyFramesFromStereo(InterpolationType interpolationType,
                             DebugOutputType debugOutputType);
@@ -31,6 +30,7 @@ private:
   bool hasFirstFrame;
   int framesSkipped;
   cv::Mat frames[2];
+  int globalFrameNums[2];
 };
 
 } // namespace fishdso

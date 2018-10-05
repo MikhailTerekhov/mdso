@@ -4,11 +4,16 @@
 #include "util/types.h"
 #include "util/util.h"
 #include <Eigen/Dense>
+#include <Eigen/StdVector>
 #include <ceres/ceres.h>
 #include <opencv2/core.hpp>
 #include <string>
 
 namespace fishdso {
+
+class CameraModel;
+typedef std::vector<CameraModel, Eigen::aligned_allocator<CameraModel>>
+    stdvectorCameraModel;
 
 class CameraModel {
 
@@ -77,6 +82,14 @@ public:
     res *= T(scale);
     return res;
   }
+  
+  EIGEN_STRONG_INLINE Vec3 unmap(const Vec2 &point) const {
+    return unmap(point.data());
+  }
+
+  EIGEN_STRONG_INLINE Vec2 map(const Vec3 &ray) const {
+    return map(ray.data());
+  }
 
   template <typename T>
   void undistort(const cv::Mat &img, cv::Mat &result,
@@ -105,6 +118,8 @@ public:
   void getRectByAngle(double observeAngle, int &width, int &height) const;
 
   void setMapPolyCoeffs();
+
+  stdvectorCameraModel camPyr();
 
 private:
   friend std::istream &operator>>(std::istream &is, CameraModel &cc);

@@ -2,7 +2,7 @@
 
 namespace fishdso {
 
-Terrain::Terrain(CameraModel *cam, const std::vector<Vec2> &points,
+Terrain::Terrain(CameraModel *cam, const stdvectorVec2 &points,
                  const std::vector<double> &depths)
     : depths(depths), triang(points) {
   if (points.size() != depths.size())

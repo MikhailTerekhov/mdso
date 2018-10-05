@@ -8,35 +8,15 @@ namespace fishdso {
 
 int KeyFrame::adaptiveBlockSize = settingInitialAdaptiveBlockSize;
 
-KeyFrame::KeyFrame(const cv::Mat &frameColored) : frameColored(frameColored), areDepthsSet(false) {
-  cv::cvtColor(frameColored, framePyr[0], cv::COLOR_BGR2GRAY);
-  grad(framePyr[0], gradX, gradY, gradNorm);
-  selectPoints();
-  setImgPyrs();
-}
+KeyFrame::KeyFrame(const cv::Mat &frameColored, int globalFrameNum)
+    : preKeyFrame(std::unique_ptr<PreKeyFrame>(
+          new PreKeyFrame(frameColored, globalFrameNum))),
+      frameColored(frameColored) {
+  grad(preKeyFrame->framePyr[0], gradX, gradY, gradNorm);
 
-void KeyFrame::setDepthPyrs() {
-  depths[0] = cv::Mat1f(framePyr[0].rows, framePyr[0].cols, -1.0);
-  for (int i = 1; i < PL; ++i)
-    depths[i] = cv::Mat1f(framePyr[i].size());
-  
-  cv::Mat1f weights = cv::Mat1f::zeros(framePyr[0].size());
-  for (const auto &ip : interestPoints) {
-    depths[0](toCvPoint(ip.p)) = ip.depth;
-    weights(toCvPoint(ip.p)) = 1 / std::sqrt(ip.variance);
-  }
-
-  cv::Mat1f weightedDepths = depths[0].mul(weights, 1); 
-  std::cout << "weighted depths chceck: " << weightedDepths(0, 0) << std::endl;
-  cv::Mat1f integralWeightedDepths;
-  cv::Mat1f integralWeights;
-  cv::integral(weights, integralWeights, CV_32F);
-  cv::integral(weightedDepths, integralWeightedDepths, CV_32F);
-  
-  for (int il = 1; il < PL; ++il) 
-    depths[il] = pyrNUpDepth(integralWeightedDepths, integralWeights, il);
- 
-  areDepthsSet = true;
+  int foundTotal = selectPoints(adaptiveBlockSize, settingInterestPointsUsed);
+  lastBlockSize = adaptiveBlockSize;
+  updateAdaptiveBlockSize(foundTotal);
 }
 
 void KeyFrame::updateAdaptiveBlockSize(int pointsFound) {
@@ -60,7 +40,21 @@ void selectInterestPointsInternal(const cv::Mat &gradNorm, int selBlockSize,
     }
 }
 
-void KeyFrame::selectPoints() {
+void KeyFrame::setDepthPyrs() {
+  cv::Mat1d depths0 = cv::Mat1d(preKeyFrame->framePyr[0].rows,
+                                preKeyFrame->framePyr[0].cols, -1.0);
+  cv::Mat1d weights = cv::Mat1d::zeros(preKeyFrame->framePyr[0].size());
+  for (const auto &ip : interestPoints) {
+    depths0(toCvPoint(ip.p)) = ip.depth;
+    weights(toCvPoint(ip.p)) = 1 / std::sqrt(ip.variance);
+  }
+
+  preKeyFrame->setDepthPyrs(depths0, weights);
+}
+
+int KeyFrame::selectPoints(int blockSize, int pointsNeeded) {
+  lastBlockSize = blockSize;
+  // std::cout << "selecting with blockSize = " << blockSize << std::endl;
   std::vector<cv::Point> pointsOverThres[LI];
   std::vector<cv::Point> pointsAll;
 
@@ -68,10 +62,11 @@ void KeyFrame::selectPoints() {
     pointsOverThres[i].reserve(settingInterestPointsAdaptTo);
 
   for (int i = 0; i < LI; ++i) {
-    selectInterestPointsInternal(gradNorm,
-                                 (1 << i) * settingInitialAdaptiveBlockSize,
+    selectInterestPointsInternal(gradNorm, (1 << i) * blockSize,
                                  settingGradThreshold[i], pointsOverThres[i]);
     std::random_shuffle(pointsOverThres[i].begin(), pointsOverThres[i].end());
+    // std::cout << "over thres " << i << " are " << pointsOverThres[i].size()
+    // << std::endl;
   }
 
   int foundTotal = std::accumulate(
@@ -80,41 +75,36 @@ void KeyFrame::selectPoints() {
         return accumulated + b.size();
       });
 
-  if (foundTotal > settingInterestPointsUsed) {
+  if (foundTotal > pointsNeeded) {
     int sz = 0;
     for (int i = 1; i < LI; ++i) {
-      pointsOverThres[i].resize(pointsOverThres[i].size() *
-                                settingInterestPointsUsed / foundTotal);
+      pointsOverThres[i].resize(pointsOverThres[i].size() * pointsNeeded /
+                                foundTotal);
       sz += pointsOverThres[i].size();
     }
-    pointsOverThres[0].resize(settingInterestPointsUsed - sz);
+    pointsOverThres[0].resize(pointsNeeded - sz);
   }
+
+  interestPoints.clear();
+  interestPoints.reserve(foundTotal);
 
   for (int curL = 0; curL < LI; ++curL)
     for (cv::Point p : pointsOverThres[curL])
       interestPoints.push_back(InterestPoint(toVec2(p)));
 
-  updateAdaptiveBlockSize(foundTotal);
+  lastPointsFound = foundTotal;
+  lastPointsUsed = interestPoints.size();
+  lastBlockSize = blockSize;
+
+  return foundTotal;
 }
 
-void KeyFrame::setImgPyrs() {
-  for (int lvl = 1; lvl < PL; ++lvl)
-    framePyr[lvl] = boxFilterPyrUp<unsigned char>(framePyr[lvl - 1]);
+void KeyFrame::selectPointsDenser(int pointsNeeded) {
+  int newBlockSize =
+      lastBlockSize *
+      std::sqrt(static_cast<double>(lastPointsFound) / pointsNeeded);
+  selectPoints(newBlockSize, pointsNeeded);
+  // std::cout << "after reselection = " << interestPoints.size() << std::endl;
 }
-
-
-cv::Mat KeyFrame::drawDepthedFrame(int pyrLevel, double minDepth, double maxDepth) {
-  if (!areDepthsSet)
-    throw std::runtime_error("trying to draw depths while they weren't initialized");
-  
-  int w = framePyr[pyrLevel].cols, h = framePyr[pyrLevel].rows;
-  cv::Mat3b res(h, w);
-  cv::cvtColor(framePyr[pyrLevel], res, cv::COLOR_GRAY2BGR);
-  for (int y = 0; y < h; ++y)
-    for (int x = 0; x < w; ++x)
-      if (depths[pyrLevel](y, x) > 0)
-        res(y, x) = toCvVec3bDummy(depthCol(depths[pyrLevel](y, x), minDepth, maxDepth));
-  return res;
- }
 
 } // namespace fishdso

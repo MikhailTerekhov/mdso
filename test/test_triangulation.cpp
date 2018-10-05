@@ -22,15 +22,15 @@ TEST_P(TriangulationTest, IsConsistent) {
 
   for (auto e : edges)
     for (auto p : e->vert)
-      EXPECT_TRUE(p->edges.find(e) != p->edges.end());
+      EXPECT_NE(p->edges.find(e), p->edges.end());
 
   for (auto t : triangles)
     for (auto p : t->vert)
-      EXPECT_TRUE(p->triangles.find(t) != p->triangles.end());
+      EXPECT_NE(p->triangles.find(t), p->triangles.end());
 
   for (auto t : triangles)
     for (auto e : t->edges)
-      EXPECT_TRUE(std::find(e->triang, e->triang + 2, t) != (e->triang + 2));
+      EXPECT_NE(std::find(e->triang, e->triang + 2, t), (e->triang + 2));
 }
 
 double cross2(const Vec2 &a, const Vec2 &b) {
@@ -60,7 +60,7 @@ TEST_P(TriangulationTest, IsPlanar) {
 }
 
 std::shared_ptr<Triangulation> getSimpleTriang() {
-  std::vector<Vec2> pnt;
+  stdvectorVec2 pnt;
 
   pnt.push_back(Vec2(1, 1));
   pnt.push_back(Vec2(1, 2));
@@ -71,8 +71,7 @@ std::shared_ptr<Triangulation> getSimpleTriang() {
   pnt.push_back(Vec2(1.75, 1.75));
   pnt.push_back(Vec2(1.75, 1.5));
 
-  std::shared_ptr<Triangulation> triang =
-      std::shared_ptr<Triangulation>(new Triangulation(pnt));
+  std::shared_ptr<Triangulation> triang(new Triangulation(pnt));
   std::cout << "points:" << std::endl;
   for (auto p : *triang) {
     std::cout << p->pos.transpose() << std::endl;
@@ -83,15 +82,15 @@ std::shared_ptr<Triangulation> getSimpleTriang() {
     std::cout << e->vert[0]->pos.transpose() << " to "
               << e->vert[1]->pos.transpose() << std::endl;
 
-  cv::Mat img = triang->draw(800, 800);
-  cv::imshow("simple", img);
-  cv::waitKey();
+  // cv::Mat img = triang->draw(800, 800);
+  // cv::imshow("simple", img);
+  // cv::waitKey();
   return triang;
 }
 
 std::shared_ptr<Triangulation> getRandomTriang() {
   const int pntCount = 1000;
-  std::vector<Vec2> pnt;
+  stdvectorVec2 pnt;
   pnt.reserve(pntCount);
 
   std::mt19937 mt;
@@ -106,7 +105,7 @@ std::shared_ptr<Triangulation> getRandomTriang() {
 std::shared_ptr<Triangulation> getNonGeneralTriang() {
   const int segmentsCount = 200;
   const int onSegmCount = 5;
-  std::vector<Vec2> pnt;
+  stdvectorVec2 pnt;
 
   std::mt19937 mt;
   std::uniform_real_distribution<double> d(0, 100);
@@ -131,7 +130,7 @@ TEST(TriangulationTest, IndicesConsistent) {
   const int pntCount = 200;
   std::mt19937 mt;
   std::uniform_real_distribution<double> d(0, 10);
-  std::vector<Vec2> points;
+  stdvectorVec2 points;
 
   for (int i = 0; i < pntCount; ++i)
     points.push_back(Vec2(d(mt), d(mt)));

@@ -1,11 +1,12 @@
 #include "system/stereogeometryestimator.h"
 #include <RelativePoseEstimator.h>
 #include <ceres/ceres.h>
+#include <fstream>
 
 namespace fishdso {
 
 StereoGeometryEstimator::StereoGeometryEstimator(
-    CameraModel *cam, const std::vector<std::pair<Vec2, Vec2>> &imgCorresps)
+    CameraModel *cam, const stdvectorStdpairVec2Vec2 &imgCorresps)
     : cam(cam), imgCorresps(imgCorresps), rays(imgCorresps.size()),
       _depths(imgCorresps.size()), coarseFound(false), preciseFound(false),
       depthsEvaluated(false) {
@@ -38,6 +39,21 @@ StereoGeometryEstimator::depths() {
       _depths[i].first = curDepths[0];
       _depths[i].second = curDepths[1];
     }
+
+    int minInd = *std::min_element(
+        _inliersInds.begin(), _inliersInds.end(), [this](int i1, int i2) {
+          return _depths[i1].second < _depths[i2].second;
+        });
+    Vec2 unm = cam->map(rays[minInd].second.data());
+    // std::cout << "min depth position = " << unm.transpose(); 
+
+    // std::ofstream ofs("log.txt");
+    // ofs << rays[minInd].first.transpose() << std::endl;
+    // ofs << rays[minInd].second.transpose() << std::endl;
+    // ofs << motion.translation().transpose() << std::endl;
+    // ofs << motion.unit_quaternion().coeffs().transpose() << std::endl;
+    // ofs.close();
+    // Vec2 thoseDepths = calcDepthsInCorresp(motion, rays[minInd]);
   }
 
   return _depths;

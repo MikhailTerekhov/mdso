@@ -1,7 +1,9 @@
 #pragma once
 
 #include "system/interestpoint.h"
+#include "system/prekeyframe.h"
 #include "util/settings.h"
+#include <Eigen/StdVector>
 #include <memory>
 #include <opencv2/core.hpp>
 #include <vector>
@@ -13,25 +15,25 @@ struct KeyFrame {
   static constexpr int PL = settingPyrLevels;
   static int adaptiveBlockSize;
 
-  KeyFrame(const cv::Mat &frameColored);
-  
+  KeyFrame(const cv::Mat &frameColored, int globalFrameNum);
+
   void setDepthPyrs();
 
-  cv::Mat1f depths[PL];
+  void selectPointsDenser(int pointsNeeded);
 
-  cv::Mat framePyr[PL];
+  std::unique_ptr<PreKeyFrame> preKeyFrame;
   cv::Mat frameColored;
   cv::Mat gradX, gradY, gradNorm;
-  std::vector<InterestPoint> interestPoints;
-
-  cv::Mat drawDepthedFrame(int pyrLevel, double minDepth, double maxDepth);
+  stdvectorInterestPoint interestPoints;
 
 private:
   static void updateAdaptiveBlockSize(int pointsFound);
 
-  void selectPoints();
-  void setImgPyrs();
+  int selectPoints(int blockSize, int pointsNeeded);
 
+  int lastBlockSize;
+  int lastPointsFound;
+  int lastPointsUsed;
   bool areDepthsSet;
 };
 

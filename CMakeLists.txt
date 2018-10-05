@@ -22,9 +22,11 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/src/util/triangulation.h
     ${PROJECT_SOURCE_DIR}/src/util/sphericaltriangulation.h
     ${PROJECT_SOURCE_DIR}/src/util/sphericalterrain.h
+    ${PROJECT_SOURCE_DIR}/src/system/affinelighttransform.h
     ${PROJECT_SOURCE_DIR}/src/system/terrain.h
     ${PROJECT_SOURCE_DIR}/src/system/dsosystem.h
     ${PROJECT_SOURCE_DIR}/src/system/dsoinitializer.h
+    ${PROJECT_SOURCE_DIR}/src/system/prekeyframe.h
     ${PROJECT_SOURCE_DIR}/src/system/keyframe.h
     ${PROJECT_SOURCE_DIR}/src/system/interestpoint.h
     ${PROJECT_SOURCE_DIR}/src/system/cameramodel.h
@@ -42,12 +44,12 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/src/system/terrain.cpp
     ${PROJECT_SOURCE_DIR}/src/system/dsosystem.cpp
     ${PROJECT_SOURCE_DIR}/src/system/dsoinitializer.cpp
+    ${PROJECT_SOURCE_DIR}/src/system/prekeyframe.cpp
     ${PROJECT_SOURCE_DIR}/src/system/keyframe.cpp
     ${PROJECT_SOURCE_DIR}/src/system/cameramodel.cpp
     ${PROJECT_SOURCE_DIR}/src/system/stereomatcher.cpp
     ${PROJECT_SOURCE_DIR}/src/system/stereogeometryestimator.cpp
     ${PROJECT_SOURCE_DIR}/src/system/frametracker.cpp
-    ${PROJECT_SOURCE_DIR}/src/main.cpp
 )
 
 set(essietial_5pt_estimator_SOURCE_FILES
@@ -57,7 +59,6 @@ set(essietial_5pt_estimator_SOURCE_FILES
 add_library(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES}
     ${essietial_5pt_estimator_SOURCE_FILES}
 )
-target_compile_definitions(dso PRIVATE $<$<CONFIG:Debug>:DEBUG>)
 target_link_libraries(dso ${OpenCV_LIBS} ${CERES_LIBRARIES})
 
 add_subdirectory(samples)

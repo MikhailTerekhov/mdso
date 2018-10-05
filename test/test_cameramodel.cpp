@@ -31,7 +31,7 @@ TEST(CameraModelTest, CoreanCameraReprojection) {
 
   double rmse = std::sqrt(sqErr / testnum); // rmse in pixels
   std::cout << "reprojection rmse = " << rmse << std::endl;
-  EXPECT_TRUE(rmse < 0.1);
+  EXPECT_LT(rmse, 0.1);
 }
 
 TEST(CameraModelTest, SolelyPolynomial) {
@@ -56,7 +56,40 @@ TEST(CameraModelTest, SolelyPolynomial) {
   }
   double rmse = std::sqrt(sqErr / testnum);
   std::cout << "rmse = " << rmse << std::endl;
-  EXPECT_TRUE(rmse < 0.0005);
+  EXPECT_LT(rmse, 0.0005);
+}
+
+TEST(CameraModelTest, CamerasPyramid) {
+  double scale = 604.0;
+  Vec2 center(1.58447, 1.07353);
+  int unmapPolyDeg = 7;
+  VecX unmapPolyCoeffs(unmapPolyDeg, 1);
+  unmapPolyCoeffs << 1.14544, -0.146714, -0.967996, 2.13329, -2.42001, 1.33018,
+      -0.292722;
+  int width = 1920, height = 1208;
+  CameraModel cam(width, height, scale, center, unmapPolyCoeffs);
+  stdvectorCameraModel camPyr = cam.camPyr();
+
+  std::mt19937 mt;
+  std::uniform_real_distribution<> xs(0, width - 1);
+  std::uniform_real_distribution<> ys(0, height - 1);
+
+  const int testCount = 1000;
+  for (int lvl = 0; lvl < settingPyrLevels; ++lvl)
+    for (int it = 0; it < testCount; ++it) {
+      double x = xs(mt), y = ys(mt);
+      Vec2 pnt(x, y);
+      Vec2 pntScaled(x / (1 << lvl), y / (1 << lvl));
+      Vec3 unmapOrig = cam.unmap(pnt).normalized();
+      Vec3 unmapPyr = camPyr[lvl].unmap(pntScaled).normalized();
+      double cos = unmapOrig.dot(unmapPyr); 
+      if (cos < -1)
+        cos = -1;
+      if (cos > 1)
+        cos = 1;
+      double angle = (180.0 / M_PI) * std::acos(cos);
+      EXPECT_LT(angle, 0.01);
+    }
 }
 
 int main(int argc, char **argv) {

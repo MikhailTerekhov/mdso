@@ -9,7 +9,7 @@ using namespace fishdso;
 int main() {
   const int segmentsCount = 10;
   const int onSegmCount = 5;
-  std::vector<Vec2> pnt;
+  stdvectorVec2 pnt;
 
   std::random_device rd;
   std::uniform_real_distribution<double> d(0, 100);

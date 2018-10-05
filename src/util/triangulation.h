@@ -52,7 +52,7 @@ public:
 
   static const int POINT_NOT_FOUND = -4;
 
-  Triangulation(const std::vector<Vec2> &newPoints);
+  Triangulation(const stdvectorVec2 &newPoints);
 
   VertexIterator begin() const;
   VertexIterator end() const;

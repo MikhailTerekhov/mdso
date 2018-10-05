@@ -36,8 +36,8 @@ double sectorBadness(SphericalTriangulation::TrihedralSector *sec) {
   return maxAngle;
 }
 
-std::vector<Vec2> projectAll(const std::vector<Vec3> &rays) {
-  std::vector<Vec2> result(rays.size());
+stdvectorVec2 projectAll(const std::vector<Vec3> &rays) {
+  stdvectorVec2 result(rays.size());
   std::transform(rays.begin(), rays.end(), result.begin(),
                  stereographicProject);
   return result;
@@ -62,7 +62,7 @@ SphericalTriangulation::enclosingSector(Vec3 ray) {
   if (secIters.size() == 1) {
     return &secIters[0]->second;
   } else if (secIters.size() > 1) {
-    std::cout << "removing some sectors!" << std::endl;
+    // std::cout << "removing some sectors!" << std::endl;
 
     auto bestSecIter = *std::min_element(
         secIters.begin(), secIters.end(), [](auto si1, auto si2) {

@@ -10,9 +10,11 @@ namespace fishdso {
 DsoInitializer::DsoInitializer(CameraModel *cam)
     : cam(cam), stereoMatcher(cam), hasFirstFrame(false), framesSkipped(0) {}
 
-bool DsoInitializer::addFrame(const cv::Mat &frame) {
+bool DsoInitializer::addFrame(const cv::Mat &frame, int globalFrameNum) {
   if (!hasFirstFrame) {
-    addFirstFrame(frame);
+    frames[0] = frame;
+    globalFrameNums[0] = globalFrameNum;
+    hasFirstFrame = true;
     return false;
   } else {
     if (framesSkipped < settingFirstFramesSkip) {
@@ -21,6 +23,7 @@ bool DsoInitializer::addFrame(const cv::Mat &frame) {
     }
 
     frames[1] = frame;
+    globalFrameNums[1] = globalFrameNum;
     return true;
   }
 }
@@ -30,21 +33,19 @@ std::vector<KeyFrame> DsoInitializer::createKeyFrames(
   return createKeyFramesFromStereo(NORMAL, debugOutputType);
 }
 
-void DsoInitializer::addFirstFrame(const cv::Mat &frame) {
-  frames[0] = frame;
-  hasFirstFrame = true;
-}
-
 std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
     InterpolationType interpolationType,
     DsoInitializer::DebugOutputType debugOutputType) {
-  std::vector<Vec2> keyPoints[2];
+  stdvectorVec2 keyPoints[2];
   std::vector<double> depths[2];
-  stereoMatcher.match(frames, keyPoints, depths);
+  SE3 motion = stereoMatcher.match(frames, keyPoints, depths);
 
   std::vector<KeyFrame> keyFrames;
   for (int i = 0; i < 2; ++i)
-    keyFrames.push_back(KeyFrame(frames[i]));
+    keyFrames.push_back(KeyFrame(frames[i], globalFrameNums[i]));
+
+  keyFrames[0].preKeyFrame->worldToThis = SE3();
+  keyFrames[1].preKeyFrame->worldToThis = motion;
 
   if (interpolationType == PLAIN) {
     Terrain kpTerrains[2] = {Terrain(cam, keyPoints[0], depths[0]),
@@ -69,42 +70,55 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
 
     SphericalTerrain kpTerrains[2] = {SphericalTerrain(depthedRays[0]),
                                       SphericalTerrain(depthedRays[1])};
-    for (int i = 0; i < 2; ++i)
-      for (InterestPoint &ip : keyFrames[i].interestPoints) {
-        double depth;
-        if (kpTerrains[i](cam->unmap(ip.p.data()), depth))
-          ip.depth = depth;
-      }
 
-    for (int i = 0; i < 2; ++i) {
-      auto it = std::remove_if(keyFrames[i].interestPoints.begin(),
-                               keyFrames[i].interestPoints.end(),
-                               [](InterestPoint p) { return p.depth < 0; });
-      keyFrames[i].interestPoints.erase(it, keyFrames[i].interestPoints.end());
-      keyFrames[i].setDepthPyrs();
+    for (int kfInd = 0; kfInd < 2; ++kfInd) {
+      const int reselectCount = 1;
+      for (int i = 0; i < reselectCount + 1; ++i) {
+        for (InterestPoint &ip : keyFrames[kfInd].interestPoints) {
+          double depth;
+          if (kpTerrains[kfInd](cam->unmap(ip.p.data()), depth))
+            ip.depth = depth;
+        }
+
+        int pointsTotal = keyFrames[kfInd].interestPoints.size();
+        auto it = std::remove_if(keyFrames[kfInd].interestPoints.begin(),
+                                 keyFrames[kfInd].interestPoints.end(),
+                                 [](InterestPoint p) { return p.depth < 0; });
+        keyFrames[kfInd].interestPoints.erase(
+            it, keyFrames[kfInd].interestPoints.end());
+        int pointsInTriang = keyFrames[kfInd].interestPoints.size();
+        int pointsNeeded = settingInterestPointsUsed *
+                           (static_cast<double>(pointsTotal) / pointsInTriang);
+        // std::cout << "in kf" << kfInd << "total = " << pointsTotal
+        // << "inside triang = " << pointsInTriang << std::endl;
+        // std::cout << "so we need " << pointsNeeded << std::endl;
+        if (i != reselectCount)
+          keyFrames[kfInd].selectPointsDenser(pointsNeeded);
+      }
+      keyFrames[kfInd].setDepthPyrs();
     }
+
+    stdvectorStdpairVec2double keyPairs(keyPoints[1].size());
+    for (int i = 0; i < int(keyPoints[1].size()); ++i)
+      keyPairs[i] = {keyPoints[1][i], depths[1][i]};
+    std::sort(keyPairs.begin(), keyPairs.end(),
+              [](auto a, auto b) { return a.second < b.second; });
+
+    int paddingLeft = 0;
+    int paddingRight = int(0.2 * keyPairs.size());
+    minDepth = keyPairs[paddingLeft].second;
+    maxDepth = keyPairs[paddingRight].second;
 
     if (debugOutputType != NO_DEBUG) {
       cv::Mat img = keyFrames[1].frameColored.clone();
       // KpTerrains[1].draw(img, CV_GREEN);
 
-      std::vector<std::pair<Vec2, double>> keyPairs(keyPoints[1].size());
-      for (int i = 0; i < int(keyPoints[1].size()); ++i)
-        keyPairs[i] = {keyPoints[1][i], depths[1][i]};
-      std::sort(keyPairs.begin(), keyPairs.end(),
-                [](auto a, auto b) { return a.second < b.second; });
-
-      int paddingLeft = 0;
-      int paddingRight = int(0.4 * keyPairs.size());
-      double minDepth = keyPairs[paddingLeft].second,
-             maxDepth = keyPairs[paddingRight].second;
-
       insertDepths(img, keyPoints[1], depths[1], minDepth, maxDepth, true);
 
-      cv::circle(img, cv::Point(1800, 450), 7, CV_BLACK, 2);
+      // cv::circle(img, cv::Point(1268, 173), 7, CV_BLACK, 2);
 
-      std::vector<InterestPoint> &ip = keyFrames[1].interestPoints;
-      std::vector<Vec2> pnts(ip.size());
+      stdvectorInterestPoint &ip = keyFrames[1].interestPoints;
+      stdvectorVec2 pnts(ip.size());
       std::vector<double> d(ip.size());
       for (int i = 0; i < int(ip.size()); ++i) {
         pnts[i] = ip[i].p;
@@ -127,7 +141,8 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
 
       } else if (debugOutputType == FILLED_DEPTHS) {
         //        if (interpolationType == PLAIN)
-        //          kpTerrains[1].drawDensePlainDepths(img, minDepth, maxDepth);
+        //          kpTerrains[1].drawDensePlainDepths(img, minDepth,
+        //          maxDepth);
         // KpTerrains[1].draw(img, CV_BLACK);
       }
 
@@ -152,21 +167,29 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
       // cv::imshow("tangent", tangImg);
       cv::imshow("interpolated", img);
 
-      int pyrDW = frames[1].cols / 2, pyrDH = frames[1].rows / 2;
-      for (int pi = 0; pi < settingPyrLevels; ++pi) {
-        cv::Mat pyrD = keyFrames[1].drawDepthedFrame(pi, minDepth, maxDepth);
-        cv::Mat sizedPyrD;
-        cv::resize(pyrD, sizedPyrD, cv::Size(pyrDW, pyrDH), 0, 0, cv::INTER_NEAREST);
+      // int pyrDW = frames[1].cols / 2, pyrDH = frames[1].rows / 2;
+      // for (int pi = 0; pi < settingPyrLevels; ++pi) {
+      // cv::Mat pyrD =
+      // keyFrames[1].preKeyFrame->drawDepthedFrame(pi, minDepth, maxDepth);
+      // cv::Mat sizedPyrD;
+      // cv::resize(pyrD, sizedPyrD, cv::Size(pyrDW, pyrDH), 0, 0,
+      // cv::INTER_NEAREST);
 
-        cv::imshow("pyr " + std::to_string(pi) + " depths", sizedPyrD);
+      // cv::imshow("pyr " + std::to_string(pi) + " depths", sizedPyrD);
 
-        cv::Mat img2;
-        cv::resize(img, img2, cv::Size(), 0.5, 0.5);
-      }
+      // cv::Mat img2;
+      // cv::resize(img, img2, cv::Size(), 0.5, 0.5);
+      // }
 
       cv::waitKey();
+
+      cv::destroyWindow("interpolated");
     }
   }
+
+  // cv::imshow("f1", frames[0]);
+  // cv::imshow("f2", frames[1]);
+  // cv::waitKey();
 
   return keyFrames;
 }

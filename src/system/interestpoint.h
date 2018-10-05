@@ -2,6 +2,7 @@
 
 #include "util/types.h"
 #include <Eigen/Core>
+#include <Eigen/StdVector>
 #include <opencv2/core.hpp>
 
 namespace fishdso {
@@ -16,5 +17,8 @@ struct InterestPoint {
   double depth;
   double variance;
 };
+
+typedef std::vector<InterestPoint, Eigen::aligned_allocator<InterestPoint>>
+    stdvectorInterestPoint;
 
 } // namespace fishdso

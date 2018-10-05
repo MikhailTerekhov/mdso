@@ -9,15 +9,18 @@ namespace fishdso {
 
 // global image for debugging purposes
 extern cv::Mat dbg;
+extern double minDepth, maxDepth;
 
-void putDot(cv::Mat &img, cv::Point const &pos, cv::Scalar const &col);
+void putDot(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col);
+void putCross(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col,
+              int size, int thikness);
 
 void grad(cv::Mat const &img, cv::Mat &gradX, cv::Mat &gradY,
           cv::Mat &gradNorm);
 
 cv::Scalar depthCol(double d, double mind, double maxd);
 
-void insertDepths(cv::Mat &img, const std::vector<Vec2> &points,
+void insertDepths(cv::Mat &img, const stdvectorVec2 &points,
                   const std::vector<double> &depths, double minDepth,
                   double maxDepth, bool areSolidPnts);
 
@@ -39,7 +42,7 @@ template <typename T> void fillBlackPixels(cv::Mat &img) {
   for (int y = 0; y < img.rows; ++y)
     for (int x = 0; x < img.cols; ++x)
       if (img.at<T>(y, x) == T()) {
-        typename accum_type<T>::type accum = accum_type<T>::type();
+        typename accum_type<T>::type accum = typename accum_type<T>::type();
 
         int nonBlackCnt = 0;
         for (int yy = std::max(0, y - d); yy < std::min(y + d, img.rows - 1);
@@ -73,8 +76,10 @@ template <typename T> cv::Mat boxFilterPyrUp(const cv::Mat &img) {
 extern template cv::Mat boxFilterPyrUp<unsigned char>(const cv::Mat &img);
 extern template cv::Mat boxFilterPyrUp<cv::Vec3b>(const cv::Mat &img);
 
-cv::Mat pyrNUpDepth(const cv::Mat1f &integralWeightedDepths,
-                            const cv::Mat1f &integralWeights,
-                            int levelNum);
+cv::Mat pyrNUpDepth(const cv::Mat1d &integralWeightedDepths,
+                    const cv::Mat1d &integralWeights, int levelNum);
+
+cv::Mat drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
+                         double minDepth, double maxDepth);
 
 } // namespace fishdso
