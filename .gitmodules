@@ -1,3 +1,6 @@
 [submodule "thirdparty/googletest"]
 	path = thirdparty/googletest
 	url = https://github.com/google/googletest
+[submodule "thirdparty/Sophus"]
+	path = thirdparty/Sophus
+	url = git://github.com/strasdat/Sophus.git
