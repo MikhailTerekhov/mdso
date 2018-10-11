@@ -1,4 +1,4 @@
-#include "util/triangulation.h"
+#include "util/Triangulation.h"
 #include "util/defs.h"
 #include "util/types.h"
 #include "util/util.h"
@@ -7,7 +7,7 @@
 
 namespace fishdso {
 
-Triangulation::Triangulation(const stdvectorVec2 &newPoints)
+Triangulation::Triangulation(const StdVector<Vec2> &newPoints)
     : indicesInv(newPoints.size()) {
   //_vertices.reserve(newPoints.size() + 3);
 

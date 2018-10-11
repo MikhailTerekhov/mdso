@@ -1,5 +1,5 @@
 #include <fstream>
-#include "system/dsosystem.h"
+#include "system/DsoSystem.h"
 
 using namespace fishdso;
 
@@ -54,7 +54,7 @@ outpred stands for file to put prediction info it)abacaba";
   std::ofstream outpred(argv[6]); 
   dsoSystem.printPredictionInfo(outpred);
   
-  std::ofstream outPly("points.ply");
+  std::ofstream outPly("test/data/frames/points.ply");
   dsoSystem.printLastKfInPly(outPly);
 
   return 0;

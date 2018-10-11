@@ -1,10 +1,11 @@
-#pragma once
+#ifndef INCLUDE_DSOSYSTEM
+#define INCLUDE_DSOSYSTEM
 
 #include "util/settings.h"
-#include "system/cameramodel.h"
-#include "system/dsoinitializer.h"
-#include "system/frametracker.h"
-#include "system/keyframe.h"
+#include "system/CameraModel.h"
+#include "system/DsoInitializer.h"
+#include "system/FrameTracker.h"
+#include "system/KeyFrame.h"
 #include <map>
 #include <memory>
 #include <opencv2/core.hpp>
@@ -26,7 +27,7 @@ private:
   SE3 purePredictKfToCur();
 
   CameraModel *cam;
-  stdvectorCameraModel camPyr;
+  StdVector<CameraModel> camPyr;
 
   DsoInitializer dsoInitializer;
   bool isInitialized;
@@ -35,10 +36,12 @@ private:
   
   int curFrameNum;
   std::map<int, KeyFrame> keyFrames;
-  stdmapIntSE3 worldToFrame;
-  stdmapIntSE3 worldToFramePredict;
+  StdMap<int, SE3> worldToFrame;
+  StdMap<int, SE3> worldToFramePredict;
 
   AffineLightTransform<double> lightKfToLast;
 };
 
 } // namespace fishdso
+
+#endif

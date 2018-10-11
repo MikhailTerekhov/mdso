@@ -1,8 +1,8 @@
-#include "system/terrain.h"
+#include "util/Terrain.h"
 
 namespace fishdso {
 
-Terrain::Terrain(CameraModel *cam, const stdvectorVec2 &points,
+Terrain::Terrain(CameraModel *cam, const StdVector<Vec2> &points,
                  const std::vector<double> &depths)
     : depths(depths), triang(points) {
   if (points.size() != depths.size())

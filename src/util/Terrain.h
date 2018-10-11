@@ -1,5 +1,5 @@
-#include "system/cameramodel.h"
-#include "util/triangulation.h"
+#include "system/CameraModel.h"
+#include "util/Triangulation.h"
 
 namespace fishdso {
 
@@ -9,7 +9,7 @@ class Terrain {
   using Triangle = Triangulation::Triangle;
 
 public:
-  Terrain(CameraModel *cam, const stdvectorVec2 &points,
+  Terrain(CameraModel *cam, const StdVector<Vec2> &points,
           const std::vector<double> &depths);
 
   bool hasInterpolatedDepth(Vec2 p);

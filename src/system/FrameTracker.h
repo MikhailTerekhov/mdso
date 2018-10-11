@@ -1,16 +1,15 @@
-#pragma once
+#ifndef INCLUDE_FRAMETRACKER
+#define INCLUDE_FRAMETRACKER
 
-#include "system/affinelighttransform.h"
-#include "system/cameramodel.h"
-#include "system/keyframe.h"
+#include "system/AffineLightTransform.h"
+#include "system/CameraModel.h"
+#include "system/KeyFrame.h"
 
 namespace fishdso {
 
-extern int dbg1;
-
 class FrameTracker {
 public:
-  FrameTracker(const stdvectorCameraModel &camPyr, PreKeyFrame *base);
+  FrameTracker(const StdVector<CameraModel> &camPyr, PreKeyFrame *base);
 
   std::pair<SE3, AffineLightTransform<double>>
   trackFrame(PreKeyFrame *frame, const SE3 &coarseMotion,
@@ -23,8 +22,10 @@ private:
                 const SE3 &coarseMotion,
                 const AffineLightTransform<double> &coarseAffLight);
 
-  const stdvectorCameraModel &camPyr;
+  const StdVector<CameraModel> &camPyr;
   PreKeyFrame *base;
 };
 
 } // namespace fishdso
+
+#endif

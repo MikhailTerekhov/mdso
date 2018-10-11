@@ -1,24 +1,20 @@
-#include "system/frametracker.h"
+#include "system/FrameTracker.h"
 #include "util/defs.h"
 #include <ceres/cubic_interpolation.h>
 
 namespace fishdso {
 
-#define SETTING_AFFINE_LIGHT true
+bool settingAffineLight = true;
 int settingPyrLevelsUnused = 0;
 int dbg1 = 0, dbg2 = 0;
 
-cv::Mat depthed;
-
-FrameTracker::FrameTracker(const stdvectorCameraModel &camPyr,
+FrameTracker::FrameTracker(const StdVector<CameraModel> &camPyr,
                            PreKeyFrame *base)
     : camPyr(camPyr), base(base) {}
 
 std::pair<SE3, AffineLightTransform<double>>
 FrameTracker::trackFrame(PreKeyFrame *frame, const SE3 &coarseMotion,
                          const AffineLightTransform<double> &coarseAffLight) {
-  dbg1++;
-  dbg2 = 0;
   cv::Size displSz = base->framePyr[1].size();
 
   SE3 motion = coarseMotion;
@@ -35,9 +31,7 @@ FrameTracker::trackFrame(PreKeyFrame *frame, const SE3 &coarseMotion,
   return {motion, affLight};
 }
 
-template <bool useAffLight> struct PointTrackingResidual;
-
-template <> struct PointTrackingResidual<true> {
+struct PointTrackingResidual {
   PointTrackingResidual(
       Vec3 pos, double baseIntensity, const CameraModel *cam,
       ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> *trackedFrame)
@@ -76,21 +70,6 @@ template <> struct PointTrackingResidual<true> {
   ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> *trackedFrame;
 };
 
-template <> struct PointTrackingResidual<false> {
-  PointTrackingResidual(
-      Vec3 pos, double baseIntensity, const CameraModel *cam,
-      ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> *trackedFrame)
-      : ref(pos, baseIntensity, cam, trackedFrame) {}
-
-  template <typename T>
-  bool operator()(const T *const rotP, const T *const transP, T *res) const {
-    static const AffineLightTransform<T> defaultAffLight(T(1.0), T(0.0));
-    return ref(rotP, transP, defaultAffLight.data, res);
-  }
-
-  PointTrackingResidual<true> ref;
-};
-
 bool isPointTrackable(const CameraModel &cam, const Vec3 &basePos,
                       const SE3 &coarseBaseToCur) {
   Vec3 coarseCurPos = coarseBaseToCur * basePos;
@@ -104,8 +83,6 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
     const cv::Mat1d &baseDepths, const cv::Mat1b &trackedImg,
     const SE3 &coarseMotion,
     const AffineLightTransform<double> &coarseAffLight) {
-
-  dbg2++;
   SE3 motion = coarseMotion;
   AffineLightTransform<double> affLight = coarseAffLight;
 
@@ -154,8 +131,9 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
                             new ceres::EigenQuaternionParameterization());
   problem.AddParameterBlock(motion.translation().data(), 3);
 
-  if (SETTING_AFFINE_LIGHT)
-    problem.AddParameterBlock(affLight.data, 2);
+  problem.AddParameterBlock(affLight.data, 2);
+  if (!settingAffineLight)
+    problem.SetParameterBlockConstant(affLight.data);
 
   std::vector<double> pixUsed;
 
@@ -164,14 +142,17 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
 
   double pnt[2] = {0.0, 0.0};
 
-  std::vector<PointTrackingResidual<SETTING_AFFINE_LIGHT> *> residuals;
-  stdvectorVec2 gotOutside;
+  std::vector<PointTrackingResidual*> residuals;
+  StdVector<Vec2> gotOutside;
+
+  int pntTotal = 0, pntOutside = 0, pntOutlier = 0;
 
   for (int y = 0; y < baseImg.rows; ++y)
     for (int x = 0; x < baseImg.cols; ++x)
       if (baseDepths(y, x) > 0) {
         if (!resMask(y, x))
           continue;
+        ++pntTotal;
         pnt[0] = x;
         pnt[1] = y;
 
@@ -183,22 +164,13 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
 
         pixUsed.push_back(baseImg(y, x));
 
-#if SETTING_AFFINE_LIGHT
-        residuals.push_back(new PointTrackingResidual<true>(
+        residuals.push_back(new PointTrackingResidual(
             pos, static_cast<double>(baseImg(y, x)), &cam, &trackedFrame));
         problem.AddResidualBlock(
-            new ceres::AutoDiffCostFunction<PointTrackingResidual<true>, 1, 4,
+            new ceres::AutoDiffCostFunction<PointTrackingResidual, 1, 4,
                                             3, 2>(residuals.back()),
             lossFunc, motion.so3().data(), motion.translation().data(),
             affLight.data);
-#else
-        residuals.push_back(new PointTrackingResidual<false>(
-            pos, static_cast<double>(baseImg(y, x)), &cam, &trackedFrame));
-        problem.AddResidualBlock(
-            new ceres::AutoDiffCostFunction<PointTrackingResidual<false>, 1, 4,
-                                            3>(residuals.back()),
-            lossFunc, motion.so3().data(), motion.translation().data());
-#endif
       }
 
   double meanIntens =
@@ -208,8 +180,8 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
     sumSqDev += (p - meanIntens) * (p - meanIntens);
   double meanSqDev = std::sqrt(sumSqDev / pixUsed.size());
 
-  std::cout << "pix intensity mean square deviation = " << meanSqDev
-            << std::endl;
+  // std::cout << "pix intensity mean square deviation = " << meanSqDev
+  // << std::endl;
 
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_QR;
@@ -219,40 +191,15 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
 
   ceres::Solve(options, &problem, &summary);
 
-  std::cout << summary.BriefReport() << std::endl;
-  std::cout << "num res = " << summary.num_residuals << std::endl;
-  std::cout << "avg robustified res = "
-            << std::sqrt(summary.final_cost / summary.num_residuals)
-            << std::endl;
-  SE3 diff = motion * coarseMotion.inverse();
-  std::cout << "trans delta = " << diff.translation().norm() << std::endl;
-  std::cout << "rot delta = " << diff.so3().log().norm() << std::endl;
-  std::cout << std::endl;
-
-  // #if SETTING_AFFINE_LIGHT
-  // Vec3 lowest = (*std::min_element(
-  // residuals.begin(), residuals.end(),
-  // [cam](PointTrackingResidual<SETTING_AFFINE_LIGHT> *res1,
-  // PointTrackingResidual<SETTING_AFFINE_LIGHT> *res2) {
-  // return cam.map(res1->pos)[1] < cam.map(res2->pos)[1];
-  // }))
-  // ->pos;
-  // #else
-  // Vec3 lowest =
-  // (*std::min_element(
-  // residuals.begin(), residuals.end(),
-  // [cam](PointTrackingResidual<SETTING_AFFINE_LIGHT> *res1,
-  // PointTrackingResidual<SETTING_AFFINE_LIGHT> *res2) {
-  // return cam.map(res1->ref.pos)[1] < cam.map(res2->ref.pos)[1];
-  // }))
-  // ->ref.pos;
-  // #endif
-
-  // std::cout << "img sizes = " << cam.getWidth() << ' ' << cam.getHeight()
+  // std::cout << summary.BriefReport() << std::endl;
+  // std::cout << "num res = " << summary.num_residuals << std::endl;
+  // std::cout << "avg robustified res = "
+  // << std::sqrt(summary.final_cost / summary.num_residuals)
   // << std::endl;
-  // std::cout << "lowest point = " << cam.map(lowest).transpose() << std::endl;
-  // Vec2 reprojLowest = cam.map(motion * lowest);
-  // std::cout << "reproj = " << reprojLowest.transpose() << std::endl;
+  // SE3 diff = motion * coarseMotion.inverse();
+  // std::cout << "trans delta = " << diff.translation().norm() << std::endl;
+  // std::cout << "rot delta = " << diff.so3().log().norm() << std::endl;
+  // std::cout << std::endl;
 
   cv::Mat depthed = drawDepthedFrame(baseImg, baseDepths, minDepth, maxDepth);
   cv::Mat dfr;
@@ -267,37 +214,20 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
         CV_BLACK, 4, 2);
   }
 
-#if SETTING_AFFINE_LIGHT
   for (auto rsd : residuals) {
     double result = -1;
     rsd->operator()(motion.unit_quaternion().coeffs().data(),
                     motion.translation().data(), affLight.data, &result);
     if (std::abs(result) > settingOutlierIntensityDiff) {
+      pntOutlier++;
       Vec2 mapped = cam.map(rsd->pos.data());
       cv::Point pnt = toCvPoint(mapped, scaleX, scaleY,
                                 cv::Point(0.5 * scaleX, 0.5 * scaleY));
       cv::circle(dfr, pnt, 4, CV_BLACK, 2);
     }
   }
-#else
-  for (auto rsd : residuals) {
-    double result = -1;
-    rsd->operator()(motion.unit_quaternion().coeffs().data(),
-                    motion.translation().data(), &result);
-    if (std::abs(result) > settingOutlierIntensityDiff) {
-      Vec2 mapped = cam.map(rsd->ref.pos.data());
-      cv::Point pnt = toCvPoint(mapped, scaleX, scaleY,
-                                cv::Point(0.5 * scaleX, 0.5 * scaleY));
-      cv::circle(dfr, pnt, 4, CV_BLACK, 2);
-    }
-  }
-#endif
-  cv::imshow("cur depths", dfr);
-  // if (dbg1 == 1)
-  // cv::imwrite("frames/worse/depths1" + std::to_string(dbg2) + ".jpg", dfr);
-  // else if (dbg1 == 4)
-  // cv::imwrite("frames/worse/depths4" + std::to_string(dbg2) + ".jpg", dfr);
 
+  cv::imshow("deprhs", dfr);
   cv::waitKey();
 
   return {motion, affLight};

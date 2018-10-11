@@ -1,6 +1,7 @@
-﻿#pragma once
+﻿#ifndef INCLUDE_TRIANGULATION
+#define INCLUDE_TRIANGULATION
 
-#include "system/cameramodel.h"
+#include "system/CameraModel.h"
 #include "util/types.h"
 #include <opencv2/opencv.hpp>
 #include <unordered_set>
@@ -52,7 +53,7 @@ public:
 
   static const int POINT_NOT_FOUND = -4;
 
-  Triangulation(const stdvectorVec2 &newPoints);
+  Triangulation(const StdVector<Vec2> &newPoints);
 
   VertexIterator begin() const;
   VertexIterator end() const;
@@ -125,3 +126,5 @@ void drawCurvedInternal(CameraModel *cam, Vec2 ptFrom, Vec2 ptTo, cv::Mat &img,
                         cv::Scalar edgeCol);
 
 } // namespace fishdso
+
+#endif

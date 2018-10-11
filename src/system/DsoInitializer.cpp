@@ -1,6 +1,6 @@
-#include "system/dsoinitializer.h"
+#include "system/DsoInitializer.h"
+#include "util/SphericalTerrain.h"
 #include "util/defs.h"
-#include "util/sphericalterrain.h"
 #include "util/util.h"
 #include <algorithm>
 #include <opencv2/opencv.hpp>
@@ -36,7 +36,7 @@ std::vector<KeyFrame> DsoInitializer::createKeyFrames(
 std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
     InterpolationType interpolationType,
     DsoInitializer::DebugOutputType debugOutputType) {
-  stdvectorVec2 keyPoints[2];
+  StdVector<Vec2> keyPoints[2];
   std::vector<double> depths[2];
   SE3 motion = stereoMatcher.match(frames, keyPoints, depths);
 
@@ -98,7 +98,7 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
       keyFrames[kfInd].setDepthPyrs();
     }
 
-    stdvectorStdpairVec2double keyPairs(keyPoints[1].size());
+    StdVector<std::pair<Vec2, double>> keyPairs(keyPoints[1].size());
     for (int i = 0; i < int(keyPoints[1].size()); ++i)
       keyPairs[i] = {keyPoints[1][i], depths[1][i]};
     std::sort(keyPairs.begin(), keyPairs.end(),
@@ -117,8 +117,8 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
 
       // cv::circle(img, cv::Point(1268, 173), 7, CV_BLACK, 2);
 
-      stdvectorInterestPoint &ip = keyFrames[1].interestPoints;
-      stdvectorVec2 pnts(ip.size());
+      StdVector<InterestPoint> &ip = keyFrames[1].interestPoints;
+      StdVector<Vec2> pnts(ip.size());
       std::vector<double> d(ip.size());
       for (int i = 0; i < int(ip.size()); ++i) {
         pnts[i] = ip[i].p;

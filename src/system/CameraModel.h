@@ -1,4 +1,5 @@
-#pragma once
+#ifndef INCLUDE_CAMERAMODEL
+#define INCLUDE_CAMERAMODEL
 
 #include "util/settings.h"
 #include "util/types.h"
@@ -10,10 +11,6 @@
 #include <string>
 
 namespace fishdso {
-
-class CameraModel;
-typedef std::vector<CameraModel, Eigen::aligned_allocator<CameraModel>>
-    stdvectorCameraModel;
 
 class CameraModel {
 
@@ -119,7 +116,7 @@ public:
 
   void setMapPolyCoeffs();
 
-  stdvectorCameraModel camPyr();
+  StdVector<CameraModel> camPyr();
 
 private:
   friend std::istream &operator>>(std::istream &is, CameraModel &cc);
@@ -158,3 +155,5 @@ private:
 };
 
 } // namespace fishdso
+
+#endif

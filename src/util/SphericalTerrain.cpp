@@ -1,4 +1,4 @@
-#include "util/sphericalterrain.h"
+#include "util/SphericalTerrain.h"
 #include "util/defs.h"
 
 namespace fishdso {

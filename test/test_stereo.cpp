@@ -1,5 +1,5 @@
-#include "system/cameramodel.h"
-#include "system/stereogeometryestimator.h"
+#include "system/CameraModel.h"
+#include "system/StereoGeometryEstimator.h"
 #include <gtest/gtest.h>
 #include <memory>
 #include <random>
@@ -43,7 +43,7 @@ TEST_F(StereoPositioningTest, RandomPointsCoarse) {
   //  SO3 rotations[] = {SO3::rotX(angle(mt)),
   //                     SO3::rotX(angle(mt)) * SO3::rotY(angle(mt))};
 
-  stdvectorSO3 rotations = {SO3(),
+  StdVector<SO3> rotations = {SO3(),
                             SO3::rotX(angle(mt)),
                             SO3::rotZ(angle(mt)),
                             SO3::rotX(angle(mt)) * SO3::rotY(angle(mt)),
@@ -53,7 +53,7 @@ TEST_F(StereoPositioningTest, RandomPointsCoarse) {
   std::vector<Vec3> translations = {Vec3(0, 0, 10), Vec3(0, 0, -10),
                                     Vec3(0, 10, 0), Vec3(0, -10, 0),
                                     Vec3(10, 0, 0), Vec3(-10, 0, 0)};
-  stdvectorSE3 motions;
+  StdVector<SE3> motions;
   for (const SO3 &rot : rotations)
     for (const Vec3 &trans : translations)
       motions.push_back(SE3(rot, trans));
@@ -73,7 +73,7 @@ TEST_F(StereoPositioningTest, RandomPointsCoarse) {
     //    Mat33 E = tCross * mot.rotationMatrix();
     //    std::cout << "[t]x =\n" << tCross << "\nE =\n" << E << std::endl;
 
-    stdvectorStdpairVec2Vec2 imgCorresps;
+    StdVector<std::pair<Vec2, Vec2>> imgCorresps;
     imgCorresps.reserve((int(npoints * (1 + outlierPart))));
     for (int i = 0; i < npoints; ++i) {
       Vec3 p(xdistr(mt), ydistr(mt), zdistr(mt));
@@ -139,7 +139,7 @@ TEST_F(StereoPositioningTest, RandomPointsPrecise) {
   //  SO3 rotations[] = {SO3::rotX(angle(mt)),
   //                     SO3::rotX(angle(mt)) * SO3::rotY(angle(mt))};
 
-  stdvectorSO3 rotations = {SO3(),
+  StdVector<SO3> rotations = {SO3(),
                             SO3::rotX(angle(mt)),
                             SO3::rotZ(angle(mt)),
                             SO3::rotX(angle(mt)) * SO3::rotY(angle(mt)),
@@ -149,7 +149,7 @@ TEST_F(StereoPositioningTest, RandomPointsPrecise) {
   std::vector<Vec3> translations = {Vec3(0, 0, 1), Vec3(0, 0, -1),
                                     Vec3(0, 1, 0), Vec3(0, -1, 0),
                                     Vec3(1, 0, 0), Vec3(-1, 0, 0)};
-  stdvectorSE3 motions;
+  StdVector<SE3> motions;
   for (const SO3 &rot : rotations)
     for (const Vec3 &trans : translations)
       motions.push_back(SE3(rot, trans));
@@ -168,7 +168,7 @@ TEST_F(StereoPositioningTest, RandomPointsPrecise) {
     //    Mat33 E = tCross * mot.rotationMatrix();
     //    std::cout << "[t]x =\n" << tCross << "\nE =\n" << E << std::endl;
 
-    stdvectorStdpairVec2Vec2 imgCorresps;
+    StdVector<std::pair<Vec2, Vec2>> imgCorresps;
     imgCorresps.reserve(int(npoints * (1 + outlierPart)));
 
     for (int i = 0; i < int(npoints * outlierPart); ++i)

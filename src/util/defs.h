@@ -1,4 +1,5 @@
-#pragma once
+#ifndef INCLUDE_DEFS
+#define INCLUDE_DEFS
 
 #include <cmath>
 #include <opencv2/core.hpp>
@@ -15,3 +16,5 @@ namespace fishdso {
 #define CV_WHITE_BYTE static_cast<unsigned char>(255)
 
 } // namespace fishdso
+
+#endif

@@ -1,7 +1,8 @@
-#pragma once
+#ifndef INCLUDE_KEYFRAME
+#define INCLUDE_KEYFRAME
 
-#include "system/interestpoint.h"
-#include "system/prekeyframe.h"
+#include "system/InterestPoint.h"
+#include "system/PreKeyFrame.h"
 #include "util/settings.h"
 #include <Eigen/StdVector>
 #include <memory>
@@ -24,7 +25,7 @@ struct KeyFrame {
   std::unique_ptr<PreKeyFrame> preKeyFrame;
   cv::Mat frameColored;
   cv::Mat gradX, gradY, gradNorm;
-  stdvectorInterestPoint interestPoints;
+  StdVector<InterestPoint> interestPoints;
 
 private:
   static void updateAdaptiveBlockSize(int pointsFound);
@@ -38,3 +39,5 @@ private:
 };
 
 } // namespace fishdso
+
+#endif

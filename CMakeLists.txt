@@ -19,37 +19,37 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/src/util/types.h
     ${PROJECT_SOURCE_DIR}/src/util/defs.h
     ${PROJECT_SOURCE_DIR}/src/util/settings.h
-    ${PROJECT_SOURCE_DIR}/src/util/triangulation.h
-    ${PROJECT_SOURCE_DIR}/src/util/sphericaltriangulation.h
-    ${PROJECT_SOURCE_DIR}/src/util/sphericalterrain.h
-    ${PROJECT_SOURCE_DIR}/src/system/affinelighttransform.h
-    ${PROJECT_SOURCE_DIR}/src/system/terrain.h
-    ${PROJECT_SOURCE_DIR}/src/system/dsosystem.h
-    ${PROJECT_SOURCE_DIR}/src/system/dsoinitializer.h
-    ${PROJECT_SOURCE_DIR}/src/system/prekeyframe.h
-    ${PROJECT_SOURCE_DIR}/src/system/keyframe.h
-    ${PROJECT_SOURCE_DIR}/src/system/interestpoint.h
-    ${PROJECT_SOURCE_DIR}/src/system/cameramodel.h
-    ${PROJECT_SOURCE_DIR}/src/system/stereomatcher.h
-    ${PROJECT_SOURCE_DIR}/src/system/stereogeometryestimator.h
-    ${PROJECT_SOURCE_DIR}/src/system/frametracker.h
+    ${PROJECT_SOURCE_DIR}/src/util/Triangulation.h
+    ${PROJECT_SOURCE_DIR}/src/util/Terrain.h
+    ${PROJECT_SOURCE_DIR}/src/util/SphericalTriangulation.h
+    ${PROJECT_SOURCE_DIR}/src/util/SphericalTerrain.h
+    ${PROJECT_SOURCE_DIR}/src/system/AffineLightTransform.h
+    ${PROJECT_SOURCE_DIR}/src/system/DsoSystem.h
+    ${PROJECT_SOURCE_DIR}/src/system/DsoInitializer.h
+    ${PROJECT_SOURCE_DIR}/src/system/PreKeyFrame.h
+    ${PROJECT_SOURCE_DIR}/src/system/KeyFrame.h
+    ${PROJECT_SOURCE_DIR}/src/system/InterestPoint.h
+    ${PROJECT_SOURCE_DIR}/src/system/CameraModel.h
+    ${PROJECT_SOURCE_DIR}/src/system/StereoMatcher.h
+    ${PROJECT_SOURCE_DIR}/src/system/StereoGeometryEstimator.h
+    ${PROJECT_SOURCE_DIR}/src/system/FrameTracker.h
 )
 
 set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/src/util/util.cpp
     ${PROJECT_SOURCE_DIR}/src/util/settings.cpp
-    ${PROJECT_SOURCE_DIR}/src/util/triangulation.cpp
-    ${PROJECT_SOURCE_DIR}/src/util/sphericaltriangulation.cpp
-    ${PROJECT_SOURCE_DIR}/src/util/sphericalterrain.cpp
-    ${PROJECT_SOURCE_DIR}/src/system/terrain.cpp
-    ${PROJECT_SOURCE_DIR}/src/system/dsosystem.cpp
-    ${PROJECT_SOURCE_DIR}/src/system/dsoinitializer.cpp
-    ${PROJECT_SOURCE_DIR}/src/system/prekeyframe.cpp
-    ${PROJECT_SOURCE_DIR}/src/system/keyframe.cpp
-    ${PROJECT_SOURCE_DIR}/src/system/cameramodel.cpp
-    ${PROJECT_SOURCE_DIR}/src/system/stereomatcher.cpp
-    ${PROJECT_SOURCE_DIR}/src/system/stereogeometryestimator.cpp
-    ${PROJECT_SOURCE_DIR}/src/system/frametracker.cpp
+    ${PROJECT_SOURCE_DIR}/src/util/Triangulation.cpp
+    ${PROJECT_SOURCE_DIR}/src/util/Terrain.cpp
+    ${PROJECT_SOURCE_DIR}/src/util/SphericalTriangulation.cpp
+    ${PROJECT_SOURCE_DIR}/src/util/SphericalTerrain.cpp
+    ${PROJECT_SOURCE_DIR}/src/system/DsoSystem.cpp
+    ${PROJECT_SOURCE_DIR}/src/system/DsoInitializer.cpp
+    ${PROJECT_SOURCE_DIR}/src/system/PreKeyFrame.cpp
+    ${PROJECT_SOURCE_DIR}/src/system/KeyFrame.cpp
+    ${PROJECT_SOURCE_DIR}/src/system/CameraModel.cpp
+    ${PROJECT_SOURCE_DIR}/src/system/StereoMatcher.cpp
+    ${PROJECT_SOURCE_DIR}/src/system/StereoGeometryEstimator.cpp
+    ${PROJECT_SOURCE_DIR}/src/system/FrameTracker.cpp
 )
 
 set(essietial_5pt_estimator_SOURCE_FILES

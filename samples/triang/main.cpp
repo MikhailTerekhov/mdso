@@ -1,4 +1,4 @@
-#include "util/triangulation.h"
+#include "util/Triangulation.h"
 #include "util/types.h"
 #include <chrono>
 #include <opencv2/opencv.hpp>
@@ -9,7 +9,7 @@ using namespace fishdso;
 int main() {
   const int segmentsCount = 10;
   const int onSegmCount = 5;
-  stdvectorVec2 pnt;
+  StdVector<Vec2> pnt;
 
   std::random_device rd;
   std::uniform_real_distribution<double> d(0, 100);

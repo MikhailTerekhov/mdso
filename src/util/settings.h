@@ -1,4 +1,5 @@
-#pragma once
+#ifndef INCLUDE_SETTINGS
+#define INCLUDE_SETTINGS
 
 namespace fishdso {
 
@@ -38,3 +39,5 @@ constexpr int settingPyrLevels = 6;
 extern double settingOutlierIntensityDiff;
 
 } // namespace fishdso
+
+#endif

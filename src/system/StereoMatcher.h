@@ -1,8 +1,9 @@
-#pragma once
+#ifndef INCLUDE_STEREOMATCHER
+#define INCLUDE_STEREOMATCHER
 
-#include "system/cameramodel.h"
-#include "system/stereogeometryestimator.h"
-#include "system/terrain.h"
+#include "system/CameraModel.h"
+#include "system/StereoGeometryEstimator.h"
+#include "util/Terrain.h"
 #include "util/types.h"
 #include <opencv2/opencv.hpp>
 #include <vector>
@@ -13,7 +14,7 @@ class StereoMatcher {
 public:
   StereoMatcher(CameraModel *cam);
 
-  SE3 match(cv::Mat frames[2], stdvectorVec2 resPoints[2],
+  SE3 match(cv::Mat frames[2], StdVector<Vec2> resPoints[2],
             std::vector<double> resDepths[2]);
 
   std::shared_ptr<Terrain> getBaseTerrain();
@@ -31,3 +32,5 @@ private:
 };
 
 } // namespace fishdso
+
+#endif

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef INCLUDE_UTIL
+#define INCLUDE_UTIL
 
 #include "util/settings.h"
 #include "util/types.h"
@@ -20,7 +21,7 @@ void grad(cv::Mat const &img, cv::Mat &gradX, cv::Mat &gradY,
 
 cv::Scalar depthCol(double d, double mind, double maxd);
 
-void insertDepths(cv::Mat &img, const stdvectorVec2 &points,
+void insertDepths(cv::Mat &img, const StdVector<Vec2> &points,
                   const std::vector<double> &depths, double minDepth,
                   double maxDepth, bool areSolidPnts);
 
@@ -83,3 +84,5 @@ cv::Mat drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
                          double minDepth, double maxDepth);
 
 } // namespace fishdso
+
+#endif

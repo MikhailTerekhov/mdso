@@ -1,6 +1,8 @@
-#pragma once
-#include "system/keyframe.h"
-#include "system/stereomatcher.h"
+#ifndef INCLUDE_DSOINITIALIZER
+#define INCLUDE_DSOINITIALIZER
+
+#include "system/KeyFrame.h"
+#include "system/StereoMatcher.h"
 #include <memory>
 #include <opencv2/opencv.hpp>
 
@@ -34,3 +36,5 @@ private:
 };
 
 } // namespace fishdso
+
+#endif

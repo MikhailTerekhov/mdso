@@ -1,7 +1,8 @@
-#pragma once
+#ifndef INCLUDE_SPHERICAL_TERRAIN
+#define INCLUDE_SPHERICAL_TERRAIN
 
-#include "system/cameramodel.h"
-#include "util/sphericaltriangulation.h"
+#include "system/CameraModel.h"
+#include "util/SphericalTriangulation.h"
 #include <opencv2/opencv.hpp>
 
 namespace fishdso {
@@ -29,3 +30,5 @@ private:
 };
 
 } // namespace fishdso
+
+#endif

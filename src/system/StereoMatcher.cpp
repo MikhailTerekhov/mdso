@@ -1,4 +1,4 @@
-#include "system/stereomatcher.h"
+#include "system/StereoMatcher.h"
 #include "util/defs.h"
 #include "util/settings.h"
 #include <RelativePoseEstimator.h>
@@ -40,7 +40,7 @@ void filterOutStillMatches(std::vector<cv::DMatch> &matches,
   std::cout << "still matches removed = " << stillMatches.size() << std::endl;
 }
 
-SE3 StereoMatcher::match(cv::Mat frames[2], stdvectorVec2 resPoints[2],
+SE3 StereoMatcher::match(cv::Mat frames[2], StdVector<Vec2> resPoints[2],
                          std::vector<double> resDepths[2]) {
   cv::Ptr<cv::ORB> orb = cv::ORB::create(settingKeyPointsCount);
   std::vector<cv::KeyPoint> keyPoints[2];
@@ -63,7 +63,7 @@ SE3 StereoMatcher::match(cv::Mat frames[2], stdvectorVec2 resPoints[2],
   std::vector<cv::DMatch> stillMatches;
   filterOutStillMatches(matches, stillMatches, keyPoints);
 
-  stdvectorStdpairVec2Vec2 corresps;
+  StdVector<std::pair<Vec2, Vec2>> corresps;
   corresps.reserve(matches.size());
   for (int i = 0; i < int(matches.size()); ++i)
     corresps.push_back({toVec2(keyPoints[0][matches[i].trainIdx].pt),

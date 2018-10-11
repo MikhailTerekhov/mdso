@@ -1,4 +1,4 @@
-#include "system/cameramodel.h"
+#include "system/CameraModel.h"
 
 namespace fishdso {
 
@@ -7,7 +7,7 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   StereoGeometryEstimator(
-      CameraModel *cam, const stdvectorStdpairVec2Vec2 &imgCorresps);
+      CameraModel *cam, const StdVector<std::pair<Vec2, Vec2>> &imgCorresps);
 
   SE3 findCoarseMotion();
   SE3 findPreciseMotion();
@@ -85,7 +85,7 @@ private:
                     int &newInliers);
 
   CameraModel *cam;
-  stdvectorStdpairVec2Vec2 imgCorresps;
+  StdVector<std::pair<Vec2, Vec2>> imgCorresps;
   std::vector<std::pair<Vec3, Vec3>> rays;
   std::vector<std::pair<double, double>> _depths;
   std::vector<int> _inliersInds;

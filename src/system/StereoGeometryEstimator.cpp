@@ -1,4 +1,4 @@
-#include "system/stereogeometryestimator.h"
+#include "system/StereoGeometryEstimator.h"
 #include <RelativePoseEstimator.h>
 #include <ceres/ceres.h>
 #include <fstream>
@@ -6,7 +6,7 @@
 namespace fishdso {
 
 StereoGeometryEstimator::StereoGeometryEstimator(
-    CameraModel *cam, const stdvectorStdpairVec2Vec2 &imgCorresps)
+    CameraModel *cam, const StdVector<std::pair<Vec2, Vec2>> &imgCorresps)
     : cam(cam), imgCorresps(imgCorresps), rays(imgCorresps.size()),
       _depths(imgCorresps.size()), coarseFound(false), preciseFound(false),
       depthsEvaluated(false) {

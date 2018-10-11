@@ -1,4 +1,5 @@
-#pragma once
+#ifndef INCLUDE_TYPES
+#define INCLUDE_TYPES
 
 #include <Eigen/Core>
 #include <Eigen/StdVector>
@@ -35,18 +36,12 @@ typedef Sophus::Sim3d Sim3;
 typedef Sophus::SE3d SE3;
 typedef Sophus::SO3d SO3;
 
-typedef std::vector<Vec2, Eigen::aligned_allocator<Vec2>> stdvectorVec2;
-typedef std::vector<SE3, Eigen::aligned_allocator<SE3>> stdvectorSE3;
-typedef std::vector<SO3, Eigen::aligned_allocator<SO3>> stdvectorSO3;
-typedef std::vector<std::pair<Vec2, Vec2>,
-                    Eigen::aligned_allocator<std::pair<Vec2, Vec2>>>
-    stdvectorStdpairVec2Vec2;
-typedef std::vector<std::pair<Vec2, double>,
-                    Eigen::aligned_allocator<std::pair<Vec2, double>>>
-    stdvectorStdpairVec2double;
+template <typename T>
+using StdVector = std::vector<T, Eigen::aligned_allocator<T>>;
 
-typedef std::map<int, SE3, std::less<int>,
-                 Eigen::aligned_allocator<std::pair<int, SE3>>>
-    stdmapIntSE3;
+template <typename K, typename T>
+using StdMap = std::map<K, T, std::less<int>, Eigen::aligned_allocator<std::pair<K, T>>>;
 
 } // namespace fishdso
+
+#endif

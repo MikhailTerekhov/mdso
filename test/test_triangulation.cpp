@@ -1,4 +1,4 @@
-#include "util/triangulation.h"
+#include "util/Triangulation.h"
 #include <gtest/gtest.h>
 #include <set>
 
@@ -60,7 +60,7 @@ TEST_P(TriangulationTest, IsPlanar) {
 }
 
 std::shared_ptr<Triangulation> getSimpleTriang() {
-  stdvectorVec2 pnt;
+  StdVector<Vec2> pnt;
 
   pnt.push_back(Vec2(1, 1));
   pnt.push_back(Vec2(1, 2));
@@ -90,7 +90,7 @@ std::shared_ptr<Triangulation> getSimpleTriang() {
 
 std::shared_ptr<Triangulation> getRandomTriang() {
   const int pntCount = 1000;
-  stdvectorVec2 pnt;
+  StdVector<Vec2> pnt;
   pnt.reserve(pntCount);
 
   std::mt19937 mt;
@@ -105,7 +105,7 @@ std::shared_ptr<Triangulation> getRandomTriang() {
 std::shared_ptr<Triangulation> getNonGeneralTriang() {
   const int segmentsCount = 200;
   const int onSegmCount = 5;
-  stdvectorVec2 pnt;
+  StdVector<Vec2> pnt;
 
   std::mt19937 mt;
   std::uniform_real_distribution<double> d(0, 100);
@@ -130,7 +130,7 @@ TEST(TriangulationTest, IndicesConsistent) {
   const int pntCount = 200;
   std::mt19937 mt;
   std::uniform_real_distribution<double> d(0, 10);
-  stdvectorVec2 points;
+  StdVector<Vec2> points;
 
   for (int i = 0; i < pntCount; ++i)
     points.push_back(Vec2(d(mt), d(mt)));

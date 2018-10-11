@@ -1,4 +1,5 @@
-#pragma once
+#ifndef INCLUDE_PREKEYFRAME
+#define INCLUDE_PREKEYFRAME
 
 #include "util/settings.h"
 #include "util/types.h"
@@ -26,3 +27,5 @@ struct PreKeyFrame {
 };
 
 } // namespace fishdso
+
+#endif

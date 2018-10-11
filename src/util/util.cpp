@@ -50,7 +50,7 @@ cv::Scalar depthCol(double d, double mind, double maxd) {
                  : CV_RED * ((mid - d) / dist) + CV_GREEN * ((d - mind) / dist);
 }
 
-void insertDepths(cv::Mat &img, const stdvectorVec2 &points,
+void insertDepths(cv::Mat &img, const StdVector<Vec2> &points,
                   const std::vector<double> &depths, double minDepth,
                   double maxDepth, bool areSolidPnts) {
   if (points.size() != depths.size())

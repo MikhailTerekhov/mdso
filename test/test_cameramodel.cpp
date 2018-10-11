@@ -1,5 +1,5 @@
-#include "system/cameramodel.h"
-#include "system/dsosystem.h"
+#include "system/CameraModel.h"
+#include "system/DsoSystem.h"
 #include "util/types.h"
 #include <Eigen/Core>
 #include <gtest/gtest.h>
@@ -68,7 +68,7 @@ TEST(CameraModelTest, CamerasPyramid) {
       -0.292722;
   int width = 1920, height = 1208;
   CameraModel cam(width, height, scale, center, unmapPolyCoeffs);
-  stdvectorCameraModel camPyr = cam.camPyr();
+  StdVector<CameraModel> camPyr = cam.camPyr();
 
   std::mt19937 mt;
   std::uniform_real_distribution<> xs(0, width - 1);

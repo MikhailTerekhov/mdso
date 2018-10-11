@@ -1,4 +1,4 @@
-#include "util/sphericaltriangulation.h"
+#include "util/SphericalTriangulation.h"
 #include "util/defs.h"
 
 namespace fishdso {
@@ -36,8 +36,8 @@ double sectorBadness(SphericalTriangulation::TrihedralSector *sec) {
   return maxAngle;
 }
 
-stdvectorVec2 projectAll(const std::vector<Vec3> &rays) {
-  stdvectorVec2 result(rays.size());
+StdVector<Vec2> projectAll(const std::vector<Vec3> &rays) {
+  StdVector<Vec2> result(rays.size());
   std::transform(rays.begin(), rays.end(), result.begin(),
                  stereographicProject);
   return result;

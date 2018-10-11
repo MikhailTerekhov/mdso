@@ -1,4 +1,5 @@
-#pragma once
+#ifndef INCLUDE_INTERESTPOINT
+#define INCLUDE_INTERESTPOINT
 
 #include "util/types.h"
 #include <Eigen/Core>
@@ -18,7 +19,6 @@ struct InterestPoint {
   double variance;
 };
 
-typedef std::vector<InterestPoint, Eigen::aligned_allocator<InterestPoint>>
-    stdvectorInterestPoint;
-
 } // namespace fishdso
+
+#endif

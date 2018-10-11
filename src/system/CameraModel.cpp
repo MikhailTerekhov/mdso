@@ -1,4 +1,4 @@
-#include "system/cameramodel.h"
+#include "system/CameraModel.h"
 #include "util/defs.h"
 #include "util/settings.h"
 #include "util/types.h"
@@ -96,7 +96,7 @@ void CameraModel::setMapPolyCoeffs() {
   // unprojected ray
   int nPnts = settingCameraMapPolyPoints;
   int deg = settingCameraMapPolyDegree;
-  stdvectorVec2 funcGraph;
+  StdVector<Vec2> funcGraph;
   funcGraph.reserve(nPnts);
   std::mt19937 gen;
   std::uniform_real_distribution<> distr(0, maxRadius);
@@ -142,8 +142,8 @@ void CameraModel::setMapPolyCoeffs() {
   //           mapPolyCoeffs.rows() * mapPolyCoeffs.cols() * sizeof(double));
 }
 
-stdvectorCameraModel CameraModel::camPyr() {
-  stdvectorCameraModel result(settingPyrLevels, *this);
+StdVector<CameraModel> CameraModel::camPyr() {
+  StdVector<CameraModel> result(settingPyrLevels, *this);
   for (int i = 0; i < settingPyrLevels; ++i) {
     result[i].scale /= (1 << i);
     result[i].width /= (1 << i);

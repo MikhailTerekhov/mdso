@@ -1,5 +1,5 @@
-#include "system/dsosystem.h"
-#include "system/affinelighttransform.h"
+#include "system/DsoSystem.h"
+#include "system/AffineLightTransform.h"
 #include "util/settings.h"
 
 namespace fishdso {
@@ -86,9 +86,9 @@ void DsoSystem::addFrame(const cv::Mat &frame) {
       frameTracker->trackFrame(preKeyFrame.get(), predicted, lightKfToLast);
 
   SE3 diff = kfToCur * predicted.inverse();
-  std::cout << "diff to predicted:" << std::endl;
-  std::cout << "trans = " << diff.translation().norm()
-            << "\nrot = " << diff.so3().log().norm() << std::endl;
+  // std::cout << "diff to predicted:" << std::endl;
+  // std::cout << "trans = " << diff.translation().norm()
+  // << "\nrot = " << diff.so3().log().norm() << std::endl;
 
   std::cout << "aff = " << lightKfToCur.data[0] << ' ' << lightKfToCur.data[1]
             << std::endl;
@@ -126,7 +126,8 @@ end_header
     Vec3 pos = cam->unmap(ip.p.data()).normalized() * ip.depth;
     out << pos[0] << ' ' << pos[1] << ' ' << pos[2] << ' ';
     cv::Vec3b color = lastKf.frameColored.at<cv::Vec3b>(toCvPoint(ip.p));
-    out << int(color[2]) << ' ' << int(color[1]) << ' ' << int(color[0]) << std::endl;
+    out << int(color[2]) << ' ' << int(color[1]) << ' ' << int(color[0])
+        << std::endl;
   }
 }
 

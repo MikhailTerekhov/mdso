@@ -1,7 +1,8 @@
-#pragma once
+#ifndef INCLUDE_SPHERICAL_TRIANGULATION
+#define INCLUDE_SPHERICAL_TRIANGULATION
 
-#include "system/cameramodel.h"
-#include "util/triangulation.h"
+#include "system/CameraModel.h"
+#include "util/Triangulation.h"
 #include "util/types.h"
 
 namespace fishdso {
@@ -34,3 +35,5 @@ private:
 };
 
 } // namespace fishdso
+
+#endif

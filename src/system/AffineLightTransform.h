@@ -1,4 +1,5 @@
-#pragma once
+#ifndef INCLUDE_AFFINELIGHTTRANSFORM
+#define INCLUDE_AFFINELIGHTTRANSFORM
 
 #include <Eigen/Core>
 
@@ -14,3 +15,5 @@ template <typename T> struct AffineLightTransform {
 };
 
 } // namespace fishdso
+
+#endif
