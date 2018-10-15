@@ -1,6 +1,8 @@
 #ifndef INCLUDE_SETTINGS
 #define INCLUDE_SETTINGS
 
+#include <gflags/gflags.h>
+
 namespace fishdso {
 
 // candidate point selection
@@ -39,5 +41,6 @@ constexpr int settingPyrLevels = 6;
 extern double settingOutlierIntensityDiff;
 
 } // namespace fishdso
+DECLARE_bool(optimize_affine_light);
 
 #endif

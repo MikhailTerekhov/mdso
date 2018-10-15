@@ -4,7 +4,6 @@
 
 namespace fishdso {
 
-bool settingAffineLight = true;
 int settingPyrLevelsUnused = 0;
 int dbg1 = 0, dbg2 = 0;
 
@@ -132,7 +131,7 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
   problem.AddParameterBlock(motion.translation().data(), 3);
 
   problem.AddParameterBlock(affLight.data, 2);
-  if (!settingAffineLight)
+  if (!FLAGS_optimize_affine_light)
     problem.SetParameterBlockConstant(affLight.data);
 
   std::vector<double> pixUsed;

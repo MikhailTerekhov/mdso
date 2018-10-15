@@ -40,7 +40,8 @@ template <typename T>
 using StdVector = std::vector<T, Eigen::aligned_allocator<T>>;
 
 template <typename K, typename T>
-using StdMap = std::map<K, T, std::less<int>, Eigen::aligned_allocator<std::pair<K, T>>>;
+using StdMap =
+    std::map<K, T, std::less<K>, Eigen::aligned_allocator<std::pair<K, T>>>;
 
 } // namespace fishdso
 

@@ -3,7 +3,7 @@ import pandas as pd
 import quaternion as quat
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
+
 
 def extract_motions(fname):
     tbl = pd.read_csv(fname, sep='\s+', header=None,

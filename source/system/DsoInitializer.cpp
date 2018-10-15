@@ -4,6 +4,7 @@
 #include "util/util.h"
 #include <algorithm>
 #include <opencv2/opencv.hpp>
+#include <glog/logging.h>
 
 namespace fishdso {
 
@@ -89,9 +90,6 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
         int pointsInTriang = keyFrames[kfInd].interestPoints.size();
         int pointsNeeded = settingInterestPointsUsed *
                            (static_cast<double>(pointsTotal) / pointsInTriang);
-        // std::cout << "in kf" << kfInd << "total = " << pointsTotal
-        // << "inside triang = " << pointsInTriang << std::endl;
-        // std::cout << "so we need " << pointsNeeded << std::endl;
         if (i != reselectCount)
           keyFrames[kfInd].selectPointsDenser(pointsNeeded);
       }

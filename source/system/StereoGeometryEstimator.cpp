@@ -2,6 +2,7 @@
 #include <RelativePoseEstimator.h>
 #include <ceres/ceres.h>
 #include <fstream>
+#include <glog/logging.h>
 
 namespace fishdso {
 
@@ -45,7 +46,7 @@ StereoGeometryEstimator::depths() {
           return _depths[i1].second < _depths[i2].second;
         });
     Vec2 unm = cam->map(rays[minInd].second.data());
-    // std::cout << "min depth position = " << unm.transpose(); 
+    // std::cout << "min depth position = " << unm.transpose();
 
     // std::ofstream ofs("log.txt");
     // ofs << rays[minInd].first.transpose() << std::endl;
@@ -244,7 +245,9 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
     }
   }
 
-  std::cout << "iterNum = " << iterNum << std::endl;
+  LOG(INFO) << "iterNum = " << iterNum << std::endl;
+  if (iterNum == settingRansacMaxIter)
+    LOG(WARNING) << "max number of RANSAC iterations reached" << std::endl;
   coarseFound = true;
   motion = bestMotion;
 
@@ -329,10 +332,12 @@ SE3 StereoGeometryEstimator::findPreciseMotion() {
   //  std::cout << "inliers in inds = " << inlierInds.size() << std::endl;
 
   //  std::sort(inlierInds.begin(), inlierInds.end(), [&](int i1, int i2) {
-  //    ReprojectionResidual res1(cam, raysNorm[i1].first, raysNorm[i1].second,
+  //    ReprojectionResidual res1(cam, raysNorm[i1].first,
+  //    raysNorm[i1].second,
   //                              imgCorresps[i1].first,
   //                              imgCorresps[i1].second);
-  //    ReprojectionResidual res2(cam, raysNorm[i2].first, raysNorm[i2].second,
+  //    ReprojectionResidual res2(cam, raysNorm[i2].first,
+  //    raysNorm[i2].second,
   //                              imgCorresps[i2].first,
   //                              imgCorresps[i2].second);
   //    double results1[4], results2[4];
@@ -350,7 +355,8 @@ SE3 StereoGeometryEstimator::findPreciseMotion() {
   //    return norm1 < norm2;
   //  });
 
-  //  std::cout << inlierInds.size() << ' ' << settingRemoveResidualsRatio << '
+  //  std::cout << inlierInds.size() << ' ' << settingRemoveResidualsRatio <<
+  //  '
   //  '
   //            << int(inlierInds.size() * settingRemoveResidualsRatio)
   //            << std::endl;

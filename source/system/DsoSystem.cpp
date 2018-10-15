@@ -1,12 +1,15 @@
 #include "system/DsoSystem.h"
 #include "system/AffineLightTransform.h"
 #include "util/settings.h"
+#include <glog/logging.h>
 
 namespace fishdso {
 
 DsoSystem::DsoSystem(CameraModel *cam)
     : cam(cam), camPyr(cam->camPyr()), dsoInitializer(cam),
-      isInitialized(false), curFrameNum(0) {}
+      isInitialized(false), curFrameNum(0) {
+  LOG(INFO) << "create DsoSystem" << std::endl;
+}
 
 SE3 predictInternal(int prevFramesSkipped, const SE3 &worldToLastKf,
                     const SE3 &worldToLbo, const SE3 &worldToLast) {
@@ -51,11 +54,14 @@ SE3 DsoSystem::purePredictKfToCur() {
 
 void DsoSystem::addFrame(const cv::Mat &frame) {
   curFrameNum++;
+  LOG(INFO) << "add frame #" << curFrameNum << std::endl;
 
   if (!isInitialized) {
+    LOG(INFO) << "put into initializer" << std::endl;
     isInitialized = dsoInitializer.addFrame(frame, curFrameNum);
 
     if (isInitialized) {
+      LOG(INFO) << "initialization successful" << std::endl;
       std::vector<KeyFrame> kf =
           dsoInitializer.createKeyFrames(DsoInitializer::SPARSE_DEPTHS);
       for (const auto &f : kf)
@@ -78,27 +84,33 @@ void DsoSystem::addFrame(const cv::Mat &frame) {
   SE3 kfToCur;
   AffineLightTransform<double> lightKfToCur;
 
-  std::cout << "\n\n\nTRACK NEXT" << std::endl;
-
   SE3 purePredicted = purePredictKfToCur();
   SE3 predicted = predictKfToCur();
+
+  LOG(INFO) << "start tracking this frame" << std::endl;
   std::tie(kfToCur, lightKfToCur) =
       frameTracker->trackFrame(preKeyFrame.get(), predicted, lightKfToLast);
+  LOG(INFO) << "tracking ended" << std::endl;
 
   SE3 diff = kfToCur * predicted.inverse();
-  // std::cout << "diff to predicted:" << std::endl;
-  // std::cout << "trans = " << diff.translation().norm()
-  // << "\nrot = " << diff.so3().log().norm() << std::endl;
-
-  std::cout << "aff = " << lightKfToCur.data[0] << ' ' << lightKfToCur.data[1]
-            << std::endl;
-
   PreKeyFrame *lastKf = keyFrames.rbegin()->second.preKeyFrame.get();
   worldToFrame[curFrameNum] = kfToCur * lastKf->worldToThis;
   worldToFramePredict[curFrameNum] = purePredicted * lastKf->worldToThis;
   preKeyFrame->worldToThis = worldToFrame[curFrameNum];
   // worldToFrame[curFrameNum] = predicted * lastKf->worldToThis;
   lightKfToLast = lightKfToCur;
+  LOG(INFO) << "estimated motion"
+            << "\ntrans = " << diff.translation().norm()
+            << "\nrot = " << diff.so3().log().norm() << std::endl;
+  LOG(INFO) << "estimated aff = " << lightKfToCur.data[0] << ' '
+            << lightKfToCur.data[1] << std::endl;
+
+  LOG(INFO) << "diff to predicted:"
+            << "\ntrans = " << diff.translation().norm()
+            << "\nrot = " << diff.so3().log().norm() << std::endl;
+  LOG(INFO) << "estimated aff = " << lightKfToCur.data[0] << ' '
+            << lightKfToCur.data[1] << std::endl;
+
 }
 
 void putMotion(std::ostream &out, const SE3 &motion) {

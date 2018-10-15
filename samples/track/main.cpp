@@ -1,10 +1,18 @@
-#include <fstream>
 #include "system/DsoSystem.h"
+#include <fstream>
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 
 using namespace fishdso;
 
+DEFINE_bool(check_flag, true, "just check if gflags work");
+
 int main(int argc, char **argv) {
-  std::string usage = R"abacaba(Usage: track cam framesdir start count output outpred
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  google::InitGoogleLogging(argv[0]);
+
+  std::string usage =
+      R"abacaba(Usage: track cam framesdir start count output outpred
 Where cam names a file with camera calibration
 framesdir names a directory with video frames.
 Images from this directory should be named #.jpg
@@ -27,7 +35,6 @@ outpred stands for file to put prediction info it)abacaba";
     std::cerr << "starting frame could not be read!\n" << usage << std::endl;
     return 2;
   }
-  
 
   int N = 0;
   if (sscanf(argv[4], "%d", &N) != 1) {
@@ -47,13 +54,13 @@ outpred stands for file to put prediction info it)abacaba";
     std::cout << "put frame " << it << std::endl;
     dsoSystem.addFrame(frame);
   }
-  
+
   std::ofstream output(argv[5]);
   dsoSystem.printTrackingInfo(output);
-  
-  std::ofstream outpred(argv[6]); 
+
+  std::ofstream outpred(argv[6]);
   dsoSystem.printPredictionInfo(outpred);
-  
+
   std::ofstream outPly("test/data/frames/points.ply");
   dsoSystem.printLastKfInPly(outPly);
 

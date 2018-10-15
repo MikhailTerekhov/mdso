@@ -2,6 +2,7 @@
 #include "util/defs.h"
 #include "util/settings.h"
 #include <RelativePoseEstimator.h>
+#include <glog/logging.h>
 
 namespace fishdso {
 
@@ -9,7 +10,7 @@ StereoMatcher::StereoMatcher(CameraModel *cam)
     : cam(cam),
       descriptorsMask(cam->getHeight(), cam->getWidth(), CV_8U, CV_WHITE_BYTE),
       altMask(cam->getHeight(), cam->getWidth(), CV_8U, CV_BLACK_BYTE),
-      orb(cv::ORB::create(2000)),
+      orb(cv::ORB::create(settingKeyPointsCount)),
       descriptorMatcher(std::unique_ptr<cv::DescriptorMatcher>(
           new cv::BFMatcher(cv::NORM_HAMMING, true))) {
 
@@ -37,12 +38,11 @@ void filterOutStillMatches(std::vector<cv::DMatch> &matches,
   std::copy_n(stillIt, matches.end() - stillIt, stillMatches.begin());
   matches.erase(stillIt, matches.end());
 
-  std::cout << "still matches removed = " << stillMatches.size() << std::endl;
+  LOG(INFO) << "still matches removed = " << stillMatches.size() << std::endl;
 }
 
 SE3 StereoMatcher::match(cv::Mat frames[2], StdVector<Vec2> resPoints[2],
                          std::vector<double> resDepths[2]) {
-  cv::Ptr<cv::ORB> orb = cv::ORB::create(settingKeyPointsCount);
   std::vector<cv::KeyPoint> keyPoints[2];
   cv::Mat descriptors[2];
   for (int i = 0; i < 2; ++i) {
@@ -56,7 +56,7 @@ SE3 StereoMatcher::match(cv::Mat frames[2], StdVector<Vec2> resPoints[2],
 
   std::vector<cv::DMatch> matches;
   descriptorMatcher->match(descriptors[1], descriptors[0], matches);
-  std::cout << "total matches = " << matches.size() << std::endl;
+  LOG(INFO) << "total matches = " << matches.size() << std::endl;
   if (matches.empty())
     throw std::runtime_error("StereoMatcher error: no matches found");
 
@@ -73,10 +73,7 @@ SE3 StereoMatcher::match(cv::Mat frames[2], StdVector<Vec2> resPoints[2],
       std::unique_ptr<StereoGeometryEstimator>(
           new StereoGeometryEstimator(cam, corresps));
   SE3 motion = geometryEstimator->findPreciseMotion();
-  std::cout << "t = " << motion.translation().transpose() << "\n"
-            << "rot = " << motion.unit_quaternion().coeffs().transpose()
-            << std::endl;
-  std::cout << "inlier matches = " << geometryEstimator->inliersNum()
+  LOG(INFO) << "inlier matches = " << geometryEstimator->inliersNum()
             << std::endl;
 
   // std::vector<cv::DMatch> inlierMatches;

@@ -33,3 +33,5 @@ double settingTriangulationDrawPadding = 0.1;
 double settingOutlierIntensityDiff = 15;
 
 } // namespace fishdso
+
+DEFINE_bool(optimize_affine_light, true, "perform affine light transform optimization");

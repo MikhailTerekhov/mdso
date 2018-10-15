@@ -1,7 +1,9 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.0.2)
 
 project(dso-fisheye-ceres)
 
+find_package(gflags REQUIRED)
+find_package(glog REQUIRED)
 find_package(Ceres REQUIRED)
 find_package(OpenCV REQUIRED)
 
@@ -9,6 +11,8 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/thirdparty/googletest)
 
 include_directories(
     ${CERES_INCLUDE_DIRS}
+    ${GFLAGS_INCLUDE_DIRS}
+    ${GLOG_INCLUDE_DIRS}
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
     ${PROJECT_SOURCE_DIR}/thirdparty/relative_pose_solver
@@ -59,7 +63,8 @@ set(essietial_5pt_estimator_SOURCE_FILES
 add_library(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES}
     ${essietial_5pt_estimator_SOURCE_FILES}
 )
-target_link_libraries(dso ${OpenCV_LIBS} ${CERES_LIBRARIES})
+
+target_link_libraries(dso ${OpenCV_LIBS} ${CERES_LIBRARIES} ${GLOG_LIBRARIES})
 
 add_subdirectory(samples)
 
