@@ -22,6 +22,8 @@ struct KeyFrame {
 
   void selectPointsDenser(int pointsNeeded);
 
+  cv::Mat drawDepthedFrame(double minDepth, double maxDepth);
+
   std::unique_ptr<PreKeyFrame> preKeyFrame;
   cv::Mat frameColored;
   cv::Mat gradX, gradY, gradNorm;

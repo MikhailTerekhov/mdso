@@ -22,12 +22,12 @@ img1 and img2 name files with two frames to track.)abacaba";
     std::cout << "img1 could not be found or read!" << std::endl;
     return 0;
   }
-  
+
   // cv::Mat res;
-  // Mat33 K = (Mat33() 
-    // <<  1866.0 , 0.0    , 960.0 
-      // , 0.0    , 1866.0 , 960.0
-      // , 0.0    , 0.0    , 1.0).finished();
+  // Mat33 K = (Mat33()
+  // <<  1866.0 , 0.0    , 960.0
+  // , 0.0    , 1866.0 , 960.0
+  // , 0.0    , 0.0    , 1.0).finished();
   // cam.undistort<cv::Vec3b>(frame1, res, K);
 
   frame2 = cv::imread(argv[3]);

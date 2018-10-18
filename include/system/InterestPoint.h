@@ -11,12 +11,15 @@ namespace fishdso {
 struct InterestPoint {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  InterestPoint(Vec2 p, double depth = -1, double variance = 1)
-      : p(p), depth(depth), variance(variance) {}
+  enum State { ACTIVE, OUTLIER };
+
+  InterestPoint(const Vec2 &p, double invDepth = -1, double variance = 1)
+      : p(p), invDepth(invDepth), variance(variance), state(ACTIVE) {}
 
   Vec2 p;
-  double depth;
+  double invDepth;
   double variance;
+  State state;
 };
 
 } // namespace fishdso

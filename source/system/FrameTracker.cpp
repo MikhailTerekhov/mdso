@@ -137,11 +137,11 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
   std::vector<double> pixUsed;
 
   ceres::LossFunction *lossFunc =
-      new ceres::HuberLoss(settingOutlierIntensityDiff);
+      new ceres::HuberLoss(settingTrackingOutlierIntensityDiff);
 
   double pnt[2] = {0.0, 0.0};
 
-  std::vector<PointTrackingResidual*> residuals;
+  std::vector<PointTrackingResidual *> residuals;
   StdVector<Vec2> gotOutside;
 
   int pntTotal = 0, pntOutside = 0, pntOutlier = 0;
@@ -166,8 +166,8 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
         residuals.push_back(new PointTrackingResidual(
             pos, static_cast<double>(baseImg(y, x)), &cam, &trackedFrame));
         problem.AddResidualBlock(
-            new ceres::AutoDiffCostFunction<PointTrackingResidual, 1, 4,
-                                            3, 2>(residuals.back()),
+            new ceres::AutoDiffCostFunction<PointTrackingResidual, 1, 4, 3, 2>(
+                residuals.back()),
             lossFunc, motion.so3().data(), motion.translation().data(),
             affLight.data);
       }
@@ -217,7 +217,7 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
     double result = -1;
     rsd->operator()(motion.unit_quaternion().coeffs().data(),
                     motion.translation().data(), affLight.data, &result);
-    if (std::abs(result) > settingOutlierIntensityDiff) {
+    if (std::abs(result) > settingTrackingOutlierIntensityDiff) {
       pntOutlier++;
       Vec2 mapped = cam.map(rsd->pos.data());
       cv::Point pnt = toCvPoint(mapped, scaleX, scaleY,
@@ -226,8 +226,8 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
     }
   }
 
-  cv::imshow("deprhs", dfr);
-  cv::waitKey();
+  // cv::imshow("deprhs", dfr);
+  // cv::waitKey();
 
   return {motion, affLight};
 }

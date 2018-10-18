@@ -1,6 +1,7 @@
 #ifndef INCLUDE_SETTINGS
 #define INCLUDE_SETTINGS
 
+#include "util/types.h"
 #include <gflags/gflags.h>
 
 namespace fishdso {
@@ -38,9 +39,23 @@ extern double settingTriangulationDrawPadding;
 
 // frame tracking
 constexpr int settingPyrLevels = 6;
-extern double settingOutlierIntensityDiff;
+extern double settingTrackingOutlierIntensityDiff;
+
+// bundle adjustment
+constexpr int settingResidualPatternSize = 8;
+extern Vec2 settingResidualPattern[settingResidualPatternSize];
+extern double settingBAOutlierIntensityDiff;
+extern double settingMaxPointDepth;
 
 } // namespace fishdso
+
 DECLARE_bool(optimize_affine_light);
+
+DECLARE_bool(use_ORB_initialization);
+
+DECLARE_double(red_depths_part);
+DECLARE_double(blue_depths_part);
+
+DECLARE_string(output_directory);
 
 #endif

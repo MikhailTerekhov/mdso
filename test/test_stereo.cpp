@@ -44,12 +44,12 @@ TEST_F(StereoPositioningTest, RandomPointsCoarse) {
   //                     SO3::rotX(angle(mt)) * SO3::rotY(angle(mt))};
 
   StdVector<SO3> rotations = {SO3(),
-                            SO3::rotX(angle(mt)),
-                            SO3::rotZ(angle(mt)),
-                            SO3::rotX(angle(mt)) * SO3::rotY(angle(mt)),
-                            SO3::rotX(angle(mt)) * SO3::rotZ(angle(mt)),
-                            SO3::rotX(angle(mt)) * SO3::rotY(angle(mt)) *
-                                SO3::rotZ(angle(mt))};
+                              SO3::rotX(angle(mt)),
+                              SO3::rotZ(angle(mt)),
+                              SO3::rotX(angle(mt)) * SO3::rotY(angle(mt)),
+                              SO3::rotX(angle(mt)) * SO3::rotZ(angle(mt)),
+                              SO3::rotX(angle(mt)) * SO3::rotY(angle(mt)) *
+                                  SO3::rotZ(angle(mt))};
   std::vector<Vec3> translations = {Vec3(0, 0, 10), Vec3(0, 0, -10),
                                     Vec3(0, 10, 0), Vec3(0, -10, 0),
                                     Vec3(10, 0, 0), Vec3(-10, 0, 0)};
@@ -140,12 +140,12 @@ TEST_F(StereoPositioningTest, RandomPointsPrecise) {
   //                     SO3::rotX(angle(mt)) * SO3::rotY(angle(mt))};
 
   StdVector<SO3> rotations = {SO3(),
-                            SO3::rotX(angle(mt)),
-                            SO3::rotZ(angle(mt)),
-                            SO3::rotX(angle(mt)) * SO3::rotY(angle(mt)),
-                            SO3::rotX(angle(mt)) * SO3::rotZ(angle(mt)),
-                            SO3::rotX(angle(mt)) * SO3::rotY(angle(mt)) *
-                                SO3::rotZ(angle(mt))};
+                              SO3::rotX(angle(mt)),
+                              SO3::rotZ(angle(mt)),
+                              SO3::rotX(angle(mt)) * SO3::rotY(angle(mt)),
+                              SO3::rotX(angle(mt)) * SO3::rotZ(angle(mt)),
+                              SO3::rotX(angle(mt)) * SO3::rotY(angle(mt)) *
+                                  SO3::rotZ(angle(mt))};
   std::vector<Vec3> translations = {Vec3(0, 0, 1), Vec3(0, 0, -1),
                                     Vec3(0, 1, 0), Vec3(0, -1, 0),
                                     Vec3(1, 0, 0), Vec3(-1, 0, 0)};

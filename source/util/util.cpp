@@ -15,14 +15,35 @@ namespace fishdso {
 cv::Mat dbg;
 double minDepth = 0, maxDepth = 0;
 
+void setDepthColBounds(const std::vector<double> &depths) {
+  std::vector<double> sorted = depths;
+  std::sort(sorted.begin(), sorted.end());
+  int redInd = FLAGS_red_depths_part * int(sorted.size());
+  if (redInd < 0)
+    redInd = 0;
+  if (redInd >= sorted.size())
+    redInd = sorted.size() - 1;
+
+  int blueInd = FLAGS_blue_depths_part * sorted.size();
+  if (blueInd < 0)
+    blueInd = 0;
+  if (blueInd >= sorted.size())
+    blueInd = sorted.size() - 1;
+
+  minDepth = sorted[redInd];
+  maxDepth = sorted[blueInd];
+}
+
 void putDot(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col) {
   cv::circle(img, pos, 4, col, cv::FILLED);
 }
 
 void putCross(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col,
               int size, int thikness) {
-  cv::line(img, pos - cv::Point(size, size), pos + cv::Point(size, size), col, thikness);
-  cv::line(img, pos + cv::Point(-size, size), pos + cv::Point(size, -size), col, thikness);
+  cv::line(img, pos - cv::Point(size, size), pos + cv::Point(size, size), col,
+           thikness);
+  cv::line(img, pos + cv::Point(-size, size), pos + cv::Point(size, -size), col,
+           thikness);
 }
 
 void grad(cv::Mat const &img, cv::Mat &gradX, cv::Mat &gradY,
@@ -62,7 +83,7 @@ void insertDepths(cv::Mat &img, const StdVector<Vec2> &points,
   for (int i = 0; i < int(points.size()); ++i) {
     cv::Point cvp(static_cast<int>(points[i][0]),
                   static_cast<int>(points[i][1]));
-    cv::circle(img, cvp, areSolidPnts ? 6 : 4,
+    cv::circle(img, cvp, areSolidPnts ? 6 : 5,
                depthCol(depths[i], minDepth, maxDepth),
                areSolidPnts ? cv::FILLED : 2);
     // putDot(result, cvp, depthCol(depths[i], minDepth, maxDepth));

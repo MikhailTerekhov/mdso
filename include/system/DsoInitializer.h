@@ -26,6 +26,7 @@ private:
   std::vector<KeyFrame>
   createKeyFramesFromStereo(InterpolationType interpolationType,
                             DebugOutputType debugOutputType);
+  std::vector<KeyFrame> createKeyFramesDummy();
 
   CameraModel *cam;
   StereoMatcher stereoMatcher;

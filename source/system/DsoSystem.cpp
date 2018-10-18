@@ -11,6 +11,14 @@ DsoSystem::DsoSystem(CameraModel *cam)
   LOG(INFO) << "create DsoSystem" << std::endl;
 }
 
+DsoSystem::~DsoSystem() {
+  std::ofstream ofsTracked(FLAGS_output_directory + "/tracked_pos.txt");
+  printTrackingInfo(ofsTracked);
+
+  std::ofstream ofsPredicted(FLAGS_output_directory + "/predicted_pos.txt");
+  printPredictionInfo(ofsPredicted);
+}
+
 SE3 predictInternal(int prevFramesSkipped, const SE3 &worldToLastKf,
                     const SE3 &worldToLbo, const SE3 &worldToLast) {
   SE3 lboToLast = worldToLast * worldToLbo.inverse();
@@ -74,6 +82,20 @@ void DsoSystem::addFrame(const cv::Mat &frame) {
       PreKeyFrame *lastKf = keyFrames.rbegin()->second.preKeyFrame.get();
       frameTracker =
           std::unique_ptr<FrameTracker>(new FrameTracker(camPyr, lastKf));
+
+      bundleAdjuster = std::unique_ptr<BundleAdjuster>(new BundleAdjuster(cam));
+      for (auto &p : keyFrames)
+        bundleAdjuster->addKeyFrame(&p.second);
+
+      std::ofstream ofsBeforeAdjust(FLAGS_output_directory +
+                                    "/before_adjust.ply");
+      printLastKfInPly(ofsBeforeAdjust);
+
+      bundleAdjuster->adjust();
+
+      std::ofstream ofsAfterAdjust(FLAGS_output_directory +
+                                   "/after_adjust.ply");
+      printLastKfInPly(ofsAfterAdjust);
     }
 
     return;
@@ -92,25 +114,24 @@ void DsoSystem::addFrame(const cv::Mat &frame) {
       frameTracker->trackFrame(preKeyFrame.get(), predicted, lightKfToLast);
   LOG(INFO) << "tracking ended" << std::endl;
 
-  SE3 diff = kfToCur * predicted.inverse();
   PreKeyFrame *lastKf = keyFrames.rbegin()->second.preKeyFrame.get();
+
+  preKeyFrame->lightWorldToThis = lightKfToCur * lastKf->lightWorldToThis;
+
+  SE3 diff = kfToCur * predicted.inverse();
   worldToFrame[curFrameNum] = kfToCur * lastKf->worldToThis;
   worldToFramePredict[curFrameNum] = purePredicted * lastKf->worldToThis;
   preKeyFrame->worldToThis = worldToFrame[curFrameNum];
   // worldToFrame[curFrameNum] = predicted * lastKf->worldToThis;
   lightKfToLast = lightKfToCur;
   LOG(INFO) << "estimated motion"
-            << "\ntrans = " << diff.translation().norm()
-            << "\nrot = " << diff.so3().log().norm() << std::endl;
-  LOG(INFO) << "estimated aff = " << lightKfToCur.data[0] << ' '
-            << lightKfToCur.data[1] << std::endl;
-
+            << "\ntrans = " << kfToCur.translation()
+            << "\nrot = " << kfToCur.unit_quaternion().coeffs().transpose()
+            << std::endl;
   LOG(INFO) << "diff to predicted:"
             << "\ntrans = " << diff.translation().norm()
             << "\nrot = " << diff.so3().log().norm() << std::endl;
-  LOG(INFO) << "estimated aff = " << lightKfToCur.data[0] << ' '
-            << lightKfToCur.data[1] << std::endl;
-
+  LOG(INFO) << "estimated aff = " << lightKfToCur << std::endl;
 }
 
 void putMotion(std::ostream &out, const SE3 &motion) {
@@ -135,7 +156,7 @@ end_header
 )__";
 
   for (const InterestPoint &ip : lastKf.interestPoints) {
-    Vec3 pos = cam->unmap(ip.p.data()).normalized() * ip.depth;
+    Vec3 pos = cam->unmap(ip.p.data()).normalized() / ip.invDepth;
     out << pos[0] << ' ' << pos[1] << ' ' << pos[2] << ' ';
     cv::Vec3b color = lastKf.frameColored.at<cv::Vec3b>(toCvPoint(ip.p));
     out << int(color[2]) << ' ' << int(color[1]) << ' ' << int(color[0])

@@ -3,8 +3,8 @@
 #include "util/defs.h"
 #include "util/util.h"
 #include <algorithm>
-#include <opencv2/opencv.hpp>
 #include <glog/logging.h>
+#include <opencv2/opencv.hpp>
 
 namespace fishdso {
 
@@ -31,7 +31,10 @@ bool DsoInitializer::addFrame(const cv::Mat &frame, int globalFrameNum) {
 
 std::vector<KeyFrame> DsoInitializer::createKeyFrames(
     DsoInitializer::DebugOutputType debugOutputType) {
-  return createKeyFramesFromStereo(NORMAL, debugOutputType);
+  if (FLAGS_use_ORB_initialization)
+    return createKeyFramesFromStereo(NORMAL, debugOutputType);
+  else
+    return createKeyFramesDummy();
 }
 
 std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
@@ -55,7 +58,7 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
       for (InterestPoint &ip : keyFrames[i].interestPoints) {
         double depth;
         if (kpTerrains[i](ip.p, depth))
-          ip.depth = depth;
+          ip.invDepth = 1 / depth;
       }
       keyFrames[i].setDepthPyrs();
     }
@@ -78,13 +81,14 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
         for (InterestPoint &ip : keyFrames[kfInd].interestPoints) {
           double depth;
           if (kpTerrains[kfInd](cam->unmap(ip.p.data()), depth))
-            ip.depth = depth;
+            ip.invDepth = 1 / depth;
         }
 
         int pointsTotal = keyFrames[kfInd].interestPoints.size();
-        auto it = std::remove_if(keyFrames[kfInd].interestPoints.begin(),
-                                 keyFrames[kfInd].interestPoints.end(),
-                                 [](InterestPoint p) { return p.depth < 0; });
+        auto it =
+            std::remove_if(keyFrames[kfInd].interestPoints.begin(),
+                           keyFrames[kfInd].interestPoints.end(),
+                           [](InterestPoint p) { return p.invDepth < 0; });
         keyFrames[kfInd].interestPoints.erase(
             it, keyFrames[kfInd].interestPoints.end());
         int pointsInTriang = keyFrames[kfInd].interestPoints.size();
@@ -96,16 +100,11 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
       keyFrames[kfInd].setDepthPyrs();
     }
 
-    StdVector<std::pair<Vec2, double>> keyPairs(keyPoints[1].size());
-    for (int i = 0; i < int(keyPoints[1].size()); ++i)
-      keyPairs[i] = {keyPoints[1][i], depths[1][i]};
-    std::sort(keyPairs.begin(), keyPairs.end(),
-              [](auto a, auto b) { return a.second < b.second; });
-
-    int paddingLeft = 0;
-    int paddingRight = int(0.2 * keyPairs.size());
-    minDepth = keyPairs[paddingLeft].second;
-    maxDepth = keyPairs[paddingRight].second;
+    std::vector<double> ipDepths;
+    ipDepths.reserve(keyFrames[1].interestPoints.size());
+    for (const InterestPoint &ip : keyFrames[1].interestPoints)
+      ipDepths.push_back(1 / ip.invDepth);
+    setDepthColBounds(ipDepths);
 
     if (debugOutputType != NO_DEBUG) {
       cv::Mat img = keyFrames[1].frameColored.clone();
@@ -120,7 +119,7 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
       std::vector<double> d(ip.size());
       for (int i = 0; i < int(ip.size()); ++i) {
         pnts[i] = ip[i].p;
-        d[i] = ip[i].depth;
+        d[i] = 1 / ip[i].invDepth;
       }
 
       //    drawCurvedInternal(cam, Vec2(100.0, 100.0), Vec2(1000.0, 500.0),
@@ -164,6 +163,7 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
       // cv::imwrite("../../../../test/data/maps/uncovered/frame5.jpg", img);
       // cv::imshow("tangent", tangImg);
       cv::imshow("interpolated", img);
+      cv::imwrite(FLAGS_output_directory + "/triangulated.jpg", img);
 
       // int pyrDW = frames[1].cols / 2, pyrDH = frames[1].rows / 2;
       // for (int pi = 0; pi < settingPyrLevels; ++pi) {
@@ -188,6 +188,17 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
   // cv::imshow("f1", frames[0]);
   // cv::imshow("f2", frames[1]);
   // cv::waitKey();
+
+  return keyFrames;
+}
+
+std::vector<KeyFrame> DsoInitializer::createKeyFramesDummy() {
+  std::vector<KeyFrame> keyFrames;
+  for (int i = 0; i < 2; ++i) {
+    keyFrames.push_back(KeyFrame(frames[i], globalFrameNums[i]));
+    for (InterestPoint &ip : keyFrames.back().interestPoints)
+      ip.invDepth = 1;
+  }
 
   return keyFrames;
 }

@@ -4,6 +4,7 @@ compile_commands.json
 *.sh
 *.autosave
 test/data/**
+output/**
 cmake_install.cmake
 CMakeLists.txt.user
 bin/**

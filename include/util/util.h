@@ -8,9 +8,10 @@
 
 namespace fishdso {
 
-// global image for debugging purposes
 extern cv::Mat dbg;
 extern double minDepth, maxDepth;
+
+void setDepthColBounds(const std::vector<double> &depths);
 
 void putDot(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col);
 void putCross(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col,

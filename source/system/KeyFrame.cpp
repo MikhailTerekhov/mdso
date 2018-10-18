@@ -12,7 +12,7 @@ KeyFrame::KeyFrame(const cv::Mat &frameColored, int globalFrameNum)
     : preKeyFrame(std::unique_ptr<PreKeyFrame>(
           new PreKeyFrame(frameColored, globalFrameNum))),
       frameColored(frameColored) {
-  grad(preKeyFrame->framePyr[0], gradX, gradY, gradNorm);
+  grad(preKeyFrame->frame(), gradX, gradY, gradNorm);
 
   int foundTotal = selectPoints(adaptiveBlockSize, settingInterestPointsUsed);
   lastBlockSize = adaptiveBlockSize;
@@ -41,11 +41,13 @@ void selectInterestPointsInternal(const cv::Mat &gradNorm, int selBlockSize,
 }
 
 void KeyFrame::setDepthPyrs() {
-  cv::Mat1d depths0 = cv::Mat1d(preKeyFrame->framePyr[0].rows,
-                                preKeyFrame->framePyr[0].cols, -1.0);
-  cv::Mat1d weights = cv::Mat1d::zeros(preKeyFrame->framePyr[0].size());
+  cv::Mat1d depths0 =
+      cv::Mat1d(preKeyFrame->frame().rows, preKeyFrame->frame().cols, -1.0);
+  cv::Mat1d weights = cv::Mat1d::zeros(preKeyFrame->frame().size());
   for (const auto &ip : interestPoints) {
-    depths0(toCvPoint(ip.p)) = ip.depth;
+    if (ip.state == InterestPoint::OUTLIER)
+      continue;
+    depths0(toCvPoint(ip.p)) = 1 / ip.invDepth;
     weights(toCvPoint(ip.p)) = 1 / std::sqrt(ip.variance);
   }
 
@@ -105,6 +107,17 @@ void KeyFrame::selectPointsDenser(int pointsNeeded) {
       std::sqrt(static_cast<double>(lastPointsFound) / pointsNeeded);
   selectPoints(newBlockSize, pointsNeeded);
   // std::cout << "after reselection = " << interestPoints.size() << std::endl;
+}
+
+cv::Mat KeyFrame::drawDepthedFrame(double minDepth, double maxDepth) {
+  cv::Mat res = frameColored.clone();
+
+  for (const InterestPoint &ip : interestPoints)
+    cv::circle(res, toCvPoint(ip.p), 5,
+               toCvVec3bDummy(depthCol(1 / ip.invDepth, minDepth, maxDepth)),
+               2);
+
+  return res;
 }
 
 } // namespace fishdso

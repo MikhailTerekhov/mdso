@@ -6,10 +6,12 @@ namespace fishdso {
 
 PreKeyFrame::PreKeyFrame(const cv::Mat &frameColored, int globalFrameNum)
     : areDepthsSet(false), globalFrameNum(globalFrameNum) {
-  cv::cvtColor(frameColored, framePyr[0], cv::COLOR_BGR2GRAY);
+  cv::cvtColor(frameColored, frame(), cv::COLOR_BGR2GRAY);
   for (int lvl = 1; lvl < PL; ++lvl)
     framePyr[lvl] = boxFilterPyrUp<unsigned char>(framePyr[lvl - 1]);
 }
+
+cv::Mat1b &PreKeyFrame::frame() { return framePyr[0]; }
 
 void PreKeyFrame::setDepthPyrs(const cv::Mat1d &depths0,
                                const cv::Mat1d &weights) {

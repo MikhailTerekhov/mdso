@@ -37,6 +37,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/system/StereoMatcher.h
     ${PROJECT_SOURCE_DIR}/include/system/StereoGeometryEstimator.h
     ${PROJECT_SOURCE_DIR}/include/system/FrameTracker.h
+    ${PROJECT_SOURCE_DIR}/include/system/BundleAdjuster.h
 )
 
 set(dso_SOURCE_FILES
@@ -54,6 +55,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/system/StereoMatcher.cpp
     ${PROJECT_SOURCE_DIR}/source/system/StereoGeometryEstimator.cpp
     ${PROJECT_SOURCE_DIR}/source/system/FrameTracker.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/BundleAdjuster.cpp
 )
 
 set(essietial_5pt_estimator_SOURCE_FILES

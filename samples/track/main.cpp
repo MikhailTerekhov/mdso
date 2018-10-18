@@ -5,24 +5,20 @@
 
 using namespace fishdso;
 
-DEFINE_bool(check_flag, true, "just check if gflags work");
-
 int main(int argc, char **argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 
   std::string usage =
-      R"abacaba(Usage: track cam framesdir start count output outpred
+      R"abacaba(Usage: track cam framesdir start count
 Where cam names a file with camera calibration
 framesdir names a directory with video frames.
 Images from this directory should be named #.jpg
 # stands for 9-symbol integer aligned with leading zeros
 start is the number of the frame to start from
-count is the number of frames for system to process
-output stands for file to put calculated positions into
-outpred stands for file to put prediction info it)abacaba";
+count is the number of frames for system to process)abacaba";
 
-  if (argc != 7) {
+  if (argc != 5) {
     std::cerr << "Wrong number of arguments!\n" << usage << std::endl;
     return 1;
   }
@@ -54,12 +50,6 @@ outpred stands for file to put prediction info it)abacaba";
     std::cout << "put frame " << it << std::endl;
     dsoSystem.addFrame(frame);
   }
-
-  std::ofstream output(argv[5]);
-  dsoSystem.printTrackingInfo(output);
-
-  std::ofstream outpred(argv[6]);
-  dsoSystem.printPredictionInfo(outpred);
 
   std::ofstream outPly("test/data/frames/points.ply");
   dsoSystem.printLastKfInPly(outPly);

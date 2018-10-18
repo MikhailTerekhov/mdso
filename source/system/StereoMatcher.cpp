@@ -79,10 +79,10 @@ SE3 StereoMatcher::match(cv::Mat frames[2], StdVector<Vec2> resPoints[2],
   // std::vector<cv::DMatch> inlierMatches;
   // inlierMatches.reserve(matches.size());
   // for (int i : geometryEstimator->inliersInds())
-    // inlierMatches.push_back(matches[i]);
+  // inlierMatches.push_back(matches[i]);
   // cv::Mat imi, imi2;
   // cv::drawMatches(frames[1], keyPoints[1], frames[0], keyPoints[0],
-                  // inlierMatches, imi);
+  // inlierMatches, imi);
   // cv::resize(imi, imi2, cv::Size(), 0.5, 0.5);
   // cv::imshow("inlier matches", imi2);
 

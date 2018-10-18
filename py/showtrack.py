@@ -24,8 +24,8 @@ def draw_motions(axes, motions, color):
               dir_vects[:, 0], dir_vects[:, 1], dir_vects[:, 2], color=color)
 
 
-actual = extract_motions('track.txt')
-predicted = extract_motions('trackpred.txt')
+actual = extract_motions('output/20181021_231809/tracked_pos.txt')
+predicted = extract_motions('output/20181021_231809/predicted_pos.txt')
 
 fig = plt.figure()
 ax = Axes3D(fig)

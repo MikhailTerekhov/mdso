@@ -6,8 +6,8 @@ class StereoGeometryEstimator {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  StereoGeometryEstimator(
-      CameraModel *cam, const StdVector<std::pair<Vec2, Vec2>> &imgCorresps);
+  StereoGeometryEstimator(CameraModel *cam,
+                          const StdVector<std::pair<Vec2, Vec2>> &imgCorresps);
 
   SE3 findCoarseMotion();
   SE3 findPreciseMotion();

@@ -82,7 +82,7 @@ TEST(CameraModelTest, CamerasPyramid) {
       Vec2 pntScaled(x / (1 << lvl), y / (1 << lvl));
       Vec3 unmapOrig = cam.unmap(pnt).normalized();
       Vec3 unmapPyr = camPyr[lvl].unmap(pntScaled).normalized();
-      double cos = unmapOrig.dot(unmapPyr); 
+      double cos = unmapOrig.dot(unmapPyr);
       if (cos < -1)
         cos = -1;
       if (cos > 1)

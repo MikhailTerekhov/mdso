@@ -79,7 +79,7 @@ public:
     res *= T(scale);
     return res;
   }
-  
+
   EIGEN_STRONG_INLINE Vec3 unmap(const Vec2 &point) const {
     return unmap(point.data());
   }
