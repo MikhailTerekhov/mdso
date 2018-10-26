@@ -1,5 +1,6 @@
 #include "system/DsoSystem.h"
 #include "system/AffineLightTransform.h"
+#include "system/StereoMatcher.h"
 #include "util/settings.h"
 #include <glog/logging.h>
 
@@ -17,25 +18,46 @@ DsoSystem::~DsoSystem() {
 
   std::ofstream ofsPredicted(FLAGS_output_directory + "/predicted_pos.txt");
   printPredictionInfo(ofsPredicted);
+
+  if (FLAGS_perform_tracking_check) {
+    std::ofstream ofsMatched(FLAGS_output_directory + "/matched_pos.txt");
+    printMatcherInfo(ofsMatched);
+  }
 }
 
-SE3 predictInternal(int prevFramesSkipped, const SE3 &worldToLastKf,
-                    const SE3 &worldToLbo, const SE3 &worldToLast) {
+SE3 predictScrewInternal(int prevFramesSkipped, const SE3 &worldToBaseKf,
+                         const SE3 &worldToLbo, const SE3 &worldToLast) {
   SE3 lboToLast = worldToLast * worldToLbo.inverse();
+  double alpha = 1.0 / prevFramesSkipped;
+  return SE3::exp(alpha * lboToLast.log()) * worldToLast *
+         worldToBaseKf.inverse();
+}
 
+SE3 predictSimpleInternal(int prevFramesSkipped, const SE3 &worldToBaseKf,
+                          const SE3 &worldToLbo, const SE3 &worldToLast) {
+  SE3 lboToLast = worldToLast * worldToLbo.inverse();
   double alpha = 1.0 / prevFramesSkipped;
   SO3 lastToCurRot = SO3::exp(alpha * lboToLast.so3().log());
   Vec3 lastToCurTrans = alpha * (lastToCurRot * lboToLast.so3().inverse() *
                                  lboToLast.translation());
 
-  SE3 worldToCur = SE3(lastToCurRot, lastToCurTrans) * worldToLast;
-
   return SE3(lastToCurRot, lastToCurTrans) * worldToLast *
-         worldToLastKf.inverse();
+         worldToBaseKf.inverse();
 }
 
-SE3 DsoSystem::predictKfToCur() {
-  PreKeyFrame *lastKf = keyFrames.rbegin()->second.preKeyFrame.get();
+EIGEN_STRONG_INLINE SE3 predictInternal(int prevFramesSkipped,
+                                        const SE3 &worldToBaseKf,
+                                        const SE3 &worldToLbo,
+                                        const SE3 &worldToLast) {
+  return FLAGS_predict_using_screw
+             ? predictScrewInternal(prevFramesSkipped, worldToBaseKf,
+                                    worldToLbo, worldToLast)
+             : predictSimpleInternal(prevFramesSkipped, worldToBaseKf,
+                                     worldToLbo, worldToLast);
+}
+
+SE3 DsoSystem::predictBaseKfToCur() {
+  PreKeyFrame *baseKf = baseKeyFrame().preKeyFrame.get();
 
   int prevFramesSkipped =
       worldToFrame.rbegin()->first - (++worldToFrame.rbegin())->first;
@@ -43,12 +65,12 @@ SE3 DsoSystem::predictKfToCur() {
   SE3 worldToLbo = (++worldToFrame.rbegin())->second;
   SE3 worldToLast = worldToFrame.rbegin()->second;
 
-  return predictInternal(prevFramesSkipped, lastKf->worldToThis, worldToLbo,
+  return predictInternal(prevFramesSkipped, baseKf->worldToThis, worldToLbo,
                          worldToLast);
 }
 
-SE3 DsoSystem::purePredictKfToCur() {
-  PreKeyFrame *lastKf = keyFrames.rbegin()->second.preKeyFrame.get();
+SE3 DsoSystem::purePredictBaseKfToCur() {
+  PreKeyFrame *baseKf = baseKeyFrame().preKeyFrame.get();
 
   int prevFramesSkipped = worldToFramePredict.rbegin()->first -
                           (++worldToFramePredict.rbegin())->first;
@@ -56,7 +78,7 @@ SE3 DsoSystem::purePredictKfToCur() {
   SE3 worldToLbo = (++worldToFramePredict.rbegin())->second;
   SE3 worldToLast = worldToFramePredict.rbegin()->second;
 
-  return predictInternal(prevFramesSkipped, lastKf->worldToThis, worldToLbo,
+  return predictInternal(prevFramesSkipped, baseKf->worldToThis, worldToLbo,
                          worldToLast);
 }
 
@@ -79,10 +101,6 @@ void DsoSystem::addFrame(const cv::Mat &frame) {
       for (int i = 0; i < int(kf.size()); ++i)
         keyFrames.insert(std::pair<int, KeyFrame>(i, std::move(kf[i])));
 
-      PreKeyFrame *lastKf = keyFrames.rbegin()->second.preKeyFrame.get();
-      frameTracker =
-          std::unique_ptr<FrameTracker>(new FrameTracker(camPyr, lastKf));
-
       bundleAdjuster = std::unique_ptr<BundleAdjuster>(new BundleAdjuster(cam));
       for (auto &p : keyFrames)
         bundleAdjuster->addKeyFrame(&p.second);
@@ -96,6 +114,9 @@ void DsoSystem::addFrame(const cv::Mat &frame) {
       std::ofstream ofsAfterAdjust(FLAGS_output_directory +
                                    "/after_adjust.ply");
       printLastKfInPly(ofsAfterAdjust);
+
+      frameTracker = std::unique_ptr<FrameTracker>(
+          new FrameTracker(camPyr, baseKeyFrame().preKeyFrame.get()));
     }
 
     return;
@@ -103,49 +124,76 @@ void DsoSystem::addFrame(const cv::Mat &frame) {
 
   std::unique_ptr<PreKeyFrame> preKeyFrame(new PreKeyFrame(frame, curFrameNum));
 
-  SE3 kfToCur;
-  AffineLightTransform<double> lightKfToCur;
+  SE3 baseKfToCur;
+  AffineLightTransform<double> lightBaseKfToCur;
 
-  SE3 purePredicted = purePredictKfToCur();
-  SE3 predicted = predictKfToCur();
+  SE3 purePredicted = purePredictBaseKfToCur();
+  SE3 predicted = predictBaseKfToCur();
 
   LOG(INFO) << "start tracking this frame" << std::endl;
-  std::tie(kfToCur, lightKfToCur) =
+
+  std::tie(baseKfToCur, lightBaseKfToCur) =
       frameTracker->trackFrame(preKeyFrame.get(), predicted, lightKfToLast);
+
   LOG(INFO) << "tracking ended" << std::endl;
 
-  PreKeyFrame *lastKf = keyFrames.rbegin()->second.preKeyFrame.get();
+  PreKeyFrame *baseKf = baseKeyFrame().preKeyFrame.get();
+  preKeyFrame->lightWorldToThis = lightBaseKfToCur * baseKf->lightWorldToThis;
 
-  preKeyFrame->lightWorldToThis = lightKfToCur * lastKf->lightWorldToThis;
-
-  SE3 diff = kfToCur * predicted.inverse();
-  worldToFrame[curFrameNum] = kfToCur * lastKf->worldToThis;
-  worldToFramePredict[curFrameNum] = purePredicted * lastKf->worldToThis;
+  worldToFrame[curFrameNum] = baseKfToCur * baseKf->worldToThis;
+  worldToFramePredict[curFrameNum] = purePredicted * baseKf->worldToThis;
   preKeyFrame->worldToThis = worldToFrame[curFrameNum];
-  // worldToFrame[curFrameNum] = predicted * lastKf->worldToThis;
-  lightKfToLast = lightKfToCur;
+
+  lightKfToLast = lightBaseKfToCur;
+
   LOG(INFO) << "estimated motion"
-            << "\ntrans = " << kfToCur.translation()
-            << "\nrot = " << kfToCur.unit_quaternion().coeffs().transpose()
+            << "\ntrans = " << baseKfToCur.translation()
+            << "\nrot = " << baseKfToCur.unit_quaternion().coeffs().transpose()
             << std::endl;
+
+  SE3 diff = baseKfToCur * predicted.inverse();
   LOG(INFO) << "diff to predicted:"
             << "\ntrans = " << diff.translation().norm()
             << "\nrot = " << diff.so3().log().norm() << std::endl;
-  LOG(INFO) << "estimated aff = " << lightKfToCur << std::endl;
+  LOG(INFO) << "estimated aff = \n" << lightBaseKfToCur << std::endl;
+
+  if (FLAGS_perform_tracking_check) {
+    std::cout << "perform check" << std::endl;
+    checkLastTracked(std::move(preKeyFrame));
+  }
 }
 
-void putMotion(std::ostream &out, const SE3 &motion) {
-  out << motion.unit_quaternion().coeffs().transpose() << ' ';
-  out << motion.translation().transpose();
+void DsoSystem::checkLastTracked(std::unique_ptr<PreKeyFrame> lastFrame) {
+  cv::Mat1b frames[2];
+  frames[0] = baseKeyFrame().preKeyFrame->frame();
+  frames[1] = lastFrame->frame();
+
+  SE3 worldToBase = baseKeyFrame().preKeyFrame->worldToThis;
+
+  StdVector<Vec2> points[2];
+  std::vector<double> depths[2];
+  StereoMatcher matcher(cam);
+  SE3 refMotion = matcher.match(frames, points, depths);
+  SE3 trackedMotion = worldToFrame.rbegin()->second * worldToBase.inverse();
+
+  double transErr = angle(refMotion.translation(), trackedMotion.translation());
+  double rotErr =
+      (trackedMotion.so3() * refMotion.so3().inverse()).log().norm();
+  std::cout << "trans error angle = " << 180. / M_PI * transErr
+            << "\nrot error angle = " << 180. / M_PI * rotErr << std::endl;
+  std::cout << "rel rot error = " << rotErr / refMotion.so3().log().norm()
+            << std::endl;
+
+  refMotion.translation() *= trackedMotion.translation().norm();
+  worldToFrameMatched[worldToFrame.rbegin()->first] = refMotion * worldToBase;
 }
 
 void DsoSystem::printLastKfInPly(std::ostream &out) {
-  KeyFrame &lastKf = keyFrames.rbegin()->second;
   out.precision(15);
   out << R"__(ply
 format ascii 1.0
 element vertex )__"
-      << lastKf.interestPoints.size() << R"__(
+      << lastKeyFrame().interestPoints.size() << R"__(
 property float x
 property float y
 property float z
@@ -155,31 +203,41 @@ property uchar blue
 end_header
 )__";
 
-  for (const InterestPoint &ip : lastKf.interestPoints) {
-    Vec3 pos = cam->unmap(ip.p.data()).normalized() / ip.invDepth;
+  for (const InterestPoint &ip : lastKeyFrame().interestPoints) {
+    Vec3 pos = cam->unmap(ip.p.data()).normalized() * ip.depthd();
     out << pos[0] << ' ' << pos[1] << ' ' << pos[2] << ' ';
-    cv::Vec3b color = lastKf.frameColored.at<cv::Vec3b>(toCvPoint(ip.p));
+    cv::Vec3b color =
+        lastKeyFrame().frameColored.at<cv::Vec3b>(toCvPoint(ip.p));
     out << int(color[2]) << ' ' << int(color[1]) << ' ' << int(color[0])
         << std::endl;
   }
 }
 
-void DsoSystem::printTrackingInfo(std::ostream &out) {
+void putMotion(std::ostream &out, const SE3 &motion) {
+  out << motion.unit_quaternion().coeffs().transpose() << ' ';
+  out << motion.translation().transpose();
+}
+
+void DsoSystem::printMotionInfo(std::ostream &out,
+                                const StdMap<int, SE3> &motions) {
   out.precision(15);
-  for (auto p : worldToFrame) {
+  for (auto p : motions) {
     out << p.first << ' ';
     putMotion(out, p.second);
     out << std::endl;
   }
 }
 
+void DsoSystem::printTrackingInfo(std::ostream &out) {
+  printMotionInfo(out, worldToFrame);
+}
+
 void DsoSystem::printPredictionInfo(std::ostream &out) {
-  out.precision(15);
-  for (auto p : worldToFramePredict) {
-    out << p.first << ' ';
-    putMotion(out, p.second);
-    out << std::endl;
-  }
+  printMotionInfo(out, worldToFramePredict);
+}
+
+void DsoSystem::printMatcherInfo(std::ostream &out) {
+  printMotionInfo(out, worldToFrameMatched);
 }
 
 } // namespace fishdso

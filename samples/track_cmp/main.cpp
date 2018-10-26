@@ -7,7 +7,7 @@ using namespace fishdso;
 
 int main(int argc, char **argv) {
   std::string usage =
-      R"abacaba(Usage: track cam framesdir start count
+      R"abacaba(Usage: track_cmp cam framesdir start count
 Where cam names a file with camera calibration
 framesdir names a directory with video frames.
 Images from this directory should be named #.jpg
@@ -39,10 +39,11 @@ count is the number of frames for system to process)abacaba";
     return 3;
   }
 
+  cv::Mat frame;
   for (int it = start; it < start + N; ++it) {
     char filename[256];
     sprintf(filename, "%s/%09d.jpg", argv[2], it);
-    cv::Mat frame = cv::imread(filename);
+    frame = cv::imread(filename);
     if (frame.data == NULL) {
       std::cerr << "frame named \"" << filename << "\" could not be read!"
                 << std::endl;

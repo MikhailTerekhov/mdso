@@ -28,6 +28,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/util/SphericalTriangulation.h
     ${PROJECT_SOURCE_DIR}/include/util/SphericalTerrain.h
     ${PROJECT_SOURCE_DIR}/include/system/AffineLightTransform.h
+    ${PROJECT_SOURCE_DIR}/include/system/SphericalPlus.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoSystem.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoInitializer.h
     ${PROJECT_SOURCE_DIR}/include/system/PreKeyFrame.h
@@ -47,6 +48,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/util/Terrain.cpp
     ${PROJECT_SOURCE_DIR}/source/util/SphericalTriangulation.cpp
     ${PROJECT_SOURCE_DIR}/source/util/SphericalTerrain.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/SphericalPlus.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoSystem.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoInitializer.cpp
     ${PROJECT_SOURCE_DIR}/source/system/PreKeyFrame.cpp

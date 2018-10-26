@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 import pandas as pd
 import quaternion as quat
@@ -20,17 +21,34 @@ def draw_motions(axes, motions, color):
     centers = np.array(
         list(map(lambda mot: -np.matmul(mot[1].T, mot[0]), motions)))
     dir_vects = np.array(list(map(lambda mot: 0.15 * mot[1][2, :], motions)))
-    ax.quiver(centers[:, 0], centers[:, 1], centers[:, 2],
+    axes.quiver(centers[:, 0], centers[:, 1], centers[:, 2],
               dir_vects[:, 0], dir_vects[:, 1], dir_vects[:, 2], color=color)
 
+def main(argv):
+    if (len(argv) != 2):
+        print("I need just one argument -- dso output directory")
+        return 0
 
-actual = extract_motions('output/20181021_231809/tracked_pos.txt')
-predicted = extract_motions('output/20181021_231809/predicted_pos.txt')
+    out_dir = argv[1]
+    actual = extract_motions(out_dir + '/tracked_pos.txt')
+    predicted = extract_motions(out_dir + '/predicted_pos.txt')
 
-fig = plt.figure()
-ax = Axes3D(fig)
+    has_stereo_matched = True
+    try:
+        stereo_matched = extract_motions(out_dir + '/matched_pos.txt')
+    except FileNotFoundError:
+        has_stereo_matched = False
+        print('no stereo-matching provided')
 
-draw_motions(ax, actual, 'orange')
-draw_motions(ax, predicted, 'blue')
+    fig = plt.figure()
+    ax = Axes3D(fig)
 
-plt.show()
+    draw_motions(ax, actual, 'orange')
+    draw_motions(ax, predicted, 'blue')
+    if (has_stereo_matched):
+        draw_motions(ax, stereo_matched, 'green')
+
+    plt.show()
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

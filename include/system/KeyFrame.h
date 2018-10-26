@@ -26,7 +26,7 @@ struct KeyFrame {
 
   std::unique_ptr<PreKeyFrame> preKeyFrame;
   cv::Mat frameColored;
-  cv::Mat gradX, gradY, gradNorm;
+  cv::Mat1d gradX, gradY, gradNorm;
   StdVector<InterestPoint> interestPoints;
 
 private:

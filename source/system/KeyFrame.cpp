@@ -45,9 +45,9 @@ void KeyFrame::setDepthPyrs() {
       cv::Mat1d(preKeyFrame->frame().rows, preKeyFrame->frame().cols, -1.0);
   cv::Mat1d weights = cv::Mat1d::zeros(preKeyFrame->frame().size());
   for (const auto &ip : interestPoints) {
-    if (ip.state == InterestPoint::OUTLIER)
+    if (ip.state != InterestPoint::ACTIVE)
       continue;
-    depths0(toCvPoint(ip.p)) = 1 / ip.invDepth;
+    depths0(toCvPoint(ip.p)) = ip.depthd();
     weights(toCvPoint(ip.p)) = 1 / std::sqrt(ip.variance);
   }
 
@@ -114,8 +114,7 @@ cv::Mat KeyFrame::drawDepthedFrame(double minDepth, double maxDepth) {
 
   for (const InterestPoint &ip : interestPoints)
     cv::circle(res, toCvPoint(ip.p), 5,
-               toCvVec3bDummy(depthCol(1 / ip.invDepth, minDepth, maxDepth)),
-               2);
+               toCvVec3bDummy(depthCol(ip.depthd(), minDepth, maxDepth)), 2);
 
   return res;
 }

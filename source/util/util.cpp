@@ -15,6 +15,15 @@ namespace fishdso {
 cv::Mat dbg;
 double minDepth = 0, maxDepth = 0;
 
+double angle(const Vec3 &a, const Vec3 &b) {
+  double cosAngle = a.normalized().dot(b.normalized());
+  if (cosAngle < -1)
+    cosAngle = -1;
+  else if (cosAngle > 1)
+    cosAngle = 1;
+  return std::acos(cosAngle);
+}
+
 void setDepthColBounds(const std::vector<double> &depths) {
   std::vector<double> sorted = depths;
   std::sort(sorted.begin(), sorted.end());
@@ -46,17 +55,23 @@ void putCross(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col,
            thikness);
 }
 
-void grad(cv::Mat const &img, cv::Mat &gradX, cv::Mat &gradY,
-          cv::Mat &gradNorm) {
-  static float filter[] = {-1.0, 0.0, 1.0};
-  static cv::Mat gradXKer(1, 3, CV_32FC1, filter);
-  static cv::Mat gradYKer(3, 1, CV_32FC1, filter);
+void grad(const cv::Mat &img, cv::Mat1d &gradX, cv::Mat1d &gradY,
+          cv::Mat1d &gradNorm) {
+  static double filter[] = {-0.5, 0.0, 0.5};
+  static cv::Mat1d gradXKer(1, 3, filter);
+  static cv::Mat1d gradYKer(3, 1, filter);
 
-  cv::filter2D(img, gradX, CV_32F, gradXKer, cv::Point(-1, -1), 0,
+  cv::filter2D(img, gradX, CV_64F, gradXKer, cv::Point(-1, -1), 0,
                cv::BORDER_REPLICATE);
-  cv::filter2D(img, gradY, CV_32F, gradYKer, cv::Point(-1, -1), 0,
+  cv::filter2D(img, gradY, CV_64F, gradYKer, cv::Point(-1, -1), 0,
                cv::BORDER_REPLICATE);
   cv::magnitude(gradX, gradY, gradNorm);
+}
+
+double gradNormAt(const cv::Mat1b &img, const cv::Point &p) {
+  double dx = (img(p.y, p.x + 1) - img(p.y, p.x - 1)) / 2.0;
+  double dy = (img(p.y + 1, p.x) - img(p.y - 1, p.x)) / 2.0;
+  return std::hypot(dx, dy);
 }
 
 cv::Scalar depthCol(double d, double mind, double maxd) {

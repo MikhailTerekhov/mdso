@@ -4,6 +4,8 @@
 #include "util/types.h"
 #include <Eigen/Core>
 #include <Eigen/StdVector>
+#include <ceres/ceres.h>
+#include <cmath>
 #include <opencv2/core.hpp>
 
 namespace fishdso {
@@ -11,13 +13,19 @@ namespace fishdso {
 struct InterestPoint {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  enum State { ACTIVE, OUTLIER };
+  enum State { ACTIVE, OOB, OUTLIER };
 
-  InterestPoint(const Vec2 &p, double invDepth = -1, double variance = 1)
-      : p(p), invDepth(invDepth), variance(variance), state(ACTIVE) {}
+  InterestPoint(const Vec2 &p) : p(p), state(OUTLIER) {}
+
+  EIGEN_STRONG_INLINE void activate(double depth) {
+    state = ACTIVE;
+    logInvDepth = -std::log(depth);
+  }
+
+  EIGEN_STRONG_INLINE double depthd() const { return std::exp(-logInvDepth); }
 
   Vec2 p;
-  double invDepth;
+  double logInvDepth;
   double variance;
   State state;
 };

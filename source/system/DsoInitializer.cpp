@@ -58,7 +58,9 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
       for (InterestPoint &ip : keyFrames[i].interestPoints) {
         double depth;
         if (kpTerrains[i](ip.p, depth))
-          ip.invDepth = 1 / depth;
+          ip.activate(depth);
+        else
+          ip.state = InterestPoint::OOB;
       }
       keyFrames[i].setDepthPyrs();
     }
@@ -81,14 +83,16 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
         for (InterestPoint &ip : keyFrames[kfInd].interestPoints) {
           double depth;
           if (kpTerrains[kfInd](cam->unmap(ip.p.data()), depth))
-            ip.invDepth = 1 / depth;
+            ip.activate(depth);
+          else
+            ip.state = InterestPoint::OOB;
         }
 
         int pointsTotal = keyFrames[kfInd].interestPoints.size();
-        auto it =
-            std::remove_if(keyFrames[kfInd].interestPoints.begin(),
-                           keyFrames[kfInd].interestPoints.end(),
-                           [](InterestPoint p) { return p.invDepth < 0; });
+        auto it = std::remove_if(
+            keyFrames[kfInd].interestPoints.begin(),
+            keyFrames[kfInd].interestPoints.end(),
+            [](InterestPoint p) { return p.state != InterestPoint::ACTIVE; });
         keyFrames[kfInd].interestPoints.erase(
             it, keyFrames[kfInd].interestPoints.end());
         int pointsInTriang = keyFrames[kfInd].interestPoints.size();
@@ -103,7 +107,7 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
     std::vector<double> ipDepths;
     ipDepths.reserve(keyFrames[1].interestPoints.size());
     for (const InterestPoint &ip : keyFrames[1].interestPoints)
-      ipDepths.push_back(1 / ip.invDepth);
+      ipDepths.push_back(ip.depthd());
     setDepthColBounds(ipDepths);
 
     if (debugOutputType != NO_DEBUG) {
@@ -119,7 +123,7 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
       std::vector<double> d(ip.size());
       for (int i = 0; i < int(ip.size()); ++i) {
         pnts[i] = ip[i].p;
-        d[i] = 1 / ip[i].invDepth;
+        d[i] = ip[i].depthd();
       }
 
       //    drawCurvedInternal(cam, Vec2(100.0, 100.0), Vec2(1000.0, 500.0),
@@ -197,7 +201,7 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesDummy() {
   for (int i = 0; i < 2; ++i) {
     keyFrames.push_back(KeyFrame(frames[i], globalFrameNums[i]));
     for (InterestPoint &ip : keyFrames.back().interestPoints)
-      ip.invDepth = 1;
+      ip.activate(1);
   }
 
   return keyFrames;

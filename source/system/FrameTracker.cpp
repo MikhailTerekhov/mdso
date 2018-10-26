@@ -1,5 +1,6 @@
 #include "system/FrameTracker.h"
 #include "util/defs.h"
+#include "util/util.h"
 #include <ceres/cubic_interpolation.h>
 
 namespace fishdso {
@@ -14,8 +15,6 @@ FrameTracker::FrameTracker(const StdVector<CameraModel> &camPyr,
 std::pair<SE3, AffineLightTransform<double>>
 FrameTracker::trackFrame(PreKeyFrame *frame, const SE3 &coarseMotion,
                          const AffineLightTransform<double> &coarseAffLight) {
-  cv::Size displSz = base->framePyr[1].size();
-
   SE3 motion = coarseMotion;
   AffineLightTransform<double> affLight;
 
@@ -109,20 +108,20 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
   ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> trackedFrame(
       imgGrid);
 
-  std::mt19937 mt;
-  std::normal_distribution<double> noize(0, 0.5);
-  cv::Mat1b noizedGrid(trackedImg.size());
-  for (int y = 0; y < noizedGrid.rows; ++y)
-    for (int x = 0; x < noizedGrid.cols; ++x) {
-      // double xN = x + noize(mt), yN = y + noize(mt);
-      double xN = x, yN = y;
-      double pixValue = 0;
-      trackedFrame.Evaluate(yN, xN, &pixValue);
-      noizedGrid(y, x) = (unsigned char)pixValue;
-    }
-  cv::Mat ngr;
-  cv::resize(noizedGrid, ngr, displSz, 0, 0, cv::INTER_NEAREST);
-  cv::imshow("grid", ngr);
+  // std::mt19937 mt;
+  // std::normal_distribution<double> noize(0, 0.5);
+  // cv::Mat1b noizedGrid(trackedImg.size());
+  // for (int y = 0; y < noizedGrid.rows; ++y)
+  // for (int x = 0; x < noizedGrid.cols; ++x) {
+  // // double xN = x + noize(mt), yN = y + noize(mt);
+  // double xN = x, yN = y;
+  // double pixValue = 0;
+  // trackedFrame.Evaluate(yN, xN, &pixValue);
+  // noizedGrid(y, x) = (unsigned char)pixValue;
+  // }
+  // cv::Mat ngr;
+  // cv::resize(noizedGrid, ngr, displSz, 0, 0, cv::INTER_NEAREST);
+  // cv::imshow("grid", ngr);
 
   ceres::Problem problem;
 
@@ -131,6 +130,11 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
   problem.AddParameterBlock(motion.translation().data(), 3);
 
   problem.AddParameterBlock(affLight.data, 2);
+  problem.SetParameterLowerBound(affLight.data, 0, settingMinAffineLigthtA);
+  problem.SetParameterUpperBound(affLight.data, 0, settingMaxAffineLigthtA);
+  problem.SetParameterLowerBound(affLight.data, 1, settingMinAffineLigthtB);
+  problem.SetParameterUpperBound(affLight.data, 1, settingMaxAffineLigthtB);
+
   if (!FLAGS_optimize_affine_light)
     problem.SetParameterBlockConstant(affLight.data);
 
@@ -162,6 +166,17 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
         }
 
         pixUsed.push_back(baseImg(y, x));
+
+        ceres::LossFunction *lossFunc = nullptr;
+        if (FLAGS_use_grad_weights_on_tracking) {
+          double gradNorm = gradNormAt(baseImg, cv::Point(x, y));
+          double c = settingGreadientWeighingConstant;
+          double weight = c / std::hypot(c, gradNorm);
+          lossFunc = new ceres::ScaledLoss(
+              new ceres::HuberLoss(settingTrackingOutlierIntensityDiff), weight,
+              ceres::Ownership::TAKE_OWNERSHIP);
+        } else
+          lossFunc = new ceres::HuberLoss(settingTrackingOutlierIntensityDiff);
 
         residuals.push_back(new PointTrackingResidual(
             pos, static_cast<double>(baseImg(y, x)), &cam, &trackedFrame));

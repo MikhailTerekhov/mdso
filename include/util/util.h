@@ -1,6 +1,5 @@
 #ifndef INCLUDE_UTIL
 #define INCLUDE_UTIL
-
 #include "util/settings.h"
 #include "util/types.h"
 #include <opencv2/opencv.hpp>
@@ -11,14 +10,24 @@ namespace fishdso {
 extern cv::Mat dbg;
 extern double minDepth, maxDepth;
 
+template <typename T>
+EIGEN_STRONG_INLINE std::vector<T> reservedVector(int toReserve) {
+  std::vector<T> res;
+  res.reserve(toReserve);
+  return res;
+}
+
 void setDepthColBounds(const std::vector<double> &depths);
+
+double angle(const Vec3 &a, const Vec3 &b);
 
 void putDot(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col);
 void putCross(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col,
               int size, int thikness);
 
-void grad(cv::Mat const &img, cv::Mat &gradX, cv::Mat &gradY,
-          cv::Mat &gradNorm);
+void grad(const cv::Mat &img, cv::Mat1d &gradX, cv::Mat1d &gradY,
+          cv::Mat1d &gradNorm);
+double gradNormAt(const cv::Mat1b &img, const cv::Point &p);
 
 cv::Scalar depthCol(double d, double mind, double maxd);
 

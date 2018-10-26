@@ -1,10 +1,15 @@
 #include "system/StereoGeometryEstimator.h"
+#include "system/SphericalPlus.h"
 #include <RelativePoseEstimator.h>
 #include <ceres/ceres.h>
 #include <fstream>
 #include <glog/logging.h>
 
 namespace fishdso {
+
+Mat33 toEssential(const SE3 motion) {
+  return SO3::hat(motion.translation()) * motion.rotationMatrix();
+}
 
 StereoGeometryEstimator::StereoGeometryEstimator(
     CameraModel *cam, const StdVector<std::pair<Vec2, Vec2>> &imgCorresps)
@@ -62,26 +67,34 @@ StereoGeometryEstimator::depths() {
 
 int StereoGeometryEstimator::inliersNum() { return _inliersInds.size(); }
 
+double reprojectionError(CameraModel *cam, const Mat33 &E, const Mat33 &Et,
+                         const std::pair<Vec2, Vec2> &imgCorresp,
+                         std::pair<Vec3, Vec3> rayCorresp) {
+  Vec3 norm1 = Et * rayCorresp.second;
+  Vec3 norm2 = E * rayCorresp.first;
+  if (norm1.squaredNorm() > 1e-4)
+    rayCorresp.first -=
+        (rayCorresp.first.dot(norm1) / norm1.squaredNorm()) * norm1;
+  if (norm2.squaredNorm() > 1e-4)
+    rayCorresp.second -=
+        (rayCorresp.second.dot(norm2) / norm2.squaredNorm()) * norm2;
+
+  double err1 =
+      (cam->map(rayCorresp.first.data()) - imgCorresp.first).squaredNorm();
+  double err2 =
+      (cam->map(rayCorresp.second.data()) - imgCorresp.second).squaredNorm();
+
+  return std::min(err1, err2);
+}
+
 int StereoGeometryEstimator::findInliersEssential(
     const Mat33 &E, std::vector<int> &inliersInds) {
   inliersInds.resize(0);
   int result = 0;
   Mat33 Et = E.transpose();
-  Vec3 norm1, norm2;
   for (int i = 0; i < int(rays.size()); ++i) {
-    auto r = rays[i];
-    const auto &pr = imgCorresps[i];
-    norm1 = Et * r.second;
-    norm2 = E * r.first;
-    if (norm1.squaredNorm() > 1e-4)
-      r.first -= (r.first.dot(norm1) / norm1.squaredNorm()) * norm1;
-    if (norm2.squaredNorm() > 1e-4)
-      r.second -= (r.second.dot(norm2) / norm2.squaredNorm()) * norm2;
-
-    double err1 = (cam->map(r.first.data()) - pr.first).squaredNorm();
-    double err2 = (cam->map(r.second.data()) - pr.second).squaredNorm();
-
-    if (std::min(err1, err2) < settingEssentialReprojErrThreshold) {
+    if (reprojectionError(cam, E, Et, imgCorresps[i], rays[i]) <
+        settingEssentialReprojErrThreshold) {
       ++result;
       inliersInds.push_back(i);
     }
@@ -91,7 +104,8 @@ int StereoGeometryEstimator::findInliersEssential(
 
 int StereoGeometryEstimator::findInliersMotion(const SE3 &motion,
                                                std::vector<int> &inliersInds) {
-  static std::vector<int> newInlierInds = reservedVector();
+  static std::vector<int> newInlierInds =
+      reservedVector<int>(settingKeyPointsCount);
 
   newInlierInds.resize(0);
   for (int i : inliersInds) {
@@ -106,7 +120,8 @@ int StereoGeometryEstimator::findInliersMotion(const SE3 &motion,
 
 SE3 StereoGeometryEstimator::extractMotion(const Mat33 &E,
                                            std::vector<int> &inliersInds,
-                                           int &newInliers) {
+                                           int &newInliers,
+                                           bool doLogFrontPoints) {
   Eigen::JacobiSVD<Mat33> svdE(E, Eigen::ComputeFullU | Eigen::ComputeFullV);
   Mat33 U = svdE.matrixU();
   Mat33 V = svdE.matrixV();
@@ -133,14 +148,22 @@ SE3 StereoGeometryEstimator::extractMotion(const Mat33 &E,
   int bestFrontPointsNum = 0;
   SE3 bestSol;
 
-  static std::vector<int> bestInliersInds = reservedVector(),
-                          curInliersInds = reservedVector();
+  static std::vector<int> bestInliersInds =
+                              reservedVector<int>(settingKeyPointsCount),
+                          curInliersInds =
+                              reservedVector<int>(settingKeyPointsCount);
   bestInliersInds.resize(0);
   curInliersInds.resize(0);
+
+  if (doLogFrontPoints)
+    VLOG(1) << "points in front: ";
 
   for (SE3 sol : solutions) {
     curInliersInds = inliersInds;
     int curFrontPointsNum = findInliersMotion(sol, curInliersInds);
+
+    if (doLogFrontPoints)
+      VLOG(1) << curFrontPointsNum << ' ';
 
     if (curFrontPointsNum > bestFrontPointsNum) {
       bestFrontPointsNum = curFrontPointsNum;
@@ -148,6 +171,10 @@ SE3 StereoGeometryEstimator::extractMotion(const Mat33 &E,
       std::swap(curInliersInds, bestInliersInds);
     }
   }
+
+  if (doLogFrontPoints)
+    VLOG(1) << std::endl;
+
   std::swap(inliersInds, bestInliersInds);
   newInliers = bestFrontPointsNum;
   return bestSol;
@@ -169,7 +196,13 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
   int hypotesisInd[N];
   std::pair<Vec3 *, Vec3 *> hypotesis[N];
   Mat33 results[10];
+
   int bestInliers = -1;
+  static std::vector<int> curInliersInds =
+                              reservedVector<int>(settingKeyPointsCount),
+                          bestInliersInds =
+                              reservedVector<int>(settingKeyPointsCount);
+
   long long iterNum = settingRansacMaxIter;
   double q = std::pow(1.0 - std::pow(1 - p, 1.0 / iterNum), 1.0 / N);
 
@@ -219,8 +252,6 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
     //      std::cout << results[i].norm() << ' ';
     //    std::cout << std::endl;
 
-    static std::vector<int> curInliersInds = reservedVector(),
-                            bestInliersInds = reservedVector();
     for (int i = 0; i < foundN; ++i) {
       int inliers = findInliersEssential(results[i], curInliersInds);
       if (inliers > maxInliers) {
@@ -229,8 +260,8 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
         std::swap(bestInliersInds, curInliersInds);
       }
     }
-    SE3 curMotion =
-        extractMotion(results[maxInliersInd], bestInliersInds, maxInliers);
+    SE3 curMotion = extractMotion(results[maxInliersInd], bestInliersInds,
+                                  maxInliers, false);
     if (bestInliers < maxInliers) {
       bestInliers = maxInliers;
       bestMotion = curMotion;
@@ -246,76 +277,89 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
   }
 
   LOG(INFO) << "iterNum = " << iterNum << std::endl;
+  LOG(INFO) << "total inliers on coarse = " << bestInliers << std::endl;
   if (iterNum == settingRansacMaxIter)
     LOG(WARNING) << "max number of RANSAC iterations reached" << std::endl;
   coarseFound = true;
   motion = bestMotion;
 
+  if (FLAGS_output_reproj_CDF) {
+    std::vector<double> values = reservedVector<double>(rays.size());
+    Mat33 E = toEssential(motion);
+    Mat33 Et = E.transpose();
+    for (int i = 0; i < rays.size(); ++i)
+      values.push_back(
+          std::sqrt(reprojectionError(cam, E, Et, imgCorresps[i], rays[i])));
+    std::sort(values.begin(), values.end());
+
+    std::ofstream ofs(FLAGS_output_directory + "/reproj_err.txt");
+    ofs << values.size() << std::endl;
+    for (double v : values)
+      ofs << v << ' ';
+    ofs.close();
+  }
+
+  bestMotion =
+      extractMotion(toEssential(bestMotion), _inliersInds, bestInliers, true);
+  VLOG(1) << "total inliers on coarse after front check = " << bestInliers;
+
   return bestMotion;
 }
 
-class SphericalPlus {
-public:
+struct ReprojectionResidual {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  SphericalPlus(const Vec3 &_k) : k(_k.normalized()) {
-    int minI = std::min_element(k.data(), k.data() + 3,
-                                [](double a, double b) {
-                                  return std::abs(a) < std::abs(b);
-                                }) -
-               k.data();
-    Vec3 v1, v2;
-    if (minI == 0)
-      v1 = Vec3(0, -k[2], k[1]).normalized();
-    else if (minI == 1)
-      v1 = Vec3(-k[2], 0, k[0]).normalized();
-    else
-      v1 = Vec3(-k[1], k[0], 0).normalized();
-    v2 = k.cross(v1).normalized();
-    kDeltaOrts.col(0) = v1;
-    kDeltaOrts.col(1) = v2;
-  }
+  ReprojectionResidual(CameraModel *cam, const Vec3 &p, const Vec3 &q,
+                       const Vec2 &pMapped, const Vec2 &qMapped)
+      : cam(cam), p(p), q(q), pMapped(pMapped), qMapped(qMapped) {}
 
   template <typename T>
-  bool operator()(const T *const vecP, const T *const deltaP, T *res) const {
-    typedef Eigen::Matrix<T, 3, 1> Vec3t;
+  bool operator()(const T *const rotP, const T *const transP, T *res) const {
     typedef Eigen::Matrix<T, 2, 1> Vec2t;
-    typedef Eigen::Matrix<T, 3, 2> Mat32t;
+    typedef Eigen::Matrix<T, 3, 1> Vec3t;
     typedef Eigen::Matrix<T, 3, 3> Mat33t;
+    typedef Eigen::Quaternion<T> Quatt;
+    typedef Sophus::SO3<T> SO3t;
 
-    Vec3t kT = k.cast<T>();
-    Eigen::Map<const Vec3t> vecM(vecP);
-    Vec3t vec = vecM;
-    Eigen::Map<const Vec2t> deltaM(deltaP);
-    Vec2t delta = deltaM;
-    Vec3t rotAxis = vec + k;
-    T rotAxisSqN = rotAxis.squaredNorm();
+    Eigen::Map<const Vec3t> transM(transP);
+    Vec3t trans(transM);
+    Eigen::Map<const Quatt> rotM(rotP);
+    Quatt rot(rotM);
 
-    Mat33t R;
-    if (rotAxisSqN < 1e-4)
-      R = degenerateR.cast<T>();
-    else
-      R = -Mat33t::Identity() +
-          ((T(2.0) / rotAxisSqN) * rotAxis * rotAxis.transpose());
+    Vec3t pT = p.cast<T>(), qT = q.cast<T>();
+    Vec2t pMappedT = pMapped.cast<T>(), qMappedT = qMapped.cast<T>();
 
-    Vec3t resV = (vec + R * kDeltaOrts * delta).normalized();
-    memcpy(res, resV.data(), 3 * sizeof(T));
+    Mat33t E = SO3t::hat(trans) * rot.toRotationMatrix();
+    Vec3t Ep = E * pT, Etq = E.transpose() * qT;
+
+    T EpSqN = Ep.squaredNorm(), EtqSqN = Etq.squaredNorm();
+    if (EpSqN < T(1e-4) || EtqSqN < T(1e-4)) {
+      res[0] = T(0.0);
+      res[1] = T(0.0);
+      res[2] = T(0.0);
+      res[3] = T(0.0);
+      return true;
+    }
+
+    Vec3t pProj = pT - (pT.dot(Etq) / EtqSqN) * Etq;
+    Vec3t qProj = qT - (qT.dot(Ep) / EpSqN) * Ep;
+
+    Vec2t errVec1 = cam->map(pProj.data()) - pMappedT;
+    Vec2t errVec2 = cam->map(qProj.data()) - qMappedT;
+
+    res[0] = errVec1[0];
+    res[1] = errVec1[1];
+    res[2] = errVec2[0];
+    res[3] = errVec2[1];
 
     return true;
   }
 
 private:
-  Mat32 kDeltaOrts;
-  Vec3 k;
-  static Mat33 degenerateR;
+  CameraModel *cam;
+  Vec3 p, q;
+  Vec2 pMapped, qMapped;
 };
-
-// clang-format off
-Mat33 SphericalPlus::degenerateR =
-    (Mat33() << 1.0,  0.0,  0.0,
-                0.0, -1.0,  0.0,
-                0.0,  0.0, -1.0).finished();
-// clang-format on
 
 SE3 StereoGeometryEstimator::findPreciseMotion() {
   if (preciseFound)
@@ -388,8 +432,9 @@ SE3 StereoGeometryEstimator::findPreciseMotion() {
             new ReprojectionResidual(cam, rays[i].first, rays[i].second,
                                      imgCorresps[i].first,
                                      imgCorresps[i].second)),
-        new ceres::ArctanLoss(1), motion.so3().data(),
-        motion.translation().data());
+        new ceres::HuberLoss(
+            std::sqrt(2.0 * settingEssentialReprojErrThreshold)),
+        motion.so3().data(), motion.translation().data());
 
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_QR;
@@ -406,8 +451,7 @@ SE3 StereoGeometryEstimator::findPreciseMotion() {
   //            << std::sqrt(summary.final_cost / summary.num_residuals)
   //            << std::endl;
 
-  findInliersEssential(SO3::hat(motion.translation()) * motion.rotationMatrix(),
-                       _inliersInds);
+  findInliersEssential(toEssential(motion), _inliersInds);
   findInliersMotion(motion, _inliersInds);
 
   preciseFound = true;

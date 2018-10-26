@@ -37,6 +37,14 @@ extern double settingEpsSamePoints;
 
 extern double settingTriangulationDrawPadding;
 
+// common direct alignment parameters
+extern double settingMinAffineLigthtA;
+extern double settingMaxAffineLigthtA;
+extern double settingMinAffineLigthtB;
+extern double settingMaxAffineLigthtB;
+
+extern double settingGreadientWeighingConstant;
+
 // frame tracking
 constexpr int settingPyrLevels = 6;
 extern double settingTrackingOutlierIntensityDiff;
@@ -49,9 +57,17 @@ extern double settingMaxPointDepth;
 
 } // namespace fishdso
 
+DECLARE_bool(use_ORB_initialization);
+DECLARE_bool(output_reproj_CDF);
+
 DECLARE_bool(optimize_affine_light);
 
-DECLARE_bool(use_ORB_initialization);
+DECLARE_bool(perform_tracking_check);
+DECLARE_bool(track_from_lask_kf);
+DECLARE_bool(predict_using_screw);
+DECLARE_bool(use_grad_weights_on_tracking);
+
+DECLARE_bool(fixed_motion_on_first_ba);
 
 DECLARE_double(red_depths_part);
 DECLARE_double(blue_depths_part);

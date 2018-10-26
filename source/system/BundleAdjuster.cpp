@@ -12,7 +12,7 @@ BundleAdjuster::BundleAdjuster(CameraModel *cam)
 
 bool BundleAdjuster::isOOB(const SE3 &worldToBase, const SE3 &worldToRef,
                            const InterestPoint &baseIP) {
-  Vec3 inBase = cam->unmap(baseIP.p).normalized() / baseIP.invDepth;
+  Vec3 inBase = cam->unmap(baseIP.p).normalized() * baseIP.depthd();
   Vec2 reproj = cam->map(worldToRef * worldToBase.inverse() * inBase);
   return !(reproj[0] >= 0 && reproj[0] < cam->getWidth() && reproj[1] >= 0 &&
            reproj[1] < cam->getHeight());
@@ -28,19 +28,16 @@ struct DirectResidual {
   DirectResidual(
       ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> *baseFrame,
       ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> *refFrame,
-      const CameraModel *cam, InterestPoint *interestPoint, KeyFrame *baseKf,
-      KeyFrame *refKf)
-      : cam(cam), refFrame(refFrame), interestPoint(interestPoint),
-        baseKf(baseKf), refKf(refKf) {
-    for (int i = 0; i < settingResidualPatternSize; ++i) {
-      Vec2 pos = interestPoint->p + settingResidualPattern[i];
-      baseDirections[i] = cam->unmap(pos).normalized();
-      baseFrame->Evaluate(pos[1], pos[0], &baseIntencities[i]);
-    }
+      const CameraModel *cam, InterestPoint *interestPoint, const Vec2 &pos,
+      KeyFrame *baseKf, KeyFrame *refKf)
+      : cam(cam), baseDirection(cam->unmap(pos).normalized()),
+        refFrame(refFrame), interestPoint(interestPoint), baseKf(baseKf),
+        refKf(refKf) {
+    baseFrame->Evaluate(pos[1], pos[0], &baseIntencity);
   }
 
   template <typename T>
-  bool operator()(const T *const invDepthP, const T *const baseTransP,
+  bool operator()(const T *const logInvDepthP, const T *const baseTransP,
                   const T *const baseRotP, const T *const refTransP,
                   const T *const refRotP, const T *const baseAffP,
                   const T *const refAffP, T *res) const {
@@ -70,23 +67,20 @@ struct DirectResidual {
 
     AffineLightTransform<T>::normalizeMultiplier(refAffLight, baseAffLight);
 
-    const T &invDepth = *invDepthP;
-    for (int i = 0; i < settingResidualPatternSize; ++i) {
-      Vec3t refPos = (worldToRef * worldToBase.inverse()) *
-                     (baseDirections[i].cast<T>() / invDepth);
-      Vec2t refPosMapped = cam->map(refPos.data()).template cast<T>();
-      T trackedIntensity;
-      refFrame->Evaluate(refPosMapped[1], refPosMapped[0], &trackedIntensity);
-      res[i] =
-          refAffLight(trackedIntensity) - baseAffLight(T(baseIntencities[i]));
-    }
+    T depth = ceres::exp(-(*logInvDepthP));
+    Vec3t refPos = (worldToRef * worldToBase.inverse()) *
+                   (baseDirection.cast<T>() * depth);
+    Vec2t refPosMapped = cam->map(refPos.data()).template cast<T>();
+    T trackedIntensity;
+    refFrame->Evaluate(refPosMapped[1], refPosMapped[0], &trackedIntensity);
+    *res = refAffLight(trackedIntensity) - baseAffLight(T(baseIntencity));
 
     return true;
   }
 
-  Vec3 baseDirections[settingResidualPatternSize];
-  double baseIntencities[settingResidualPatternSize];
   const CameraModel *cam;
+  Vec3 baseDirection;
+  double baseIntencity;
   ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> *refFrame;
   InterestPoint *interestPoint;
   KeyFrame *baseKf;
@@ -96,11 +90,14 @@ struct DirectResidual {
 void BundleAdjuster::adjust() {
   int pointsTotal = 0, pointsOOB = 0, pointsOutliers = 0;
 
-  KeyFrame *secondKf = nullptr;
+  KeyFrame *secondKeyFrame = nullptr;
   for (auto kf : keyFrames)
-    if (kf != firstKeyFrame)
-      secondKf = kf;
-  SE3 oldMotion = secondKf->preKeyFrame->worldToThis;
+    if (kf != firstKeyFrame) {
+      secondKeyFrame = kf;
+      break;
+    }
+
+  SE3 oldMotion = secondKeyFrame->preKeyFrame->worldToThis;
 
   std::map<KeyFrame *, std::unique_ptr<ceres::Grid2D<unsigned char, 1>>> grid;
 
@@ -128,14 +125,18 @@ void BundleAdjuster::adjust() {
         keyFrame->preKeyFrame->worldToThis.translation().data(), 3);
     problem.AddParameterBlock(keyFrame->preKeyFrame->worldToThis.so3().data(),
                               4, new ceres::EigenQuaternionParameterization());
-    problem.AddParameterBlock(keyFrame->preKeyFrame->lightWorldToThis.data, 2);
+    auto affLight = keyFrame->preKeyFrame->lightWorldToThis.data;
+    problem.AddParameterBlock(affLight, 2);
+    problem.SetParameterLowerBound(affLight, 0, settingMinAffineLigthtA);
+    problem.SetParameterUpperBound(affLight, 0, settingMaxAffineLigthtA);
+    problem.SetParameterLowerBound(affLight, 1, settingMinAffineLigthtB);
+    problem.SetParameterUpperBound(affLight, 1, settingMaxAffineLigthtB);
 
     ordering->AddElementToGroup(
         keyFrame->preKeyFrame->worldToThis.translation().data(), 1);
     ordering->AddElementToGroup(keyFrame->preKeyFrame->worldToThis.so3().data(),
                                 1);
-    ordering->AddElementToGroup(keyFrame->preKeyFrame->lightWorldToThis.data,
-                                1);
+    ordering->AddElementToGroup(affLight, 1);
   }
 
   problem.SetParameterBlockConstant(
@@ -144,18 +145,28 @@ void BundleAdjuster::adjust() {
       firstKeyFrame->preKeyFrame->worldToThis.so3().data());
   problem.SetParameterBlockConstant(
       firstKeyFrame->preKeyFrame->lightWorldToThis.data);
-  problem.SetParameterBlockConstant(
-      firstKeyFrame->preKeyFrame->lightWorldToThis.data);
 
-  ceres::LossFunction *lossFunc =
-      new ceres::HuberLoss(settingBAOutlierIntensityDiff);
+  problem.SetParameterization(
+      secondKeyFrame->preKeyFrame->worldToThis.translation().data(),
+      new ceres::AutoDiffLocalParameterization<SphericalPlus, 3, 2>(
+          new SphericalPlus(
+              secondKeyFrame->preKeyFrame->worldToThis.translation())));
+
+  if (FLAGS_fixed_motion_on_first_ba && keyFrames.size() == 2) {
+    problem.SetParameterBlockConstant(
+        secondKeyFrame->preKeyFrame->worldToThis.translation().data());
+    problem.SetParameterBlockConstant(
+        secondKeyFrame->preKeyFrame->worldToThis.so3().data());
+    problem.SetParameterBlockConstant(
+        secondKeyFrame->preKeyFrame->lightWorldToThis.data);
+  }
 
   std::cout << "points on the first = " << firstKeyFrame->interestPoints.size()
             << std::endl;
-  std::cout << "points on the second = " << secondKf->interestPoints.size()
-            << std::endl;
+  std::cout << "points on the second = "
+            << secondKeyFrame->interestPoints.size() << std::endl;
 
-  std::vector<DirectResidual *> residuals;
+  std::map<InterestPoint *, std::vector<DirectResidual *>> residualsFor;
 
   std::vector<Vec2> oobPos;
   std::vector<Vec2> oobKf1;
@@ -169,32 +180,41 @@ void BundleAdjuster::adjust() {
         if (isOOB(baseFrame->preKeyFrame->worldToThis,
                   refFrame->preKeyFrame->worldToThis, ip)) {
           pointsOOB++;
-          if (baseFrame == secondKf)
+          if (baseFrame == secondKeyFrame)
             oobPos.push_back(ip.p);
           else
             oobKf1.push_back(ip.p);
           continue;
         }
 
-        problem.AddParameterBlock(&ip.invDepth, 1);
-        problem.SetParameterLowerBound(&ip.invDepth, 0,
-                                       1 / settingMaxPointDepth);
-        ordering->AddElementToGroup(&ip.invDepth, 0);
+        problem.AddParameterBlock(&ip.logInvDepth, 1);
+        ordering->AddElementToGroup(&ip.logInvDepth, 0);
 
-        residuals.push_back(new DirectResidual(interpolated[baseFrame].get(),
-                                               interpolated[refFrame].get(),
-                                               cam, &ip, baseFrame, refFrame));
-        problem.AddResidualBlock(
-            new ceres::AutoDiffCostFunction<DirectResidual,
-                                            settingResidualPatternSize, 1, 3, 4,
-                                            3, 4, 2, 2>(residuals.back()),
-            lossFunc, &ip.invDepth,
-            baseFrame->preKeyFrame->worldToThis.translation().data(),
-            baseFrame->preKeyFrame->worldToThis.so3().data(),
-            refFrame->preKeyFrame->worldToThis.translation().data(),
-            refFrame->preKeyFrame->worldToThis.so3().data(),
-            baseFrame->preKeyFrame->lightWorldToThis.data,
-            refFrame->preKeyFrame->lightWorldToThis.data);
+        for (int i = 0; i < settingResidualPatternSize; ++i) {
+          const Vec2 &pos = ip.p + settingResidualPattern[i];
+          DirectResidual *newResidual = new DirectResidual(
+              interpolated[baseFrame].get(), interpolated[refFrame].get(), cam,
+              &ip, pos, baseFrame, refFrame);
+
+          double gradNorm = baseFrame->gradNorm(toCvPoint(pos));
+          double c = settingGreadientWeighingConstant;
+          double weight = c / std::hypot(c, gradNorm);
+          ceres::LossFunction *lossFunc = new ceres::ScaledLoss(
+              new ceres::HuberLoss(settingBAOutlierIntensityDiff), weight,
+              ceres::Ownership::TAKE_OWNERSHIP);
+
+          residualsFor[&ip].push_back(newResidual);
+          problem.AddResidualBlock(
+              new ceres::AutoDiffCostFunction<DirectResidual, 1, 1, 3, 4, 3, 4,
+                                              2, 2>(newResidual),
+              lossFunc, &ip.logInvDepth,
+              baseFrame->preKeyFrame->worldToThis.translation().data(),
+              baseFrame->preKeyFrame->worldToThis.so3().data(),
+              refFrame->preKeyFrame->worldToThis.translation().data(),
+              refFrame->preKeyFrame->worldToThis.so3().data(),
+              baseFrame->preKeyFrame->lightWorldToThis.data,
+              refFrame->preKeyFrame->lightWorldToThis.data);
+        }
       }
 
   ceres::Solver::Options options;
@@ -207,7 +227,7 @@ void BundleAdjuster::adjust() {
   std::ofstream ofsReport(FLAGS_output_directory + "/BA_report.txt");
   ofsReport << summary.FullReport() << std::endl;
 
-  SE3 newMotion = secondKf->preKeyFrame->worldToThis;
+  SE3 newMotion = secondKeyFrame->preKeyFrame->worldToThis;
 
   std::cout << "old motion: "
             << "\ntrans = " << oldMotion.translation().transpose()
@@ -230,45 +250,46 @@ void BundleAdjuster::adjust() {
                    (newMotion.so3().inverse() * oldMotion.so3()).log().norm()
             << std::endl;
 
-  std::cout << "aff light:\n" << secondKf->preKeyFrame->lightWorldToThis;
+  std::cout << "aff light:\n" << secondKeyFrame->preKeyFrame->lightWorldToThis;
 
   auto p = std::minmax_element(
-      secondKf->interestPoints.begin(), secondKf->interestPoints.end(),
-      [](auto ip1, auto ip2) { return 1 / ip1.invDepth < 1 / ip2.invDepth; });
-  std::cout << "minmax d = " << 1 / p.first->invDepth << ' '
-            << 1 / p.second->invDepth << std::endl;
+      secondKeyFrame->interestPoints.begin(),
+      secondKeyFrame->interestPoints.end(),
+      [](auto ip1, auto ip2) { return ip1.depthd() < ip2.depthd(); });
+  std::cout << "minmax d = " << p.first->depthd() << ' ' << p.second->depthd()
+            << std::endl;
 
   std::vector<double> depthsVec;
-  depthsVec.reserve(secondKf->interestPoints.size());
-  for (const InterestPoint &ip : secondKf->interestPoints)
-    depthsVec.push_back(1 / ip.invDepth);
+  depthsVec.reserve(secondKeyFrame->interestPoints.size());
+  for (const InterestPoint &ip : secondKeyFrame->interestPoints)
+    depthsVec.push_back(ip.depthd());
   // setDepthColBounds(depthsVec);
 
-  cv::Mat kfDepths = secondKf->drawDepthedFrame(minDepth, maxDepth);
+  cv::Mat kfDepths = secondKeyFrame->drawDepthedFrame(minDepth, maxDepth);
 
   StdVector<Vec2> outliers;
   StdVector<Vec2> badDepth;
-  outliers.reserve(residuals.size());
-  badDepth.reserve(residuals.size());
-  for (auto res : residuals) {
-    if (res->baseKf != secondKf)
-      continue;
-    double values[settingResidualPatternSize];
-    double &invDepth = res->interestPoint->invDepth;
-    PreKeyFrame *base = res->baseKf->preKeyFrame.get();
-    PreKeyFrame *ref = res->refKf->preKeyFrame.get();
-    if (res->operator()(&invDepth, base->worldToThis.translation().data(),
-                        base->worldToThis.so3().data(),
-                        ref->worldToThis.translation().data(),
-                        ref->worldToThis.so3().data(),
-                        base->lightWorldToThis.data, ref->lightWorldToThis.data,
-                        values)) {
-      std::sort(values, values + settingResidualPatternSize);
-      double median = values[settingResidualPatternSize / 2];
-      if (median > settingBAOutlierIntensityDiff) {
-        res->interestPoint->state = InterestPoint::OUTLIER;
-        outliers.push_back(res->interestPoint->p);
-      }
+  for (InterestPoint &ip : secondKeyFrame->interestPoints) {
+    std::vector<double> values =
+        reservedVector<double>(residualsFor[&ip].size());
+    for (DirectResidual *res : residualsFor[&ip]) {
+      double value;
+      double &logInvDepth = ip.logInvDepth;
+      PreKeyFrame *base = res->baseKf->preKeyFrame.get();
+      PreKeyFrame *ref = res->refKf->preKeyFrame.get();
+      res->operator()(
+          &logInvDepth, base->worldToThis.translation().data(),
+          base->worldToThis.so3().data(), ref->worldToThis.translation().data(),
+          ref->worldToThis.so3().data(), base->lightWorldToThis.data,
+          ref->lightWorldToThis.data, &value);
+      values.push_back(value);
+    }
+
+    std::sort(values.begin(), values.end());
+    double median = values[values.size() / 2];
+    if (median > settingBAOutlierIntensityDiff) {
+      ip.state = InterestPoint::OUTLIER;
+      outliers.push_back(ip.p);
     }
   }
   pointsOutliers = outliers.size();
@@ -292,6 +313,9 @@ void BundleAdjuster::adjust() {
 
   cv::imshow("after ba", kfDepths);
   cv::imwrite(FLAGS_output_directory + "/adjusted.jpg", kfDepths);
+  
   cv::waitKey();
+
+  cv::destroyAllWindows();
 }
 } // namespace fishdso

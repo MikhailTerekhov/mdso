@@ -24,10 +24,6 @@ bool isInSector(Vec3 ray, Vec3 *s[3]) {
   return coeffsR[0] >= 0 && coeffsR[1] >= 0 && coeffsR[2] >= 0;
 }
 
-double angle(Vec3 r1, Vec3 r2) {
-  return std::acos(r1.dot(r2) / r1.norm() / r2.norm());
-}
-
 double sectorBadness(SphericalTriangulation::TrihedralSector *sec) {
   double maxAngle = -std::numeric_limits<double>::infinity();
   for (int i = 0; i < 3; ++i)
