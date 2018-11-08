@@ -72,19 +72,29 @@ SE3 StereoMatcher::match(cv::Mat frames[2], StdVector<Vec2> resPoints[2],
   std::unique_ptr<StereoGeometryEstimator> geometryEstimator =
       std::unique_ptr<StereoGeometryEstimator>(
           new StereoGeometryEstimator(cam, corresps));
-  SE3 motion = geometryEstimator->findPreciseMotion();
+
+  SE3 motion;
+  if (FLAGS_average_ORB_motion)
+    motion = geometryEstimator->findPreciseMotion();
+  else
+    motion = geometryEstimator->findCoarseMotion();
+
   LOG(INFO) << "inlier matches = " << geometryEstimator->inliersNum()
             << std::endl;
 
   // std::vector<cv::DMatch> inlierMatches;
   // inlierMatches.reserve(matches.size());
   // for (int i : geometryEstimator->inliersInds())
-  // inlierMatches.push_back(matches[i]);
+    // inlierMatches.push_back(matches[i]);
   // cv::Mat imi, imi2;
   // cv::drawMatches(frames[1], keyPoints[1], frames[0], keyPoints[0],
-  // inlierMatches, imi);
+                  // inlierMatches, imi);
   // cv::resize(imi, imi2, cv::Size(), 0.5, 0.5);
   // cv::imshow("inlier matches", imi2);
+  // cv::waitKey();
+  // cv::destroyWindow("inlier matches");
+
+
 
   for (int frameNum = 0; frameNum < 2; ++frameNum) {
     resPoints[frameNum].resize(0);

@@ -4,25 +4,28 @@ import pandas as pd
 import quaternion as quat
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-
+from numpy.linalg import norm
 
 def extract_motions(fname):
     tbl = pd.read_csv(fname, sep='\s+', header=None,
                       index_col=0, dtype=np.float64)
-    return list(map(
+    motions = list(map(
         lambda x: (np.array(x[-3:]),
                    quat.as_rotation_matrix(
                        np.quaternion(x[3], x[0], x[1], x[2]))),
         tbl.apply(list, axis=1).tolist()
     ))
+    return motions
 
 
 def draw_motions(axes, motions, color):
-    centers = np.array(
-        list(map(lambda mot: -np.matmul(mot[1].T, mot[0]), motions)))
-    dir_vects = np.array(list(map(lambda mot: 0.15 * mot[1][2, :], motions)))
+    centers = np.array([-np.matmul(mot[1].T, mot[0]) for mot in motions])
+    dir_vects = np.array([mot[1][2, :] for mot in motions])
+
     axes.quiver(centers[:, 0], centers[:, 1], centers[:, 2],
-              dir_vects[:, 0], dir_vects[:, 1], dir_vects[:, 2], color=color)
+              dir_vects[:, 0], dir_vects[:, 1], dir_vects[:, 2], 
+                color=color, normalize=True, arrow_length_ratio=0.2, 
+                length=0.15)
 
 def main(argv):
     if (len(argv) != 2):
@@ -30,6 +33,9 @@ def main(argv):
         return 0
 
     out_dir = argv[1]
+    if (out_dir[-1] == '/'):
+        out_dir = out_dir[0:-1]
+
     actual = extract_motions(out_dir + '/tracked_pos.txt')
     predicted = extract_motions(out_dir + '/predicted_pos.txt')
 
@@ -40,13 +46,24 @@ def main(argv):
         has_stereo_matched = False
         print('no stereo-matching provided')
 
+    has_ground_truth = True
+    try:
+        ground_truth = extract_motions(out_dir + '/ground_truth_pos.txt')
+    except FileNotFoundError:
+        has_ground_truth = False
+        print('no ground truth provided')
+
     fig = plt.figure()
     ax = Axes3D(fig)
+    ax.set_xlim3d(-0.5, 0.5)
+    ax.set_ylim3d(-0.5, 0.5)
+    ax.set_zlim3d(-0.5, 2.5)
 
     draw_motions(ax, actual, 'orange')
     draw_motions(ax, predicted, 'blue')
+    draw_motions(ax, ground_truth, 'green')
     if (has_stereo_matched):
-        draw_motions(ax, stereo_matched, 'green')
+        draw_motions(ax, stereo_matched, 'red')
 
     plt.show()
 

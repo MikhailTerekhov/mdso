@@ -49,7 +49,7 @@ count is the number of frames for system to process)abacaba";
       return 4;
     }
     std::cout << "put frame " << it << std::endl;
-    dsoSystem.addFrame(frame);
+    dsoSystem.addFrame(frame, it);
   }
 
   return 0;

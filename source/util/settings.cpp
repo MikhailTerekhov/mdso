@@ -48,30 +48,46 @@ Vec2 settingResidualPattern[settingResidualPatternSize] = {
 } // namespace fishdso
 
 DEFINE_bool(use_ORB_initialization, true,
-            "use keypoint-based stereomatching on first two keyframes?");
+            "Use keypoint-based stereomatching on first two keyframes?");
+DEFINE_bool(average_ORB_motion, true,
+            "Use NNLS motion averaging after RANSAC?");
 DEFINE_bool(
     output_reproj_CDF, false,
-    "output reprojection errors when doing keypoint-based stereomatching? If "
+    "Output reprojection errors when doing keypoint-based stereomatching? If "
     "set to true, values will be in {output_directory}/reproj_err.txt");
+DEFINE_bool(switch_first_motion_to_GT, false,
+            "If we have ground truth and this flag is set to true, after "
+            "stereo-initialization has been performed and depths were "
+            "estimated, motion we got will be replaced by the ground truth "
+            "one. This is needed since stereo-estimation is poor for now, and "
+            "tracking is usually performed relative to the second keyframe.");
 
 DEFINE_bool(optimize_affine_light, true,
-            "perform affine light transform optimization while tracking?");
+            "Perform affine light transform optimization while tracking?");
 
-DEFINE_bool(perform_tracking_check, false,
-            "compare tracking results with keypoint-based motion estimation?");
+DEFINE_bool(
+    perform_tracking_check_stereo, false,
+    "Compare tracking results with keypoint-based motion estimation? This flag "
+    "will be shadowed if perform_tracking_check_GT is set to true.");
+DEFINE_bool(
+    perform_tracking_check_GT, false,
+    "Compare tracking results with externally provided ground truth? This, if "
+    "set to true, shadows perform_tracking_check_stereo. One could provide "
+    "ground truth poses using DsoSystem::addGroundTruthPose. No check will "
+    "happen if not all frames poses are provided.");
 DEFINE_bool(track_from_lask_kf, true,
-            "use last keyframe as the base one for tracking? If set to false, "
+            "Use last keyframe as the base one for tracking? If set to false, "
             "last but one keyframe is used");
 DEFINE_bool(
     predict_using_screw, false,
-    "predict motion to the newest frame by dividing previous motion as a screw "
+    "Predict motion to the newest frame by dividing previous motion as a screw "
     "motion (use SLERP over the whole SE(3)? If set to false, SLERP is done "
     "only on rotation, and trnslational part is simply divided");
 DEFINE_bool(use_grad_weights_on_tracking, false,
-    "use gradient-dependent residual weights when tracking");
+            "Use gradient-dependent residual weights when tracking");
 
 DEFINE_bool(fixed_motion_on_first_ba, false,
-            "optimize only depths when running bundle adjustment on first two "
+            "Optimize only depths when running bundle adjustment on first two "
             "keyframes? We could assume that a good motion estimation is "
             "already availible due to RANSAC initialization and averaging.");
 
@@ -84,14 +100,14 @@ bool validateDepthsPart(const char *flagname, double value) {
 }
 
 DEFINE_double(red_depths_part, 0,
-              "part of contrast points that will be drawn red (i.e. they are "
+              "Part of contrast points that will be drawn red (i.e. they are "
               "too close to be distinguished)");
 DEFINE_validator(red_depths_part, validateDepthsPart);
 
 DEFINE_double(blue_depths_part, 0.7,
-              "part of contrast points that will NOT be drawn completely blue "
+              "Part of contrast points that will NOT be drawn completely blue "
               "(i.e. they are not too far to be distinguished)");
 DEFINE_validator(blue_depths_part, validateDepthsPart);
 
 DEFINE_string(output_directory, "output/default",
-              "CO: \"it's output directory!\"");
+              "CO: \"it's dso's output directory!\"");

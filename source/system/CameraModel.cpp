@@ -32,6 +32,17 @@ CameraModel::CameraModel(int width, int height,
   setMapPolyCoeffs();
 }
 
+CameraModel::CameraModel(int width, int height, double f, double cx, double cy)
+    : width(width), height(height), unmapPolyDeg(0), center(cx, cy), scale(1) {
+  unmapPolyCoeffs.resize(1, 1);
+  unmapPolyCoeffs[0] = f;
+  normalize();
+  setMapPolyCoeffs();
+
+  std::cout << "unmap coeffs  = " << unmapPolyCoeffs.transpose() 
+     << "\nmap poly coeffs = " << mapPolyCoeffs.transpose() << std::endl;
+}
+
 int CameraModel::getWidth() const { return width; }
 
 int CameraModel::getHeight() const { return height; }
@@ -91,9 +102,8 @@ std::istream &operator>>(std::istream &is, CameraModel &cc) {
 }
 
 void CameraModel::setMapPolyCoeffs() {
-  // points of type (\tilde{z}, r), where r stands for scaled radius of a point
-  // in the image and \tilde{z} stands for z-coordinate of the normalized
-  // unprojected ray
+  // points of type (r, \theta), where r stands for scaled radius of a point
+  // in the image and \theta stands for angle to z-axis of the unprojected ray
   int nPnts = settingCameraMapPolyPoints;
   int deg = settingCameraMapPolyDegree;
   StdVector<Vec2> funcGraph;

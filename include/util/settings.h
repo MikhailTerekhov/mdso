@@ -58,11 +58,14 @@ extern double settingMaxPointDepth;
 } // namespace fishdso
 
 DECLARE_bool(use_ORB_initialization);
+DECLARE_bool(average_ORB_motion);
 DECLARE_bool(output_reproj_CDF);
+DECLARE_bool(switch_first_motion_to_GT);
 
 DECLARE_bool(optimize_affine_light);
 
-DECLARE_bool(perform_tracking_check);
+DECLARE_bool(perform_tracking_check_stereo);
+DECLARE_bool(perform_tracking_check_GT);
 DECLARE_bool(track_from_lask_kf);
 DECLARE_bool(predict_using_screw);
 DECLARE_bool(use_grad_weights_on_tracking);

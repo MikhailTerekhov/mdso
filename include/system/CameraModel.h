@@ -20,6 +20,7 @@ public:
   CameraModel(int width, int height, double scale, Vec2 center,
               VecX unmapPolyCoeffs);
   CameraModel(int width, int height, const std::string &calibFileName);
+  CameraModel(int width, int height, double f, double cx, double cy);
 
   template <typename T> Eigen::Matrix<T, 3, 1> unmap(const T *point) const {
     typedef Eigen::Matrix<T, 3, 1> Vec3t;
@@ -89,9 +90,8 @@ public:
   }
 
   template <typename T>
-  void undistort(const cv::Mat &img, cv::Mat &result,
-                 const Mat33 &cameraMatrix) const {
-    result = cv::Mat::zeros(img.rows, img.cols, img.type());
+  cv::Mat undistort(const cv::Mat &img, const Mat33 &cameraMatrix) const {
+    cv::Mat result = cv::Mat::zeros(img.rows, img.cols, img.type());
     double pnt[] = {0, 0};
     for (int y = 0; y < img.rows; ++y)
       for (int x = 0; x < img.cols; ++x) {
@@ -105,6 +105,7 @@ public:
           result.at<T>(newY, newX) = img.at<T>(y, x);
       }
     fillBlackPixels<T>(result);
+    return result;
   }
 
   int getWidth() const;

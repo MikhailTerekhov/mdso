@@ -8,7 +8,7 @@ namespace fishdso {
 
 DsoSystem::DsoSystem(CameraModel *cam)
     : cam(cam), camPyr(cam->camPyr()), dsoInitializer(cam),
-      isInitialized(false), curFrameNum(0) {
+      isInitialized(false) {
   LOG(INFO) << "create DsoSystem" << std::endl;
 }
 
@@ -19,7 +19,10 @@ DsoSystem::~DsoSystem() {
   std::ofstream ofsPredicted(FLAGS_output_directory + "/predicted_pos.txt");
   printPredictionInfo(ofsPredicted);
 
-  if (FLAGS_perform_tracking_check) {
+  if (FLAGS_perform_tracking_check_GT) {
+    std::ofstream ofsGT(FLAGS_output_directory + "/ground_truth_pos.txt");
+    printGroundTruthInfo(ofsGT);
+  } else if (FLAGS_perform_tracking_check_stereo) {
     std::ofstream ofsMatched(FLAGS_output_directory + "/matched_pos.txt");
     printMatcherInfo(ofsMatched);
   }
@@ -82,13 +85,16 @@ SE3 DsoSystem::purePredictBaseKfToCur() {
                          worldToLast);
 }
 
-void DsoSystem::addFrame(const cv::Mat &frame) {
-  curFrameNum++;
-  LOG(INFO) << "add frame #" << curFrameNum << std::endl;
+void DsoSystem::addGroundTruthPose(int ind, const SE3 &worldToThat) {
+  worldToFrameGT[ind] = worldToThat;
+}
+
+void DsoSystem::addFrame(const cv::Mat &frame, int globalFrameNum) {
+  LOG(INFO) << "add frame #" << globalFrameNum << std::endl;
 
   if (!isInitialized) {
     LOG(INFO) << "put into initializer" << std::endl;
-    isInitialized = dsoInitializer.addFrame(frame, curFrameNum);
+    isInitialized = dsoInitializer.addFrame(frame, globalFrameNum);
 
     if (isInitialized) {
       LOG(INFO) << "initialization successful" << std::endl;
@@ -98,8 +104,9 @@ void DsoSystem::addFrame(const cv::Mat &frame) {
         worldToFramePredict[f.preKeyFrame->globalFrameNum] =
             worldToFrame[f.preKeyFrame->globalFrameNum] =
                 f.preKeyFrame->worldToThis;
-      for (int i = 0; i < int(kf.size()); ++i)
-        keyFrames.insert(std::pair<int, KeyFrame>(i, std::move(kf[i])));
+      for (KeyFrame &keyFrame : kf)
+        keyFrames.insert(std::pair<int, KeyFrame>(
+            keyFrame.preKeyFrame->globalFrameNum, std::move(keyFrame)));
 
       bundleAdjuster = std::unique_ptr<BundleAdjuster>(new BundleAdjuster(cam));
       for (auto &p : keyFrames)
@@ -110,6 +117,15 @@ void DsoSystem::addFrame(const cv::Mat &frame) {
       printLastKfInPly(ofsBeforeAdjust);
 
       bundleAdjuster->adjust();
+
+      if (FLAGS_switch_first_motion_to_GT) {
+        SE3 worldToSecondKfGT =
+            worldToFrameGT[keyFrames.rbegin()
+                               ->second.preKeyFrame->globalFrameNum];
+        keyFrames.rbegin()->second.preKeyFrame->worldToThis = worldToSecondKfGT;
+        worldToFrame[keyFrames.rbegin()->second.preKeyFrame->globalFrameNum] =
+            worldToSecondKfGT;
+      }
 
       std::ofstream ofsAfterAdjust(FLAGS_output_directory +
                                    "/after_adjust.ply");
@@ -122,7 +138,8 @@ void DsoSystem::addFrame(const cv::Mat &frame) {
     return;
   }
 
-  std::unique_ptr<PreKeyFrame> preKeyFrame(new PreKeyFrame(frame, curFrameNum));
+  std::unique_ptr<PreKeyFrame> preKeyFrame(
+      new PreKeyFrame(frame, globalFrameNum));
 
   SE3 baseKfToCur;
   AffineLightTransform<double> lightBaseKfToCur;
@@ -140,9 +157,9 @@ void DsoSystem::addFrame(const cv::Mat &frame) {
   PreKeyFrame *baseKf = baseKeyFrame().preKeyFrame.get();
   preKeyFrame->lightWorldToThis = lightBaseKfToCur * baseKf->lightWorldToThis;
 
-  worldToFrame[curFrameNum] = baseKfToCur * baseKf->worldToThis;
-  worldToFramePredict[curFrameNum] = purePredicted * baseKf->worldToThis;
-  preKeyFrame->worldToThis = worldToFrame[curFrameNum];
+  worldToFrame[globalFrameNum] = baseKfToCur * baseKf->worldToThis;
+  worldToFramePredict[globalFrameNum] = purePredicted * baseKf->worldToThis;
+  preKeyFrame->worldToThis = worldToFrame[globalFrameNum];
 
   lightKfToLast = lightBaseKfToCur;
 
@@ -157,13 +174,36 @@ void DsoSystem::addFrame(const cv::Mat &frame) {
             << "\nrot = " << diff.so3().log().norm() << std::endl;
   LOG(INFO) << "estimated aff = \n" << lightBaseKfToCur << std::endl;
 
-  if (FLAGS_perform_tracking_check) {
-    std::cout << "perform check" << std::endl;
-    checkLastTracked(std::move(preKeyFrame));
+  if (FLAGS_perform_tracking_check_GT) {
+    std::cout << "perform comparison to ground truth" << std::endl;
+    checkLastTrackedGT(std::move(preKeyFrame));
+  } else if (FLAGS_perform_tracking_check_stereo) {
+    std::cout << "perform stereo check" << std::endl;
+    checkLastTrackedStereo(std::move(preKeyFrame));
   }
 }
 
-void DsoSystem::checkLastTracked(std::unique_ptr<PreKeyFrame> lastFrame) {
+void DsoSystem::checkLastTrackedGT(std::unique_ptr<PreKeyFrame> lastFrame) {
+  SE3 worldToBase = baseKeyFrame().preKeyFrame->worldToThis;
+  SE3 worldToLast = lastFrame->worldToThis;
+  SE3 baseToLast = worldToLast * worldToBase.inverse();
+
+  SE3 worldToBaseGT =
+      worldToFrameGT[baseKeyFrame().preKeyFrame->globalFrameNum];
+  SE3 worldToLastGT = worldToFrameGT[lastFrame->globalFrameNum];
+  SE3 baseToLastGT = worldToLastGT * worldToBaseGT.inverse();
+
+  double transErr =
+      (baseToLastGT.translation() - baseToLast.translation()).norm();
+  double rotErr =
+      180. / M_PI *
+      (baseToLast.so3() * baseToLastGT.so3().inverse()).log().norm();
+
+  std::cout << "translation error distance = " << transErr
+            << "\nrotation error angle = " << rotErr << std::endl;
+}
+
+void DsoSystem::checkLastTrackedStereo(std::unique_ptr<PreKeyFrame> lastFrame) {
   cv::Mat1b frames[2];
   frames[0] = baseKeyFrame().preKeyFrame->frame();
   frames[1] = lastFrame->frame();
@@ -189,11 +229,21 @@ void DsoSystem::checkLastTracked(std::unique_ptr<PreKeyFrame> lastFrame) {
 }
 
 void DsoSystem::printLastKfInPly(std::ostream &out) {
+  StdVector<std::pair<Vec2, double>> points;
+  points.reserve(lastKeyFrame().interestPoints.size());
+  for (const auto &ip : lastKeyFrame().interestPoints) {
+    double d = ip.depthd();
+    if (d != d || d > 1e3)
+      continue;
+
+    points.push_back({ip.p, d});
+  }
+
   out.precision(15);
   out << R"__(ply
 format ascii 1.0
 element vertex )__"
-      << lastKeyFrame().interestPoints.size() << R"__(
+      << points.size() << R"__(
 property float x
 property float y
 property float z
@@ -203,11 +253,11 @@ property uchar blue
 end_header
 )__";
 
-  for (const InterestPoint &ip : lastKeyFrame().interestPoints) {
-    Vec3 pos = cam->unmap(ip.p.data()).normalized() * ip.depthd();
+  for (const auto &p : points) {
+    Vec3 pos = cam->unmap(p.first).normalized() * p.second;
     out << pos[0] << ' ' << pos[1] << ' ' << pos[2] << ' ';
     cv::Vec3b color =
-        lastKeyFrame().frameColored.at<cv::Vec3b>(toCvPoint(ip.p));
+        lastKeyFrame().frameColored.at<cv::Vec3b>(toCvPoint(p.first));
     out << int(color[2]) << ' ' << int(color[1]) << ' ' << int(color[0])
         << std::endl;
   }
@@ -238,6 +288,10 @@ void DsoSystem::printPredictionInfo(std::ostream &out) {
 
 void DsoSystem::printMatcherInfo(std::ostream &out) {
   printMotionInfo(out, worldToFrameMatched);
+}
+
+void DsoSystem::printGroundTruthInfo(std::ostream &out) {
+  printMotionInfo(out, worldToFrameGT);
 }
 
 } // namespace fishdso

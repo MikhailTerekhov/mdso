@@ -270,6 +270,9 @@ void BundleAdjuster::adjust() {
   StdVector<Vec2> outliers;
   StdVector<Vec2> badDepth;
   for (InterestPoint &ip : secondKeyFrame->interestPoints) {
+    if (ip.state == InterestPoint::OOB)
+      continue;
+
     std::vector<double> values =
         reservedVector<double>(residualsFor[&ip].size());
     for (DirectResidual *res : residualsFor[&ip]) {
@@ -277,12 +280,18 @@ void BundleAdjuster::adjust() {
       double &logInvDepth = ip.logInvDepth;
       PreKeyFrame *base = res->baseKf->preKeyFrame.get();
       PreKeyFrame *ref = res->refKf->preKeyFrame.get();
-      res->operator()(
-          &logInvDepth, base->worldToThis.translation().data(),
-          base->worldToThis.so3().data(), ref->worldToThis.translation().data(),
-          ref->worldToThis.so3().data(), base->lightWorldToThis.data,
-          ref->lightWorldToThis.data, &value);
-      values.push_back(value);
+      if (res->operator()(&logInvDepth, base->worldToThis.translation().data(),
+                          base->worldToThis.so3().data(),
+                          ref->worldToThis.translation().data(),
+                          ref->worldToThis.so3().data(),
+                          base->lightWorldToThis.data,
+                          ref->lightWorldToThis.data, &value))
+        values.push_back(value);
+    }
+    
+    if (values.empty()) {
+      ip.state = InterestPoint::OOB;
+      continue;
     }
 
     std::sort(values.begin(), values.end());
@@ -313,7 +322,7 @@ void BundleAdjuster::adjust() {
 
   cv::imshow("after ba", kfDepths);
   cv::imwrite(FLAGS_output_directory + "/adjusted.jpg", kfDepths);
-  
+
   cv::waitKey();
 
   cv::destroyAllWindows();

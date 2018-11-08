@@ -18,11 +18,13 @@ public:
   DsoSystem(CameraModel *cam);
   ~DsoSystem();
 
-  void addFrame(const cv::Mat &frame);
+  void addFrame(const cv::Mat &frame, int globalFrameNum);
+  void addGroundTruthPose(int globalFrameNum, const SE3 &worldToThat);
 
   void printLastKfInPly(std::ostream &out);
   void printTrackingInfo(std::ostream &out);
   void printPredictionInfo(std::ostream &out);
+  void printGroundTruthInfo(std::ostream &out);
   void printMatcherInfo(std::ostream &out);
 
 private:
@@ -39,7 +41,10 @@ private:
   SE3 predictBaseKfToCur();
   SE3 purePredictBaseKfToCur();
 
-  void checkLastTracked(std::unique_ptr<PreKeyFrame> lastFrame);
+  void checkLastTrackedStereo(std::unique_ptr<PreKeyFrame> lastFrame);
+  void checkLastTrackedGT(std::unique_ptr<PreKeyFrame> lastFrame);
+  void checkLastTrackedInternal(std::unique_ptr<PreKeyFrame> lastFrame,
+                                const SE3 &refMotion);
 
   static void printMotionInfo(std::ostream &out,
                               const StdMap<int, SE3> &motions);
@@ -53,11 +58,11 @@ private:
   std::unique_ptr<FrameTracker> frameTracker;
   std::unique_ptr<BundleAdjuster> bundleAdjuster;
 
-  int curFrameNum;
   std::map<int, KeyFrame> keyFrames;
   StdMap<int, SE3> worldToFrame;
   StdMap<int, SE3> worldToFramePredict;
   StdMap<int, SE3> worldToFrameMatched;
+  StdMap<int, SE3> worldToFrameGT;
 
   AffineLightTransform<double> lightKfToLast;
 };
