@@ -58,6 +58,7 @@ extern double settingMaxPointDepth;
 } // namespace fishdso
 
 DECLARE_bool(use_ORB_initialization);
+DECLARE_bool(run_max_RANSAC_iterations);
 DECLARE_bool(average_ORB_motion);
 DECLARE_bool(output_reproj_CDF);
 DECLARE_bool(switch_first_motion_to_GT);

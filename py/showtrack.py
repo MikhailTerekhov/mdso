@@ -55,15 +55,16 @@ def main(argv):
 
     fig = plt.figure()
     ax = Axes3D(fig)
-    ax.set_xlim3d(-0.5, 0.5)
-    ax.set_ylim3d(-0.5, 0.5)
-    ax.set_zlim3d(-0.5, 2.5)
+    #  ax.set_xlim3d(-0.5, 0.5)
+    #  ax.set_ylim3d(-0.5, 0.5)
+    #  ax.set_zlim3d(-0.5, 2.5)
 
-    draw_motions(ax, actual, 'orange')
+    #  draw_motions(ax, actual, 'orange')
     draw_motions(ax, predicted, 'blue')
-    draw_motions(ax, ground_truth, 'green')
-    if (has_stereo_matched):
-        draw_motions(ax, stereo_matched, 'red')
+    if (has_ground_truth):
+        draw_motions(ax, ground_truth, 'green')
+    elif (has_stereo_matched):
+        draw_motions(ax, stereo_matched, 'green')
 
     plt.show()
 

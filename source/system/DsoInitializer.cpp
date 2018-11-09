@@ -132,6 +132,10 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
 
       // KpTerrains[1].drawCurved(cam, img, CV_GREEN);
 
+      cv::Mat kpOnly = img.clone();
+      cv::imshow("keypoints only", kpOnly);
+      cv::imwrite(FLAGS_output_directory + "/keypoints.jpg", img);
+
       kpTerrains[1].draw(img, cam, CV_GREEN, minDepth, maxDepth);
 
       if (debugOutputType == SPARSE_DEPTHS) {
@@ -147,7 +151,7 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
         // KpTerrains[1].draw(img, CV_BLACK);
       }
 
-      cv::Mat tangImg = kpTerrains[1].drawTangentTri(800, 800);
+      // cv::Mat tangImg = kpTerrains[1].drawTangentTri(800, 800);
       //      cv::imwrite("../../../../test/data/maps/badtri/frame505tangentTriang.jpg",
       //                  tangImg);
 

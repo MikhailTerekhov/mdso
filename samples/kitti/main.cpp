@@ -39,11 +39,11 @@ count is the number of frames for system to process)abacaba";
   for (int it = start; it < start + N; ++it) {
     cv::Mat frame = reader.getFrame(it);
     // if (it == start) {
-      // std::cout << "img channels = " << frame.channels() << std::endl;
-      // cv::Mat fc = frame.clone();
-      // putDot(fc, toCvPoint(reader.cam->getImgCenter()), CV_RED);
-      // cv::imshow("centered", fc);
-      // cv::waitKey();
+    // std::cout << "img channels = " << frame.channels() << std::endl;
+    // cv::Mat fc = frame.clone();
+    // putDot(fc, toCvPoint(reader.cam->getImgCenter()), CV_RED);
+    // cv::imshow("centered", fc);
+    // cv::waitKey();
     // }
     std::cout << "put frame #" << it << std::endl;
     dsoSystem.addGroundTruthPose(it, reader.getWorldToFrameGT(it));

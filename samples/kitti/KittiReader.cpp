@@ -22,20 +22,20 @@ KittiReader::KittiReader(const std::string &newKittiDir, int sequenceNum,
         posesIfs >> posMat(i, j);
     Mat33 rotMat = posMat.block<3, 3>(0, 0);
     double det = rotMat.determinant();
-    if (std::abs(det - 1.0) > 1e-5) 
+    if (std::abs(det - 1.0) > 1e-5)
       std::cout << "bad input rotation determinant = " << det << std::endl;
 
-    Eigen::JacobiSVD<Mat33> svd(rotMat, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    Eigen::JacobiSVD<Mat33> svd(rotMat,
+                                Eigen::ComputeFullU | Eigen::ComputeFullV);
     Mat33 U = svd.matrixU(), V = svd.matrixV();
     U *= U.determinant();
     V *= V.determinant();
     rotMat = U * V.transpose();
 
-    SE3 worldToThis =
-        SE3(rotMat, posMat.block<3, 1>(0, 3)).inverse();
+    SE3 worldToThis = SE3(rotMat, posMat.block<3, 1>(0, 3)).inverse();
     worldToFrameGT.push_back(worldToThis);
   }
-  
+
   SE3 startToWorld = worldToFrameGT[startFrame].inverse();
   for (SE3 &worldToThis : worldToFrameGT)
     worldToThis = worldToThis * startToWorld;

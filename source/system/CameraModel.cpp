@@ -39,8 +39,8 @@ CameraModel::CameraModel(int width, int height, double f, double cx, double cy)
   normalize();
   setMapPolyCoeffs();
 
-  std::cout << "unmap coeffs  = " << unmapPolyCoeffs.transpose() 
-     << "\nmap poly coeffs = " << mapPolyCoeffs.transpose() << std::endl;
+  std::cout << "unmap coeffs  = " << unmapPolyCoeffs.transpose()
+            << "\nmap poly coeffs = " << mapPolyCoeffs.transpose() << std::endl;
 }
 
 int CameraModel::getWidth() const { return width; }

@@ -16,6 +16,8 @@ public:
   const std::vector<std::pair<double, double>> &depths();
   int inliersNum();
 
+  void outputInlierCorresps();
+
 private:
   int findInliersEssential(const Mat33 &E, std::vector<int> &_inliersInds);
   int findInliersMotion(const SE3 &motion, std::vector<int> &_inliersInds);

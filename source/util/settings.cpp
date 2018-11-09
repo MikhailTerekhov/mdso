@@ -19,7 +19,7 @@ int settingRansacMaxIter = 100000;
 double settingInitKeypointsObserveAngle = M_PI / 3;
 double settingMatchNonMove = 8.0;
 int settingFirstFramesSkip = 4;
-double settingEssentialSuccessProb = 0.99;
+double settingEssentialSuccessProb = 0.999;
 double settingEssentialReprojErrThreshold = 16.0;
 double settingRemoveResidualsRatio = 0.5;
 
@@ -49,6 +49,9 @@ Vec2 settingResidualPattern[settingResidualPatternSize] = {
 
 DEFINE_bool(use_ORB_initialization, true,
             "Use keypoint-based stereomatching on first two keyframes?");
+DEFINE_bool(
+    run_max_RANSAC_iterations, false,
+    "Always run maximum RANSAC iterations. This will be extremely long!");
 DEFINE_bool(average_ORB_motion, true,
             "Use NNLS motion averaging after RANSAC?");
 DEFINE_bool(

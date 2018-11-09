@@ -46,23 +46,34 @@ StereoGeometryEstimator::depths() {
       _depths[i].second = curDepths[1];
     }
 
-    int minInd = *std::min_element(
+    int neededInd = *std::min_element(
         _inliersInds.begin(), _inliersInds.end(), [this](int i1, int i2) {
-          return _depths[i1].second < _depths[i2].second;
-        });
-    Vec2 unm = cam->map(rays[minInd].second.data());
-    // std::cout << "min depth position = " << unm.transpose();
+          if (imgCorresps[i1].second[0] <= 600 &&
+              imgCorresps[i2].second[0] > 600)
+            return true;
+          else if (imgCorresps[i1].second[0] > 600 &&
+                   imgCorresps[i2].second[0] <= 600)
+            return false;
 
-    // std::ofstream ofs("log.txt");
-    // ofs << rays[minInd].first.transpose() << std::endl;
-    // ofs << rays[minInd].second.transpose() << std::endl;
-    // ofs << motion.translation().transpose() << std::endl;
-    // ofs << motion.unit_quaternion().coeffs().transpose() << std::endl;
-    // ofs.close();
-    // Vec2 thoseDepths = calcDepthsInCorresp(motion, rays[minInd]);
+          return imgCorresps[i1].second[1] > imgCorresps[i2].second[1];
+        });
+    Vec2 unm = cam->map(rays[neededInd].second);
+    std::cout << "min depth position = " << unm.transpose();
   }
 
   return _depths;
+}
+
+void StereoGeometryEstimator::outputInlierCorresps() {
+  std::ofstream out(FLAGS_output_directory + "/corresps.txt");
+  for (int i : _inliersInds) {
+    out << i << std::endl;
+    out << rays[i].first.transpose() << std::endl;
+    out << rays[i].second.transpose() << std::endl;
+    out << motion.translation().transpose() << std::endl;
+    out << motion.unit_quaternion().coeffs().transpose() << std::endl;
+  }
+  out.close();
 }
 
 int StereoGeometryEstimator::inliersNum() { return _inliersInds.size(); }
@@ -272,7 +283,8 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
     if (curQ > q) {
       q = curQ;
       double newIterNum = std::log(1 - p) / std::log(1 - std::pow(curQ, N));
-      iterNum = static_cast<long long>(newIterNum);
+      if (!FLAGS_run_max_RANSAC_iterations)
+        iterNum = static_cast<long long>(newIterNum);
     }
   }
 
@@ -443,6 +455,8 @@ SE3 StereoGeometryEstimator::findPreciseMotion() {
   ceres::Solver::Summary summary;
 
   ceres::Solve(options, &problem, &summary);
+
+  LOG(INFO) << "post-RANSAC averaging:\n" << summary.FullReport() << std::endl;
 
   // std::cout << summary.FullReport() << "\n";
   //  std::cout << "avg residual before = "

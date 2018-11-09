@@ -288,7 +288,7 @@ void BundleAdjuster::adjust() {
                           ref->lightWorldToThis.data, &value))
         values.push_back(value);
     }
-    
+
     if (values.empty()) {
       ip.state = InterestPoint::OOB;
       continue;
