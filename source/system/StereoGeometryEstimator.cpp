@@ -379,6 +379,8 @@ SE3 StereoGeometryEstimator::findPreciseMotion() {
   if (!coarseFound)
     findCoarseMotion();
 
+  SE3 coarseMotion = motion;
+
   //  std::vector<int> inlierInds;
   //  inlierInds.reserve(inliersNum);
   //  std::cout << "inliers before cleanup = " << inliersNum << std::endl;
@@ -433,10 +435,12 @@ SE3 StereoGeometryEstimator::findPreciseMotion() {
 
   problem.AddParameterBlock(motion.so3().data(), 4,
                             new ceres::EigenQuaternionParameterization());
+
+  // Scale of the dso is chosen here
   problem.AddParameterBlock(
       motion.translation().data(), 3,
       new ceres::AutoDiffLocalParameterization<SphericalPlus, 3, 2>(
-          new SphericalPlus(motion.translation())));
+          new SphericalPlus(Vec3::Zero(), 1, motion.translation())));
 
   for (int i : _inliersInds)
     problem.AddResidualBlock(
@@ -467,6 +471,14 @@ SE3 StereoGeometryEstimator::findPreciseMotion() {
 
   findInliersEssential(toEssential(motion), _inliersInds);
   findInliersMotion(motion, _inliersInds);
+
+  LOG(INFO) << "translation diff angle = "
+            << 180. / M_PI *
+                   (coarseMotion.translation() - motion.translation()).norm()
+            << "\nrotation diff = "
+            << 180. / M_PI *
+                   (coarseMotion.so3() * motion.so3().inverse()).log().norm()
+            << std::endl;
 
   preciseFound = true;
   return motion;

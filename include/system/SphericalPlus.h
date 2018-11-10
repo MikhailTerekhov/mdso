@@ -11,7 +11,10 @@ class SphericalPlus {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  SphericalPlus(const Vec3 &_k) : k(_k.normalized()) {
+  SphericalPlus(const Vec3 &center, double radius, const Vec3 &initialValue)
+      : center(center), radius(radius),
+        k((initialValue - center).normalized()) {
+    CHECK(((initialValue - center).norm() - radius) / radius < 1e-4);
     int minI = std::min_element(k.data(), k.data() + 3,
                                 [](double a, double b) {
                                   return std::abs(a) < std::abs(b);
@@ -44,6 +47,8 @@ public:
     Vec3t rotAxis = vec + k;
     T rotAxisSqN = rotAxis.squaredNorm();
 
+    vec -= center.cast<T>();
+
     Mat33t R;
     if (rotAxisSqN < 1e-4)
       R = degenerateR.cast<T>();
@@ -51,7 +56,8 @@ public:
       R = -Mat33t::Identity() +
           ((T(2.0) / rotAxisSqN) * rotAxis * rotAxis.transpose());
 
-    Vec3t resV = (vec + R * kDeltaOrts * delta).normalized();
+    Vec3t resV = (vec + R * kDeltaOrts * delta).normalized() * T(radius) +
+                 center.cast<T>();
     memcpy(res, resV.data(), 3 * sizeof(T));
 
     return true;
@@ -59,6 +65,8 @@ public:
 
 private:
   Mat32 kDeltaOrts;
+  Vec3 center;
+  double radius;
   Vec3 k;
   static Mat33 degenerateR;
 };

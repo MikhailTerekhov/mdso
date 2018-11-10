@@ -1,5 +1,6 @@
 #include "system/BundleAdjuster.h"
 #include "system/AffineLightTransform.h"
+#include "system/SphericalPlus.h"
 #include "util/defs.h"
 #include "util/util.h"
 #include <ceres/ceres.h>
@@ -146,11 +147,16 @@ void BundleAdjuster::adjust() {
   problem.SetParameterBlockConstant(
       firstKeyFrame->preKeyFrame->lightWorldToThis.data);
 
+  SE3 worldToFirst = firstKeyFrame->preKeyFrame->worldToThis;
+  SE3 worldToSecond = secondKeyFrame->preKeyFrame->worldToThis;
+  SE3 secondToFirst = worldToFirst * worldToSecond.inverse();
+  Vec3 firstFramePos = worldToFirst.inverse().translation();
+  double radius = secondToFirst.translation().norm();
+  Vec3 center = -(worldToSecond.so3() * firstFramePos);
   problem.SetParameterization(
       secondKeyFrame->preKeyFrame->worldToThis.translation().data(),
       new ceres::AutoDiffLocalParameterization<SphericalPlus, 3, 2>(
-          new SphericalPlus(
-              secondKeyFrame->preKeyFrame->worldToThis.translation())));
+          new SphericalPlus(center, radius, worldToSecond.translation())));
 
   if (FLAGS_fixed_motion_on_first_ba && keyFrames.size() == 2) {
     problem.SetParameterBlockConstant(
@@ -188,6 +194,11 @@ void BundleAdjuster::adjust() {
         }
 
         problem.AddParameterBlock(&ip.logInvDepth, 1);
+        problem.SetParameterLowerBound(&ip.logInvDepth, 0,
+                                       -std::log(settingMaxDepth));
+        problem.SetParameterUpperBound(&ip.logInvDepth, 0,
+                                       -std::log(settingMinDepth));
+
         ordering->AddElementToGroup(&ip.logInvDepth, 0);
 
         for (int i = 0; i < settingResidualPatternSize; ++i) {
@@ -197,7 +208,7 @@ void BundleAdjuster::adjust() {
               &ip, pos, baseFrame, refFrame);
 
           double gradNorm = baseFrame->gradNorm(toCvPoint(pos));
-          double c = settingGreadientWeighingConstant;
+          double c = settingGradientWeighingConstant;
           double weight = c / std::hypot(c, gradNorm);
           ceres::LossFunction *lossFunc = new ceres::ScaledLoss(
               new ceres::HuberLoss(settingBAOutlierIntensityDiff), weight,
@@ -221,11 +232,12 @@ void BundleAdjuster::adjust() {
   options.linear_solver_type = ceres::DENSE_SCHUR;
   options.linear_solver_ordering = ordering;
   options.minimizer_progress_to_stdout = true;
+  options.max_linear_solver_iterations = 100;
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
 
-  std::ofstream ofsReport(FLAGS_output_directory + "/BA_report.txt");
-  ofsReport << summary.FullReport() << std::endl;
+  // std::ofstream ofsReport(FLAGS_output_directory + "/BA_report.txt");
+  // ofsReport << summary.FullReport() << std::endl;
 
   SE3 newMotion = secondKeyFrame->preKeyFrame->worldToThis;
 
@@ -308,9 +320,26 @@ void BundleAdjuster::adjust() {
   LOG(INFO) << "OOB points = " << pointsOOB << std::endl;
   LOG(INFO) << "outlier points = " << pointsOutliers << std::endl;
 
-  for (Vec2 p : outliers)
+  SE3 oldFirstToSecond = secondToFirst.inverse();
+  SE3 newFirstToSecond = secondKeyFrame->preKeyFrame->worldToThis *
+                         firstKeyFrame->preKeyFrame->worldToThis.inverse();
+  LOG(INFO) << "BA first to second kf motion change:\n"
+            << "translation diff angle = "
+            << 180. / M_PI *
+                   angle(oldFirstToSecond.translation(),
+                         newFirstToSecond.translation())
+            << "\nrotation diff = "
+            << 180. / M_PI *
+                   (oldFirstToSecond.so3() * newFirstToSecond.so3().inverse())
+                       .log()
+                       .norm()
+            << std::endl;
+
+  LOG(INFO) << summary.FullReport() << std::endl;
+
+  for (const Vec2 p : outliers)
     cv::circle(kfDepths, toCvPoint(p), 3, CV_BLACK, cv::FILLED);
-  for (Vec2 p : oobPos)
+  for (const Vec2 &p : oobPos)
     putCross(kfDepths, toCvPoint(p), CV_BLACK, 3, 2);
 
   cv::Mat kf1Depthed = firstKeyFrame->drawDepthedFrame(minDepth, maxDepth);

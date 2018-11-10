@@ -59,7 +59,7 @@ def main(argv):
     #  ax.set_ylim3d(-0.5, 0.5)
     #  ax.set_zlim3d(-0.5, 2.5)
 
-    #  draw_motions(ax, actual, 'orange')
+    draw_motions(ax, actual, 'orange')
     draw_motions(ax, predicted, 'blue')
     if (has_ground_truth):
         draw_motions(ax, ground_truth, 'green')

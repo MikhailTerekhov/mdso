@@ -132,9 +132,14 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
 
       // KpTerrains[1].drawCurved(cam, img, CV_GREEN);
 
-      cv::Mat kpOnly = img.clone();
-      cv::imshow("keypoints only", kpOnly);
-      cv::imwrite(FLAGS_output_directory + "/keypoints.jpg", img);
+      // cv::Mat kpOnly0 = keyFrames[0].frameColored.clone();
+      // insertDepths(kpOnly0, keyPoints[0], depths[0], minDepth, maxDepth,
+      // true); cv::imshow("kp only first", kpOnly0);
+      // cv::imwrite(FLAGS_output_directory + "/keypoints1.jpg", kpOnly0);
+
+      // cv::Mat kpOnly1 = img.clone();
+      // cv::imshow("keypoints only second", kpOnly1);
+      // cv::imwrite(FLAGS_output_directory + "/keypoints2.jpg", kpOnly1);
 
       kpTerrains[1].draw(img, cam, CV_GREEN, minDepth, maxDepth);
 

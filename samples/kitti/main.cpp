@@ -8,7 +8,7 @@ int main(int argc, char **argv) {
   std::string usage =
       R"abacaba(Usage: kitti kitti_dir start count
 Where kitti_dir names a directory with KITTI dataset.
-It should contain "\"sequences\" subdirectory.
+It should contain "sequences" subdirectory.
 start is the number of the frame to start from
 count is the number of frames for system to process)abacaba";
 

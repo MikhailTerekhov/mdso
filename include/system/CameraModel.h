@@ -17,7 +17,7 @@ class CameraModel {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  CameraModel(int width, int height, double scale, Vec2 center,
+  CameraModel(int width, int height, double scale, const Vec2 &center,
               VecX unmapPolyCoeffs);
   CameraModel(int width, int height, const std::string &calibFileName);
   CameraModel(int width, int height, double f, double cx, double cy);
@@ -91,18 +91,17 @@ public:
 
   template <typename T>
   cv::Mat undistort(const cv::Mat &img, const Mat33 &cameraMatrix) const {
+    Mat33 Kinv = cameraMatrix.inverse();
     cv::Mat result = cv::Mat::zeros(img.rows, img.cols, img.type());
-    double pnt[] = {0, 0};
-    for (int y = 0; y < img.rows; ++y)
-      for (int x = 0; x < img.cols; ++x) {
-        pnt[0] = x;
-        pnt[1] = y;
-        Vec3 newPixelD = cameraMatrix * unmap(pnt);
-        int newX = int(newPixelD[0] / newPixelD[2]);
-        int newY = int(newPixelD[1] / newPixelD[2]);
-        if (newPixelD[2] > 0 && newX >= 0 && newX < result.cols && newY >= 0 &&
-            newY < result.rows)
-          result.at<T>(newY, newX) = img.at<T>(y, x);
+
+    for (int y = 0; y < result.rows; ++y)
+      for (int x = 0; x < result.cols; ++x) {
+        Vec3 pnt(double(x), double(y), 1.);
+        Vec2 origPix = map(Kinv * pnt);
+        int origX = origPix[0], origY = origPix[1];
+        if (origX >= 0 && origX < result.cols && origY >= 0 &&
+            origY < result.rows)
+          result.at<T>(y, x) = img.at<T>(origY, origX);
       }
     fillBlackPixels<T>(result);
     return result;

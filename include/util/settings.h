@@ -43,7 +43,10 @@ extern double settingMaxAffineLigthtA;
 extern double settingMinAffineLigthtB;
 extern double settingMaxAffineLigthtB;
 
-extern double settingGreadientWeighingConstant;
+extern double settingMinDepth;
+extern double settingMaxDepth;
+
+extern double settingGradientWeighingConstant;
 
 // frame tracking
 constexpr int settingPyrLevels = 6;

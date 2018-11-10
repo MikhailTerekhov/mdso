@@ -170,7 +170,7 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
         ceres::LossFunction *lossFunc = nullptr;
         if (FLAGS_use_grad_weights_on_tracking) {
           double gradNorm = gradNormAt(baseImg, cv::Point(x, y));
-          double c = settingGreadientWeighingConstant;
+          double c = settingGradientWeighingConstant;
           double weight = c / std::hypot(c, gradNorm);
           lossFunc = new ceres::ScaledLoss(
               new ceres::HuberLoss(settingTrackingOutlierIntensityDiff), weight,

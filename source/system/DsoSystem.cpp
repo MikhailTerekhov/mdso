@@ -205,15 +205,17 @@ void DsoSystem::checkLastTrackedGT(std::unique_ptr<PreKeyFrame> lastFrame) {
 
 void DsoSystem::checkLastTrackedStereo(std::unique_ptr<PreKeyFrame> lastFrame) {
   cv::Mat1b frames[2];
-  frames[0] = baseKeyFrame().preKeyFrame->frame();
+  frames[0] = keyFrames.begin()->second.preKeyFrame->frame();
   frames[1] = lastFrame->frame();
 
+  SE3 worldToFirst = keyFrames.rbegin()->second.preKeyFrame->worldToThis;
   SE3 worldToBase = baseKeyFrame().preKeyFrame->worldToThis;
 
   StdVector<Vec2> points[2];
   std::vector<double> depths[2];
   StereoMatcher matcher(cam);
-  SE3 refMotion = matcher.match(frames, points, depths);
+  SE3 matchedFirstToLast = matcher.match(frames, points, depths);
+  SE3 refMotion = matchedFirstToLast * worldToFirst * worldToBase.inverse();
   SE3 trackedMotion = worldToFrame.rbegin()->second * worldToBase.inverse();
 
   double transErr = angle(refMotion.translation(), trackedMotion.translation());

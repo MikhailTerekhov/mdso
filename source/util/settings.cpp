@@ -20,7 +20,7 @@ double settingInitKeypointsObserveAngle = M_PI / 3;
 double settingMatchNonMove = 8.0;
 int settingFirstFramesSkip = 4;
 double settingEssentialSuccessProb = 0.999;
-double settingEssentialReprojErrThreshold = 16.0;
+double settingEssentialReprojErrThreshold = 0.25;
 double settingRemoveResidualsRatio = 0.5;
 
 int settingHalfFillingFilterSize = 1;
@@ -35,7 +35,10 @@ double settingMaxAffineLigthtA = std::log(1.1);
 double settingMinAffineLigthtB = -0.1 * 256;
 double settingMaxAffineLigthtB = 0.1 * 256;
 
-double settingGreadientWeighingConstant = 50.0;
+double settingMinDepth = 1e-3;
+double settingMaxDepth = 1e4;
+
+double settingGradientWeighingConstant = 50.0;
 
 double settingTrackingOutlierIntensityDiff = 12.0;
 double settingBAOutlierIntensityDiff = settingTrackingOutlierIntensityDiff;

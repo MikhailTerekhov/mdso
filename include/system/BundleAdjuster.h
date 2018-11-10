@@ -3,7 +3,6 @@
 
 #include "system/CameraModel.h"
 #include "system/KeyFrame.h"
-#include "system/SphericalPlus.h"
 #include <memory>
 #include <set>
 #include <sophus/se3.hpp>
