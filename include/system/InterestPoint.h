@@ -15,7 +15,7 @@ struct InterestPoint {
 
   enum State { ACTIVE, OOB, OUTLIER };
 
-  InterestPoint(const Vec2 &p) : p(p), state(OUTLIER) {}
+  InterestPoint(const Vec2 &p) : p(p), variance(1), state(OUTLIER) {}
 
   EIGEN_STRONG_INLINE void activate(double depth) {
     state = ACTIVE;

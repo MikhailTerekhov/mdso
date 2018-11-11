@@ -5,7 +5,7 @@
 
 namespace fishdso {
 
-int settingPyrLevelsUnused = 0;
+int settingPyrLevelsUnused = 2;
 int dbg1 = 0, dbg2 = 0;
 
 FrameTracker::FrameTracker(const StdVector<CameraModel> &camPyr,
@@ -19,6 +19,7 @@ FrameTracker::trackFrame(PreKeyFrame *frame, const SE3 &coarseMotion,
   AffineLightTransform<double> affLight;
 
   for (int i = settingPyrLevels - 1; i >= settingPyrLevelsUnused; --i) {
+    LOG(INFO) << "track level #" << i << std::endl;
     std::tie(motion, affLight) =
         trackPyrLevel(camPyr[i], base->framePyr[i], base->depths[i],
                       frame->framePyr[i], motion, affLight);
@@ -204,7 +205,9 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
   ceres::Solver::Summary summary;
 
   ceres::Solve(options, &problem, &summary);
-
+  
+  LOG(INFO) << summary.FullReport() << std::endl;
+  
   // std::cout << summary.BriefReport() << std::endl;
   // std::cout << "num res = " << summary.num_residuals << std::endl;
   // std::cout << "avg robustified res = "

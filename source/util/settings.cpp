@@ -20,7 +20,7 @@ double settingInitKeypointsObserveAngle = M_PI / 3;
 double settingMatchNonMove = 8.0;
 int settingFirstFramesSkip = 4;
 double settingEssentialSuccessProb = 0.999;
-double settingEssentialReprojErrThreshold = 0.25;
+double settingEssentialReprojErrThreshold = 1.25;
 double settingRemoveResidualsRatio = 0.5;
 
 int settingHalfFillingFilterSize = 1;

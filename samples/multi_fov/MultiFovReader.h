@@ -9,8 +9,9 @@ class MultiFovReader {
 public:
   MultiFovReader(const std::string &newDatasetDir);
 
-  cv::Mat getFrame(int globalFrameNum);
-  SE3 getWorldToFrameGT(int globalFrameNum);
+  cv::Mat getFrame(int globalFrameNum) const;
+  cv::Mat1f getDepths(int globalFrameNum) const;
+  SE3 getWorldToFrameGT(int globalFrameNum) const;
 
   std::unique_ptr<CameraModel> cam;
 

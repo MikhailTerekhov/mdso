@@ -46,19 +46,19 @@ StereoGeometryEstimator::depths() {
       _depths[i].second = curDepths[1];
     }
 
-    int neededInd = *std::min_element(
-        _inliersInds.begin(), _inliersInds.end(), [this](int i1, int i2) {
-          if (imgCorresps[i1].second[0] <= 600 &&
-              imgCorresps[i2].second[0] > 600)
-            return true;
-          else if (imgCorresps[i1].second[0] > 600 &&
-                   imgCorresps[i2].second[0] <= 600)
-            return false;
+    // int neededInd = *std::min_element(
+    // _inliersInds.begin(), _inliersInds.end(), [this](int i1, int i2) {
+    // if (imgCorresps[i1].second[0] <= 600 &&
+    // imgCorresps[i2].second[0] > 600)
+    // return true;
+    // else if (imgCorresps[i1].second[0] > 600 &&
+    // imgCorresps[i2].second[0] <= 600)
+    // return false;
 
-          return imgCorresps[i1].second[1] > imgCorresps[i2].second[1];
-        });
-    Vec2 unm = cam->map(rays[neededInd].second);
-    std::cout << "min depth position = " << unm.transpose();
+    // return imgCorresps[i1].second[1] > imgCorresps[i2].second[1];
+    // });
+    // Vec2 unm = cam->map(rays[neededInd].second);
+    // std::cout << "min depth position = " << unm.transpose();
   }
 
   return _depths;
@@ -91,9 +91,9 @@ double reprojectionError(CameraModel *cam, const Mat33 &E, const Mat33 &Et,
         (rayCorresp.second.dot(norm2) / norm2.squaredNorm()) * norm2;
 
   double err1 =
-      (cam->map(rayCorresp.first.data()) - imgCorresp.first).squaredNorm();
+      (cam->map(rayCorresp.first.data()) - imgCorresp.first).norm();
   double err2 =
-      (cam->map(rayCorresp.second.data()) - imgCorresp.second).squaredNorm();
+      (cam->map(rayCorresp.second.data()) - imgCorresp.second).norm();
 
   return std::min(err1, err2);
 }
@@ -301,7 +301,7 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
     Mat33 Et = E.transpose();
     for (int i = 0; i < rays.size(); ++i)
       values.push_back(
-          std::sqrt(reprojectionError(cam, E, Et, imgCorresps[i], rays[i])));
+          reprojectionError(cam, E, Et, imgCorresps[i], rays[i]));
     std::sort(values.begin(), values.end());
 
     std::ofstream ofs(FLAGS_output_directory + "/reproj_err.txt");
@@ -449,7 +449,7 @@ SE3 StereoGeometryEstimator::findPreciseMotion() {
                                      imgCorresps[i].first,
                                      imgCorresps[i].second)),
         new ceres::HuberLoss(
-            std::sqrt(2.0 * settingEssentialReprojErrThreshold)),
+            std::sqrt(2.0) * settingEssentialReprojErrThreshold),
         motion.so3().data(), motion.translation().data());
 
   ceres::Solver::Options options;

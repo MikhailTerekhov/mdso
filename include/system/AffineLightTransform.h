@@ -4,12 +4,18 @@
 #include <Eigen/Core>
 #include <ceres/ceres.h>
 #include <ostream>
+#include <cstring>
 
 namespace fishdso {
 
 template <typename T> struct AffineLightTransform {
   AffineLightTransform() : data{T(0.0), T(0.0)} {}
   AffineLightTransform(const T &a, const T &b) : data{a, b} {}
+
+  AffineLightTransform<T> &operator=(const AffineLightTransform<T> &other) {
+    memcpy(data, other.data, 2 * sizeof(T));
+    return *this;
+  }
 
   EIGEN_STRONG_INLINE T operator()(const T &x) {
     return ceres::exp(data[0]) * (x + data[1]);
