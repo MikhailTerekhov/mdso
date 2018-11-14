@@ -7,6 +7,94 @@
 
 using namespace fishdso;
 
+SE3 predictBaseToThisDummy(const SE3 &baseToLbo, const SE3 &baseToLast) {
+  return (baseToLast * baseToLbo.inverse()) * baseToLast;
+}
+
+void runTracker(const MultiFovReader &reader, int startFrameNum,
+                int framesCount, double depthsNoiseLevel,
+                StdVector<SE3> &worldToTracked,
+                std::vector<AffineLightTransform<double>> &trackedAffLights) {
+  StdVector<CameraModel> camPyr = reader.cam->camPyr();
+
+  KeyFrame startFrame(reader.getFrame(startFrameNum), startFrameNum);
+  cv::Mat1f depths = reader.getDepths(startFrameNum);
+  StdVector<Vec2> pnts;
+  std::vector<double> depthsVec;
+
+  std::mt19937 mt;
+  std::normal_distribution<double> depthsErrDistr(1, depthsNoiseLevel);
+
+  for (InterestPoint &ip : startFrame.interestPoints) {
+    double gtDepth = depths(toCvPoint(ip.p));
+    double usedDepth = std::max(1e-3, gtDepth * depthsErrDistr(mt));
+    // double usedDepth = gtDepth;
+    ip.activate(usedDepth);
+
+    pnts.push_back(ip.p);
+    depthsVec.push_back(usedDepth);
+  }
+
+  // setDepthColBounds(depthsVec);
+  // cv::Mat depthedFrame = startFrame.frameColored.clone();
+  // insertDepths(depthedFrame, pnts, depthsVec, minDepth, maxDepth, false);
+  // cv::imshow("depths used", depthedFrame);
+  // cv::waitKey();
+
+  startFrame.setDepthPyrs();
+
+  // for (int i = settingPyrLevels - 1; i >= 0; --i) {
+  // cv::Mat pimgSm =
+  // startFrame.preKeyFrame->drawDepthedFrame(i, minDepth, maxDepth);
+  // cv::Mat pimg;
+  // cv::resize(pimgSm, pimg,
+  // cv::Size(reader.cam->getWidth(), reader.cam->getHeight()), 0,
+  // 0, cv::INTER_NEAREST);
+  // cv::imshow("pyr lvl #" + std::to_string(i), pimg);
+  // cv::waitKey();
+  // }
+
+  FrameTracker tracker(camPyr, startFrame.preKeyFrame.get());
+  AffineLightTransform<double> affLight;
+  SE3 baseToLbo;
+  SE3 baseToLast = reader.getWorldToFrameGT(startFrameNum) *
+                   reader.getWorldToFrameGT(startFrameNum - 1).inverse();
+
+  worldToTracked.reserve(framesCount);
+  worldToTracked.resize(0);
+  worldToTracked.push_back(SE3());
+  trackedAffLights.resize(framesCount);
+  trackedAffLights.resize(0);
+  trackedAffLights.push_back(AffineLightTransform<double>());
+
+  for (int trackedNum = startFrameNum + 1;
+       trackedNum <= startFrameNum + framesCount; ++trackedNum) {
+    PreKeyFrame trackedFrame(reader.getFrame(trackedNum), trackedNum);
+    AffineLightTransform<double> newAffLight;
+    SE3 newBaseToLast;
+    SE3 newBaseToLastPred = predictBaseToThisDummy(baseToLbo, baseToLast);
+    std::tie(newBaseToLast, newAffLight) =
+        tracker.trackFrame(&trackedFrame, newBaseToLastPred, affLight);
+    affLight = newAffLight;
+    baseToLbo = baseToLast;
+    baseToLast = newBaseToLast;
+    worldToTracked.push_back(baseToLast);
+    trackedAffLights.push_back(affLight);
+  }
+
+  SE3 firstToTrackedGT = reader.getWorldToFrameGT(startFrameNum + framesCount) *
+                         reader.getWorldToFrameGT(startFrameNum).inverse();
+  double transErr =
+      180. / M_PI *
+      angle(baseToLast.translation(), firstToTrackedGT.translation());
+  double rotErr =
+      180. / M_PI *
+      (baseToLast.so3() * firstToTrackedGT.so3().inverse()).log().norm();
+
+  LOG(INFO) << "trans, rot errors = " << transErr << ' ' << rotErr << std::endl;
+  std::cout << "trans, rot errors = " << transErr << ' ' << rotErr << std::endl;
+}
+
 void compareReprojThresholds(const MultiFovReader &reader) {
   double values[] = {4., 3., 2., 1.75, 1.5, 1.25, 1., 0.75, 0.5, 0.25};
   const int testCount = 10;
@@ -74,10 +162,6 @@ void compareReprojThresholds(const MultiFovReader &reader) {
   tbl.close();
 }
 
-SE3 predictBaseToThisDummy(const SE3 &baseToLbo, const SE3 &baseToLast) {
-  return (baseToLast * baseToLbo.inverse()) * baseToLast;
-}
-
 void compareDirectThresholds(const MultiFovReader &reader) {
   int valCount = 19;
   double values[] = {3,     7,  8,     9,    9.5,   10, 10.5, 11, 11.25, 11.5,
@@ -87,10 +171,9 @@ void compareDirectThresholds(const MultiFovReader &reader) {
   const int trackCount = 10;
   const int candCount = 500;
   const int testCount = 20;
-  const double depthRelStddev = 0.05;
+  const double depthsNoizeLevel = 0.05;
   std::mt19937 mt;
   std::uniform_int_distribution<> startDistr(2, framesCount - trackCount);
-  std::normal_distribution<double> depthErrDistr(1, depthRelStddev);
   int starts[testCount];
 
   std::vector<std::pair<int, double>> places;
@@ -137,65 +220,12 @@ void compareDirectThresholds(const MultiFovReader &reader) {
       // cv::waitKey();
       // exit(0);
 
-      std::vector<double> depthsVec;
-      for (InterestPoint &ip : startFrame.interestPoints) {
-        double gtDepth = depths(toCvPoint(ip.p));
-        double usedDepth = std::max(1e-3, gtDepth * depthErrDistr(mt));
-        // double usedDepth = gtDepth;
-        ip.activate(usedDepth);
+      StdVector<SE3> worldToTracked;
+      std::vector<AffineLightTransform<double>> trackedAffLights;
+      runTracker(reader, st, trackCount, depthsNoizeLevel, worldToTracked,
+                 trackedAffLights);
 
-        pnts.push_back(ip.p);
-        depthsVec.push_back(usedDepth);
-      }
-
-      // setDepthColBounds(depthsVec);
-      // cv::Mat depthedFrame = startFrame.frameColored.clone();
-      // insertDepths(depthedFrame, pnts, depthsVec, minDepth, maxDepth, false);
-      // cv::imshow("depths used", depthedFrame);
-      // cv::waitKey();
-
-      startFrame.setDepthPyrs();
-
-      // for (int i = settingPyrLevels - 1; i >= 0; --i) {
-      // cv::Mat pimgSm =
-      // startFrame.preKeyFrame->drawDepthedFrame(i, minDepth, maxDepth);
-      // cv::Mat pimg;
-      // cv::resize(pimgSm, pimg,
-      // cv::Size(reader.cam->getWidth(), reader.cam->getHeight()), 0,
-      // 0, cv::INTER_NEAREST);
-      // cv::imshow("pyr lvl #" + std::to_string(i), pimg);
-      // cv::waitKey();
-      // }
-
-      FrameTracker tracker(camPyr, startFrame.preKeyFrame.get());
-      AffineLightTransform<double> affLight;
-      SE3 baseToLbo;
-      SE3 baseToLast = reader.getWorldToFrameGT(st) *
-                       reader.getWorldToFrameGT(st - 1).inverse();
-
-      SE3 firstToTrackedPredict;
-      for (int i = 0; i < trackCount; ++i)
-        firstToTrackedPredict *= baseToLast;
-
-      for (int trackedNum = st + 1; trackedNum <= st + trackCount;
-           ++trackedNum) {
-        PreKeyFrame trackedFrame(reader.getFrame(trackedNum), trackedNum);
-        AffineLightTransform<double> newAffLight;
-        SE3 newBaseToLast;
-        SE3 newBaseToLastPred = predictBaseToThisDummy(baseToLbo, baseToLast);
-        std::tie(newBaseToLast, newAffLight) =
-            tracker.trackFrame(&trackedFrame, newBaseToLastPred, affLight);
-        affLight = newAffLight;
-        baseToLbo = baseToLast;
-        baseToLast = newBaseToLast;
-
-        // std::cout << "aff light:\n" << affLight << std::endl;
-        // std::cout << "trans = " << newBaseToLast.translation().transpose()
-        // << "\nrot = "
-        // << newBaseToLast.unit_quaternion().coeffs().transpose()
-        // << std::endl;
-      }
-
+      SE3 baseToLast = worldToTracked.back();
       SE3 firstToTrackedGT = reader.getWorldToFrameGT(st + trackCount) *
                              reader.getWorldToFrameGT(st).inverse();
       double transErr =
@@ -206,17 +236,6 @@ void compareDirectThresholds(const MultiFovReader &reader) {
           (baseToLast.so3() * firstToTrackedGT.so3().inverse()).log().norm();
       sumTransErr += transErr;
       sumRotErr += rotErr;
-
-      double transErrPred = 180. / M_PI *
-                            angle(firstToTrackedPredict.translation(),
-                                  firstToTrackedGT.translation());
-      double rotErrPred =
-          180. / M_PI *
-          (firstToTrackedPredict.so3() * firstToTrackedGT.so3().inverse())
-              .log()
-              .norm();
-      sumTransErrPred += transErrPred;
-      sumRotErrPred += rotErrPred;
 
       LOG(INFO) << "trans, rot errors = " << transErr << ' ' << rotErr
                 << std::endl;
@@ -242,6 +261,13 @@ void compareDirectThresholds(const MultiFovReader &reader) {
   tbl.close();
 }
 
+DEFINE_double(depths_noize, 0.05,
+              "Multiplicative Gaussian noize with this standart deviation is "
+              "applied to the base keyframe depths.");
+
+DEFINE_int32(start_frame, 2, "Frame to start tracking from.");
+DEFINE_int32(track_count, 50, "Number of frames to track.");
+
 int main(int argc, char **argv) {
   std::string usage =
       R"abacaba(Usage: multi_fov data_dir
@@ -259,20 +285,34 @@ It should contain "info" and "data" subdirectories.)abacaba";
 
   MultiFovReader reader(argv[1]);
 
-  // Mat33 K;
-  // // clang-format off
-  // K << 100,   0, 320,
-  // 0, 100, 240,
-  // 0,   0,   1;
-  // // clang-format on
-  // cv::Mat frame = reader.getFrame(1);
-  // cv::Mat undistorted = reader.cam->undistort<cv::Vec3b>(frame, K);
-  // cv::imshow("orig", frame);
-  // cv::imshow("undistort", undistorted);
-  // cv::waitKey();
+  StdVector<SE3> worldToTracked;
+  std::vector<AffineLightTransform<double>> trackedAffLights;
+  runTracker(reader, FLAGS_start_frame, FLAGS_track_count, FLAGS_depths_noize, worldToTracked,
+             trackedAffLights);
+  StdVector<SE3> worldToTrackedGT;
+  worldToTrackedGT.reserve(FLAGS_track_count);
+  SE3 worldToFirst = reader.getWorldToFrameGT(FLAGS_start_frame);
+  for (int frameNum = FLAGS_start_frame + 1;
+       frameNum <= FLAGS_start_frame + FLAGS_track_count; ++frameNum)
+    worldToTrackedGT.push_back(reader.getWorldToFrameGT(frameNum) *
+                               worldToFirst.inverse());
 
-  // compareReprojThresholds(reader);
-  compareDirectThresholds(reader);
+  std::ofstream trackedOfs(FLAGS_output_directory + "/tracked_pos.txt");
+  std::ofstream gtOfs(FLAGS_output_directory + "/ground_truth_pos.txt");
+
+  int i = 1;
+  for (const SE3 &motion : worldToTracked) {
+    trackedOfs << i++ << ' ';
+    putMotion(trackedOfs, motion);
+    trackedOfs << std::endl;
+  }
+
+  i = 1;
+  for (const SE3 &motion : worldToTrackedGT) {
+    gtOfs << i++ << ' ';
+    putMotion(gtOfs, motion);
+    gtOfs << std::endl;
+  }
 
   return 0;
 }

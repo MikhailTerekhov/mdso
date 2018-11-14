@@ -265,11 +265,6 @@ end_header
   }
 }
 
-void putMotion(std::ostream &out, const SE3 &motion) {
-  out << motion.unit_quaternion().coeffs().transpose() << ' ';
-  out << motion.translation().transpose();
-}
-
 void DsoSystem::printMotionInfo(std::ostream &out,
                                 const StdMap<int, SE3> &motions) {
   out.precision(15);

@@ -37,7 +37,13 @@ def main(argv):
         out_dir = out_dir[0:-1]
 
     actual = extract_motions(out_dir + '/tracked_pos.txt')
-    predicted = extract_motions(out_dir + '/predicted_pos.txt')
+
+    has_predicted = True
+    try:
+        predicted = extract_motions(out_dir + '/predicted_pos.txt')
+    except FileNotFoundError:
+        has_predicted = False
+        print('no prediction provided')
 
     has_stereo_matched = True
     try:
@@ -55,15 +61,18 @@ def main(argv):
 
     fig = plt.figure()
     ax = Axes3D(fig)
-    #  ax.set_xlim3d(-0.5, 0.5)
-    #  ax.set_ylim3d(-0.5, 0.5)
-    #  ax.set_zlim3d(-0.5, 2.5)
+
+    xylim = 8
+    ax.set_xlim3d(-xylim, xylim)
+    ax.set_ylim3d(-xylim, xylim)
+    ax.set_zlim3d(-0.1, 8)
 
     draw_motions(ax, actual, 'orange')
-    draw_motions(ax, predicted, 'blue')
-    if (has_ground_truth):
+    if has_predicted:
+        draw_motions(ax, predicted, 'blue')
+    if has_ground_truth:
         draw_motions(ax, ground_truth, 'green')
-    elif (has_stereo_matched):
+    elif has_stereo_matched:
         draw_motions(ax, stereo_matched, 'green')
 
     plt.show()

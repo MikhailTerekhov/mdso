@@ -19,6 +19,8 @@ EIGEN_STRONG_INLINE std::vector<T> reservedVector(int toReserve) {
 
 void setDepthColBounds(const std::vector<double> &depths);
 
+void putMotion(std::ostream &out, const SE3 &motion);
+
 double angle(const Vec3 &a, const Vec3 &b);
 
 void putDot(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col);

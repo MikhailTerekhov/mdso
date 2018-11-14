@@ -7,7 +7,7 @@
 
 namespace fishdso {
 
-Mat33 toEssential(const SE3 motion) {
+Mat33 toEssential(const SE3 &motion) {
   return SO3::hat(motion.translation()) * motion.rotationMatrix();
 }
 

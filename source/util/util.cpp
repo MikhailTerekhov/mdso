@@ -43,6 +43,12 @@ void setDepthColBounds(const std::vector<double> &depths) {
   maxDepth = sorted[blueInd];
 }
 
+void putMotion(std::ostream &out, const SE3 &motion) {
+  out << motion.unit_quaternion().coeffs().transpose() << ' ';
+  out << motion.translation().transpose();
+}
+
+
 void putDot(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col) {
   cv::circle(img, pos, 4, col, cv::FILLED);
 }
