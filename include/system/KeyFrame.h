@@ -1,8 +1,10 @@
 #ifndef INCLUDE_KEYFRAME
 #define INCLUDE_KEYFRAME
 
-#include "system/InterestPoint.h"
 #include "system/PreKeyFrame.h"
+#include "system/ImmaturePoint.h"
+#include "system/OptimizedPoint.h"
+#include "util/DepthedImagePyramid.h"
 #include "util/settings.h"
 #include <Eigen/StdVector>
 #include <memory>
@@ -18,8 +20,8 @@ struct KeyFrame {
 
   KeyFrame(const cv::Mat &frameColored, int globalFrameNum);
 
-  void setDepthPyrs();
-
+  void activateAllImmature();
+  DepthedImagePyramid makePyramid();
   void selectPointsDenser(int pointsNeeded);
 
   cv::Mat drawDepthedFrame(double minDepth, double maxDepth);
@@ -27,7 +29,10 @@ struct KeyFrame {
   std::unique_ptr<PreKeyFrame> preKeyFrame;
   cv::Mat frameColored;
   cv::Mat1d gradX, gradY, gradNorm;
-  StdVector<InterestPoint> interestPoints;
+
+  StdUnorderedSet<std::unique_ptr<ImmaturePoint>> immaturePoints;
+  StdUnorderedSet<std::unique_ptr<OptimizedPoint>> optimizedPoints;
+
 
 private:
   static void updateAdaptiveBlockSize(int pointsFound);

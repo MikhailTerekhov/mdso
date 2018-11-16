@@ -132,7 +132,7 @@ void DsoSystem::addFrame(const cv::Mat &frame, int globalFrameNum) {
       printLastKfInPly(ofsAfterAdjust);
 
       frameTracker = std::unique_ptr<FrameTracker>(
-          new FrameTracker(camPyr, baseKeyFrame().preKeyFrame.get()));
+          new FrameTracker(camPyr, baseKeyFrame().makePyramid()));
     }
 
     return;
@@ -150,7 +150,7 @@ void DsoSystem::addFrame(const cv::Mat &frame, int globalFrameNum) {
   LOG(INFO) << "start tracking this frame" << std::endl;
 
   std::tie(baseKfToCur, lightBaseKfToCur) =
-      frameTracker->trackFrame(preKeyFrame.get(), predicted, lightKfToLast);
+      frameTracker->trackFrame(ImagePyramid(preKeyFrame->frame), predicted, lightKfToLast);
 
   LOG(INFO) << "tracking ended" << std::endl;
 
@@ -205,8 +205,8 @@ void DsoSystem::checkLastTrackedGT(std::unique_ptr<PreKeyFrame> lastFrame) {
 
 void DsoSystem::checkLastTrackedStereo(std::unique_ptr<PreKeyFrame> lastFrame) {
   cv::Mat1b frames[2];
-  frames[0] = keyFrames.begin()->second.preKeyFrame->frame();
-  frames[1] = lastFrame->frame();
+  frames[0] = keyFrames.begin()->second.preKeyFrame->frame;
+  frames[1] = lastFrame->frame;
 
   SE3 worldToFirst = keyFrames.rbegin()->second.preKeyFrame->worldToThis;
   SE3 worldToBase = baseKeyFrame().preKeyFrame->worldToThis;
@@ -232,13 +232,21 @@ void DsoSystem::checkLastTrackedStereo(std::unique_ptr<PreKeyFrame> lastFrame) {
 
 void DsoSystem::printLastKfInPly(std::ostream &out) {
   StdVector<std::pair<Vec2, double>> points;
-  points.reserve(lastKeyFrame().interestPoints.size());
-  for (const auto &ip : lastKeyFrame().interestPoints) {
-    double d = ip.depthd();
-    if (d != d || d > 1e3)
+  points.reserve(lastKeyFrame().optimizedPoints.size() + lastKeyFrame().immaturePoints.size());
+  for (const auto &op : lastKeyFrame().optimizedPoints) {
+    double d = op->depth();
+    if (!std::isfinite(d) || d > 1e3)
       continue;
 
-    points.push_back({ip.p, d});
+    points.push_back({op->p, d});
+  }
+
+  for (const auto &ip : lastKeyFrame().immaturePoints) {
+    double d = ip->depth;
+    if (!std::isfinite(d) || d > 1e3)
+      continue;
+
+    points.push_back({ip->p, d});
   }
 
   out.precision(15);

@@ -9,11 +9,12 @@ int settingPyrLevelsUnused = 2;
 int dbg1 = 0, dbg2 = 0;
 
 FrameTracker::FrameTracker(const StdVector<CameraModel> &camPyr,
-                           PreKeyFrame *base)
-    : camPyr(camPyr), base(base) {}
+                           const DepthedImagePyramid &baseFrame)
+    : camPyr(camPyr), baseFrame(baseFrame), displayWidth(camPyr[1].getWidth()),
+      displayHeight(camPyr[1].getHeight()) {}
 
 std::pair<SE3, AffineLightTransform<double>>
-FrameTracker::trackFrame(PreKeyFrame *frame, const SE3 &coarseMotion,
+FrameTracker::trackFrame(const ImagePyramid &frame, const SE3 &coarseMotion,
                          const AffineLightTransform<double> &coarseAffLight) {
   SE3 motion = coarseMotion;
   AffineLightTransform<double> affLight;
@@ -21,8 +22,8 @@ FrameTracker::trackFrame(PreKeyFrame *frame, const SE3 &coarseMotion,
   for (int i = settingPyrLevels - 1; i >= settingPyrLevelsUnused; --i) {
     LOG(INFO) << "track level #" << i << std::endl;
     std::tie(motion, affLight) =
-        trackPyrLevel(camPyr[i], base->framePyr[i], base->depths[i],
-                      frame->framePyr[i], motion, affLight);
+        trackPyrLevel(camPyr[i], baseFrame.images[i], baseFrame.depths[i],
+                      frame.images[i], motion, affLight);
   }
 
   // cv::waitKey();
@@ -85,7 +86,7 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
   SE3 motion = coarseMotion;
   AffineLightTransform<double> affLight = coarseAffLight;
 
-  cv::Size displSz = base->framePyr[1].size();
+  cv::Size displSz = cv::Size(displayHeight, displayWidth);
   cv::Mat1b resMask(baseImg.size(), CV_WHITE_BYTE);
   // cv::rectangle(resMask, cv::Point(0.15 * baseImg.cols, 0.3 * baseImg.rows),
   // cv::Point(0.85 * baseImg.cols, baseImg.rows), CV_WHITE_BYTE,
@@ -205,9 +206,9 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
   ceres::Solver::Summary summary;
 
   ceres::Solve(options, &problem, &summary);
-  
+
   LOG(INFO) << summary.FullReport() << std::endl;
-  
+
   // std::cout << summary.BriefReport() << std::endl;
   // std::cout << "num res = " << summary.num_residuals << std::endl;
   // std::cout << "avg robustified res = "
@@ -218,7 +219,8 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
   // std::cout << "rot delta = " << diff.so3().log().norm() << std::endl;
   // std::cout << std::endl;
 
-  cv::Mat depthed = drawDepthedFrame(baseImg, baseDepths, minDepth, maxDepth);
+  cv::Mat depthed =
+      drawDepthedFrame(baseImg, baseDepths, minDepthCol, maxDepthCol);
   cv::Mat dfr;
   cv::resize(depthed, dfr, displSz, 0, 0, cv::INTER_NEAREST);
   double scaleX = static_cast<double>(dfr.cols) / depthed.cols;

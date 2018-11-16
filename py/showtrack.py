@@ -62,10 +62,10 @@ def main(argv):
     fig = plt.figure()
     ax = Axes3D(fig)
 
-    xylim = 8
+    xylim = 4
     ax.set_xlim3d(-xylim, xylim)
     ax.set_ylim3d(-xylim, xylim)
-    ax.set_zlim3d(-0.1, 8)
+    ax.set_zlim3d(0, 2 * xylim)
 
     draw_motions(ax, actual, 'orange')
     if has_predicted:

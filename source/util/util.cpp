@@ -13,7 +13,7 @@
 namespace fishdso {
 
 cv::Mat dbg;
-double minDepth = 0, maxDepth = 0;
+double minDepthCol = 0, maxDepthCol = 0;
 
 double angle(const Vec3 &a, const Vec3 &b) {
   double cosAngle = a.normalized().dot(b.normalized());
@@ -39,8 +39,8 @@ void setDepthColBounds(const std::vector<double> &depths) {
   if (blueInd >= sorted.size())
     blueInd = sorted.size() - 1;
 
-  minDepth = sorted[redInd];
-  maxDepth = sorted[blueInd];
+  minDepthCol = sorted[redInd];
+  maxDepthCol = sorted[blueInd];
 }
 
 void putMotion(std::ostream &out, const SE3 &motion) {

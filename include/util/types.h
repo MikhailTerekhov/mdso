@@ -6,6 +6,7 @@
 #include <map>
 #include <sophus/se3.hpp>
 #include <sophus/sim3.hpp>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -38,6 +39,10 @@ typedef Sophus::SO3d SO3;
 
 template <typename T>
 using StdVector = std::vector<T, Eigen::aligned_allocator<T>>;
+
+template <typename T>
+using StdUnorderedSet = std::unordered_set<T, std::hash<T>, std::equal_to<T>,
+                                           Eigen::aligned_allocator<T>>;
 
 template <typename K, typename T>
 using StdMap =

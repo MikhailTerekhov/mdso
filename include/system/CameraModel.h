@@ -103,7 +103,6 @@ public:
             origY < result.rows)
           result.at<T>(y, x) = img.at<T>(origY, origX);
       }
-    fillBlackPixels<T>(result);
     return result;
   }
 

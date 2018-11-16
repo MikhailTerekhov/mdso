@@ -4,15 +4,16 @@
 #include "system/AffineLightTransform.h"
 #include "system/CameraModel.h"
 #include "system/KeyFrame.h"
+#include "util/DepthedImagePyramid.h"
 
 namespace fishdso {
 
 class FrameTracker {
 public:
-  FrameTracker(const StdVector<CameraModel> &camPyr, PreKeyFrame *base);
+  FrameTracker(const StdVector<CameraModel> &camPyr, const DepthedImagePyramid &baseFrame);
 
   std::pair<SE3, AffineLightTransform<double>>
-  trackFrame(PreKeyFrame *frame, const SE3 &coarseMotion,
+  trackFrame(const ImagePyramid &frame, const SE3 &coarseMotion,
              const AffineLightTransform<double> &coarseAffLight);
 
 private:
@@ -23,7 +24,8 @@ private:
                 const AffineLightTransform<double> &coarseAffLight);
 
   const StdVector<CameraModel> &camPyr;
-  PreKeyFrame *base;
+  DepthedImagePyramid baseFrame;  
+  int displayWidth, displayHeight;
 };
 
 } // namespace fishdso

@@ -8,7 +8,7 @@
 namespace fishdso {
 
 extern cv::Mat dbg;
-extern double minDepth, maxDepth;
+extern double minDepthCol, maxDepthCol;
 
 template <typename T>
 EIGEN_STRONG_INLINE std::vector<T> reservedVector(int toReserve) {
@@ -49,27 +49,6 @@ template <> struct accum_type<unsigned char> { typedef int type; };
 template <> struct accum_type<signed char> { typedef int type; };
 template <> struct accum_type<char> { typedef int type; };
 template <> struct accum_type<cv::Vec3b> { typedef cv::Vec3i type; };
-
-template <typename T> void fillBlackPixels(cv::Mat &img) {
-  int d = settingHalfFillingFilterSize;
-  for (int y = 0; y < img.rows; ++y)
-    for (int x = 0; x < img.cols; ++x)
-      if (img.at<T>(y, x) == T()) {
-        typename accum_type<T>::type accum = typename accum_type<T>::type();
-
-        int nonBlackCnt = 0;
-        for (int yy = std::max(0, y - d); yy < std::min(y + d, img.rows - 1);
-             ++yy)
-          for (int xx = std::max(0, x - d); xx < std::min(x + d, img.cols - 1);
-               ++xx)
-            if (img.at<T>(yy, xx) != T()) {
-              accum += img.at<T>(yy, xx);
-              nonBlackCnt++;
-            }
-        if (nonBlackCnt != 0)
-          img.at<T>(y, x) = T(accum / nonBlackCnt);
-      }
-}
 
 template <typename T> cv::Mat boxFilterPyrUp(const cv::Mat &img) {
   constexpr int d = 2;

@@ -18,20 +18,24 @@ void runTracker(const MultiFovReader &reader, int startFrameNum,
   StdVector<CameraModel> camPyr = reader.cam->camPyr();
 
   KeyFrame startFrame(reader.getFrame(startFrameNum), startFrameNum);
+  startFrame.activateAllImmature();
   cv::Mat1f depths = reader.getDepths(startFrameNum);
   StdVector<Vec2> pnts;
+  std::vector<cv::Point> cvPnts;
+  std::vector<double> weights;
   std::vector<double> depthsVec;
 
   std::mt19937 mt;
   std::normal_distribution<double> depthsErrDistr(1, depthsNoiseLevel);
 
-  for (InterestPoint &ip : startFrame.interestPoints) {
-    double gtDepth = depths(toCvPoint(ip.p));
+  for (const auto &ip : startFrame.immaturePoints) {
+    double gtDepth = depths(toCvPoint(ip->p));
     double usedDepth = std::max(1e-3, gtDepth * depthsErrDistr(mt));
     // double usedDepth = gtDepth;
-    ip.activate(usedDepth);
 
-    pnts.push_back(ip.p);
+    pnts.push_back(ip->p);
+    cvPnts.push_back(toCvPoint(ip->p));
+    weights.push_back(1.0);
     depthsVec.push_back(usedDepth);
   }
 
@@ -40,8 +44,6 @@ void runTracker(const MultiFovReader &reader, int startFrameNum,
   // insertDepths(depthedFrame, pnts, depthsVec, minDepth, maxDepth, false);
   // cv::imshow("depths used", depthedFrame);
   // cv::waitKey();
-
-  startFrame.setDepthPyrs();
 
   // for (int i = settingPyrLevels - 1; i >= 0; --i) {
   // cv::Mat pimgSm =
@@ -54,7 +56,9 @@ void runTracker(const MultiFovReader &reader, int startFrameNum,
   // cv::waitKey();
   // }
 
-  FrameTracker tracker(camPyr, startFrame.preKeyFrame.get());
+  FrameTracker tracker(camPyr,
+                       DepthedImagePyramid(startFrame.preKeyFrame->frame,
+                                           cvPnts, depthsVec, weights));
   AffineLightTransform<double> affLight;
   SE3 baseToLbo;
   SE3 baseToLast = reader.getWorldToFrameGT(startFrameNum) *
@@ -73,8 +77,8 @@ void runTracker(const MultiFovReader &reader, int startFrameNum,
     AffineLightTransform<double> newAffLight;
     SE3 newBaseToLast;
     SE3 newBaseToLastPred = predictBaseToThisDummy(baseToLbo, baseToLast);
-    std::tie(newBaseToLast, newAffLight) =
-        tracker.trackFrame(&trackedFrame, newBaseToLastPred, affLight);
+    std::tie(newBaseToLast, newAffLight) = tracker.trackFrame(
+        ImagePyramid(trackedFrame.frame), newBaseToLastPred, affLight);
     affLight = newAffLight;
     baseToLbo = baseToLast;
     baseToLast = newBaseToLast;
@@ -287,8 +291,8 @@ It should contain "info" and "data" subdirectories.)abacaba";
 
   StdVector<SE3> worldToTracked;
   std::vector<AffineLightTransform<double>> trackedAffLights;
-  runTracker(reader, FLAGS_start_frame, FLAGS_track_count, FLAGS_depths_noize, worldToTracked,
-             trackedAffLights);
+  runTracker(reader, FLAGS_start_frame, FLAGS_track_count, FLAGS_depths_noize,
+             worldToTracked, trackedAffLights);
   StdVector<SE3> worldToTrackedGT;
   worldToTrackedGT.reserve(FLAGS_track_count);
   SE3 worldToFirst = reader.getWorldToFrameGT(FLAGS_start_frame);

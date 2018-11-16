@@ -27,13 +27,16 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/util/Terrain.h
     ${PROJECT_SOURCE_DIR}/include/util/SphericalTriangulation.h
     ${PROJECT_SOURCE_DIR}/include/util/SphericalTerrain.h
+    ${PROJECT_SOURCE_DIR}/include/util/ImagePyramid.h
+    ${PROJECT_SOURCE_DIR}/include/util/DepthedImagePyramid.h
     ${PROJECT_SOURCE_DIR}/include/system/AffineLightTransform.h
     ${PROJECT_SOURCE_DIR}/include/system/SphericalPlus.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoSystem.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoInitializer.h
     ${PROJECT_SOURCE_DIR}/include/system/PreKeyFrame.h
     ${PROJECT_SOURCE_DIR}/include/system/KeyFrame.h
-    ${PROJECT_SOURCE_DIR}/include/system/InterestPoint.h
+    ${PROJECT_SOURCE_DIR}/include/system/ImmaturePoint.h
+    ${PROJECT_SOURCE_DIR}/include/system/OptimizedPoint.h
     ${PROJECT_SOURCE_DIR}/include/system/CameraModel.h
     ${PROJECT_SOURCE_DIR}/include/system/StereoMatcher.h
     ${PROJECT_SOURCE_DIR}/include/system/StereoGeometryEstimator.h
@@ -48,6 +51,8 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/util/Terrain.cpp
     ${PROJECT_SOURCE_DIR}/source/util/SphericalTriangulation.cpp
     ${PROJECT_SOURCE_DIR}/source/util/SphericalTerrain.cpp
+    ${PROJECT_SOURCE_DIR}/source/util/ImagePyramid.cpp
+    ${PROJECT_SOURCE_DIR}/source/util/DepthedImagePyramid.cpp
     ${PROJECT_SOURCE_DIR}/source/system/SphericalPlus.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoSystem.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoInitializer.cpp

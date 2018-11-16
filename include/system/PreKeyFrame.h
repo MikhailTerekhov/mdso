@@ -16,13 +16,9 @@ struct PreKeyFrame {
 
   PreKeyFrame(const cv::Mat &frameColored, int globalFrameNum);
 
-  cv::Mat1b &frame();
-  void setDepthPyrs(const cv::Mat1d &depths0, const cv::Mat1d &weights);
-
   cv::Mat drawDepthedFrame(int pyrLevel, double minDepth, double maxDepth);
 
-  cv::Mat1b framePyr[PL];
-  cv::Mat1d depths[PL];
+  cv::Mat1b frame;
   SE3 worldToThis;
   AffineLightTransform<double> lightWorldToThis;
   int globalFrameNum;

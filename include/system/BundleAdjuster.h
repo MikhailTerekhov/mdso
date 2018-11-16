@@ -18,7 +18,7 @@ public:
 
 private:
   bool isOOB(const SE3 &worldToBase, const SE3 &worldToRef,
-             const InterestPoint &baseIP);
+             const OptimizedPoint &baseOP);
   CameraModel *cam;
   std::set<KeyFrame *> keyFrames;
   KeyFrame *firstKeyFrame;
