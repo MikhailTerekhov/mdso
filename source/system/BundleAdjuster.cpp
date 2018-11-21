@@ -15,8 +15,7 @@ bool BundleAdjuster::isOOB(const SE3 &worldToBase, const SE3 &worldToRef,
                            const OptimizedPoint &baseOP) {
   Vec3 inBase = cam->unmap(baseOP.p).normalized() * baseOP.depth();
   Vec2 reproj = cam->map(worldToRef * worldToBase.inverse() * inBase);
-  return !(reproj[0] >= 0 && reproj[0] < cam->getWidth() && reproj[1] >= 0 &&
-           reproj[1] < cam->getHeight());
+  return !cam->isOnImage(reproj, settingResidualPatternHeight);
 }
 
 void BundleAdjuster::addKeyFrame(KeyFrame *keyFrame) {
@@ -88,7 +87,7 @@ struct DirectResidual {
   KeyFrame *refKf;
 };
 
-void BundleAdjuster::adjust() {
+void BundleAdjuster::adjust(int maxNumIterations) {
   int pointsTotal = 0, pointsOOB = 0, pointsOutliers = 0;
 
   KeyFrame *secondKeyFrame = nullptr;
@@ -99,22 +98,6 @@ void BundleAdjuster::adjust() {
     }
 
   SE3 oldMotion = secondKeyFrame->preKeyFrame->worldToThis;
-
-  std::map<KeyFrame *, std::unique_ptr<ceres::Grid2D<unsigned char, 1>>> grid;
-
-  std::map<KeyFrame *, std::unique_ptr<ceres::BiCubicInterpolator<
-                           ceres::Grid2D<unsigned char, 1>>>>
-      interpolated;
-  for (KeyFrame *keyFrame : keyFrames)
-    grid[keyFrame] = std::make_unique<ceres::Grid2D<unsigned char, 1>>(
-        keyFrame->preKeyFrame->frame.data, 0,
-        keyFrame->preKeyFrame->frame.rows, 0,
-        keyFrame->preKeyFrame->frame.cols);
-
-  for (KeyFrame *keyFrame : keyFrames)
-    interpolated[keyFrame] = std::make_unique<
-        ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>>(
-        *grid[keyFrame]);
 
   std::shared_ptr<ceres::ParameterBlockOrdering> ordering(
       new ceres::ParameterBlockOrdering());
@@ -174,8 +157,8 @@ void BundleAdjuster::adjust() {
 
   std::map<OptimizedPoint *, std::vector<DirectResidual *>> residualsFor;
 
-  std::vector<Vec2> oobPos;
-  std::vector<Vec2> oobKf1;
+  StdVector<Vec2> oobPos;
+  StdVector<Vec2> oobKf1;
 
   for (KeyFrame *baseFrame : keyFrames)
     for (const auto &op : baseFrame->optimizedPoints)
@@ -203,9 +186,10 @@ void BundleAdjuster::adjust() {
 
         for (int i = 0; i < settingResidualPatternSize; ++i) {
           const Vec2 &pos = op->p + settingResidualPattern[i];
-          DirectResidual *newResidual = new DirectResidual(
-              interpolated[baseFrame].get(), interpolated[refFrame].get(), cam,
-              op.get(), pos, baseFrame, refFrame);
+          DirectResidual *newResidual =
+              new DirectResidual(&baseFrame->preKeyFrame->frameInterpolator,
+                                 &refFrame->preKeyFrame->frameInterpolator, cam,
+                                 op.get(), pos, baseFrame, refFrame);
 
           double gradNorm = baseFrame->gradNorm(toCvPoint(pos));
           double c = settingGradientWeighingConstant;
@@ -232,7 +216,7 @@ void BundleAdjuster::adjust() {
   options.linear_solver_type = ceres::DENSE_SCHUR;
   options.linear_solver_ordering = ordering;
   options.minimizer_progress_to_stdout = true;
-  options.max_linear_solver_iterations = 100;
+  options.max_num_iterations = maxNumIterations;
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
 
@@ -264,12 +248,13 @@ void BundleAdjuster::adjust() {
 
   std::cout << "aff light:\n" << secondKeyFrame->preKeyFrame->lightWorldToThis;
 
-  auto p = std::minmax_element(
-      secondKeyFrame->optimizedPoints.begin(),
-      secondKeyFrame->optimizedPoints.end(),
-      [](const auto &op1, const auto &op2) { return op1->depth() < op2->depth(); });
-  std::cout << "minmax d = " << (*p.first)->depth() << ' ' << (*p.second)->depth()
-            << std::endl;
+  auto p = std::minmax_element(secondKeyFrame->optimizedPoints.begin(),
+                               secondKeyFrame->optimizedPoints.end(),
+                               [](const auto &op1, const auto &op2) {
+                                 return op1->depth() < op2->depth();
+                               });
+  std::cout << "minmax d = " << (*p.first)->depth() << ' '
+            << (*p.second)->depth() << std::endl;
 
   std::vector<double> depthsVec;
   depthsVec.reserve(secondKeyFrame->optimizedPoints.size());
@@ -340,11 +325,12 @@ void BundleAdjuster::adjust() {
   for (const Vec2 &p : outliers)
     cv::circle(kfDepths, toCvPoint(p), 3, CV_BLACK, cv::FILLED);
   for (const Vec2 &p : oobPos)
-    putCross(kfDepths, toCvPoint(p), CV_BLACK, 3, 2);
+    putCross(kfDepths, toCvPoint(p), 3, CV_BLACK, 2);
 
-  cv::Mat kf1Depthed = firstKeyFrame->drawDepthedFrame(minDepthCol, maxDepthCol);
+  cv::Mat kf1Depthed =
+      firstKeyFrame->drawDepthedFrame(minDepthCol, maxDepthCol);
   // for (Vec2 p : oobKf1)
-  // putCross(kf1Depthed, toCvPoint(p), CV_BLACK, 3, 2);
+  // putCross(kf1Depthed, toCvPoint(p), 3, CV_BLACK, 2);
 
   cv::imshow("first frame", kf1Depthed);
   cv::imwrite(FLAGS_output_directory + "/firstf.jpg", kf1Depthed);

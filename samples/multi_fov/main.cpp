@@ -17,7 +17,8 @@ void runTracker(const MultiFovReader &reader, int startFrameNum,
                 std::vector<AffineLightTransform<double>> &trackedAffLights) {
   StdVector<CameraModel> camPyr = reader.cam->camPyr();
 
-  KeyFrame startFrame(reader.getFrame(startFrameNum), startFrameNum);
+  KeyFrame startFrame(reader.cam.get(), reader.getFrame(startFrameNum),
+                      startFrameNum);
   startFrame.activateAllImmature();
   cv::Mat1f depths = reader.getDepths(startFrameNum);
   StdVector<Vec2> pnts;
@@ -56,9 +57,9 @@ void runTracker(const MultiFovReader &reader, int startFrameNum,
   // cv::waitKey();
   // }
 
-  FrameTracker tracker(camPyr,
-                       DepthedImagePyramid(startFrame.preKeyFrame->frame,
-                                           cvPnts, depthsVec, weights));
+  FrameTracker tracker(
+      camPyr, std::make_unique<DepthedImagePyramid>(
+                  startFrame.preKeyFrame->frame(), cvPnts, depthsVec, weights));
   AffineLightTransform<double> affLight;
   SE3 baseToLbo;
   SE3 baseToLast = reader.getWorldToFrameGT(startFrameNum) *
@@ -73,12 +74,13 @@ void runTracker(const MultiFovReader &reader, int startFrameNum,
 
   for (int trackedNum = startFrameNum + 1;
        trackedNum <= startFrameNum + framesCount; ++trackedNum) {
-    PreKeyFrame trackedFrame(reader.getFrame(trackedNum), trackedNum);
+    PreKeyFrame trackedFrame(reader.cam.get(), reader.getFrame(trackedNum),
+                             trackedNum);
     AffineLightTransform<double> newAffLight;
     SE3 newBaseToLast;
     SE3 newBaseToLastPred = predictBaseToThisDummy(baseToLbo, baseToLast);
     std::tie(newBaseToLast, newAffLight) = tracker.trackFrame(
-        ImagePyramid(trackedFrame.frame), newBaseToLastPred, affLight);
+        ImagePyramid(trackedFrame.frame()), newBaseToLastPred, affLight);
     affLight = newAffLight;
     baseToLbo = baseToLast;
     baseToLast = newBaseToLast;
@@ -209,7 +211,7 @@ void compareDirectThresholds(const MultiFovReader &reader) {
     for (int st : starts) {
       LOG(INFO) << it << ") val = " << val << " firstFrame = " << st
                 << std::endl;
-      KeyFrame startFrame(reader.getFrame(st), st);
+      KeyFrame startFrame(reader.cam.get(), reader.getFrame(st), st);
       cv::Mat1f depths = reader.getDepths(st);
       StdVector<Vec2> pnts;
 

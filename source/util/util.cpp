@@ -53,12 +53,16 @@ void putDot(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col) {
   cv::circle(img, pos, 4, col, cv::FILLED);
 }
 
-void putCross(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col,
-              int size, int thikness) {
+void putCross(cv::Mat &img, const cv::Point &pos, int size, const cv::Scalar &col,  
+              int thickness) {
   cv::line(img, pos - cv::Point(size, size), pos + cv::Point(size, size), col,
-           thikness);
+           thickness);
   cv::line(img, pos + cv::Point(-size, size), pos + cv::Point(size, -size), col,
-           thikness);
+           thickness);
+}
+void putSquare(cv::Mat &img, const cv::Point &pos, int size, const cv::Scalar &col,
+               int thickness) {
+  cv::rectangle(img, pos - cv::Point(size, size), pos + cv::Point(size, size), col, thickness);
 }
 
 void grad(const cv::Mat &img, cv::Mat1d &gradX, cv::Mat1d &gradY,
@@ -127,6 +131,12 @@ cv::Point toCvPoint(const Vec2 &vec, double scaleX, double scaleY,
 
 template cv::Mat boxFilterPyrUp<unsigned char>(const cv::Mat &img);
 template cv::Mat boxFilterPyrUp<cv::Vec3b>(const cv::Mat &img);
+
+cv::Mat1b cvtBgrToGray(const cv::Mat &coloredImg) {
+  cv::Mat result;
+  cv::cvtColor(coloredImg, result, cv::COLOR_BGR2GRAY);
+  return result;
+}
 
 cv::Mat pyrNUpDepth(const cv::Mat1d &integralWeightedDepths,
                     const cv::Mat1d &integralWeights, int levelNum) {

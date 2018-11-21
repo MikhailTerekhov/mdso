@@ -28,6 +28,10 @@ template <typename T> struct AffineLightTransform {
                                        first.data[1]);
   }
 
+  EIGEN_STRONG_INLINE AffineLightTransform<T> inverse() const {
+    return AffineLightTransform<T>(-data[0], -data[1] * ceres::exp(-data[0]));
+  }
+
   EIGEN_STRONG_INLINE static void
   normalizeMultiplier(AffineLightTransform<T> &toNormalize,
                       AffineLightTransform<T> &relative) {

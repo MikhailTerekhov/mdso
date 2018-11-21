@@ -24,8 +24,10 @@ void putMotion(std::ostream &out, const SE3 &motion);
 double angle(const Vec3 &a, const Vec3 &b);
 
 void putDot(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col);
-void putCross(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col,
-              int size, int thikness);
+void putCross(cv::Mat &img, const cv::Point &pos, int size,
+              const cv::Scalar &col, int thickness);
+void putSquare(cv::Mat &img, const cv::Point &pos, int size,
+               const cv::Scalar &col, int thickness);
 
 void grad(const cv::Mat &img, cv::Mat1d &gradX, cv::Mat1d &gradY,
           cv::Mat1d &gradNorm);
@@ -68,6 +70,7 @@ template <typename T> cv::Mat boxFilterPyrUp(const cv::Mat &img) {
 extern template cv::Mat boxFilterPyrUp<unsigned char>(const cv::Mat &img);
 extern template cv::Mat boxFilterPyrUp<cv::Vec3b>(const cv::Mat &img);
 
+cv::Mat1b cvtBgrToGray(const cv::Mat &coloredImg);
 cv::Mat pyrNUpDepth(const cv::Mat1d &integralWeightedDepths,
                     const cv::Mat1d &integralWeights, int levelNum);
 

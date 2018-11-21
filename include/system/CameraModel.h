@@ -106,9 +106,12 @@ public:
     return result;
   }
 
-  int getWidth() const;
-  int getHeight() const;
-  Vec2 getImgCenter() const;
+  EIGEN_STRONG_INLINE int getWidth() const { return width; }
+  EIGEN_STRONG_INLINE int getHeight() const { return height; }
+  EIGEN_STRONG_INLINE Vec2 getImgCenter() const { return scale * center; }
+  EIGEN_STRONG_INLINE double getMaxAngle() const { return maxAngle; }
+
+  bool isOnImage(const Vec2 &p, int border);
 
   double getImgRadiusByAngle(double observeAngle) const;
   void getRectByAngle(double observeAngle, int &width, int &height) const;

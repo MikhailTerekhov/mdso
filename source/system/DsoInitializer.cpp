@@ -46,7 +46,7 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
 
   std::vector<KeyFrame> keyFrames;
   for (int i = 0; i < 2; ++i) {
-    keyFrames.push_back(KeyFrame(frames[i], globalFrameNums[i]));
+    keyFrames.push_back(KeyFrame(cam, frames[i], globalFrameNums[i]));
     keyFrames.back().activateAllImmature();
   }
 
@@ -102,8 +102,10 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
         int pointsInTriang = keyFrames[kfInd].optimizedPoints.size();
         int pointsNeeded = settingInterestPointsUsed *
                            (static_cast<double>(pointsTotal) / pointsInTriang);
-        if (i != reselectCount)
+        if (i != reselectCount) {
           keyFrames[kfInd].selectPointsDenser(pointsNeeded);
+          keyFrames[kfInd].activateAllImmature();
+        }
       }
     }
 
@@ -213,7 +215,7 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
 std::vector<KeyFrame> DsoInitializer::createKeyFramesDummy() {
   std::vector<KeyFrame> keyFrames;
   for (int i = 0; i < 2; ++i) {
-    keyFrames.push_back(KeyFrame(frames[i], globalFrameNums[i]));
+    keyFrames.push_back(KeyFrame(cam, frames[i], globalFrameNums[i]));
     keyFrames.back().activateAllImmature();
   }
 

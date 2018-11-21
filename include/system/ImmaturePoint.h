@@ -1,18 +1,29 @@
-#ifndef INCLUDE_IMMATURE_POINT
-#define INCLUDE_IMMATURE_POINT
+#ifndef INCLUDE_IMMATUREPOINT
+#define INCLUDE_IMMATUREPOINT
 
 #include "util/types.h"
+#include "util/settings.h"
+#include "system/CameraModel.h"
+#include "system/AffineLightTransform.h"
+#include "system/PreKeyFrame.h"
 
 namespace fishdso {
 
 struct ImmaturePoint {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  
+  ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p);
 
-  ImmaturePoint(const Vec2 &p) : p(p) {}
+  void traceOn(const PreKeyFrame &refFrame, bool debugOut);
 
   Vec2 p;
+  Vec3 baseDirections[settingResidualPatternSize];
+  double baseIntencities[settingResidualPatternSize];
+  double minDepth, maxDepth;
   double depth;
-  double variance;
+  double quality;
+  const PreKeyFrame *baseFrame;
+  CameraModel *cam;
 };
 
 } // namespace fishdso

@@ -14,7 +14,7 @@ public:
   BundleAdjuster(CameraModel *cam);
 
   void addKeyFrame(KeyFrame *keyFrame);
-  void adjust();
+  void adjust(int maxNumIterations);
 
 private:
   bool isOOB(const SE3 &worldToBase, const SE3 &worldToRef,

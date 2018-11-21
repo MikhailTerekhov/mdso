@@ -28,6 +28,31 @@ DsoSystem::~DsoSystem() {
   }
 }
 
+std::unique_ptr<DepthedImagePyramid> DsoSystem::optimizedPointsOntoBaseKf() {
+  std::vector<cv::Point> points;
+  std::vector<double> depths;
+  std::vector<double> weights;
+
+  for (const auto &kfp : keyFrames) {
+    if (&kfp.second == &baseKeyFrame())
+      continue;
+    SE3 curToBase = baseKeyFrame().preKeyFrame->worldToThis *
+                    kfp.second.preKeyFrame->worldToThis.inverse();
+    for (const auto &op : kfp.second.optimizedPoints) {
+      Vec2 basePos =
+          cam->map(curToBase * (op->depth() * cam->unmap(op->p).normalized()));
+      if (!cam->isOnImage(basePos, 0))
+        continue;
+      points.push_back(toCvPoint(basePos));
+      depths.push_back(basePos.norm());
+      weights.push_back(1 / op->stddev);
+    }
+  }
+
+  return std::make_unique<DepthedImagePyramid>(
+      baseKeyFrame().preKeyFrame->frame(), points, depths, weights);
+}
+
 SE3 predictScrewInternal(int prevFramesSkipped, const SE3 &worldToBaseKf,
                          const SE3 &worldToLbo, const SE3 &worldToLast) {
   SE3 lboToLast = worldToLast * worldToLbo.inverse();
@@ -89,6 +114,22 @@ void DsoSystem::addGroundTruthPose(int ind, const SE3 &worldToThat) {
   worldToFrameGT[ind] = worldToThat;
 }
 
+bool DsoSystem::checkNeedKf(PreKeyFrame *lastFrame) {
+  return lastFrame->globalFrameNum % 5 == 0;
+}
+
+void DsoSystem::marginalizeFrames() {
+  if (keyFrames.size() >= settingMaxKeyFrames)
+    for (int i = 0;
+         i < static_cast<int>(keyFrames.size()) - settingMaxKeyFrames - 1; ++i)
+      keyFrames.erase(keyFrames.begin());
+}
+
+void DsoSystem::activateNewOptimizedPoints() {
+  for (auto &kfp : keyFrames)
+    kfp.second.activateAllImmature();
+}
+
 void DsoSystem::addFrame(const cv::Mat &frame, int globalFrameNum) {
   LOG(INFO) << "add frame #" << globalFrameNum << std::endl;
 
@@ -108,15 +149,15 @@ void DsoSystem::addFrame(const cv::Mat &frame, int globalFrameNum) {
         keyFrames.insert(std::pair<int, KeyFrame>(
             keyFrame.preKeyFrame->globalFrameNum, std::move(keyFrame)));
 
-      bundleAdjuster = std::unique_ptr<BundleAdjuster>(new BundleAdjuster(cam));
+      BundleAdjuster bundleAdjuster(cam);
       for (auto &p : keyFrames)
-        bundleAdjuster->addKeyFrame(&p.second);
+        bundleAdjuster.addKeyFrame(&p.second);
 
       std::ofstream ofsBeforeAdjust(FLAGS_output_directory +
                                     "/before_adjust.ply");
       printLastKfInPly(ofsBeforeAdjust);
 
-      bundleAdjuster->adjust();
+      bundleAdjuster.adjust(settingMaxFirstBAIterations);
 
       if (FLAGS_switch_first_motion_to_GT) {
         SE3 worldToSecondKfGT =
@@ -139,7 +180,7 @@ void DsoSystem::addFrame(const cv::Mat &frame, int globalFrameNum) {
   }
 
   std::unique_ptr<PreKeyFrame> preKeyFrame(
-      new PreKeyFrame(frame, globalFrameNum));
+      new PreKeyFrame(cam, frame, globalFrameNum));
 
   SE3 baseKfToCur;
   AffineLightTransform<double> lightBaseKfToCur;
@@ -149,8 +190,8 @@ void DsoSystem::addFrame(const cv::Mat &frame, int globalFrameNum) {
 
   LOG(INFO) << "start tracking this frame" << std::endl;
 
-  std::tie(baseKfToCur, lightBaseKfToCur) =
-      frameTracker->trackFrame(ImagePyramid(preKeyFrame->frame), predicted, lightKfToLast);
+  std::tie(baseKfToCur, lightBaseKfToCur) = frameTracker->trackFrame(
+      ImagePyramid(preKeyFrame->frame()), predicted, lightKfToLast);
 
   LOG(INFO) << "tracking ended" << std::endl;
 
@@ -176,14 +217,35 @@ void DsoSystem::addFrame(const cv::Mat &frame, int globalFrameNum) {
 
   if (FLAGS_perform_tracking_check_GT) {
     std::cout << "perform comparison to ground truth" << std::endl;
-    checkLastTrackedGT(std::move(preKeyFrame));
+    checkLastTrackedGT(preKeyFrame.get());
   } else if (FLAGS_perform_tracking_check_stereo) {
     std::cout << "perform stereo check" << std::endl;
-    checkLastTrackedStereo(std::move(preKeyFrame));
+    checkLastTrackedStereo(preKeyFrame.get());
+  }
+
+  for (const auto &kfp : keyFrames)
+    for (auto &ip : kfp.second.immaturePoints)
+      ip->traceOn(*preKeyFrame, true);
+
+  if (checkNeedKf(preKeyFrame.get())) {
+    marginalizeFrames();
+    activateNewOptimizedPoints();
+
+    BundleAdjuster bundleAdjuster(cam);
+    for (auto &kfp : keyFrames)
+      bundleAdjuster.addKeyFrame(&kfp.second);
+    bundleAdjuster.adjust(settingMaxBAIterations);
+
+    int kfNum = preKeyFrame->globalFrameNum;
+    keyFrames.insert(
+        std::pair<int, KeyFrame>(kfNum, KeyFrame(std::move(preKeyFrame))));
+
+    frameTracker = std::unique_ptr<FrameTracker>(
+        new FrameTracker(camPyr, optimizedPointsOntoBaseKf()));
   }
 }
 
-void DsoSystem::checkLastTrackedGT(std::unique_ptr<PreKeyFrame> lastFrame) {
+void DsoSystem::checkLastTrackedGT(PreKeyFrame *lastFrame) {
   SE3 worldToBase = baseKeyFrame().preKeyFrame->worldToThis;
   SE3 worldToLast = lastFrame->worldToThis;
   SE3 baseToLast = worldToLast * worldToBase.inverse();
@@ -203,10 +265,10 @@ void DsoSystem::checkLastTrackedGT(std::unique_ptr<PreKeyFrame> lastFrame) {
             << "\nrotation error angle = " << rotErr << std::endl;
 }
 
-void DsoSystem::checkLastTrackedStereo(std::unique_ptr<PreKeyFrame> lastFrame) {
+void DsoSystem::checkLastTrackedStereo(PreKeyFrame *lastFrame) {
   cv::Mat1b frames[2];
-  frames[0] = keyFrames.begin()->second.preKeyFrame->frame;
-  frames[1] = lastFrame->frame;
+  frames[0] = keyFrames.begin()->second.preKeyFrame->frame();
+  frames[1] = lastFrame->frame();
 
   SE3 worldToFirst = keyFrames.rbegin()->second.preKeyFrame->worldToThis;
   SE3 worldToBase = baseKeyFrame().preKeyFrame->worldToThis;
@@ -232,7 +294,8 @@ void DsoSystem::checkLastTrackedStereo(std::unique_ptr<PreKeyFrame> lastFrame) {
 
 void DsoSystem::printLastKfInPly(std::ostream &out) {
   StdVector<std::pair<Vec2, double>> points;
-  points.reserve(lastKeyFrame().optimizedPoints.size() + lastKeyFrame().immaturePoints.size());
+  points.reserve(lastKeyFrame().optimizedPoints.size() +
+                 lastKeyFrame().immaturePoints.size());
   for (const auto &op : lastKeyFrame().optimizedPoints) {
     double d = op->depth();
     if (!std::isfinite(d) || d > 1e3)

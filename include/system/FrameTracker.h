@@ -10,7 +10,8 @@ namespace fishdso {
 
 class FrameTracker {
 public:
-  FrameTracker(const StdVector<CameraModel> &camPyr, const DepthedImagePyramid &baseFrame);
+  FrameTracker(const StdVector<CameraModel> &camPyr,
+               std::unique_ptr<DepthedImagePyramid> baseFrame);
 
   std::pair<SE3, AffineLightTransform<double>>
   trackFrame(const ImagePyramid &frame, const SE3 &coarseMotion,
@@ -24,7 +25,7 @@ private:
                 const AffineLightTransform<double> &coarseAffLight);
 
   const StdVector<CameraModel> &camPyr;
-  DepthedImagePyramid baseFrame;  
+  std::unique_ptr<DepthedImagePyramid> baseFrame;
   int displayWidth, displayHeight;
 };
 

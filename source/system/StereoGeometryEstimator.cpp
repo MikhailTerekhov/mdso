@@ -1,15 +1,12 @@
 #include "system/StereoGeometryEstimator.h"
 #include "system/SphericalPlus.h"
+#include "util/geometry.h"
 #include <RelativePoseEstimator.h>
 #include <ceres/ceres.h>
 #include <fstream>
 #include <glog/logging.h>
 
 namespace fishdso {
-
-Mat33 toEssential(const SE3 &motion) {
-  return SO3::hat(motion.translation()) * motion.rotationMatrix();
-}
 
 StereoGeometryEstimator::StereoGeometryEstimator(
     CameraModel *cam, const StdVector<std::pair<Vec2, Vec2>> &imgCorresps)
@@ -26,22 +23,13 @@ const std::vector<int> &StereoGeometryEstimator::inliersInds() const {
   return _inliersInds;
 }
 
-EIGEN_STRONG_INLINE Vec2 calcDepthsInCorresp(
-    const SE3 &motion, const std::pair<Vec3, Vec3> &rayCorresp) {
-  Mat32 A;
-  A.col(0) = motion.so3() * rayCorresp.first;
-  A.col(1) = -rayCorresp.second;
-
-  return A.fullPivHouseholderQr().solve(-motion.translation());
-}
-
 const std::vector<std::pair<double, double>> &
 StereoGeometryEstimator::depths() {
   if (!depthsEvaluated) {
     depthsEvaluated = true;
 
     for (int i : _inliersInds) {
-      Vec2 curDepths = calcDepthsInCorresp(motion, rays[i]);
+      Vec2 curDepths = triangulate(motion, rays[i].first, rays[i].second);
       _depths[i].first = curDepths[0];
       _depths[i].second = curDepths[1];
     }
@@ -120,7 +108,7 @@ int StereoGeometryEstimator::findInliersMotion(const SE3 &motion,
 
   newInlierInds.resize(0);
   for (int i : inliersInds) {
-    Vec2 depths = calcDepthsInCorresp(motion, rays[i]);
+    Vec2 depths = triangulate(motion, rays[i].first, rays[i].second);
     if (depths[0] > 0 && depths[1] > 0)
       newInlierInds.push_back(i);
   }

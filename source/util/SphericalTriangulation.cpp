@@ -1,5 +1,6 @@
 #include "util/SphericalTriangulation.h"
 #include "util/defs.h"
+#include "util/geometry.h"
 
 namespace fishdso {
 
@@ -10,18 +11,6 @@ Vec2 stereographicProject(Vec3 ray) {
   // std cout << "third component = " << (s * ray + (s - 1) * t)[2] <<
   // std::endl;
   return (s * ray + (s - 1) * t).head<2>();
-}
-
-bool isInSector(Vec3 ray, Vec3 *s[3]) {
-  static const Vec3 t(0.0, 0.0, 1.0);
-
-  Mat33 A;
-  for (int i = 0; i < 3; ++i)
-    A.col(i) = *s[i];
-  auto Qr = A.fullPivHouseholderQr();
-  Vec3 coeffsR = Qr.solve(ray);
-
-  return coeffsR[0] >= 0 && coeffsR[1] >= 0 && coeffsR[2] >= 0;
 }
 
 double sectorBadness(SphericalTriangulation::TrihedralSector *sec) {

@@ -9,9 +9,10 @@ int settingPyrLevelsUnused = 2;
 int dbg1 = 0, dbg2 = 0;
 
 FrameTracker::FrameTracker(const StdVector<CameraModel> &camPyr,
-                           const DepthedImagePyramid &baseFrame)
-    : camPyr(camPyr), baseFrame(baseFrame), displayWidth(camPyr[1].getWidth()),
-      displayHeight(camPyr[1].getHeight()) {}
+                           std::unique_ptr<DepthedImagePyramid> baseFrame)
+    : camPyr(camPyr), baseFrame(std::move(baseFrame)),
+      displayWidth(camPyr[1].getWidth()), displayHeight(camPyr[1].getHeight()) {
+}
 
 std::pair<SE3, AffineLightTransform<double>>
 FrameTracker::trackFrame(const ImagePyramid &frame, const SE3 &coarseMotion,
@@ -22,7 +23,7 @@ FrameTracker::trackFrame(const ImagePyramid &frame, const SE3 &coarseMotion,
   for (int i = settingPyrLevels - 1; i >= settingPyrLevelsUnused; --i) {
     LOG(INFO) << "track level #" << i << std::endl;
     std::tie(motion, affLight) =
-        trackPyrLevel(camPyr[i], baseFrame.images[i], baseFrame.depths[i],
+        trackPyrLevel(camPyr[i], baseFrame->images[i], baseFrame->depths[i],
                       frame.images[i], motion, affLight);
   }
 
@@ -229,8 +230,8 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
   for (Vec2 p : gotOutside) {
     putCross(
         dfr,
-        toCvPoint(p, scaleX, scaleY, cv::Point(0.5 * scaleX, 0.5 * scaleY)),
-        CV_BLACK, 4, 2);
+        toCvPoint(p, scaleX, scaleY, cv::Point(0.5 * scaleX, 0.5 * scaleY)), 4,
+        CV_BLACK, 2);
   }
 
   for (auto rsd : residuals) {

@@ -2,6 +2,7 @@
 #include "util/defs.h"
 #include "util/types.h"
 #include "util/util.h"
+#include "util/geometry.h"
 #include <opencv2/opencv.hpp>
 #include <queue>
 
@@ -229,27 +230,6 @@ EIGEN_STRONG_INLINE bool Triangulation::isIncident(Vertex *vert,
   return tri->vert[0] == vert || tri->vert[1] == vert || tri->vert[2] == vert;
 }
 
-EIGEN_STRONG_INLINE double cross2(const Vec2 &a, const Vec2 &b) {
-  return a[0] * b[1] - a[1] * b[0];
-}
-
-EIGEN_STRONG_INLINE bool isSameSide(const Vec2 &a, const Vec2 &b,
-                                    const Vec2 &p1, const Vec2 &p2) {
-  return cross2(b - a, p1 - a) * cross2(b - a, p2 - a) >= 0;
-}
-
-EIGEN_STRONG_INLINE bool isInsideTriangle(const Vec2 &a, const Vec2 &b,
-                                          const Vec2 &c, const Vec2 &p) {
-  return isSameSide(a, b, p, c) && isSameSide(a, c, p, b) &&
-         isSameSide(b, c, p, a);
-}
-
-EIGEN_STRONG_INLINE bool isABCDConvex(const Vec2 &a, const Vec2 &b,
-                                      const Vec2 &c, const Vec2 &d) {
-  return !(isInsideTriangle(b, c, d, a) || isInsideTriangle(a, c, d, b) ||
-           isInsideTriangle(a, b, d, c) || isInsideTriangle(a, b, c, d));
-}
-
 EIGEN_STRONG_INLINE bool isABLegal(const Vec2 &a, const Vec2 &b, const Vec2 &c,
                                    const Vec2 &d) {
   Vec2 da = a - d;
@@ -265,20 +245,6 @@ EIGEN_STRONG_INLINE bool isABLegal(const Vec2 &a, const Vec2 &b, const Vec2 &c,
   // clang-format on
 
   return checker.determinant() * cross2(ab, bc) <= 0;
-}
-
-EIGEN_STRONG_INLINE bool areEqual(const Vec2 &a, const Vec2 &b, double eps) {
-  return (a - b).norm() < eps;
-}
-
-EIGEN_STRONG_INLINE bool doesABcontain(const Vec2 &a, const Vec2 &b,
-                                       const Vec2 &p, double eps) {
-  Vec2 ap = p - a;
-  double abNorm = (b - a).norm();
-  Vec2 abN = (b - a) / abNorm;
-  double abNp = abN.dot(ap);
-  return std::abs(ap.dot(Vec2(abN[1], -abN[0]))) < eps && abNp >= -eps &&
-         abNp <= abNorm + eps;
 }
 
 EIGEN_STRONG_INLINE bool

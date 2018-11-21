@@ -43,12 +43,6 @@ CameraModel::CameraModel(int width, int height, double f, double cx, double cy)
             << "\nmap poly coeffs = " << mapPolyCoeffs.transpose() << std::endl;
 }
 
-int CameraModel::getWidth() const { return width; }
-
-int CameraModel::getHeight() const { return height; }
-
-Vec2 CameraModel::getImgCenter() const { return center * scale; }
-
 void CameraModel::normalize() {
   double wd = width, hd = height;
   Vec2 imcenter = center * scale;
@@ -70,6 +64,11 @@ void CameraModel::normalize() {
   double minZUnnorm = calcUnmapPoly(maxRadius);
   minZ = minZUnnorm / std::hypot(minZUnnorm, maxRadius);
   maxAngle = std::atan2(maxRadius, minZUnnorm);
+}
+
+bool CameraModel::isOnImage(const Vec2 &p, int border) {
+  return p[0] >= border && p[0] < (width - border) && p[1] >= border &&
+         p[1] <= (height - border);
 }
 
 double CameraModel::getImgRadiusByAngle(double observeAngle) const {

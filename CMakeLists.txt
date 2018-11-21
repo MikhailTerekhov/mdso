@@ -23,6 +23,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/util/types.h
     ${PROJECT_SOURCE_DIR}/include/util/defs.h
     ${PROJECT_SOURCE_DIR}/include/util/settings.h
+    ${PROJECT_SOURCE_DIR}/include/util/geometry.h
     ${PROJECT_SOURCE_DIR}/include/util/Triangulation.h
     ${PROJECT_SOURCE_DIR}/include/util/Terrain.h
     ${PROJECT_SOURCE_DIR}/include/util/SphericalTriangulation.h
@@ -47,6 +48,7 @@ set(dso_HEADER_FILES
 set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/util/util.cpp
     ${PROJECT_SOURCE_DIR}/source/util/settings.cpp
+    ${PROJECT_SOURCE_DIR}/source/util/geometry.cpp
     ${PROJECT_SOURCE_DIR}/source/util/Triangulation.cpp
     ${PROJECT_SOURCE_DIR}/source/util/Terrain.cpp
     ${PROJECT_SOURCE_DIR}/source/util/SphericalTriangulation.cpp
@@ -58,6 +60,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/system/DsoInitializer.cpp
     ${PROJECT_SOURCE_DIR}/source/system/PreKeyFrame.cpp
     ${PROJECT_SOURCE_DIR}/source/system/KeyFrame.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/ImmaturePoint.cpp
     ${PROJECT_SOURCE_DIR}/source/system/CameraModel.cpp
     ${PROJECT_SOURCE_DIR}/source/system/StereoMatcher.cpp
     ${PROJECT_SOURCE_DIR}/source/system/StereoGeometryEstimator.cpp
@@ -67,6 +70,10 @@ set(dso_SOURCE_FILES
 
 set(essietial_5pt_estimator_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/thirdparty/relative_pose_solver/relativeposeestimator_double.cpp
+)
+
+set_source_files_properties(essietial_5pt_estimator_SOURCE_FILES
+                           PROPERTIES COMPILE_FLAGS -O3
 )
 
 add_library(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES}

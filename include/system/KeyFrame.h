@@ -18,10 +18,11 @@ struct KeyFrame {
   static constexpr int PL = settingPyrLevels;
   static int adaptiveBlockSize;
 
-  KeyFrame(const cv::Mat &frameColored, int globalFrameNum);
+  KeyFrame(CameraModel *cam, const cv::Mat &frameColored, int globalFrameNum);
+  KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame);
 
   void activateAllImmature();
-  DepthedImagePyramid makePyramid();
+  std::unique_ptr<DepthedImagePyramid> makePyramid();
   void selectPointsDenser(int pointsNeeded);
 
   cv::Mat drawDepthedFrame(double minDepth, double maxDepth);
@@ -33,7 +34,6 @@ struct KeyFrame {
   StdUnorderedSet<std::unique_ptr<ImmaturePoint>> immaturePoints;
   StdUnorderedSet<std::unique_ptr<OptimizedPoint>> optimizedPoints;
 
-
 private:
   static void updateAdaptiveBlockSize(int pointsFound);
 
@@ -42,7 +42,6 @@ private:
   int lastBlockSize;
   int lastPointsFound;
   int lastPointsUsed;
-  bool areDepthsSet;
 };
 
 } // namespace fishdso

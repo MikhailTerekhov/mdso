@@ -17,10 +17,11 @@ struct OptimizedPoint {
   enum State { ACTIVE, OOB, OUTLIER };
 
   OptimizedPoint(const Vec2 &p)
-      : p(p), logInvDepth(std::nan("")), variance(1), state(OUTLIER) {}
-  OptimizedPoint(const ImmaturePoint &immaturePoint) : p(immaturePoint.p) {
+      : p(p), logInvDepth(std::nan("")), stddev(1), state(OUTLIER) {}
+  OptimizedPoint(const ImmaturePoint &immaturePoint)
+      : p(immaturePoint.p),
+        stddev((immaturePoint.maxDepth - immaturePoint.minDepth) / 2) {
     activate(immaturePoint.depth);
-    variance = immaturePoint.variance;
   }
 
   EIGEN_STRONG_INLINE void activate(double depth) {
@@ -32,7 +33,7 @@ struct OptimizedPoint {
 
   Vec2 p;
   double logInvDepth;
-  double variance;
+  double stddev;
   State state;
 };
 

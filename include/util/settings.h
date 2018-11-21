@@ -34,8 +34,13 @@ extern int settingHalfFillingFilterSize;
 // triangulation
 extern double settingEpsPointIsOnSegment;
 extern double settingEpsSamePoints;
-
 extern double settingTriangulationDrawPadding;
+
+// epipolar curve search
+extern int settingEpipolarOnImageTestCount;
+extern double settingEpipolarOutlierIntencityDiff;
+extern double settingMinSecondBestDistance;
+extern double settingMinOptimizedQuality;
 
 // common direct alignment parameters
 extern double settingMinAffineLigthtA;
@@ -53,10 +58,15 @@ constexpr int settingPyrLevels = 6;
 extern double settingTrackingOutlierIntensityDiff;
 
 // bundle adjustment
-constexpr int settingResidualPatternSize = 8;
+constexpr int settingResidualPatternSize = 9;
 extern Vec2 settingResidualPattern[settingResidualPatternSize];
+extern int settingResidualPatternHeight;
 extern double settingBAOutlierIntensityDiff;
 extern double settingMaxPointDepth;
+extern int settingMaxFirstBAIterations;
+extern int settingMaxBAIterations;
+
+extern int settingMaxKeyFrames;
 
 } // namespace fishdso
 

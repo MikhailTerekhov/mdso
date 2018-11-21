@@ -27,8 +27,12 @@ int settingHalfFillingFilterSize = 1;
 
 double settingEpsPointIsOnSegment = 1e-9;
 double settingEpsSamePoints = 1e-9;
-
 double settingTriangulationDrawPadding = 0.1;
+
+int settingEpipolarOnImageTestCount = 100;
+double settingEpipolarOutlierIntencityDiff = settingBAOutlierIntensityDiff;
+double settingMinSecondBestDistance = 4.0;
+double settingMinOptimizedQuality = 2.0;
 
 double settingMinAffineLigthtA = -std::log(1.1);
 double settingMaxAffineLigthtA = std::log(1.1);
@@ -40,13 +44,18 @@ double settingMaxDepth = 1e4;
 
 double settingGradientWeighingConstant = 50.0;
 
-double settingTrackingOutlierIntensityDiff = 12.0;
-double settingBAOutlierIntensityDiff = settingTrackingOutlierIntensityDiff;
+double settingTrackingOutlierIntensityDiff = settingBAOutlierIntensityDiff;
+double settingBAOutlierIntensityDiff = 12.0;
 double settingMaxPointDepth = 1e4;
+int settingMaxFirstBAIterations = 15;
+int settingMaxBAIterations = 10;
 
+int settingResidualPatternHeight = 2;
 Vec2 settingResidualPattern[settingResidualPatternSize] = {
-    Vec2(0, -2), Vec2(-1, -1), Vec2(1, -1), Vec2(-2, 0),
-    Vec2(0, 0),  Vec2(2, 0),   Vec2(-1, 1), Vec2(0, 2)};
+    Vec2(0, 0), Vec2(0, -2), Vec2(-1, -1), Vec2(1, -1), Vec2(-2, 0),
+    Vec2(2, 0), Vec2(-1, 1), Vec2(1, 1),   Vec2(0, 2)};
+
+int settingMaxKeyFrames = 3;
 
 } // namespace fishdso
 

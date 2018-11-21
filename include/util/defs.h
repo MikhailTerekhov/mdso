@@ -2,6 +2,7 @@
 #define INCLUDE_DEFS
 
 #include <cmath>
+#include<limits>
 #include <opencv2/core.hpp>
 
 namespace fishdso {
@@ -14,6 +15,8 @@ namespace fishdso {
 
 #define CV_BLACK_BYTE static_cast<unsigned char>(0)
 #define CV_WHITE_BYTE static_cast<unsigned char>(255)
+
+#define INF (std::numeric_limits<double>::infinity())
 
 } // namespace fishdso
 

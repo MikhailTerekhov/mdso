@@ -8,11 +8,20 @@ namespace fishdso {
 
 int KeyFrame::adaptiveBlockSize = settingInitialAdaptiveBlockSize;
 
-KeyFrame::KeyFrame(const cv::Mat &frameColored, int globalFrameNum)
+KeyFrame::KeyFrame(CameraModel *cam, const cv::Mat &frameColored, int globalFrameNum)
     : preKeyFrame(std::unique_ptr<PreKeyFrame>(
-          new PreKeyFrame(frameColored, globalFrameNum))),
+          new PreKeyFrame(cam, frameColored, globalFrameNum))),
       frameColored(frameColored) {
-  grad(preKeyFrame->frame, gradX, gradY, gradNorm);
+  grad(preKeyFrame->frame(), gradX, gradY, gradNorm);
+
+  int foundTotal = selectPoints(adaptiveBlockSize, settingInterestPointsUsed);
+  lastBlockSize = adaptiveBlockSize;
+  updateAdaptiveBlockSize(foundTotal);
+}
+
+KeyFrame::KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame)
+    : preKeyFrame(std::move(newPreKeyFrame)) {
+  grad(preKeyFrame->frame(), gradX, gradY, gradNorm);
 
   int foundTotal = selectPoints(adaptiveBlockSize, settingInterestPointsUsed);
   lastBlockSize = adaptiveBlockSize;
@@ -47,7 +56,7 @@ void KeyFrame::activateAllImmature() {
   immaturePoints.clear();
 }
 
-DepthedImagePyramid KeyFrame::makePyramid() {
+std::unique_ptr<DepthedImagePyramid> KeyFrame::makePyramid() {
   std::vector<cv::Point> points =
       reservedVector<cv::Point>(optimizedPoints.size());
   std::vector<double> depths = reservedVector<double>(optimizedPoints.size());
@@ -58,10 +67,11 @@ DepthedImagePyramid KeyFrame::makePyramid() {
       continue;
     points.push_back(toCvPoint(op->p));
     depths.push_back(op->depth());
-    weights.push_back(1 / std::sqrt(op->variance));
+    weights.push_back(1 / op->stddev);
   }
 
-  return DepthedImagePyramid(preKeyFrame->frame, points, depths, weights);
+  return std::make_unique<DepthedImagePyramid>(preKeyFrame->frame(), points,
+                                               depths, weights);
 }
 
 int KeyFrame::selectPoints(int blockSize, int pointsNeeded) {
@@ -100,8 +110,8 @@ int KeyFrame::selectPoints(int blockSize, int pointsNeeded) {
   immaturePoints.clear();
   for (int curL = 0; curL < LI; ++curL)
     for (cv::Point p : pointsOverThres[curL])
-      immaturePoints.insert(
-          std::unique_ptr<ImmaturePoint>(new ImmaturePoint(toVec2(p))));
+      immaturePoints.insert(std::unique_ptr<ImmaturePoint>(
+          new ImmaturePoint(preKeyFrame.get(), toVec2(p))));
 
   lastPointsFound = foundTotal;
   lastPointsUsed = immaturePoints.size();
@@ -122,8 +132,11 @@ cv::Mat KeyFrame::drawDepthedFrame(double minDepth, double maxDepth) {
   cv::Mat res = frameColored.clone();
 
   for (const auto &ip : immaturePoints)
-    cv::circle(res, toCvPoint(ip->p), 5,
+    putSquare(res, toCvPoint(ip->p), 5,
                toCvVec3bDummy(depthCol(ip->depth, minDepth, maxDepth)), 2);
+  for (const auto &op : optimizedPoints)
+    cv::circle(res, toCvPoint(op->p), 5,
+               toCvVec3bDummy(depthCol(op->depth(), minDepth, maxDepth)), 2);
 
   return res;
 }

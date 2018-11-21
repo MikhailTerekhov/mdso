@@ -4,9 +4,10 @@
 
 namespace fishdso {
 
-PreKeyFrame::PreKeyFrame(const cv::Mat &frameColored, int globalFrameNum)
-    : areDepthsSet(false), globalFrameNum(globalFrameNum) {
-  cv::cvtColor(frameColored, frame, cv::COLOR_BGR2GRAY);
-}
+PreKeyFrame::PreKeyFrame(CameraModel *cam, const cv::Mat &frameColored,
+                         int globalFrameNum)
+    : framePyr(cvtBgrToGray(frameColored)),
+      frameGrid(frame().data, 0, frame().rows, 0, frame().cols),
+      frameInterpolator(frameGrid), cam(cam), globalFrameNum(globalFrameNum) {}
 
 }; // namespace fishdso

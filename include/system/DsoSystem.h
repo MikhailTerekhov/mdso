@@ -6,6 +6,7 @@
 #include "system/DsoInitializer.h"
 #include "system/FrameTracker.h"
 #include "system/KeyFrame.h"
+#include "util/DepthedImagePyramid.h"
 #include "util/settings.h"
 #include <map>
 #include <memory>
@@ -38,13 +39,17 @@ private:
     return FLAGS_track_from_lask_kf ? lastKeyFrame() : lboKeyFrame();
   }
 
+  std::unique_ptr<DepthedImagePyramid> optimizedPointsOntoBaseKf();
+
   SE3 predictBaseKfToCur();
   SE3 purePredictBaseKfToCur();
 
-  void checkLastTrackedStereo(std::unique_ptr<PreKeyFrame> lastFrame);
-  void checkLastTrackedGT(std::unique_ptr<PreKeyFrame> lastFrame);
-  void checkLastTrackedInternal(std::unique_ptr<PreKeyFrame> lastFrame,
-                                const SE3 &refMotion);
+  void checkLastTrackedStereo(PreKeyFrame *lastFrame);
+  void checkLastTrackedGT(PreKeyFrame *lastFrame);
+
+  bool checkNeedKf(PreKeyFrame *lastFrame);
+  void marginalizeFrames();
+  void activateNewOptimizedPoints();
 
   static void printMotionInfo(std::ostream &out,
                               const StdMap<int, SE3> &motions);
@@ -56,7 +61,6 @@ private:
   bool isInitialized;
 
   std::unique_ptr<FrameTracker> frameTracker;
-  std::unique_ptr<BundleAdjuster> bundleAdjuster;
 
   std::map<int, KeyFrame> keyFrames;
   StdMap<int, SE3> worldToFrame;
