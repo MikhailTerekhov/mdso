@@ -1,8 +1,8 @@
 #include "util/Triangulation.h"
 #include "util/defs.h"
+#include "util/geometry.h"
 #include "util/types.h"
 #include "util/util.h"
-#include "util/geometry.h"
 #include <opencv2/opencv.hpp>
 #include <queue>
 
@@ -595,18 +595,19 @@ void Triangulation::fillPtrVectors() {
       trianglePtrs.push_back(t.get());
 }
 
-cv::Mat Triangulation::draw(int imgWidth, int imgHeight) const {
-  cv::Mat res(imgHeight, imgWidth, CV_8UC3, CV_BLACK);
+cv::Mat Triangulation::draw(int imgWidth, int imgHeight, cv::Scalar bgCol,
+                            cv::Scalar edgeCol) const {
+  cv::Mat res(imgHeight, imgWidth, CV_8UC3, bgCol);
 
   double p = settingTriangulationDrawPadding;
 
   Vec2 diag = (bottomRight - upperLeft) * (1 + 2 * p);
-  double scaleX = double(imgHeight) / diag[0];
-  double scaleY = double(imgWidth) / diag[1];
+  double scaleX = double(imgWidth) / diag[1];
+  double scaleY = double(imgHeight) / diag[0];
 
   cv::Point startFrom = cv::Point(int(p * imgWidth), int(p * imgHeight));
 
-  drawScaled(res, scaleX, scaleY, startFrom, CV_GREEN);
+  drawScaled(res, scaleX, scaleY, startFrom, edgeCol);
   return res;
 }
 
@@ -631,7 +632,7 @@ void Triangulation::drawScaled(cv::Mat &img, double scaleX, double scaleY,
                                  upperLeftPoint),
                        toCvPoint(e->vert[1]->pos - upperLeft, scaleX, scaleY,
                                  upperLeftPoint)};
-      cv::line(img, v[0], v[1], edgeCol, 1);
+      cv::line(img, v[0], v[1], edgeCol, 2);
     }
 
   //  for (auto p : _points) {

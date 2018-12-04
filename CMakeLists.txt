@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.0.2)
 
 project(dso-fisheye-ceres)
 
+set(TBB_ROOT ${PROJECT_SOURCE_DIR}/thirdparty/tbb)
+include(${TBB_ROOT}/cmake/TBBBuild.cmake)
+tbb_build(TBB_ROOT ${TBB_ROOT} CONFIG_DIR TBB_DIR MAKE_ARGS -j2)
+
+find_package(TBB REQUIRED)
 find_package(gflags REQUIRED)
 find_package(glog REQUIRED)
 find_package(Ceres REQUIRED)
@@ -16,6 +21,7 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
     ${PROJECT_SOURCE_DIR}/thirdparty/relative_pose_solver
+    ${PROJECT_SOURCE_DIR}/thirdparty/tbb/include
 )
 
 set(dso_HEADER_FILES
@@ -30,6 +36,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/util/SphericalTerrain.h
     ${PROJECT_SOURCE_DIR}/include/util/ImagePyramid.h
     ${PROJECT_SOURCE_DIR}/include/util/DepthedImagePyramid.h
+    ${PROJECT_SOURCE_DIR}/include/util/ObjectPool.h
     ${PROJECT_SOURCE_DIR}/include/system/AffineLightTransform.h
     ${PROJECT_SOURCE_DIR}/include/system/SphericalPlus.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoSystem.h

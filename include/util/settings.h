@@ -75,6 +75,7 @@ DECLARE_bool(run_max_RANSAC_iterations);
 DECLARE_bool(average_ORB_motion);
 DECLARE_bool(output_reproj_CDF);
 DECLARE_bool(switch_first_motion_to_GT);
+DECLARE_bool(draw_inlier_matches);
 
 DECLARE_bool(optimize_affine_light);
 

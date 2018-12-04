@@ -76,6 +76,7 @@ DEFINE_bool(switch_first_motion_to_GT, false,
             "estimated, motion we got will be replaced by the ground truth "
             "one. This is needed since stereo-estimation is poor for now, and "
             "tracking is usually performed relative to the second keyframe.");
+DEFINE_bool(draw_inlier_matches, false, "Debug output stereo inlier matches.");
 
 DEFINE_bool(optimize_affine_light, true,
             "Perform affine light transform optimization while tracking?");

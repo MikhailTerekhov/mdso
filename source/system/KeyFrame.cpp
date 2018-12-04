@@ -8,7 +8,8 @@ namespace fishdso {
 
 int KeyFrame::adaptiveBlockSize = settingInitialAdaptiveBlockSize;
 
-KeyFrame::KeyFrame(CameraModel *cam, const cv::Mat &frameColored, int globalFrameNum)
+KeyFrame::KeyFrame(CameraModel *cam, const cv::Mat &frameColored,
+                   int globalFrameNum)
     : preKeyFrame(std::unique_ptr<PreKeyFrame>(
           new PreKeyFrame(cam, frameColored, globalFrameNum))),
       frameColored(frameColored) {
@@ -109,9 +110,12 @@ int KeyFrame::selectPoints(int blockSize, int pointsNeeded) {
 
   immaturePoints.clear();
   for (int curL = 0; curL < LI; ++curL)
-    for (cv::Point p : pointsOverThres[curL])
-      immaturePoints.insert(std::unique_ptr<ImmaturePoint>(
-          new ImmaturePoint(preKeyFrame.get(), toVec2(p))));
+    for (cv::Point p : pointsOverThres[curL]) {
+      std::unique_ptr<ImmaturePoint> newImmature(
+          new ImmaturePoint(preKeyFrame.get(), toVec2(p)));
+      if (newImmature->state == ImmaturePoint::ACTIVE)
+        immaturePoints.insert(std::move(newImmature));
+    }
 
   lastPointsFound = foundTotal;
   lastPointsUsed = immaturePoints.size();
@@ -133,7 +137,7 @@ cv::Mat KeyFrame::drawDepthedFrame(double minDepth, double maxDepth) {
 
   for (const auto &ip : immaturePoints)
     putSquare(res, toCvPoint(ip->p), 5,
-               toCvVec3bDummy(depthCol(ip->depth, minDepth, maxDepth)), 2);
+              toCvVec3bDummy(depthCol(ip->depth, minDepth, maxDepth)), 2);
   for (const auto &op : optimizedPoints)
     cv::circle(res, toCvPoint(op->p), 5,
                toCvVec3bDummy(depthCol(op->depth(), minDepth, maxDepth)), 2);

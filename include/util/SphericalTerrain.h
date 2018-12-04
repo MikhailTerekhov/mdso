@@ -19,7 +19,7 @@ public:
             double maxDepth);
 
   void fillUncovered(cv::Mat &img, CameraModel *cam, cv::Scalar fillCol);
-  cv::Mat drawTangentTri(int imWidth, int imHeight);
+  cv::Mat drawTangentTri(int imWidth, int imHeight, cv::Scalar bgCol, cv::Scalar edgeCol);
 
 private:
   void drawDenseTriangle(cv::Mat &img, CameraModel *cam,

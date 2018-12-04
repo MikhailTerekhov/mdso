@@ -42,7 +42,7 @@ void filterOutStillMatches(std::vector<cv::DMatch> &matches,
 }
 
 SE3 StereoMatcher::match(cv::Mat frames[2], StdVector<Vec2> resPoints[2],
-                         std::vector<double> resDepths[2]) {
+                         std::vector<double> resDepths[2]) const {
   std::vector<cv::KeyPoint> keyPoints[2];
   cv::Mat descriptors[2];
   for (int i = 0; i < 2; ++i) {
@@ -84,17 +84,19 @@ SE3 StereoMatcher::match(cv::Mat frames[2], StdVector<Vec2> resPoints[2],
   LOG(INFO) << "inlier matches = " << geometryEstimator->inliersNum()
             << std::endl;
 
-  // std::vector<cv::DMatch> inlierMatches;
-  // inlierMatches.reserve(matches.size());
-  // for (int i : geometryEstimator->inliersInds())
-  // inlierMatches.push_back(matches[i]);
-  // cv::Mat imi, imi2;
-  // cv::drawMatches(frames[1], keyPoints[1], frames[0], keyPoints[0],
-  // inlierMatches, imi);
-  // cv::resize(imi, imi2, cv::Size(), 0.5, 0.5);
-  // cv::imshow("inlier matches", imi2);
-  // cv::waitKey();
-  // cv::destroyWindow("inlier matches");
+  if (FLAGS_draw_inlier_matches) {
+    std::vector<cv::DMatch> inlierMatches;
+    inlierMatches.reserve(matches.size());
+    for (int i : geometryEstimator->inliersInds())
+      inlierMatches.push_back(matches[i]);
+    cv::Mat imi, imi2;
+    cv::drawMatches(frames[1], keyPoints[1], frames[0], keyPoints[0],
+                    inlierMatches, imi);
+    cv::resize(imi, imi2, cv::Size(), 0.5, 0.5);
+    cv::imshow("inlier matches", imi2);
+    cv::waitKey();
+    cv::destroyWindow("inlier matches");
+  }
 
   for (int frameNum = 0; frameNum < 2; ++frameNum) {
     resPoints[frameNum].resize(0);

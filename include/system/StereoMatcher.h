@@ -15,7 +15,7 @@ public:
   StereoMatcher(CameraModel *cam);
 
   SE3 match(cv::Mat frames[2], StdVector<Vec2> resPoints[2],
-            std::vector<double> resDepths[2]);
+            std::vector<double> resDepths[2]) const;
 
   std::shared_ptr<Terrain> getBaseTerrain();
 

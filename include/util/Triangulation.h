@@ -65,7 +65,7 @@ public:
   Triangle *enclosingTriangle(const Vec2 &point);
   bool isIncidentToBoundary(Triangle *tri) const;
 
-  cv::Mat draw(int imgWidth, int imgHeight) const;
+  cv::Mat draw(int imgWidth, int imgHeight, cv::Scalar bgCol, cv::Scalar edgeCol) const;
   void draw(cv::Mat &img, cv::Scalar edgeCol) const;
 
   void drawCurved(CameraModel *cam, cv::Mat &img, cv::Scalar edgeCol) const;

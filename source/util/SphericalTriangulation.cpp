@@ -158,8 +158,10 @@ bool SphericalTriangulation::isInConvexDummy(Vec3 ray) {
   return false;
 }
 
-cv::Mat SphericalTriangulation::drawTangentTri(int imWidth, int imHeight) {
-  return tangentTriang.draw(imWidth, imHeight);
+cv::Mat SphericalTriangulation::drawTangentTri(int imWidth, int imHeight,
+                                               cv::Scalar bgCol,
+                                               cv::Scalar edgeCol) {
+  return tangentTriang.draw(imWidth, imHeight, bgCol, edgeCol);
 }
 
 void SphericalTriangulation::draw(cv::Mat &img, CameraModel *cam,

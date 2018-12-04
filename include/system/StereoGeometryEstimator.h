@@ -1,4 +1,5 @@
 #include "system/CameraModel.h"
+#include <util/ObjectPool.h>
 
 namespace fishdso {
 
@@ -29,7 +30,10 @@ private:
   StdVector<std::pair<Vec2, Vec2>> imgCorresps;
   std::vector<std::pair<Vec3, Vec3>> rays;
   std::vector<std::pair<double, double>> _depths;
+  
   std::vector<int> _inliersInds;
+  ObjectPool<std::vector<int>> inlierVectorsPool;
+
   SE3 motion;
   bool coarseFound, preciseFound, depthsEvaluated;
 };

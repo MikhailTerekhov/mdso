@@ -23,7 +23,8 @@ public:
 
   void fillUncovered(cv::Mat &img, CameraModel *cam, cv::Scalar fillCol);
 
-  cv::Mat drawTangentTri(int imWidth, int imHeight);
+  cv::Mat drawTangentTri(int imWidth, int imHeight, cv::Scalar bgCol,
+                         cv::Scalar edgeCol);
   void draw(cv::Mat &img, CameraModel *cam, cv::Scalar edgeCol);
 
 private:

@@ -12,6 +12,8 @@ namespace fishdso {
 struct ImmaturePoint {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   
+    enum State { ACTIVE, OOB };
+
   ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p);
 
   void traceOn(const PreKeyFrame &refFrame, bool debugOut);
@@ -24,6 +26,7 @@ struct ImmaturePoint {
   double quality;
   const PreKeyFrame *baseFrame;
   CameraModel *cam;
+  State state;
 };
 
 } // namespace fishdso

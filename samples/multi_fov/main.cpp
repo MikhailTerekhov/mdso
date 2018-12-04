@@ -4,6 +4,8 @@
 #include "util/settings.h"
 #include <gflags/gflags.h>
 #include <iostream>
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
 
 using namespace fishdso;
 
@@ -98,7 +100,40 @@ void runTracker(const MultiFovReader &reader, int startFrameNum,
       (baseToLast.so3() * firstToTrackedGT.so3().inverse()).log().norm();
 
   LOG(INFO) << "trans, rot errors = " << transErr << ' ' << rotErr << std::endl;
-  std::cout << "trans, rot errors = " << transErr << ' ' << rotErr << std::endl;
+}
+
+void visualizeTracking(const std::string &dataDir, int baseFrame,
+                       int trackCount, double depthsNoize) {
+  MultiFovReader reader(dataDir);
+
+  StdVector<SE3> worldToTracked;
+  std::vector<AffineLightTransform<double>> trackedAffLights;
+  runTracker(reader, baseFrame, trackCount, depthsNoize, worldToTracked,
+             trackedAffLights);
+  StdVector<SE3> worldToTrackedGT;
+  worldToTrackedGT.reserve(trackCount);
+  SE3 worldToFirst = reader.getWorldToFrameGT(baseFrame);
+  for (int frameNum = baseFrame + 1; frameNum <= baseFrame + trackCount;
+       ++frameNum)
+    worldToTrackedGT.push_back(reader.getWorldToFrameGT(frameNum) *
+                               worldToFirst.inverse());
+
+  std::ofstream trackedOfs("tracked_pos.txt");
+  std::ofstream gtOfs("ground_truth_pos.txt");
+
+  int i = 1;
+  for (const SE3 &motion : worldToTracked) {
+    trackedOfs << i++ << ' ';
+    putMotion(trackedOfs, motion);
+    trackedOfs << std::endl;
+  }
+
+  i = 1;
+  for (const SE3 &motion : worldToTrackedGT) {
+    gtOfs << i++ << ' ';
+    putMotion(gtOfs, motion);
+    gtOfs << std::endl;
+  }
 }
 
 void compareReprojThresholds(const MultiFovReader &reader) {
@@ -268,11 +303,216 @@ void compareDirectThresholds(const MultiFovReader &reader) {
 }
 
 DEFINE_double(depths_noize, 0.05,
-              "Multiplicative Gaussian noize with this standart deviation is "
+              "Multiplicative Gaussian noize with this standard deviation is "
               "applied to the base keyframe depths.");
 
-DEFINE_int32(start_frame, 2, "Frame to start tracking from.");
-DEFINE_int32(track_count, 50, "Number of frames to track.");
+DEFINE_int32(start_frame, 2, "First baseframe used.");
+DEFINE_int32(end_frame, 2450, "Last baseframe used.");
+DEFINE_int32(track_count, 30,
+             "Number of frames to track after each baseframe.");
+DEFINE_int32(min_stereo_displ, 5,
+             "Minimum number of frames to skip between stereo frames.");
+DEFINE_int32(max_stereo_displ, 5,
+             "Maximum number of frames to skip between stereo frames.");
+
+DEFINE_bool(collect_tracking, true, "Do we need to collect tracking errors?");
+DEFINE_bool(collect_stereo, true,
+            "Do we need to collect stereo matching errors?");
+DEFINE_bool(collect_BA, true,
+            "Do we need to collect post-stereo optimizations errors?");
+
+DEFINE_bool(run_parallel, true, "Collect all in parallel?");
+
+const int lastFrameNumGlobal = 2500;
+
+class CollectTracking {
+private:
+  const MultiFovReader *reader;
+  MatXX *transErrors;
+  MatXX *rotErrors;
+
+public:
+  CollectTracking(const MultiFovReader *reader, MatXX *transErrors,
+                  MatXX *rotErrors)
+      : reader(reader), transErrors(transErrors), rotErrors(rotErrors) {}
+
+  void operator()(const tbb::blocked_range<int> &range) const {
+    for (int baseFrameNum = range.begin(); baseFrameNum < range.end();
+         ++baseFrameNum) {
+      StdVector<SE3> worldToTracked;
+      std::vector<AffineLightTransform<double>> affLightToTracked;
+      runTracker(*reader, baseFrameNum, FLAGS_track_count, FLAGS_depths_noize,
+                 worldToTracked, affLightToTracked);
+
+      for (int trackedFrameNum = baseFrameNum + 1;
+           trackedFrameNum <= baseFrameNum + FLAGS_track_count;
+           ++trackedFrameNum) {
+        SE3 baseToLast = worldToTracked.back();
+        SE3 firstToTrackedGT =
+            reader->getWorldToFrameGT(trackedFrameNum + FLAGS_track_count) *
+            reader->getWorldToFrameGT(trackedFrameNum).inverse();
+        double transErr =
+            180. / M_PI *
+            angle(baseToLast.translation(), firstToTrackedGT.translation());
+        double rotErr =
+            180. / M_PI *
+            (baseToLast.so3() * firstToTrackedGT.so3().inverse()).log().norm();
+
+        LOG(INFO) << "trans, rot errors = " << transErr << ' ' << rotErr
+                  << std::endl;
+
+        (*transErrors)(baseFrameNum - FLAGS_start_frame,
+                       trackedFrameNum - baseFrameNum - 1) = transErr;
+        (*rotErrors)(baseFrameNum - FLAGS_start_frame,
+                     trackedFrameNum - baseFrameNum - 1) = rotErr;
+      }
+    }
+  }
+};
+
+class CollectStereo {
+private:
+  const MultiFovReader *reader;
+  const StereoMatcher *matcher;
+  MatXX *transErrors;
+  MatXX *rotErrors;
+  MatXX *depthErr25;
+  MatXX *depthErr50;
+  MatXX *depthErr75;
+  MatXX *depthErr95;
+
+public:
+  CollectStereo(const MultiFovReader *reader, const StereoMatcher *matcher,
+                MatXX *transErrors, MatXX *rotErrors, MatXX *depthErr25,
+                MatXX *depthErr50, MatXX *depthErr75, MatXX *depthErr95)
+      : reader(reader), matcher(matcher), transErrors(transErrors),
+        rotErrors(rotErrors), depthErr25(depthErr25), depthErr50(depthErr50),
+        depthErr75(depthErr75), depthErr95(depthErr95) {}
+
+  void operator()(const tbb::blocked_range<int> &range) const {
+    for (int baseFrameNum = range.begin(); baseFrameNum < range.end();
+         ++baseFrameNum)
+      for (int refFrameNum = baseFrameNum + FLAGS_min_stereo_displ;
+           refFrameNum <= baseFrameNum + FLAGS_max_stereo_displ;
+           ++refFrameNum) {
+        StdVector<Vec2> pnts[2];
+        std::vector<double> depths[2];
+        cv::Mat frames[2];
+        frames[0] = reader->getFrame(baseFrameNum);
+        frames[1] = reader->getFrame(refFrameNum);
+        SE3 estim = matcher->match(frames, pnts, depths);
+        SE3 gt = reader->getWorldToFrameGT(refFrameNum) *
+                 reader->getWorldToFrameGT(baseFrameNum).inverse();
+
+        std::vector<std::pair<int, double>> depthsGT[2];
+        cv::Mat1f depthsGTImg[2] = {reader->getDepths(baseFrameNum),
+                                    reader->getDepths(refFrameNum)};
+
+        for (int it = 0; it < 2; ++it) {
+          depthsGT[it].resize(depths[it].size());
+          for (int i = 0; i < pnts[it].size(); ++i)
+            depthsGT[it][i] = {i, depthsGTImg[it](toCvPoint(pnts[it][i]))};
+          std::sort(depthsGT[it].begin(), depthsGT[it].end(),
+                    [](auto a, auto b) { return a.second < b.second; });
+        }
+
+        auto median = depthsGT[0][depthsGT[0].size() / 2];
+        double medianMult = median.second / depths[0][median.first];
+
+        std::vector<double> errors;
+        errors.reserve(depths[0].size() + depths[1].size());
+        for (int it = 0; it < 2; ++it)
+          for (int i = 0; i < pnts[it].size(); ++i)
+            errors.push_back(
+                std::abs(medianMult * depths[it][depthsGT[it][i].first] -
+                         depthsGT[it][i].second) /
+                depthsGT[it][i].second);
+
+        std::sort(errors.begin(), errors.end());
+        double err25 = errors[errors.size() * 0.25];
+        double err50 = errors[errors.size() * 0.5];
+        double err75 = errors[errors.size() * 0.75];
+        double err95 = errors[errors.size() * 0.95];
+
+        double transErr =
+            180. / M_PI * angle(estim.translation(), gt.translation());
+        double rotErr =
+            180. / M_PI * (estim.so3() * gt.so3().inverse()).log().norm();
+
+        int row = baseFrameNum - FLAGS_start_frame;
+        int col = refFrameNum - baseFrameNum - FLAGS_min_stereo_displ;
+        (*transErrors)(row, col) = transErr;
+        (*rotErrors)(row, col) = rotErr;
+        (*depthErr25)(row, col) = err25;
+        (*depthErr50)(row, col) = err50;
+        (*depthErr75)(row, col) = err75;
+        (*depthErr95)(row, col) = err95;
+      }
+  }
+};
+
+void collectStatistics(const MultiFovReader &reader) {
+  if (FLAGS_collect_tracking) {
+    int lastFrameNum =
+        std::min(FLAGS_end_frame, lastFrameNumGlobal - FLAGS_track_count);
+
+    MatXX transErrors(lastFrameNum - FLAGS_start_frame + 1, FLAGS_track_count);
+    MatXX rotErrors(lastFrameNum - FLAGS_start_frame + 1, FLAGS_track_count);
+    tbb::parallel_for(
+        tbb::blocked_range<int>(FLAGS_start_frame, lastFrameNum + 1),
+        CollectTracking(&reader, &transErrors, &rotErrors));
+
+    std::ofstream trackingTable("tracking_err.csv");
+    for (int baseFrameNum = FLAGS_start_frame; baseFrameNum <= lastFrameNum;
+         baseFrameNum++)
+      for (int trackedFrameNum = baseFrameNum + 1;
+           trackedFrameNum <= baseFrameNum + FLAGS_track_count;
+           ++trackedFrameNum) {
+        trackingTable << baseFrameNum << "," << trackedFrameNum << ","
+                      << transErrors(baseFrameNum - FLAGS_start_frame,
+                                     trackedFrameNum - baseFrameNum - 1)
+                      << ","
+                      << rotErrors(baseFrameNum - FLAGS_start_frame,
+                                   trackedFrameNum - baseFrameNum - 1)
+                      << std::endl;
+      }
+    trackingTable.close();
+  }
+
+  if (FLAGS_collect_stereo) {
+    StereoMatcher matcher(reader.cam.get());
+    int lastFrameNum =
+        std::min(FLAGS_end_frame, lastFrameNumGlobal - FLAGS_max_stereo_displ);
+    int rows = lastFrameNum - FLAGS_start_frame + 1;
+    int cols = FLAGS_max_stereo_displ - FLAGS_min_stereo_displ + 1;
+    MatXX transErrors(rows, cols);
+    MatXX rotErrors(rows, cols);
+    MatXX depthErr25(rows, cols);
+    MatXX depthErr50(rows, cols);
+    MatXX depthErr75(rows, cols);
+    MatXX depthErr95(rows, cols);
+
+    tbb::parallel_for(
+        tbb::blocked_range<int>(FLAGS_start_frame, lastFrameNum + 1),
+        CollectStereo(&reader, &matcher, &transErrors, &rotErrors, &depthErr25,
+                      &depthErr50, &depthErr75, &depthErr95));
+    std::ofstream stereoTable("stereo_err.csv");
+    for (int baseFrameNum = FLAGS_start_frame; baseFrameNum <= lastFrameNum;
+         baseFrameNum++)
+      for (int refFrameNum = baseFrameNum + FLAGS_min_stereo_displ;
+           refFrameNum <= baseFrameNum + FLAGS_max_stereo_displ;
+           ++refFrameNum) {
+        int row = baseFrameNum - FLAGS_start_frame;
+        int col = refFrameNum - baseFrameNum - FLAGS_min_stereo_displ;
+        stereoTable << baseFrameNum << "," << refFrameNum << ","
+                    << transErrors(row, col) << "," << rotErrors(row, col)
+                    << "," << depthErr25(row, col) << ","
+                    << depthErr50(row, col) << "," << depthErr75(row, col)
+                    << "," << depthErr95(row, col) << std::endl;
+      }
+    stereoTable.close();
+  }
+}
 
 int main(int argc, char **argv) {
   std::string usage =
@@ -290,35 +530,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
   }
 
   MultiFovReader reader(argv[1]);
-
-  StdVector<SE3> worldToTracked;
-  std::vector<AffineLightTransform<double>> trackedAffLights;
-  runTracker(reader, FLAGS_start_frame, FLAGS_track_count, FLAGS_depths_noize,
-             worldToTracked, trackedAffLights);
-  StdVector<SE3> worldToTrackedGT;
-  worldToTrackedGT.reserve(FLAGS_track_count);
-  SE3 worldToFirst = reader.getWorldToFrameGT(FLAGS_start_frame);
-  for (int frameNum = FLAGS_start_frame + 1;
-       frameNum <= FLAGS_start_frame + FLAGS_track_count; ++frameNum)
-    worldToTrackedGT.push_back(reader.getWorldToFrameGT(frameNum) *
-                               worldToFirst.inverse());
-
-  std::ofstream trackedOfs(FLAGS_output_directory + "/tracked_pos.txt");
-  std::ofstream gtOfs(FLAGS_output_directory + "/ground_truth_pos.txt");
-
-  int i = 1;
-  for (const SE3 &motion : worldToTracked) {
-    trackedOfs << i++ << ' ';
-    putMotion(trackedOfs, motion);
-    trackedOfs << std::endl;
-  }
-
-  i = 1;
-  for (const SE3 &motion : worldToTrackedGT) {
-    gtOfs << i++ << ' ';
-    putMotion(gtOfs, motion);
-    gtOfs << std::endl;
-  }
+  collectStatistics(reader);
 
   return 0;
 }
