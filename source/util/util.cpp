@@ -48,21 +48,21 @@ void putMotion(std::ostream &out, const SE3 &motion) {
   out << motion.translation().transpose();
 }
 
-
 void putDot(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col) {
   cv::circle(img, pos, 4, col, cv::FILLED);
 }
 
-void putCross(cv::Mat &img, const cv::Point &pos, int size, const cv::Scalar &col,  
-              int thickness) {
+void putCross(cv::Mat &img, const cv::Point &pos, int size,
+              const cv::Scalar &col, int thickness) {
   cv::line(img, pos - cv::Point(size, size), pos + cv::Point(size, size), col,
            thickness);
   cv::line(img, pos + cv::Point(-size, size), pos + cv::Point(size, -size), col,
            thickness);
 }
-void putSquare(cv::Mat &img, const cv::Point &pos, int size, const cv::Scalar &col,
-               int thickness) {
-  cv::rectangle(img, pos - cv::Point(size, size), pos + cv::Point(size, size), col, thickness);
+void putSquare(cv::Mat &img, const cv::Point &pos, int size,
+               const cv::Scalar &col, int thickness) {
+  cv::rectangle(img, pos - cv::Point(size, size), pos + cv::Point(size, size),
+                col, thickness);
 }
 
 void grad(const cv::Mat &img, cv::Mat1d &gradX, cv::Mat1d &gradY,

@@ -150,9 +150,9 @@ void BundleAdjuster::adjust(int maxNumIterations) {
         secondKeyFrame->preKeyFrame->lightWorldToThis.data);
   }
 
-  std::cout << "points on the first = " << firstKeyFrame->optimizedPoints.size()
+  LOG(INFO) << "points on the first = " << firstKeyFrame->optimizedPoints.size()
             << std::endl;
-  std::cout << "points on the second = "
+  LOG(INFO) << "points on the second = "
             << secondKeyFrame->optimizedPoints.size() << std::endl;
 
   std::map<OptimizedPoint *, std::vector<DirectResidual *>> residualsFor;
@@ -215,7 +215,7 @@ void BundleAdjuster::adjust(int maxNumIterations) {
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_SCHUR;
   options.linear_solver_ordering = ordering;
-  options.minimizer_progress_to_stdout = true;
+  // options.minimizer_progress_to_stdout = true;
   options.max_num_iterations = maxNumIterations;
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
@@ -225,11 +225,11 @@ void BundleAdjuster::adjust(int maxNumIterations) {
 
   SE3 newMotion = secondKeyFrame->preKeyFrame->worldToThis;
 
-  std::cout << "old motion: "
+  LOG(INFO) << "old motion: "
             << "\ntrans = " << oldMotion.translation().transpose()
             << "\nrot =   " << oldMotion.unit_quaternion().coeffs().transpose()
             << std::endl;
-  std::cout << "new motion: "
+  LOG(INFO) << "new motion: "
             << "\ntrans = " << newMotion.translation().transpose()
             << "\nrot =   " << newMotion.unit_quaternion().coeffs().transpose()
             << std::endl;
@@ -240,20 +240,20 @@ void BundleAdjuster::adjust(int maxNumIterations) {
     transCos = -1;
   if (transCos > 1)
     transCos = 1;
-  std::cout << "diff angles: "
+  LOG(INFO) << "diff angles: "
             << "\ntrans = " << 180.0 / M_PI * std::acos(transCos) << "\nrot = "
             << 180.0 / M_PI *
                    (newMotion.so3().inverse() * oldMotion.so3()).log().norm()
             << std::endl;
 
-  std::cout << "aff light:\n" << secondKeyFrame->preKeyFrame->lightWorldToThis;
+  LOG(INFO) << "aff light:\n" << secondKeyFrame->preKeyFrame->lightWorldToThis;
 
   auto p = std::minmax_element(secondKeyFrame->optimizedPoints.begin(),
                                secondKeyFrame->optimizedPoints.end(),
                                [](const auto &op1, const auto &op2) {
                                  return op1->depth() < op2->depth();
                                });
-  std::cout << "minmax d = " << (*p.first)->depth() << ' '
+  LOG(INFO) << "minmax d = " << (*p.first)->depth() << ' '
             << (*p.second)->depth() << std::endl;
 
   std::vector<double> depthsVec;
@@ -332,13 +332,13 @@ void BundleAdjuster::adjust(int maxNumIterations) {
   // for (Vec2 p : oobKf1)
   // putCross(kf1Depthed, toCvPoint(p), 3, CV_BLACK, 2);
 
-  cv::imshow("first frame", kf1Depthed);
+  // cv::imshow("first frame", kf1Depthed);
   cv::imwrite(FLAGS_output_directory + "/firstf.jpg", kf1Depthed);
 
-  cv::imshow("after ba", kfDepths);
+  // cv::imshow("after ba", kfDepths);
   cv::imwrite(FLAGS_output_directory + "/adjusted.jpg", kfDepths);
 
-  cv::waitKey();
+  // cv::waitKey();
 
   cv::destroyAllWindows();
 }

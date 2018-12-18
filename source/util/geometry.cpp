@@ -19,19 +19,17 @@ double cross2(const Vec2 &a, const Vec2 &b) {
   return a[0] * b[1] - a[1] * b[0];
 }
 
-bool isSameSide(const Vec2 &a, const Vec2 &b,
-                                    const Vec2 &p1, const Vec2 &p2) {
+bool isSameSide(const Vec2 &a, const Vec2 &b, const Vec2 &p1, const Vec2 &p2) {
   return cross2(b - a, p1 - a) * cross2(b - a, p2 - a) >= 0;
 }
 
-bool isInsideTriangle(const Vec2 &a, const Vec2 &b,
-                                          const Vec2 &c, const Vec2 &p) {
+bool isInsideTriangle(const Vec2 &a, const Vec2 &b, const Vec2 &c,
+                      const Vec2 &p) {
   return isSameSide(a, b, p, c) && isSameSide(a, c, p, b) &&
          isSameSide(b, c, p, a);
 }
 
-bool isABCDConvex(const Vec2 &a, const Vec2 &b,
-                                      const Vec2 &c, const Vec2 &d) {
+bool isABCDConvex(const Vec2 &a, const Vec2 &b, const Vec2 &c, const Vec2 &d) {
   return !(isInsideTriangle(b, c, d, a) || isInsideTriangle(a, c, d, b) ||
            isInsideTriangle(a, b, d, c) || isInsideTriangle(a, b, c, d));
 }
@@ -40,8 +38,7 @@ bool areEqual(const Vec2 &a, const Vec2 &b, double eps) {
   return (a - b).norm() < eps;
 }
 
-bool doesABcontain(const Vec2 &a, const Vec2 &b,
-                                       const Vec2 &p, double eps) {
+bool doesABcontain(const Vec2 &a, const Vec2 &b, const Vec2 &p, double eps) {
   Vec2 ap = p - a;
   double abNorm = (b - a).norm();
   Vec2 abN = (b - a) / abNorm;
@@ -61,6 +58,5 @@ bool isInSector(const Vec3 &ray, Vec3 *s[3]) {
 
   return coeffsR[0] >= 0 && coeffsR[1] >= 0 && coeffsR[2] >= 0;
 }
-
 
 } // namespace fishdso

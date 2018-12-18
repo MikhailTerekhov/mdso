@@ -54,7 +54,8 @@ void SphericalTerrain::fillUncovered(cv::Mat &img, CameraModel *cam,
   triang.fillUncovered(img, cam, fillCol);
 }
 
-cv::Mat SphericalTerrain::drawTangentTri(int imWidth, int imHeight, cv::Scalar bgCol, cv::Scalar edgeCol) {
+cv::Mat SphericalTerrain::drawTangentTri(int imWidth, int imHeight,
+                                         cv::Scalar bgCol, cv::Scalar edgeCol) {
   return triang.drawTangentTri(imWidth, imHeight, bgCol, edgeCol);
 }
 

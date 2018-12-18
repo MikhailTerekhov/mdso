@@ -72,7 +72,6 @@ cv::Mat1f MultiFovReader::getDepths(int globalFrameNum) const {
     for (int x = 0; x < depths.cols; ++x)
       depthsIfs >> depths(y, x);
 
-
   return depths;
 }
 

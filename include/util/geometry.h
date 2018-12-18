@@ -11,8 +11,7 @@ bool isInsideTriangle(const Vec2 &a, const Vec2 &b, const Vec2 &c,
                       const Vec2 &p);
 bool isABCDConvex(const Vec2 &a, const Vec2 &b, const Vec2 &c, const Vec2 &d);
 bool areEqual(const Vec2 &a, const Vec2 &b, double eps);
-bool doesABcontain(const Vec2 &a, const Vec2 &b,
-                                       const Vec2 &p, double eps);
+bool doesABcontain(const Vec2 &a, const Vec2 &b, const Vec2 &p, double eps);
 bool isInSector(const Vec3 &ray, Vec3 *s[3]);
 
 } // namespace fishdso

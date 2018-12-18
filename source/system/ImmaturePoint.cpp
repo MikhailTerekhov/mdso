@@ -1,15 +1,15 @@
 #include "system/ImmaturePoint.h"
 #include "util/defs.h"
-#include "util/util.h"
 #include "util/geometry.h"
+#include "util/util.h"
 #include <ceres/internal/autodiff.h>
 #include <ceres/jet.h>
 
 namespace fishdso {
 
 ImmaturePoint::ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p)
-    : p(p), minDepth(0), maxDepth(INF),
-      quality(-1), baseFrame(baseFrame), cam(baseFrame->cam), state(ACTIVE) {
+    : p(p), minDepth(0), maxDepth(INF), quality(-1), baseFrame(baseFrame),
+      cam(baseFrame->cam), state(ACTIVE) {
   if (!cam->isOnImage(p, settingResidualPatternHeight)) {
     state = OOB;
     return;
@@ -27,7 +27,7 @@ ImmaturePoint::ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p)
 // when angle between the mapped ray and Oz is smaller then certain maxAngle, we
 // want to intersect the segment of search with the "well-mapped" part of the
 // sphere, i.e. z > z0.
-bool forceCamValidity(double maxObserveAngle, Vec3 &dir1, Vec3  &dir2) {
+bool forceCamValidity(double maxObserveAngle, Vec3 &dir1, Vec3 &dir2) {
   double angle1 = angle(dir1, Vec3(0., 0., 1.));
   double angle2 = angle(dir2, Vec3(0., 0., 1.));
   if (angle1 > maxObserveAngle && angle2 > maxObserveAngle)
@@ -176,7 +176,7 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame, bool debugOut) {
       double deltaAlpha = 1. / (mapJacobian * (dirMax - dirMin)).norm();
       alpha += sgn * deltaAlpha;
     } while (cam->isOnImage(point, settingResidualPatternHeight));
-  } 
+  }
 
   minDepth = bestDepth - 0.5;
   maxDepth = bestDepth + 0.5;

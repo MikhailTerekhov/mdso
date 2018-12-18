@@ -1,8 +1,8 @@
 #ifndef INCLUDE_DEPTHEDIMAGEPYRAMID
 #define INCLUDE_DEPTHEDIMAGEPYRAMID
 
-#include "util/settings.h"
 #include "util/ImagePyramid.h"
+#include "util/settings.h"
 #include <opencv2/opencv.hpp>
 
 namespace fishdso {

@@ -1,9 +1,9 @@
 #ifndef INCLUDE_KEYFRAME
 #define INCLUDE_KEYFRAME
 
-#include "system/PreKeyFrame.h"
 #include "system/ImmaturePoint.h"
 #include "system/OptimizedPoint.h"
+#include "system/PreKeyFrame.h"
 #include "util/DepthedImagePyramid.h"
 #include "util/settings.h"
 #include <Eigen/StdVector>

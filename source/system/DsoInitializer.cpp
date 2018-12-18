@@ -32,30 +32,37 @@ bool DsoInitializer::addFrame(const cv::Mat &frame, int globalFrameNum) {
 std::vector<KeyFrame> DsoInitializer::createKeyFrames(
     DsoInitializer::DebugOutputType debugOutputType) {
   if (FLAGS_use_ORB_initialization)
-    return createKeyFramesFromStereo(NORMAL, debugOutputType);
+    return createKeyFramesFromStereo(debugOutputType);
   else
     return createKeyFramesDummy();
 }
 
 std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
-    InterpolationType interpolationType,
     DsoInitializer::DebugOutputType debugOutputType) {
   StdVector<Vec2> keyPoints[2];
   std::vector<double> depths[2];
   SE3 motion = stereoMatcher.match(frames, keyPoints, depths);
 
+  return createKeyFramesDelaunay(cam, frames, globalFrameNums, keyPoints,
+                                 depths, motion, debugOutputType);
+}
+
+std::vector<KeyFrame> DsoInitializer::createKeyFramesDelaunay(
+    CameraModel *cam, cv::Mat frames[2], int frameNums[2],
+    StdVector<Vec2> initialPoints[2], std::vector<double> initialDepths[2],
+    const SE3 &firstToSecond, DebugOutputType debugOutputType) {
   std::vector<KeyFrame> keyFrames;
   for (int i = 0; i < 2; ++i) {
-    keyFrames.push_back(KeyFrame(cam, frames[i], globalFrameNums[i]));
+    keyFrames.push_back(KeyFrame(cam, frames[i], frameNums[i]));
     keyFrames.back().activateAllImmature();
   }
 
   keyFrames[0].preKeyFrame->worldToThis = SE3();
-  keyFrames[1].preKeyFrame->worldToThis = motion;
+  keyFrames[1].preKeyFrame->worldToThis = firstToSecond;
 
-  if (interpolationType == PLAIN) {
-    Terrain kpTerrains[2] = {Terrain(cam, keyPoints[0], depths[0]),
-                             Terrain(cam, keyPoints[1], depths[1])};
+  if (settingUsePlainTriangulation) {
+    Terrain kpTerrains[2] = {Terrain(cam, initialPoints[0], initialDepths[0]),
+                             Terrain(cam, initialPoints[1], initialDepths[1])};
     for (int i = 0; i < 2; ++i) {
       for (const auto &op : keyFrames[i].optimizedPoints) {
         double depth;
@@ -65,14 +72,14 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
           op->state = OptimizedPoint::OOB;
       }
     }
-  } else if (interpolationType == NORMAL) {
+  } else {
     std::vector<Vec3> depthedRays[2];
     for (int kfInd = 0; kfInd < 2; ++kfInd) {
-      depthedRays[kfInd].reserve(keyPoints[kfInd].size());
-      for (int i = 0; i < int(keyPoints[kfInd].size()); ++i)
+      depthedRays[kfInd].reserve(initialPoints[kfInd].size());
+      for (int i = 0; i < int(initialPoints[kfInd].size()); ++i)
         depthedRays[kfInd].push_back(
-            cam->unmap(keyPoints[kfInd][i].data()).normalized() *
-            depths[kfInd][i]);
+            cam->unmap(initialPoints[kfInd][i].data()).normalized() *
+            initialDepths[kfInd][i]);
     }
 
     SphericalTerrain kpTerrains[2] = {SphericalTerrain(depthedRays[0]),
@@ -90,7 +97,7 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
         }
 
         int pointsTotal = keyFrames[kfInd].optimizedPoints.size();
-        
+
         auto it = keyFrames[kfInd].optimizedPoints.begin();
         while (it != keyFrames[kfInd].optimizedPoints.end()) {
           if ((*it)->state != OptimizedPoint::ACTIVE)
@@ -119,7 +126,8 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
       cv::Mat img = keyFrames[1].frameColored.clone();
       // KpTerrains[1].draw(img, CV_GREEN);
 
-      insertDepths(img, keyPoints[1], depths[1], minDepthCol, maxDepthCol, true);
+      insertDepths(img, initialPoints[1], initialDepths[1], minDepthCol,
+                   maxDepthCol, true);
 
       // cv::circle(img, cv::Point(1268, 173), 7, CV_BLACK, 2);
 
@@ -182,7 +190,8 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
 
       // cv::imwrite("../../../../test/data/maps/uncovered/frame5.jpg", img);
       // cv::imshow("tangent", tangImg);
-      cv::imshow("interpolated", img);
+
+      // cv::imshow("interpolated", img);
       cv::imwrite(FLAGS_output_directory + "/triangulated.jpg", img);
 
       // int pyrDW = frames[1].cols / 2, pyrDH = frames[1].rows / 2;
@@ -199,9 +208,9 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
       // cv::resize(img, img2, cv::Size(), 0.5, 0.5);
       // }
 
-      cv::waitKey();
+      // cv::waitKey();
 
-      cv::destroyWindow("interpolated");
+      // cv::destroyWindow("interpolated");
     }
   }
 

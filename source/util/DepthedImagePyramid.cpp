@@ -9,7 +9,8 @@ DepthedImagePyramid::DepthedImagePyramid(const cv::Mat1b &baseImage,
                                          const std::vector<double> &depthsVec,
                                          const std::vector<double> &weightsVec)
     : ImagePyramid(baseImage) {
-  CHECK(points.size() == depthsVec.size() && depthsVec.size() == weightsVec.size());
+  CHECK(points.size() == depthsVec.size() &&
+        depthsVec.size() == weightsVec.size());
 
   depths[0] = cv::Mat1d(baseImage.rows, baseImage.cols, -1.0);
   cv::Mat1d weights = cv::Mat1d(baseImage.rows, baseImage.cols, 0.0);

@@ -12,7 +12,6 @@ class CameraModel;
 
 class DsoInitializer {
 public:
-  enum InterpolationType { NORMAL, PLAIN };
   enum DebugOutputType { NO_DEBUG, SPARSE_DEPTHS, FILLED_DEPTHS };
 
   DsoInitializer(CameraModel *cam);
@@ -22,10 +21,14 @@ public:
 
   std::vector<KeyFrame> createKeyFrames(DebugOutputType debugOutputType);
 
+  static std::vector<KeyFrame> createKeyFramesDelaunay(
+      CameraModel *cam, cv::Mat frames[2], int frameNums[2],
+      StdVector<Vec2> initialPoints[2], std::vector<double> initialDepths[2],
+      const SE3 &firstToSecond, DebugOutputType debugOutputType);
+
 private:
   std::vector<KeyFrame>
-  createKeyFramesFromStereo(InterpolationType interpolationType,
-                            DebugOutputType debugOutputType);
+  createKeyFramesFromStereo(DebugOutputType debugOutputType);
   std::vector<KeyFrame> createKeyFramesDummy();
 
   CameraModel *cam;

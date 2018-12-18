@@ -9,6 +9,8 @@
 
 using namespace fishdso;
 
+const int depthErrCount = 12;
+
 SE3 predictBaseToThisDummy(const SE3 &baseToLbo, const SE3 &baseToLast) {
   return (baseToLast * baseToLbo.inverse()) * baseToLast;
 }
@@ -31,13 +33,13 @@ void runTracker(const MultiFovReader &reader, int startFrameNum,
   std::mt19937 mt;
   std::normal_distribution<double> depthsErrDistr(1, depthsNoiseLevel);
 
-  for (const auto &ip : startFrame.immaturePoints) {
-    double gtDepth = depths(toCvPoint(ip->p));
+  for (const auto &op : startFrame.optimizedPoints) {
+    double gtDepth = depths(toCvPoint(op->p));
     double usedDepth = std::max(1e-3, gtDepth * depthsErrDistr(mt));
     // double usedDepth = gtDepth;
 
-    pnts.push_back(ip->p);
-    cvPnts.push_back(toCvPoint(ip->p));
+    pnts.push_back(op->p);
+    cvPnts.push_back(toCvPoint(op->p));
     weights.push_back(1.0);
     depthsVec.push_back(usedDepth);
   }
@@ -310,9 +312,9 @@ DEFINE_int32(start_frame, 2, "First baseframe used.");
 DEFINE_int32(end_frame, 2450, "Last baseframe used.");
 DEFINE_int32(track_count, 30,
              "Number of frames to track after each baseframe.");
-DEFINE_int32(min_stereo_displ, 5,
+DEFINE_int32(min_stereo_displ, 20,
              "Minimum number of frames to skip between stereo frames.");
-DEFINE_int32(max_stereo_displ, 5,
+DEFINE_int32(max_stereo_displ, 20,
              "Maximum number of frames to skip between stereo frames.");
 
 DEFINE_bool(collect_tracking, true, "Do we need to collect tracking errors?");
@@ -352,8 +354,7 @@ public:
             reader->getWorldToFrameGT(trackedFrameNum + FLAGS_track_count) *
             reader->getWorldToFrameGT(trackedFrameNum).inverse();
         double transErr =
-            180. / M_PI *
-            angle(baseToLast.translation(), firstToTrackedGT.translation());
+            (baseToLast.translation() - firstToTrackedGT.translation()).norm();
         double rotErr =
             180. / M_PI *
             (baseToLast.so3() * firstToTrackedGT.so3().inverse()).log().norm();
@@ -374,20 +375,26 @@ class CollectStereo {
 private:
   const MultiFovReader *reader;
   const StereoMatcher *matcher;
+  // transErrors and rotErrors are arrays of two MatXX, in which first ones
+  // stand for errors before BA, and the second ones -- after
   MatXX *transErrors;
   MatXX *rotErrors;
-  MatXX *depthErr25;
-  MatXX *depthErr50;
-  MatXX *depthErr75;
-  MatXX *depthErr95;
+
+  // depthErrors is an array of MatXX, in which
+  // 0..3  occupy .25, .5, .75, .95 quantiles of relative errors in keypoints
+  // 4..7  occupy the same quantiles after triangulation
+  // 8..11 occupy the same quantiles after BA
+
+  MatXX *depthErrors;
+
+  bool performBA;
 
 public:
   CollectStereo(const MultiFovReader *reader, const StereoMatcher *matcher,
-                MatXX *transErrors, MatXX *rotErrors, MatXX *depthErr25,
-                MatXX *depthErr50, MatXX *depthErr75, MatXX *depthErr95)
+                MatXX *transErrors, MatXX *rotErrors, MatXX *depthErrors,
+                bool performBA)
       : reader(reader), matcher(matcher), transErrors(transErrors),
-        rotErrors(rotErrors), depthErr25(depthErr25), depthErr50(depthErr50),
-        depthErr75(depthErr75), depthErr95(depthErr95) {}
+        rotErrors(rotErrors), depthErrors(depthErrors), performBA(performBA) {}
 
   void operator()(const tbb::blocked_range<int> &range) const {
     for (int baseFrameNum = range.begin(); baseFrameNum < range.end();
@@ -435,23 +442,86 @@ public:
         double err95 = errors[errors.size() * 0.95];
 
         double transErr =
-            180. / M_PI * angle(estim.translation(), gt.translation());
+            (medianMult * estim.translation() - gt.translation()).norm();
         double rotErr =
             180. / M_PI * (estim.so3() * gt.so3().inverse()).log().norm();
 
         int row = baseFrameNum - FLAGS_start_frame;
         int col = refFrameNum - baseFrameNum - FLAGS_min_stereo_displ;
-        (*transErrors)(row, col) = transErr;
-        (*rotErrors)(row, col) = rotErr;
-        (*depthErr25)(row, col) = err25;
-        (*depthErr50)(row, col) = err50;
-        (*depthErr75)(row, col) = err75;
-        (*depthErr95)(row, col) = err95;
+
+        transErrors[0](row, col) = transErr;
+        rotErrors[0](row, col) = rotErr;
+
+        depthErrors[0](row, col) = err25;
+        depthErrors[1](row, col) = err50;
+        depthErrors[2](row, col) = err75;
+        depthErrors[3](row, col) = err95;
+
+        if (performBA) {
+          int frameNums[2] = {baseFrameNum, refFrameNum};
+          std::vector<KeyFrame> keyFrames =
+              DsoInitializer::createKeyFramesDelaunay(
+                  reader->cam.get(), frames, frameNums, pnts, depths, estim,
+                  DsoInitializer::NO_DEBUG);
+
+          std::vector<double> errorsAfterTri;
+          errorsAfterTri.reserve(keyFrames[0].optimizedPoints.size() +
+                                 keyFrames[1].optimizedPoints.size());
+          for (int it = 0; it < 2; ++it)
+            for (const auto &op : keyFrames[it].optimizedPoints) {
+              double depthGT = depthsGTImg[it](toCvPoint(op->p));
+              errors.push_back(std::abs(medianMult * op->depth() - depthGT) /
+                               depthGT);
+            }
+          std::sort(errors.begin(), errors.end());
+          double err25Tri = errors[errors.size() * 0.25];
+          double err50Tri = errors[errors.size() * 0.5];
+          double err75Tri = errors[errors.size() * 0.75];
+          double err95Tri = errors[errors.size() * 0.95];
+
+          depthErrors[4](row, col) = err25Tri;
+          depthErrors[5](row, col) = err50Tri;
+          depthErrors[6](row, col) = err75Tri;
+          depthErrors[7](row, col) = err95Tri;
+
+          BundleAdjuster bundleAdjuster(reader->cam.get());
+          for (int it = 0; it < 2; ++it)
+            bundleAdjuster.addKeyFrame(&keyFrames[it]);
+          bundleAdjuster.adjust(settingMaxFirstBAIterations);
+
+          SE3 newEstim = keyFrames[1].preKeyFrame->worldToThis;
+          double newTransErr =
+              (medianMult * newEstim.translation() - gt.translation()).norm();
+          double newRotErr =
+              180. / M_PI * (newEstim.so3() * gt.so3().inverse()).log().norm();
+
+          transErrors[1](row, col) = newTransErr;
+          rotErrors[1](row, col) = newRotErr;
+
+          for (int it = 0; it < 2; ++it)
+            for (const auto &op : keyFrames[it].optimizedPoints) {
+              double depthGT = depthsGTImg[it](toCvPoint(op->p));
+              errors.push_back(std::abs(medianMult * op->depth() - depthGT) /
+                               depthGT);
+            }
+          std::sort(errors.begin(), errors.end());
+          double err25BA = errors[errors.size() * 0.25];
+          double err50BA = errors[errors.size() * 0.5];
+          double err75BA = errors[errors.size() * 0.75];
+          double err95BA = errors[errors.size() * 0.95];
+
+          depthErrors[8](row, col) = err25BA;
+          depthErrors[9](row, col) = err50BA;
+          depthErrors[10](row, col) = err75BA;
+          depthErrors[11](row, col) = err95BA;
+        }
       }
   }
 };
 
 void collectStatistics(const MultiFovReader &reader) {
+  std::cout << "Collect tracking errors..." << std::endl;
+
   if (FLAGS_collect_tracking) {
     int lastFrameNum =
         std::min(FLAGS_end_frame, lastFrameNumGlobal - FLAGS_track_count);
@@ -479,23 +549,27 @@ void collectStatistics(const MultiFovReader &reader) {
     trackingTable.close();
   }
 
+  std::cout << "Tracking errors collected. Start collecting "
+               "stereo-initialization errors..."
+            << std::endl;
+
   if (FLAGS_collect_stereo) {
     StereoMatcher matcher(reader.cam.get());
     int lastFrameNum =
         std::min(FLAGS_end_frame, lastFrameNumGlobal - FLAGS_max_stereo_displ);
     int rows = lastFrameNum - FLAGS_start_frame + 1;
     int cols = FLAGS_max_stereo_displ - FLAGS_min_stereo_displ + 1;
-    MatXX transErrors(rows, cols);
-    MatXX rotErrors(rows, cols);
-    MatXX depthErr25(rows, cols);
-    MatXX depthErr50(rows, cols);
-    MatXX depthErr75(rows, cols);
-    MatXX depthErr95(rows, cols);
+    MatXX transErrors[2] = {MatXX(rows, cols), MatXX(rows, cols)};
+    MatXX rotErrors[2] = {MatXX(rows, cols), MatXX(rows, cols)};
+    MatXX depthErrors[depthErrCount];
+    for (int i = 0; i < depthErrCount; ++i)
+      depthErrors[i] = MatXX(rows, cols);
 
     tbb::parallel_for(
         tbb::blocked_range<int>(FLAGS_start_frame, lastFrameNum + 1),
-        CollectStereo(&reader, &matcher, &transErrors, &rotErrors, &depthErr25,
-                      &depthErr50, &depthErr75, &depthErr95));
+        CollectStereo(&reader, &matcher, transErrors, rotErrors, depthErrors,
+                      FLAGS_collect_BA));
+
     std::ofstream stereoTable("stereo_err.csv");
     for (int baseFrameNum = FLAGS_start_frame; baseFrameNum <= lastFrameNum;
          baseFrameNum++)
@@ -505,13 +579,17 @@ void collectStatistics(const MultiFovReader &reader) {
         int row = baseFrameNum - FLAGS_start_frame;
         int col = refFrameNum - baseFrameNum - FLAGS_min_stereo_displ;
         stereoTable << baseFrameNum << "," << refFrameNum << ","
-                    << transErrors(row, col) << "," << rotErrors(row, col)
-                    << "," << depthErr25(row, col) << ","
-                    << depthErr50(row, col) << "," << depthErr75(row, col)
-                    << "," << depthErr95(row, col) << std::endl;
+                    << transErrors[0](row, col) << "," << rotErrors[0](row, col)
+                    << "," << transErrors[1](row, col) << ","
+                    << rotErrors[1](row, col) << ",";
+        for (int i = 0; i < depthErrCount - 1; ++i)
+          stereoTable << depthErrors[i](row, col) << ",";
+        stereoTable << depthErrors[depthErrCount - 1](row, col) << std::endl;
       }
     stereoTable.close();
   }
+
+  std::cout << "Stereo errors collected. Terminating." << std::endl;
 }
 
 int main(int argc, char **argv) {
@@ -528,6 +606,9 @@ It should contain "info" and "data" subdirectories.)abacaba";
     std::cerr << "Wrong number of arguments!\n" << usage << std::endl;
     return 1;
   }
+
+  // visualizeTracking(argv[1], FLAGS_start_frame, FLAGS_track_count,
+  // FLAGS_depths_noize);
 
   MultiFovReader reader(argv[1]);
   collectStatistics(reader);

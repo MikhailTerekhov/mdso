@@ -18,14 +18,14 @@ def extract_motions(fname):
     return motions
 
 
-def draw_motions(axes, motions, color):
+def draw_motions(axes, motions, color, label):
     centers = np.array([-np.matmul(mot[1].T, mot[0]) for mot in motions])
     dir_vects = np.array([mot[1][2, :] for mot in motions])
 
     axes.quiver(centers[:, 0], centers[:, 1], centers[:, 2],
               dir_vects[:, 0], dir_vects[:, 1], dir_vects[:, 2], 
                 color=color, normalize=True, arrow_length_ratio=0.2, 
-                length=0.15)
+                length=0.15, label=label)
 
 def main(argv):
     if (len(argv) != 2):
@@ -62,19 +62,31 @@ def main(argv):
     fig = plt.figure()
     ax = Axes3D(fig)
 
+    ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax.zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+
+    ax.yaxis._axinfo["grid"]['color'] =  (1,1,1,0)
+    ax.set_yticks([])
+
+    ax.view_init(azim=-90, elev=0)
+
     xylim = 4
     ax.set_xlim3d(-xylim, xylim)
     ax.set_ylim3d(-xylim, xylim)
     ax.set_zlim3d(0, 2 * xylim)
 
-    draw_motions(ax, actual, 'orange')
+    draw_motions(ax, actual, 'orange', 'полученая оценка')
     if has_predicted:
         draw_motions(ax, predicted, 'blue')
     if has_ground_truth:
-        draw_motions(ax, ground_truth, 'green')
+        draw_motions(ax, ground_truth, 'green', 'точная траектория')
     elif has_stereo_matched:
         draw_motions(ax, stereo_matched, 'green')
 
+    ax.scatter3D([0], [0], [0], color='black', label='базовый кадр')
+
+    ax.legend()
     plt.show()
 
 if __name__ == "__main__":

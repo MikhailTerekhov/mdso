@@ -9,4 +9,4 @@ ImagePyramid::ImagePyramid(const cv::Mat1b &baseImage) {
     images[lvl] = boxFilterPyrUp<unsigned char>(images[lvl - 1]);
 }
 
-}
+} // namespace fishdso

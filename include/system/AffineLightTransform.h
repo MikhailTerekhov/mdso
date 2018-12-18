@@ -3,8 +3,8 @@
 
 #include <Eigen/Core>
 #include <ceres/ceres.h>
-#include <ostream>
 #include <cstring>
+#include <ostream>
 
 namespace fishdso {
 

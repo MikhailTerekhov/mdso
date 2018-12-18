@@ -1,18 +1,18 @@
 #ifndef INCLUDE_IMMATUREPOINT
 #define INCLUDE_IMMATUREPOINT
 
-#include "util/types.h"
-#include "util/settings.h"
-#include "system/CameraModel.h"
 #include "system/AffineLightTransform.h"
+#include "system/CameraModel.h"
 #include "system/PreKeyFrame.h"
+#include "util/settings.h"
+#include "util/types.h"
 
 namespace fishdso {
 
 struct ImmaturePoint {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  
-    enum State { ACTIVE, OOB };
+
+  enum State { ACTIVE, OOB };
 
   ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p);
 

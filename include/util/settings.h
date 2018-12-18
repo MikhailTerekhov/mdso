@@ -23,6 +23,8 @@ extern int settingRansacMaxIter;
 extern double settingInitKeypointsObserveAngle;
 extern double settingMatchNonMove;
 extern int settingFirstFramesSkip;
+extern bool settingUsePlainTriangulation;
+
 constexpr int settingEssentialMinimalSolveN = 5;
 extern double settingEssentialSuccessProb;
 extern double settingEssentialReprojErrThreshold;

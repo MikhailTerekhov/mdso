@@ -1,8 +1,8 @@
 #ifndef INCLUDE_PREKEYFRAME
 #define INCLUDE_PREKEYFRAME
 
-#include "system/CameraModel.h"
 #include "system/AffineLightTransform.h"
+#include "system/CameraModel.h"
 #include "util/ImagePyramid.h"
 #include "util/settings.h"
 #include "util/types.h"
@@ -17,14 +17,15 @@ struct PreKeyFrame {
 
   static constexpr int PL = settingPyrLevels;
 
-  PreKeyFrame(CameraModel *cam, const cv::Mat &frameColored, int globalFrameNum);
+  PreKeyFrame(CameraModel *cam, const cv::Mat &frameColored,
+              int globalFrameNum);
 
   cv::Mat drawDepthedFrame(int pyrLevel, double minDepth, double maxDepth);
 
   ImagePyramid framePyr;
   EIGEN_STRONG_INLINE cv::Mat1b &frame() { return framePyr[0]; }
   EIGEN_STRONG_INLINE const cv::Mat1b &frame() const { return framePyr[0]; }
-  
+
   ceres::Grid2D<unsigned char, 1> frameGrid;
   ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> frameInterpolator;
   CameraModel *cam;
