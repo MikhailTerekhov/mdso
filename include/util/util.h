@@ -21,8 +21,6 @@ void setDepthColBounds(const std::vector<double> &depths);
 
 void putMotion(std::ostream &out, const SE3 &motion);
 
-double angle(const Vec3 &a, const Vec3 &b);
-
 void putDot(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col);
 void putCross(cv::Mat &img, const cv::Point &pos, int size,
               const cv::Scalar &col, int thickness);

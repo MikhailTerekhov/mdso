@@ -202,6 +202,7 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
 
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_QR;
+  options.num_threads = FLAGS_num_threads;
   // options.minimizer_progress_to_stdout = true;
   // options.max_num_iterations = 10;
   ceres::Solver::Summary summary;

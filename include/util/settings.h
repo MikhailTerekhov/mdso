@@ -72,6 +72,8 @@ extern int settingMaxKeyFrames;
 
 } // namespace fishdso
 
+DECLARE_int32(num_threads);
+
 DECLARE_bool(use_ORB_initialization);
 DECLARE_bool(run_max_RANSAC_iterations);
 DECLARE_bool(average_ORB_motion);

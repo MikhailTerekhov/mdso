@@ -1,7 +1,11 @@
+#define EIGEN_DONT_PARALLELIZE
+
 #include "MultiFovReader.h"
 #include "system/DsoSystem.h"
 #include "system/StereoMatcher.h"
+#include "util/geometry.h"
 #include "util/settings.h"
+#include <ceres/solver.h>
 #include <gflags/gflags.h>
 #include <iostream>
 #include <tbb/blocked_range.h>
@@ -520,6 +524,8 @@ public:
 };
 
 void collectStatistics(const MultiFovReader &reader) {
+  FLAGS_num_threads = 1;
+
   std::cout << "Collect tracking errors..." << std::endl;
 
   if (FLAGS_collect_tracking) {
@@ -528,9 +534,14 @@ void collectStatistics(const MultiFovReader &reader) {
 
     MatXX transErrors(lastFrameNum - FLAGS_start_frame + 1, FLAGS_track_count);
     MatXX rotErrors(lastFrameNum - FLAGS_start_frame + 1, FLAGS_track_count);
-    tbb::parallel_for(
-        tbb::blocked_range<int>(FLAGS_start_frame, lastFrameNum + 1),
-        CollectTracking(&reader, &transErrors, &rotErrors));
+    if (FLAGS_run_parallel) {
+      tbb::parallel_for(
+          tbb::blocked_range<int>(FLAGS_start_frame, lastFrameNum + 1),
+          CollectTracking(&reader, &transErrors, &rotErrors));
+    } else {
+      CollectTracking(&reader, &transErrors, &rotErrors)(
+          tbb::blocked_range<int>(FLAGS_start_frame, lastFrameNum + 1));
+    }
 
     std::ofstream trackingTable("tracking_err.csv");
     for (int baseFrameNum = FLAGS_start_frame; baseFrameNum <= lastFrameNum;
@@ -565,10 +576,16 @@ void collectStatistics(const MultiFovReader &reader) {
     for (int i = 0; i < depthErrCount; ++i)
       depthErrors[i] = MatXX(rows, cols);
 
-    tbb::parallel_for(
-        tbb::blocked_range<int>(FLAGS_start_frame, lastFrameNum + 1),
-        CollectStereo(&reader, &matcher, transErrors, rotErrors, depthErrors,
-                      FLAGS_collect_BA));
+    if (FLAGS_run_parallel) {
+      tbb::parallel_for(
+          tbb::blocked_range<int>(FLAGS_start_frame, lastFrameNum + 1),
+          CollectStereo(&reader, &matcher, transErrors, rotErrors, depthErrors,
+                        FLAGS_collect_BA));
+    } else {
+      CollectStereo(&reader, &matcher, transErrors, rotErrors, depthErrors,
+                    FLAGS_collect_BA)(
+          tbb::blocked_range<int>(FLAGS_start_frame, lastFrameNum + 1));
+    }
 
     std::ofstream stereoTable("stereo_err.csv");
     for (int baseFrameNum = FLAGS_start_frame; baseFrameNum <= lastFrameNum;

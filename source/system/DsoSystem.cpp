@@ -2,6 +2,7 @@
 #include "system/AffineLightTransform.h"
 #include "system/StereoMatcher.h"
 #include "util/settings.h"
+#include "util/geometry.h"
 #include <glog/logging.h>
 
 namespace fishdso {
@@ -225,7 +226,7 @@ void DsoSystem::addFrame(const cv::Mat &frame, int globalFrameNum) {
 
   for (const auto &kfp : keyFrames)
     for (auto &ip : kfp.second.immaturePoints)
-      ip->traceOn(*preKeyFrame, true);
+      ip->traceOn(*preKeyFrame, ImmaturePoint::NO_DEBUG);
 
   if (checkNeedKf(preKeyFrame.get())) {
     marginalizeFrames();

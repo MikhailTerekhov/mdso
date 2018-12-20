@@ -61,6 +61,8 @@ int settingMaxKeyFrames = 3;
 
 } // namespace fishdso
 
+DEFINE_int32(num_threads, 3, "Number of threads for Ceres Solver to use.");
+
 DEFINE_bool(use_ORB_initialization, true,
             "Use keypoint-based stereomatching on first two keyframes?");
 DEFINE_bool(

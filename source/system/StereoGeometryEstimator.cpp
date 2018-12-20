@@ -444,6 +444,7 @@ SE3 StereoGeometryEstimator::findPreciseMotion() {
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_QR;
   // options.minimizer_progress_to_stdout = true;
+  options.num_threads = FLAGS_num_threads;
   options.max_num_iterations = 10;
   ceres::Solver::Summary summary;
 

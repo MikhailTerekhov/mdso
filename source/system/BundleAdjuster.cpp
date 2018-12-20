@@ -2,8 +2,9 @@
 #include "system/AffineLightTransform.h"
 #include "system/SphericalPlus.h"
 #include "util/defs.h"
+#include "util/geometry.h"
 #include "util/util.h"
-#include <ceres/ceres.h>
+#include <ceres/ceres.h> 
 #include <ceres/cubic_interpolation.h>
 
 namespace fishdso {
@@ -217,6 +218,7 @@ void BundleAdjuster::adjust(int maxNumIterations) {
   options.linear_solver_ordering = ordering;
   // options.minimizer_progress_to_stdout = true;
   options.max_num_iterations = maxNumIterations;
+  options.num_threads = FLAGS_num_threads;
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
 

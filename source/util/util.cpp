@@ -15,15 +15,6 @@ namespace fishdso {
 cv::Mat dbg;
 double minDepthCol = 0, maxDepthCol = 0;
 
-double angle(const Vec3 &a, const Vec3 &b) {
-  double cosAngle = a.normalized().dot(b.normalized());
-  if (cosAngle < -1)
-    cosAngle = -1;
-  else if (cosAngle > 1)
-    cosAngle = 1;
-  return std::acos(cosAngle);
-}
-
 void setDepthColBounds(const std::vector<double> &depths) {
   std::vector<double> sorted = depths;
   std::sort(sorted.begin(), sorted.end());

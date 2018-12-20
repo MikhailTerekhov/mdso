@@ -13,10 +13,11 @@ struct ImmaturePoint {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   enum State { ACTIVE, OOB };
+  enum TracingDebugType { NO_DEBUG, DRAW_EPIPOLE };
 
   ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p);
 
-  void traceOn(const PreKeyFrame &refFrame, bool debugOut);
+  void traceOn(const PreKeyFrame &refFrame, TracingDebugType debugType);
 
   Vec2 p;
   Vec3 baseDirections[settingResidualPatternSize];
