@@ -230,23 +230,6 @@ EIGEN_STRONG_INLINE bool Triangulation::isIncident(Vertex *vert,
   return tri->vert[0] == vert || tri->vert[1] == vert || tri->vert[2] == vert;
 }
 
-EIGEN_STRONG_INLINE bool isABLegal(const Vec2 &a, const Vec2 &b, const Vec2 &c,
-                                   const Vec2 &d) {
-  Vec2 da = a - d;
-  Vec2 db = b - d;
-  Vec2 dc = c - d;
-  Vec2 ab = b - a;
-  Vec2 bc = c - b;
-  Mat33 checker;
-  // clang-format off
-  checker << da[0], da[1], da.squaredNorm(),
-             db[0], db[1], db.squaredNorm(),
-             dc[0], dc[1], dc.squaredNorm();
-  // clang-format on
-
-  return checker.determinant() * cross2(ab, bc) <= 0;
-}
-
 EIGEN_STRONG_INLINE bool
 Triangulation::doesContain(Triangulation::Triangle *tri,
                            const Vec2 &point) const {
@@ -292,7 +275,7 @@ EIGEN_STRONG_INLINE bool Triangulation::isEdgeLegal(Edge *edge) const {
   if (isInc1Bound || isInc2Bound)
     return !isABCDConvex(a, c, b, d);
 
-  return !isABCDConvex(a, c, b, d) || isABLegal(a, b, c, d);
+  return !isABCDConvex(a, c, b, d) || isABDelaunay(a, b, c, d);
 }
 
 Triangulation::Triangle *Triangulation::enclosingTriangle(const Vec2 &point) {

@@ -19,20 +19,6 @@ public:
 
   typedef std::vector<const Vertex *>::const_iterator VertexIterator;
 
-  //  class VertexIterator {
-  //    friend class Triangulation;
-
-  //  public:
-  //    Vertex *operator*() { return triang->operator[](i); }
-
-  //  private:
-  //    VertexIterator(const Triangulation *triang, int i) : triang(triang),
-  //    i(i) {}
-
-  //    const Triangulation *triang;
-  //    int i;
-  //  };
-
   struct Vertex {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     Vec2 pos;

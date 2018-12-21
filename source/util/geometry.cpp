@@ -1,6 +1,6 @@
 #include "util/geometry.h"
-#include <glog/logging.h>
 #include <cmath>
+#include <glog/logging.h>
 
 namespace fishdso {
 
@@ -41,8 +41,8 @@ bool isInsideTriangle(const Vec2 &a, const Vec2 &b, const Vec2 &c,
 }
 
 bool isABCDConvex(const Vec2 &a, const Vec2 &b, const Vec2 &c, const Vec2 &d) {
-  return !(isInsideTriangle(b, c, d, a) || isInsideTriangle(a, c, d, b) ||
-           isInsideTriangle(a, b, d, c) || isInsideTriangle(a, b, c, d));
+  return isSameSide(a, b, c, d) && isSameSide(b, c, a, d) &&
+         isSameSide(c, d, a, b) && isSameSide(d, a, b, c);
 }
 
 bool areEqual(const Vec2 &a, const Vec2 &b, double eps) {
@@ -58,9 +58,34 @@ bool doesABcontain(const Vec2 &a, const Vec2 &b, const Vec2 &p, double eps) {
          abNp <= abNorm + eps;
 }
 
-bool isInSector(const Vec3 &ray, Vec3 *s[3]) {
-  static const Vec3 t(0.0, 0.0, 1.0);
+bool isABDelaunay(const Vec2 &a, const Vec2 &b, const Vec2 &c,
+                                   const Vec2 &d) {
+  Vec2 da = a - d;
+  Vec2 db = b - d;
+  Vec2 dc = c - d;
+  Vec2 ab = b - a;
+  Vec2 bc = c - b;
+  Mat33 checker;
+  // clang-format off
+  checker << da[0], da[1], da.squaredNorm(),
+             db[0], db[1], db.squaredNorm(),
+             dc[0], dc[1], dc.squaredNorm();
+  // clang-format on
 
+  return checker.determinant() * cross2(ab, bc) <= 0;
+}
+
+bool doesABIntersectCD(const Vec2 &a, const Vec2 &b, const Vec2 &c,
+                       const Vec2 &d) {
+  if (!(((a[0] < c[0] && c[0] < b[0]) || (a[0] < d[0] && d[0] < b[0])) &&
+        ((a[1] < c[1] && c[1] < b[1]) || (a[1] < d[1] && d[1] < b[1]))))
+    return false;
+
+  return !isSameSide(a, b, c, d) && !isSameSide(c, d, a, b);
+}
+
+
+bool isInSector(const Vec3 &ray, Vec3 *s[3]) {
   Mat33 A;
   for (int i = 0; i < 3; ++i)
     A.col(i) = *s[i];
@@ -73,9 +98,10 @@ bool isInSector(const Vec3 &ray, Vec3 *s[3]) {
 bool intersectOnSphere(double sectorAngle, Vec3 &dir1, Vec3 &dir2) {
   double angle1 = angle(dir1, Vec3(0., 0., 1.));
   double angle2 = angle(dir2, Vec3(0., 0., 1.));
-  if (angle1 > sectorAngle && angle2 > sectorAngle)
+  static const double epsAngle = 1e-4;
+  if (angle1 > sectorAngle + epsAngle && angle2 > sectorAngle + epsAngle)
     return false;
-  if (angle1 < sectorAngle && angle2 < sectorAngle)
+  if (angle1 <= sectorAngle + epsAngle && angle2 <= sectorAngle + epsAngle)
     return true;
 
   double z0 = std::cos(sectorAngle);

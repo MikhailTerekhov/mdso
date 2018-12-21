@@ -1,4 +1,5 @@
 #include "util/Triangulation.h"
+#include "util/geometry.h"
 #include <gtest/gtest.h>
 #include <set>
 
@@ -31,20 +32,6 @@ TEST_P(TriangulationTest, IsConsistent) {
   for (auto t : triangles)
     for (auto e : t->edges)
       EXPECT_NE(std::find(e->triang, e->triang + 2, t), (e->triang + 2));
-}
-
-double cross2(const Vec2 &a, const Vec2 &b) {
-  return a[0] * b[1] - a[1] * b[0];
-}
-
-bool isSameSide(const Vec2 &a, const Vec2 &b, const Vec2 &p1, const Vec2 &p2) {
-  return cross2(b - a, p1 - a) * cross2(b - a, p2 - a) >= 0;
-}
-
-// doesn't count intersections by segment ends
-bool doesABIntersectCD(const Vec2 &a, const Vec2 &b, const Vec2 &c,
-                       const Vec2 &d) {
-  return !isSameSide(a, b, c, d) && !isSameSide(c, d, a, b);
 }
 
 TEST_P(TriangulationTest, IsPlanar) {
