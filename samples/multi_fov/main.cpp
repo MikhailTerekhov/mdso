@@ -1,6 +1,7 @@
 #define EIGEN_DONT_PARALLELIZE
 
 #include "MultiFovReader.h"
+#include "system/DelaunayDsoInitializer.h"
 #include "system/DsoSystem.h"
 #include "system/StereoMatcher.h"
 #include "util/geometry.h"
@@ -49,7 +50,7 @@ void runTracker(const MultiFovReader &reader, int startFrameNum,
   }
 
   // setDepthColBounds(depthsVec);
-  // cv::Mat depthedFrame = startFrame.frameColored.clone();
+  // cv::Mat depthedFrame = startFrame.preKeyFrame->frameColored.clone();
   // insertDepths(depthedFrame, pnts, depthsVec, minDepth, maxDepth, false);
   // cv::imshow("depths used", depthedFrame);
   // cv::waitKey();
@@ -464,9 +465,9 @@ public:
         if (performBA) {
           int frameNums[2] = {baseFrameNum, refFrameNum};
           std::vector<KeyFrame> keyFrames =
-              DsoInitializer::createKeyFramesDelaunay(
+              DelaunayDsoInitializer::createKeyFramesDelaunay(
                   reader->cam.get(), frames, frameNums, pnts, depths, estim,
-                  DsoInitializer::NO_DEBUG);
+                  DelaunayDsoInitializer::NO_DEBUG);
 
           std::vector<double> errorsAfterTri;
           errorsAfterTri.reserve(keyFrames[0].optimizedPoints.size() +

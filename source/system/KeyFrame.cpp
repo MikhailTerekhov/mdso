@@ -11,8 +11,7 @@ int KeyFrame::adaptiveBlockSize = settingInitialAdaptiveBlockSize;
 KeyFrame::KeyFrame(CameraModel *cam, const cv::Mat &frameColored,
                    int globalFrameNum)
     : preKeyFrame(std::unique_ptr<PreKeyFrame>(
-          new PreKeyFrame(cam, frameColored, globalFrameNum))),
-      frameColored(frameColored) {
+          new PreKeyFrame(cam, frameColored, globalFrameNum))) {
   grad(preKeyFrame->frame(), gradX, gradY, gradNorm);
 
   int foundTotal = selectPoints(adaptiveBlockSize, settingInterestPointsUsed);
@@ -55,6 +54,15 @@ void KeyFrame::activateAllImmature() {
     optimizedPoints.insert(
         std::unique_ptr<OptimizedPoint>(new OptimizedPoint(*ip)));
   immaturePoints.clear();
+}
+
+void KeyFrame::deactivateAllOptimized() {
+  for (const auto &op : optimizedPoints)  {
+    std::unique_ptr<ImmaturePoint> ip(new ImmaturePoint(preKeyFrame.get(), op->p));
+    ip->depth = op->depth();
+    immaturePoints.insert(std::move(ip));
+  }
+  optimizedPoints.clear();
 }
 
 std::unique_ptr<DepthedImagePyramid> KeyFrame::makePyramid() {
@@ -133,7 +141,7 @@ void KeyFrame::selectPointsDenser(int pointsNeeded) {
 }
 
 cv::Mat KeyFrame::drawDepthedFrame(double minDepth, double maxDepth) {
-  cv::Mat res = frameColored.clone();
+  cv::Mat res = preKeyFrame->frameColored.clone();
 
   for (const auto &ip : immaturePoints)
     putSquare(res, toCvPoint(ip->p), 5,

@@ -14,7 +14,6 @@ ImmaturePoint::ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p)
     state = OOB;
     return;
   }
-
   for (int i = 0; i < settingResidualPatternSize; ++i) {
     baseDirections[i] = cam->unmap(p + settingResidualPattern[i]).normalized();
     baseIntencities[i] =
@@ -42,15 +41,6 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
   if (!intersectOnSphere(cam->getMaxAngle(), dirMin, dirMax))
     return;
 
-  cv::Mat1b base;
-  cv::Mat1b curved;
-  if (debugType == DRAW_EPIPOLE) {
-    base = baseFrame->frame().clone();
-    curved = refFrame.frame().clone();
-
-    putDot(base, toCvPoint(p), CV_WHITE_BYTE);
-  }
-
   StdVector<std::pair<Vec2, double>> energiesFound;
   double bestEnergy = INF;
   Vec2 bestPoint;
@@ -58,7 +48,7 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
 
   double step = 1.0 / (settingEpipolarOnImageTestCount - 1);
   double alpha0 = 0;
-  while (alpha0 <= 1)  {
+  while (alpha0 <= 1) {
     Vec3 curDir = (1 - alpha0) * dirMax + alpha0 * dirMin;
     Vec2 curP = cam->map(curDir);
     if (!cam->isOnImage(curP, settingResidualPatternHeight)) {
@@ -88,16 +78,6 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
         reproj[0] = point;
         for (int i = 1; i < settingResidualPatternSize; ++i)
           reproj[i] = cam->map(baseToRef * (depths[0] * baseDirections[i]));
-
-        if (debugType == DRAW_EPIPOLE) {
-          cv::Point cvp = toCvPoint(reproj[0]);
-          const int size2 = 3;
-          cv::rectangle(curved, cvp - cv::Point(size2, size2),
-                        cvp + cv::Point(size2, size2), CV_WHITE_BYTE,
-                        cv::FILLED);
-          // cv::imshow("res", curved);
-          // cv::waitKey();
-        }
 
         energiesFound.push_back({reproj[0], INF});
 
@@ -159,10 +139,58 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
   quality = secondBestEnergy / bestEnergy;
 
   if (debugType == DRAW_EPIPOLE) {
+    cv::Mat base;
+    cv::Mat curved;
+    base = baseFrame->frameColored.clone();
+    curved = refFrame.frameColored.clone();
+
+    cv::circle(base, toCvPoint(p), 10, CV_GREEN, cv::FILLED);
+    drawTracing(curved, energiesFound, 8);
+
     cv::Mat curv2;
     cv::resize(curved, curv2, cv::Size(), 0.5, 0.5);
     cv::imshow("epipolar curve", curv2);
+
+    cv::Mat base2;
+    cv::resize(base, base2, cv::Size(), 0.5, 0.5);
+    cv::imshow("base frame", base2);
+
     cv::waitKey();
+  }
+}
+
+void ImmaturePoint::drawTracing(
+    cv::Mat &frame, const StdVector<std::pair<Vec2, double>> &energiesFound,
+    int lineWidth) {
+  auto comp = [](const std::pair<Vec2, double> &a,
+                 const std::pair<Vec2, double> &b) {
+    return a.second < b.second;
+  };
+  int minI =
+      std::min_element(energiesFound.begin(), energiesFound.end(), comp) -
+      energiesFound.begin();
+  double minEnergy = energiesFound[minI].second;
+
+  double maxEnergy =
+      std::max_element(energiesFound.begin(), energiesFound.end(), comp)
+          ->second;
+
+  for (int i = 0; i < energiesFound.size(); ++i) {
+    double e = energiesFound[i].second;
+    Vec2 p = energiesFound[i].first;
+    Vec2 dir = (i == energiesFound.size() - 1 ? p - energiesFound[i - 1].first
+                                              : energiesFound[i + 1].first - p);
+    Vec2 ort(dir[1], -dir[0]);
+    ort.normalize();
+    if (i == minI)
+      ort *= 2;
+    Vec2 beg = p + ort * (double(lineWidth) / 2);
+    Vec2 end = p - ort * (double(lineWidth) / 2);
+
+    cv::Scalar color =
+        (i == minI ? CV_BLACK : depthCol(e, minEnergy, maxEnergy));
+    int thickness = (i == minI ? 3 : 1);
+    cv::line(frame, toCvPoint(beg), toCvPoint(end), color, thickness);
   }
 }
 

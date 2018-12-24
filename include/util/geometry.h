@@ -13,8 +13,7 @@ bool isInsideTriangle(const Vec2 &a, const Vec2 &b, const Vec2 &c,
 bool isABCDConvex(const Vec2 &a, const Vec2 &b, const Vec2 &c, const Vec2 &d);
 bool areEqual(const Vec2 &a, const Vec2 &b, double eps);
 bool doesABcontain(const Vec2 &a, const Vec2 &b, const Vec2 &p, double eps);
-bool isABDelaunay(const Vec2 &a, const Vec2 &b, const Vec2 &c,
-                                   const Vec2 &d);
+bool isABDelaunay(const Vec2 &a, const Vec2 &b, const Vec2 &c, const Vec2 &d);
 // doesn't count intersections by segment ends
 bool doesABIntersectCD(const Vec2 &a, const Vec2 &b, const Vec2 &c,
                        const Vec2 &d);

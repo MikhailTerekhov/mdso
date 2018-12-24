@@ -1,4 +1,4 @@
-#include "system/DsoInitializer.h"
+#include "system/DelaunayDsoInitializer.h"
 
 #include <string>
 
@@ -15,7 +15,7 @@ img1 and img2 name files with two frames to track.)abacaba";
   }
 
   CameraModel cam(1920, 1208, argv[1]);
-  DsoInitializer initializer(&cam);
+  DelaunayDsoInitializer initializer(&cam, DelaunayDsoInitializer::SPARSE_DEPTHS);
   cv::Mat frame1, frame2;
   frame1 = cv::imread(argv[2]);
   if (frame1.data == NULL) {
@@ -39,5 +39,5 @@ img1 and img2 name files with two frames to track.)abacaba";
   settingFirstFramesSkip = 0;
   initializer.addFrame(frame1, 1);
   initializer.addFrame(frame2, 2);
-  initializer.createKeyFrames(DsoInitializer::SPARSE_DEPTHS);
+  initializer.createKeyFrames();
 }

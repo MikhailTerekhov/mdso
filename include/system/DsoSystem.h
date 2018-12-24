@@ -57,7 +57,7 @@ private:
   CameraModel *cam;
   StdVector<CameraModel> camPyr;
 
-  DsoInitializer dsoInitializer;
+  std::unique_ptr<DsoInitializer> dsoInitializer;
   bool isInitialized;
 
   std::unique_ptr<FrameTracker> frameTracker;

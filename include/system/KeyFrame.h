@@ -22,13 +22,14 @@ struct KeyFrame {
   KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame);
 
   void activateAllImmature();
+  void deactivateAllOptimized();
+
   std::unique_ptr<DepthedImagePyramid> makePyramid();
   void selectPointsDenser(int pointsNeeded);
 
   cv::Mat drawDepthedFrame(double minDepth, double maxDepth);
 
   std::unique_ptr<PreKeyFrame> preKeyFrame;
-  cv::Mat frameColored;
   cv::Mat1d gradX, gradY, gradNorm;
 
   StdUnorderedSet<std::unique_ptr<ImmaturePoint>> immaturePoints;

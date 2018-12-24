@@ -1,14 +1,17 @@
 #include "system/DsoSystem.h"
+#include "system/DelaunayDsoInitializer.h"
 #include "system/AffineLightTransform.h"
 #include "system/StereoMatcher.h"
-#include "util/settings.h"
 #include "util/geometry.h"
+#include "util/settings.h"
 #include <glog/logging.h>
 
 namespace fishdso {
 
 DsoSystem::DsoSystem(CameraModel *cam)
-    : cam(cam), camPyr(cam->camPyr()), dsoInitializer(cam),
+    : cam(cam), camPyr(cam->camPyr()),
+      dsoInitializer(std::unique_ptr<DsoInitializer>(new DelaunayDsoInitializer(
+          cam, DelaunayDsoInitializer::SPARSE_DEPTHS))),
       isInitialized(false) {
   LOG(INFO) << "create DsoSystem" << std::endl;
 }
@@ -136,12 +139,12 @@ void DsoSystem::addFrame(const cv::Mat &frame, int globalFrameNum) {
 
   if (!isInitialized) {
     LOG(INFO) << "put into initializer" << std::endl;
-    isInitialized = dsoInitializer.addFrame(frame, globalFrameNum);
+    isInitialized = dsoInitializer->addFrame(frame, globalFrameNum);
 
     if (isInitialized) {
       LOG(INFO) << "initialization successful" << std::endl;
       std::vector<KeyFrame> kf =
-          dsoInitializer.createKeyFrames(DsoInitializer::SPARSE_DEPTHS);
+          dsoInitializer->createKeyFrames();
       for (const auto &f : kf)
         worldToFramePredict[f.preKeyFrame->globalFrameNum] =
             worldToFrame[f.preKeyFrame->globalFrameNum] =
@@ -330,8 +333,8 @@ end_header
   for (const auto &p : points) {
     Vec3 pos = cam->unmap(p.first).normalized() * p.second;
     out << pos[0] << ' ' << pos[1] << ' ' << pos[2] << ' ';
-    cv::Vec3b color =
-        lastKeyFrame().frameColored.at<cv::Vec3b>(toCvPoint(p.first));
+    cv::Vec3b color = lastKeyFrame().preKeyFrame->frameColored.at<cv::Vec3b>(
+        toCvPoint(p.first));
     out << int(color[2]) << ' ' << int(color[1]) << ' ' << int(color[0])
         << std::endl;
   }

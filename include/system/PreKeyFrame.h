@@ -20,8 +20,7 @@ struct PreKeyFrame {
   PreKeyFrame(CameraModel *cam, const cv::Mat &frameColored,
               int globalFrameNum);
 
-  cv::Mat drawDepthedFrame(int pyrLevel, double minDepth, double maxDepth);
-
+  cv::Mat frameColored;
   ImagePyramid framePyr;
   EIGEN_STRONG_INLINE cv::Mat1b &frame() { return framePyr[0]; }
   EIGEN_STRONG_INLINE const cv::Mat1b &frame() const { return framePyr[0]; }

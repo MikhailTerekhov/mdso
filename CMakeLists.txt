@@ -41,6 +41,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/system/SphericalPlus.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoSystem.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoInitializer.h
+    ${PROJECT_SOURCE_DIR}/include/system/DelaunayDsoInitializer.h
     ${PROJECT_SOURCE_DIR}/include/system/PreKeyFrame.h
     ${PROJECT_SOURCE_DIR}/include/system/KeyFrame.h
     ${PROJECT_SOURCE_DIR}/include/system/ImmaturePoint.h
@@ -64,7 +65,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/util/DepthedImagePyramid.cpp
     ${PROJECT_SOURCE_DIR}/source/system/SphericalPlus.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoSystem.cpp
-    ${PROJECT_SOURCE_DIR}/source/system/DsoInitializer.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/DelaunayDsoInitializer.cpp
     ${PROJECT_SOURCE_DIR}/source/system/PreKeyFrame.cpp
     ${PROJECT_SOURCE_DIR}/source/system/KeyFrame.cpp
     ${PROJECT_SOURCE_DIR}/source/system/ImmaturePoint.cpp

@@ -4,7 +4,7 @@
 #include "util/defs.h"
 #include "util/geometry.h"
 #include "util/util.h"
-#include <ceres/ceres.h> 
+#include <ceres/ceres.h>
 #include <ceres/cubic_interpolation.h>
 
 namespace fishdso {

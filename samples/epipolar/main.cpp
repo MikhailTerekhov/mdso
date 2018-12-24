@@ -1,5 +1,6 @@
-#include "util/defs.h"
+#include "system/DelaunayDsoInitializer.h"
 #include "system/ImmaturePoint.h"
+#include "util/defs.h"
 #include <opencv2/opencv.hpp>
 
 using namespace fishdso;
@@ -8,27 +9,44 @@ DEFINE_int32(x, 100, "x-coordinate of the point on base frame");
 DEFINE_int32(y, 100, "y-coordinate of the point on base frame");
 
 int main(int argc, char **argv) {
+  std::string usage = R"abacaba(Usage: "stereo cam img1 img2"
+Where cam names a file with camera calibration;
+img1 and img2 name files with two frames to track.)abacaba";
+
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+  google::SetUsageMessage(usage);
   google::InitGoogleLogging(argv[0]);
 
-  double scale = 604.0;
-  Vec2 center(1.58492, 1.07424);
-  int unmapPolyDeg = 5;
-  VecX unmapPolyCoeffs(unmapPolyDeg, 1);
-  unmapPolyCoeffs << 1.14169, -0.203229, -0.362134, 0.351011, -0.147191;
-  int width = 1920, height = 1208;
-  CameraModel cam(width, height, scale, center, unmapPolyCoeffs);
+  if (argc != 4) {
+    std::cout << "Wrong number of arguments!\n" << usage << std::endl;
+    return 0;
+  }
 
-  cv::Mat image(height, width, CV_8UC3, CV_BLACK);
-  PreKeyFrame baseFrame(&cam, image, 0);
-  PreKeyFrame refFrame(&cam, image, 1);
+  CameraModel cam(1920, 1208, argv[1]);
+  DelaunayDsoInitializer initializer(&cam, DelaunayDsoInitializer::NO_DEBUG);
+  cv::Mat frame1, frame2;
+  frame1 = cv::imread(argv[2]);
+  if (frame1.data == NULL) {
+    std::cout << "img1 could not be found or read!" << std::endl;
+    return 0;
+  }
 
-  SE3 motion(SO3(), Vec3(0, 1, 0));
-  refFrame.worldToThis = motion;
+  frame2 = cv::imread(argv[3]);
+  if (frame2.data == NULL) {
+    std::cout << "img2 could not be found or read!" << std::endl;
+    return 0;
+  }
 
-  ImmaturePoint p(&baseFrame, Vec2(double(FLAGS_x), double(FLAGS_y)));
-  
-  p.traceOn(refFrame, ImmaturePoint::DRAW_EPIPOLE);
+  settingFirstFramesSkip = 0;
+  initializer.addFrame(frame1, 1);
+  initializer.addFrame(frame2, 2);
+  std::vector<KeyFrame> keyFrames =
+      initializer.createKeyFrames();
+  keyFrames[0].deactivateAllOptimized();
+
+  for (auto &ip : keyFrames[0].immaturePoints)
+    ip->traceOn(*keyFrames[1].preKeyFrame, ImmaturePoint::DRAW_EPIPOLE);
+
 
   return 0;
 }

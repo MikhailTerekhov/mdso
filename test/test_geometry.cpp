@@ -130,7 +130,6 @@ TEST(GeometryTest, InInsideTriangleTest) {
         << "test #" << i << " failed: returned true" << std::endl;
 }
 
-
 TEST(GeometryTest, IsABCDConvexTest) {
   StdVector<std::array<Vec2, 4>> testsTrue{
       {Vec2(0, 0), Vec2(1, 0), Vec2(1, 1), Vec2(0, 1)},
@@ -140,16 +139,15 @@ TEST(GeometryTest, IsABCDConvexTest) {
   StdVector<std::array<Vec2, 4>> testsFalse{
       {Vec2(0, 0), Vec2(1, 1), Vec2(2, 0), Vec2(1, 3)},
       {Vec2(-1e4, -1), Vec2(0, 0), Vec2(1e5, 1), Vec2(0, 1)},
-      {Vec2(0, 0), Vec2(1, 1), Vec2(1, 0), Vec2(0, 1)}
-  };
+      {Vec2(0, 0), Vec2(1, 1), Vec2(1, 0), Vec2(0, 1)}};
 
   for (int i = 0; i < testsTrue.size(); ++i)
-    ASSERT_TRUE(isABCDConvex(testsTrue[i][0], testsTrue[i][1],
-                                 testsTrue[i][2], testsTrue[i][3]))
+    ASSERT_TRUE(isABCDConvex(testsTrue[i][0], testsTrue[i][1], testsTrue[i][2],
+                             testsTrue[i][3]))
         << "test #" << i << " failed: returned false" << std::endl;
   for (int i = 0; i < testsFalse.size(); ++i)
     ASSERT_FALSE(isABCDConvex(testsFalse[i][0], testsFalse[i][1],
-                                  testsFalse[i][2], testsFalse[i][3]))
+                              testsFalse[i][2], testsFalse[i][3]))
         << "test #" << i << " failed: returned true" << std::endl;
 }
 

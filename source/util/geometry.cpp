@@ -1,4 +1,5 @@
 #include "util/geometry.h"
+#include "util/settings.h"
 #include <cmath>
 #include <glog/logging.h>
 
@@ -58,8 +59,7 @@ bool doesABcontain(const Vec2 &a, const Vec2 &b, const Vec2 &p, double eps) {
          abNp <= abNorm + eps;
 }
 
-bool isABDelaunay(const Vec2 &a, const Vec2 &b, const Vec2 &c,
-                                   const Vec2 &d) {
+bool isABDelaunay(const Vec2 &a, const Vec2 &b, const Vec2 &c, const Vec2 &d) {
   Vec2 da = a - d;
   Vec2 db = b - d;
   Vec2 dc = c - d;
@@ -77,13 +77,15 @@ bool isABDelaunay(const Vec2 &a, const Vec2 &b, const Vec2 &c,
 
 bool doesABIntersectCD(const Vec2 &a, const Vec2 &b, const Vec2 &c,
                        const Vec2 &d) {
-  if (!(((a[0] < c[0] && c[0] < b[0]) || (a[0] < d[0] && d[0] < b[0])) &&
-        ((a[1] < c[1] && c[1] < b[1]) || (a[1] < d[1] && d[1] < b[1]))))
+  const double eps = settingEpsPointIsOnSegment;
+  if (!(((a[0] + eps < c[0] && c[0] < b[0] - eps) ||
+         (a[0] + eps < d[0] && d[0] < b[0] - eps)) &&
+        (((a[1] + eps < c[1] && c[1] < b[1] - eps) ||
+          (a[1] + eps < d[1] && d[1] < b[1] - eps)))))
     return false;
 
   return !isSameSide(a, b, c, d) && !isSameSide(c, d, a, b);
 }
-
 
 bool isInSector(const Vec3 &ray, Vec3 *s[3]) {
   Mat33 A;

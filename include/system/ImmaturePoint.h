@@ -19,6 +19,10 @@ struct ImmaturePoint {
 
   void traceOn(const PreKeyFrame &refFrame, TracingDebugType debugType);
 
+  static void
+  drawTracing(cv::Mat &frame,
+              const StdVector<std::pair<Vec2, double>> &energiesFound, int lineWidth);
+
   Vec2 p;
   Vec3 baseDirections[settingResidualPatternSize];
   double baseIntencities[settingResidualPatternSize];

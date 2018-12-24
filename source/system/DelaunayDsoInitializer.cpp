@@ -1,4 +1,4 @@
-#include "system/DsoInitializer.h"
+#include "system/DelaunayDsoInitializer.h"
 #include "util/SphericalTerrain.h"
 #include "util/defs.h"
 #include "util/util.h"
@@ -8,10 +8,12 @@
 
 namespace fishdso {
 
-DsoInitializer::DsoInitializer(CameraModel *cam)
+DelaunayDsoInitializer::DelaunayDsoInitializer(
+    CameraModel *cam, DelaunayDsoInitializer::DebugOutputType debugOutputType)
     : cam(cam), stereoMatcher(cam), hasFirstFrame(false), framesSkipped(0) {}
 
-bool DsoInitializer::addFrame(const cv::Mat &frame, int globalFrameNum) {
+bool DelaunayDsoInitializer::addFrame(const cv::Mat &frame,
+                                      int globalFrameNum) {
   if (!hasFirstFrame) {
     frames[0] = frame;
     globalFrameNums[0] = globalFrameNum;
@@ -29,16 +31,7 @@ bool DsoInitializer::addFrame(const cv::Mat &frame, int globalFrameNum) {
   }
 }
 
-std::vector<KeyFrame> DsoInitializer::createKeyFrames(
-    DsoInitializer::DebugOutputType debugOutputType) {
-  if (FLAGS_use_ORB_initialization)
-    return createKeyFramesFromStereo(debugOutputType);
-  else
-    return createKeyFramesDummy();
-}
-
-std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
-    DsoInitializer::DebugOutputType debugOutputType) {
+std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFrames() {
   StdVector<Vec2> keyPoints[2];
   std::vector<double> depths[2];
   SE3 motion = stereoMatcher.match(frames, keyPoints, depths);
@@ -47,7 +40,7 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesFromStereo(
                                  depths, motion, debugOutputType);
 }
 
-std::vector<KeyFrame> DsoInitializer::createKeyFramesDelaunay(
+std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFramesDelaunay(
     CameraModel *cam, cv::Mat frames[2], int frameNums[2],
     StdVector<Vec2> initialPoints[2], std::vector<double> initialDepths[2],
     const SE3 &firstToSecond, DebugOutputType debugOutputType) {
@@ -123,7 +116,7 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesDelaunay(
     setDepthColBounds(opDepths);
 
     if (debugOutputType != NO_DEBUG) {
-      cv::Mat img = keyFrames[1].frameColored.clone();
+      cv::Mat img = keyFrames[1].preKeyFrame->frameColored.clone();
       // KpTerrains[1].draw(img, CV_GREEN);
 
       insertDepths(img, initialPoints[1], initialDepths[1], minDepthCol,
@@ -147,7 +140,7 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesDelaunay(
 
       // KpTerrains[1].drawCurved(cam, img, CV_GREEN);
 
-      // cv::Mat kpOnly0 = keyFrames[0].frameColored.clone();
+      // cv::Mat kpOnly0 = keyFrames[0].preKeyFrame->frameColored.clone();
       // insertDepths(kpOnly0, keyPoints[0], depths[0], minDepth, maxDepth,
       // true); cv::imshow("kp only first", kpOnly0);
       // cv::imwrite(FLAGS_output_directory + "/keypoints1.jpg", kpOnly0);
@@ -186,7 +179,7 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesDelaunay(
       //      cv::imwrite("../../../../test/data/maps/badtri_removed/frame5Masked.jpg",
       //                  img3);
 
-      // cv::imshow("first frame", keyFrames[0].frameColored);
+      // cv::imshow("first frame", keyFrames[0].preKeyFrame->frameColored);
 
       // cv::imwrite("../../../../test/data/maps/uncovered/frame5.jpg", img);
       // cv::imshow("tangent", tangImg);
@@ -217,16 +210,6 @@ std::vector<KeyFrame> DsoInitializer::createKeyFramesDelaunay(
   // cv::imshow("f1", frames[0]);
   // cv::imshow("f2", frames[1]);
   // cv::waitKey();
-
-  return keyFrames;
-}
-
-std::vector<KeyFrame> DsoInitializer::createKeyFramesDummy() {
-  std::vector<KeyFrame> keyFrames;
-  for (int i = 0; i < 2; ++i) {
-    keyFrames.push_back(KeyFrame(cam, frames[i], globalFrameNums[i]));
-    keyFrames.back().activateAllImmature();
-  }
 
   return keyFrames;
 }
