@@ -4,15 +4,14 @@ import matplotlib.pyplot as plt
 
 def main(argv):
     if (len(argv) != 2):
-        print("I need just one argument -- dso output directory")
+        print("I need just one argument -- name of the file to process")
         return 0
-    out_dir = argv[1]
-    f = open(out_dir + '/reproj_err.txt')
+    f = open(argv[1])
     val = np.array([float(x) for x in f.readline().split()])
-    prob = np.arange(0., 1., 1. / len(val))
+    prob = np.linspace(0., 1., num=len(val))
     fig, ax = plt.subplots()
     ax.plot(val, prob)
-    #  plt.xlim(0, 10)
+    plt.xlim(0, 1)
 
     plt.show()
 

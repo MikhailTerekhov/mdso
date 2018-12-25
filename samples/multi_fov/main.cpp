@@ -15,9 +15,7 @@
 using namespace fishdso;
 
 const int depthErrCount = 12;
-
-SE3 predictBaseToThisDummy(const SE3 &baseToLbo, const SE3 &baseToLast) {
-  return (baseToLast * baseToLbo.inverse()) * baseToLast;
+SE3 predictBaseToThisDummy(const SE3 &baseToLbo, const SE3 &baseToLast) { return (baseToLast * baseToLbo.inverse()) * baseToLast;
 }
 
 void runTracker(const MultiFovReader &reader, int startFrameNum,
@@ -321,12 +319,20 @@ DEFINE_int32(min_stereo_displ, 20,
              "Minimum number of frames to skip between stereo frames.");
 DEFINE_int32(max_stereo_displ, 20,
              "Maximum number of frames to skip between stereo frames.");
+DEFINE_int32(max_DSO_input, 40,
+             "Maximum number of frames to put into DSO when collecting errors "
+             "on full DSO run.");
+DEFINE_double(
+    occlusion_thres, 0.3,
+    "Relative translation error after which DSO is considered occluded");
 
 DEFINE_bool(collect_tracking, true, "Do we need to collect tracking errors?");
 DEFINE_bool(collect_stereo, true,
             "Do we need to collect stereo matching errors?");
 DEFINE_bool(collect_BA, true,
             "Do we need to collect post-stereo optimizations errors?");
+DEFINE_bool(collect_full_DSO, false,
+            "Do we need to collect errors on full DSO run?");
 
 DEFINE_bool(run_parallel, true, "Collect all in parallel?");
 
@@ -524,12 +530,113 @@ public:
   }
 };
 
+class CollectFullDSO {
+private:
+  const MultiFovReader *reader;
+  int *startFrames;
+  int *correctlyTracked;
+  std::vector<double> *depthErrors;
+  std::vector<double> *kpDepthErrors;
+
+public:
+  CollectFullDSO(const MultiFovReader *reader, int *startFrames,
+                 int *correctlyTracked, std::vector<double> *depthErrors,
+                 std::vector<double> *kpDepthErrors)
+      : reader(reader), startFrames(startFrames),
+        correctlyTracked(correctlyTracked), depthErrors(depthErrors),
+        kpDepthErrors(kpDepthErrors) {}
+
+  void operator()(const tbb::blocked_range<int> &range) const {
+    for (int ind = range.begin(); ind < range.end(); ++ind) {
+      bool isInit = false;
+      int initFrameNum = 0;
+      DsoSystem dsoSystem(reader->cam.get());
+      double scale = 0;
+      SE3 worldToFirstGT = reader->getWorldToFrameGT(startFrames[ind]);
+      int lastFrameNum = std::min(startFrames[ind] + FLAGS_max_DSO_input - 1,
+                                  lastFrameNumGlobal);
+      bool didOcclude = false;
+
+      for (int curFrameNum = startFrames[ind]; curFrameNum <= lastFrameNum;
+           ++curFrameNum) {
+        SE3 firstToCurGT =
+            reader->getWorldToFrameGT(curFrameNum) * worldToFirstGT.inverse();
+
+        if (isInit) {
+          SE3 forDSO(firstToCurGT.so3(), firstToCurGT.translation() / scale);
+          dsoSystem.addGroundTruthPose(curFrameNum, forDSO);
+        }
+
+        std::shared_ptr<PreKeyFrame> nextFrame =
+            dsoSystem.addFrame(reader->getFrame(curFrameNum), curFrameNum);
+
+        if (!nextFrame)
+          continue;
+
+        if (!isInit) {
+          isInit = true;
+          initFrameNum = curFrameNum;
+
+          SE3 firstToLastInitGT =
+              reader->getWorldToFrameGT(
+                  dsoSystem.lastInitialized->preKeyFrame->globalFrameNum) *
+              worldToFirstGT.inverse();
+          SE3 firstToLastInit =
+              dsoSystem.lastInitialized->preKeyFrame->worldToThis;
+          scale = firstToLastInitGT.translation().norm() /
+                  firstToLastInit.translation().norm();
+          LOG(INFO) << "scale = " << scale << std::endl;
+
+          StdVector<Vec2> pnts;
+          std::vector<double> depthsToDraw;
+
+          cv::Mat1f depthsGT = reader->getDepths(curFrameNum);
+          for (const auto &op : dsoSystem.lastInitialized->optimizedPoints) {
+            double depth = op->depth();
+            double depthGT = depthsGT(toCvPoint(op->p));
+            depthErrors[ind].push_back(std::abs(scale * depth - depthGT) / depthGT);
+            
+            pnts.push_back(op->p);
+            depthsToDraw.push_back(depthGT / scale);
+          }
+
+          cv::Mat imgGT = dsoSystem.lastInitialized->preKeyFrame->frameColored.clone();
+          insertDepths(imgGT, pnts, depthsToDraw, minDepthCol, maxDepthCol, false);
+          cv::imshow("GT depths", imgGT);
+          cv::waitKey();
+
+          for (const auto &kp : dsoSystem.lastKeyPointDepths) {
+            double depth = kp.second;
+            double depthGT = depthsGT(toCvPoint(kp.first));
+            kpDepthErrors[ind].push_back(std::abs(scale * depth - depthGT) / depthGT);
+          }
+        }
+
+        SE3 firstToCur = nextFrame->worldToThis;
+        double err =
+            ((scale * firstToCur.translation()) - firstToCurGT.translation())
+                .norm() /
+            firstToCurGT.translation().norm();
+        
+        if (err > FLAGS_occlusion_thres) {
+          correctlyTracked[ind] = curFrameNum - initFrameNum;
+          didOcclude = true;
+          break;
+        }
+      }
+
+      if (!didOcclude)
+        correctlyTracked[ind] = lastFrameNum - initFrameNum;
+    }
+    
+  }
+};
+
 void collectStatistics(const MultiFovReader &reader) {
   FLAGS_num_threads = 1;
 
-  std::cout << "Collect tracking errors..." << std::endl;
-
   if (FLAGS_collect_tracking) {
+    std::cout << "Collect tracking errors..." << std::endl;
     int lastFrameNum =
         std::min(FLAGS_end_frame, lastFrameNumGlobal - FLAGS_track_count);
 
@@ -559,13 +666,13 @@ void collectStatistics(const MultiFovReader &reader) {
                       << std::endl;
       }
     trackingTable.close();
+    std::cout << "Tracking errors collected." << std::endl;
   }
 
-  std::cout << "Tracking errors collected. Start collecting "
-               "stereo-initialization errors..."
-            << std::endl;
-
   if (FLAGS_collect_stereo) {
+    std::cout << "Start collecting stereo-initialization errors..."
+              << std::endl;
+
     StereoMatcher matcher(reader.cam.get());
     int lastFrameNum =
         std::min(FLAGS_end_frame, lastFrameNumGlobal - FLAGS_max_stereo_displ);
@@ -605,9 +712,64 @@ void collectStatistics(const MultiFovReader &reader) {
         stereoTable << depthErrors[depthErrCount - 1](row, col) << std::endl;
       }
     stereoTable.close();
+
+    std::cout << "Stereo errors collected." << std::endl;
   }
 
-  std::cout << "Stereo errors collected. Terminating." << std::endl;
+  if (FLAGS_collect_full_DSO) {
+    std::cout << "Start collecting full system run errors..." << std::endl;
+
+    const int testCount = 1;
+    int startFrames[testCount] = {FLAGS_start_frame};
+    int correctlyTracked[testCount] = {-1};
+    std::vector<double> depthErrors[testCount];
+    std::vector<double> kpDepthErrors[testCount];
+    int lastFrameNum =
+        std::min(FLAGS_end_frame, lastFrameNumGlobal - FLAGS_max_DSO_input);
+
+    FLAGS_continue_choosing_keyframes = false;
+    // FLAGS_write_files = false;
+
+    if (FLAGS_run_parallel) {
+      tbb::parallel_for(tbb::blocked_range<int>(0, testCount),
+                        CollectFullDSO(&reader, startFrames, correctlyTracked,
+                                       depthErrors, kpDepthErrors));
+    } else {
+      CollectFullDSO(&reader, startFrames, correctlyTracked,
+                     depthErrors, kpDepthErrors)(tbb::blocked_range<int>(0, testCount));
+    }
+
+    std::vector<double> allErrors;
+    std::vector<double> allKpErrors;
+    for (int it = 0; it < testCount; ++it)
+      for (double e : depthErrors[it])
+        allErrors.push_back(e);
+    for (int it = 0; it < testCount; ++it)
+      for (double e : kpDepthErrors[it])
+        allKpErrors.push_back(e);
+
+    std::sort(allErrors.begin(), allErrors.end());
+    std::sort(allKpErrors.begin(), allKpErrors.end());
+
+    std::ofstream depthErr("dso_depth_err.txt");
+    for (double e : allErrors)
+      depthErr << e << ' ';
+    depthErr.close();
+    
+    std::ofstream kpDepthErr("dso_kp_depth_err.txt");
+    for (double e : allKpErrors)
+      kpDepthErr << e << ' ';
+    kpDepthErr.close();
+
+    std::ofstream trackedOfs("dso_tracked.txt");
+    for (int it = 0; it < testCount; ++it)
+      trackedOfs << correctlyTracked[it];
+    trackedOfs.close();
+
+    std::cout << "Full system errors collected." << std::endl;
+  }
+
+  std::cout << "All done." << std::endl;
 }
 
 int main(int argc, char **argv) {

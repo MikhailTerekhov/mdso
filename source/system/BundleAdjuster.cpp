@@ -335,13 +335,15 @@ void BundleAdjuster::adjust(int maxNumIterations) {
   // putCross(kf1Depthed, toCvPoint(p), 3, CV_BLACK, 2);
 
   // cv::imshow("first frame", kf1Depthed);
-  cv::imwrite(FLAGS_output_directory + "/firstf.jpg", kf1Depthed);
+  if (FLAGS_write_files) {
+    cv::imwrite(FLAGS_output_directory + "/firstf.jpg", kf1Depthed);
 
-  // cv::imshow("after ba", kfDepths);
-  cv::imwrite(FLAGS_output_directory + "/adjusted.jpg", kfDepths);
+    // cv::imshow("after ba", kfDepths);
+    cv::imwrite(FLAGS_output_directory + "/adjusted.jpg", kfDepths);
+  }
 
   // cv::waitKey();
 
-  cv::destroyAllWindows();
+  // cv::destroyAllWindows();
 }
 } // namespace fishdso

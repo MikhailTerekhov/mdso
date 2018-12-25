@@ -18,8 +18,10 @@ struct KeyFrame {
   static constexpr int PL = settingPyrLevels;
   static int adaptiveBlockSize;
 
+  KeyFrame(const KeyFrame &other) = delete;
+  KeyFrame(KeyFrame &&other) = default;
   KeyFrame(CameraModel *cam, const cv::Mat &frameColored, int globalFrameNum);
-  KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame);
+  KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame);
 
   void activateAllImmature();
   void deactivateAllOptimized();
@@ -29,7 +31,7 @@ struct KeyFrame {
 
   cv::Mat drawDepthedFrame(double minDepth, double maxDepth);
 
-  std::unique_ptr<PreKeyFrame> preKeyFrame;
+  std::shared_ptr<PreKeyFrame> preKeyFrame;
   cv::Mat1d gradX, gradY, gradNorm;
 
   StdUnorderedSet<std::unique_ptr<ImmaturePoint>> immaturePoints;

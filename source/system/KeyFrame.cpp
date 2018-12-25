@@ -10,7 +10,7 @@ int KeyFrame::adaptiveBlockSize = settingInitialAdaptiveBlockSize;
 
 KeyFrame::KeyFrame(CameraModel *cam, const cv::Mat &frameColored,
                    int globalFrameNum)
-    : preKeyFrame(std::unique_ptr<PreKeyFrame>(
+    : preKeyFrame(std::shared_ptr<PreKeyFrame>(
           new PreKeyFrame(cam, frameColored, globalFrameNum))) {
   grad(preKeyFrame->frame(), gradX, gradY, gradNorm);
 
@@ -19,8 +19,8 @@ KeyFrame::KeyFrame(CameraModel *cam, const cv::Mat &frameColored,
   updateAdaptiveBlockSize(foundTotal);
 }
 
-KeyFrame::KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame)
-    : preKeyFrame(std::move(newPreKeyFrame)) {
+KeyFrame::KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame)
+    : preKeyFrame(newPreKeyFrame) {
   grad(preKeyFrame->frame(), gradX, gradY, gradNorm);
 
   int foundTotal = selectPoints(adaptiveBlockSize, settingInterestPointsUsed);

@@ -11,6 +11,7 @@
 #include <map>
 #include <memory>
 #include <opencv2/core.hpp>
+#include <bits/vector.tcc>
 
 namespace fishdso {
 
@@ -19,7 +20,7 @@ public:
   DsoSystem(CameraModel *cam);
   ~DsoSystem();
 
-  void addFrame(const cv::Mat &frame, int globalFrameNum);
+  std::shared_ptr<PreKeyFrame> addFrame(const cv::Mat &frame, int globalFrameNum);
   void addGroundTruthPose(int globalFrameNum, const SE3 &worldToThat);
 
   void printLastKfInPly(std::ostream &out);
@@ -27,6 +28,10 @@ public:
   void printPredictionInfo(std::ostream &out);
   void printGroundTruthInfo(std::ostream &out);
   void printMatcherInfo(std::ostream &out);
+
+  // output only
+  KeyFrame *lastInitialized;
+  StdVector<std::pair<Vec2, double>> lastKeyPointDepths;
 
 private:
   EIGEN_STRONG_INLINE KeyFrame &lastKeyFrame() {
@@ -62,6 +67,7 @@ private:
 
   std::unique_ptr<FrameTracker> frameTracker;
 
+  StdVector<std::shared_ptr<PreKeyFrame>> frameHistory;
   std::map<int, KeyFrame> keyFrames;
   StdMap<int, SE3> worldToFrame;
   StdMap<int, SE3> worldToFramePredict;

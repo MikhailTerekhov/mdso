@@ -1,6 +1,6 @@
 #include "system/DsoSystem.h"
-#include "system/DelaunayDsoInitializer.h"
 #include "system/AffineLightTransform.h"
+#include "system/DelaunayDsoInitializer.h"
 #include "system/StereoMatcher.h"
 #include "util/geometry.h"
 #include "util/settings.h"
@@ -11,24 +11,26 @@ namespace fishdso {
 DsoSystem::DsoSystem(CameraModel *cam)
     : cam(cam), camPyr(cam->camPyr()),
       dsoInitializer(std::unique_ptr<DsoInitializer>(new DelaunayDsoInitializer(
-          cam, DelaunayDsoInitializer::SPARSE_DEPTHS))),
-      isInitialized(false) {
+          this, cam, DelaunayDsoInitializer::SPARSE_DEPTHS))),
+      isInitialized(false), lastInitialized(nullptr) {
   LOG(INFO) << "create DsoSystem" << std::endl;
 }
 
 DsoSystem::~DsoSystem() {
-  std::ofstream ofsTracked(FLAGS_output_directory + "/tracked_pos.txt");
-  printTrackingInfo(ofsTracked);
+  if (FLAGS_write_files) {
+    std::ofstream ofsTracked(FLAGS_output_directory + "/tracked_pos.txt");
+    printTrackingInfo(ofsTracked);
 
-  std::ofstream ofsPredicted(FLAGS_output_directory + "/predicted_pos.txt");
-  printPredictionInfo(ofsPredicted);
+    std::ofstream ofsPredicted(FLAGS_output_directory + "/predicted_pos.txt");
+    printPredictionInfo(ofsPredicted);
 
-  if (FLAGS_perform_tracking_check_GT) {
-    std::ofstream ofsGT(FLAGS_output_directory + "/ground_truth_pos.txt");
-    printGroundTruthInfo(ofsGT);
-  } else if (FLAGS_perform_tracking_check_stereo) {
-    std::ofstream ofsMatched(FLAGS_output_directory + "/matched_pos.txt");
-    printMatcherInfo(ofsMatched);
+    if (FLAGS_perform_tracking_check_GT) {
+      std::ofstream ofsGT(FLAGS_output_directory + "/ground_truth_pos.txt");
+      printGroundTruthInfo(ofsGT);
+    } else if (FLAGS_perform_tracking_check_stereo) {
+      std::ofstream ofsMatched(FLAGS_output_directory + "/matched_pos.txt");
+      printMatcherInfo(ofsMatched);
+    }
   }
 }
 
@@ -134,7 +136,8 @@ void DsoSystem::activateNewOptimizedPoints() {
     kfp.second.activateAllImmature();
 }
 
-void DsoSystem::addFrame(const cv::Mat &frame, int globalFrameNum) {
+std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
+                                                 int globalFrameNum) {
   LOG(INFO) << "add frame #" << globalFrameNum << std::endl;
 
   if (!isInitialized) {
@@ -143,8 +146,7 @@ void DsoSystem::addFrame(const cv::Mat &frame, int globalFrameNum) {
 
     if (isInitialized) {
       LOG(INFO) << "initialization successful" << std::endl;
-      std::vector<KeyFrame> kf =
-          dsoInitializer->createKeyFrames();
+      std::vector<KeyFrame> kf = dsoInitializer->createKeyFrames();
       for (const auto &f : kf)
         worldToFramePredict[f.preKeyFrame->globalFrameNum] =
             worldToFrame[f.preKeyFrame->globalFrameNum] =
@@ -157,9 +159,11 @@ void DsoSystem::addFrame(const cv::Mat &frame, int globalFrameNum) {
       for (auto &p : keyFrames)
         bundleAdjuster.addKeyFrame(&p.second);
 
-      std::ofstream ofsBeforeAdjust(FLAGS_output_directory +
-                                    "/before_adjust.ply");
-      printLastKfInPly(ofsBeforeAdjust);
+      if (FLAGS_write_files) {
+        std::ofstream ofsBeforeAdjust(FLAGS_output_directory +
+                                      "/before_adjust.ply");
+        printLastKfInPly(ofsBeforeAdjust);
+      }
 
       bundleAdjuster.adjust(settingMaxFirstBAIterations);
 
@@ -172,19 +176,26 @@ void DsoSystem::addFrame(const cv::Mat &frame, int globalFrameNum) {
             worldToSecondKfGT;
       }
 
-      std::ofstream ofsAfterAdjust(FLAGS_output_directory +
-                                   "/after_adjust.ply");
-      printLastKfInPly(ofsAfterAdjust);
+      if (FLAGS_write_files) {
+        std::ofstream ofsAfterAdjust(FLAGS_output_directory +
+                                     "/after_adjust.ply");
+        printLastKfInPly(ofsAfterAdjust);
+      }
 
       frameTracker = std::unique_ptr<FrameTracker>(
           new FrameTracker(camPyr, baseKeyFrame().makePyramid()));
+
+      lastInitialized = &keyFrames.rbegin()->second;
+      return keyFrames.rbegin()->second.preKeyFrame;
     }
 
-    return;
+    return nullptr;
   }
 
-  std::unique_ptr<PreKeyFrame> preKeyFrame(
+  std::shared_ptr<PreKeyFrame> preKeyFrame(
       new PreKeyFrame(cam, frame, globalFrameNum));
+
+  frameHistory.push_back(preKeyFrame);
 
   SE3 baseKfToCur;
   AffineLightTransform<double> lightBaseKfToCur;
@@ -231,7 +242,7 @@ void DsoSystem::addFrame(const cv::Mat &frame, int globalFrameNum) {
     for (auto &ip : kfp.second.immaturePoints)
       ip->traceOn(*preKeyFrame, ImmaturePoint::NO_DEBUG);
 
-  if (checkNeedKf(preKeyFrame.get())) {
+  if (FLAGS_continue_choosing_keyframes && checkNeedKf(preKeyFrame.get())) {
     marginalizeFrames();
     activateNewOptimizedPoints();
 
@@ -247,6 +258,8 @@ void DsoSystem::addFrame(const cv::Mat &frame, int globalFrameNum) {
     frameTracker = std::unique_ptr<FrameTracker>(
         new FrameTracker(camPyr, optimizedPointsOntoBaseKf()));
   }
+
+  return preKeyFrame;
 }
 
 void DsoSystem::checkLastTrackedGT(PreKeyFrame *lastFrame) {

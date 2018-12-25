@@ -2,6 +2,7 @@
 #define INCLUDE_DELAUNAYDSOINITIALIZER
 
 #include "DsoInitializer.h"
+#include "DsoSystem.h"
 #include "system/KeyFrame.h"
 #include "system/StereoMatcher.h"
 #include <memory>
@@ -13,7 +14,8 @@ class DelaunayDsoInitializer : public DsoInitializer {
 public:
   enum DebugOutputType { NO_DEBUG, SPARSE_DEPTHS, FILLED_DEPTHS };
 
-  DelaunayDsoInitializer(CameraModel *cam, DebugOutputType debugOutputType);
+  DelaunayDsoInitializer(DsoSystem *dsoSystem, CameraModel *cam,
+                         DebugOutputType debugOutputType);
 
   // returns true if initialization is completed
   bool addFrame(const cv::Mat &frame, int globalFrameNum);
@@ -27,6 +29,7 @@ public:
 
 private:
   CameraModel *cam;
+  DsoSystem *dsoSystem;
   StereoMatcher stereoMatcher;
   bool hasFirstFrame;
   int framesSkipped;

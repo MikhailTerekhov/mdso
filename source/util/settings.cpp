@@ -18,7 +18,6 @@ int settingKeyPointsCount = 2000;
 int settingRansacMaxIter = 100000;
 double settingInitKeypointsObserveAngle = M_PI / 3;
 double settingMatchNonMove = 8.0;
-int settingFirstFramesSkip = 4;
 bool settingUsePlainTriangulation = false;
 
 double settingEssentialSuccessProb = 0.999;
@@ -63,6 +62,9 @@ int settingMaxKeyFrames = 3;
 
 DEFINE_int32(num_threads, 3, "Number of threads for Ceres Solver to use.");
 
+DEFINE_int32(first_frames_skip, 15,
+             "Number of frames to skip between two frames when initializing "
+             "from keypoints.");
 DEFINE_bool(use_ORB_initialization, true,
             "Use keypoint-based stereomatching on first two keyframes?");
 DEFINE_bool(
@@ -111,6 +113,10 @@ DEFINE_bool(fixed_motion_on_first_ba, false,
             "keyframes? We could assume that a good motion estimation is "
             "already availible due to RANSAC initialization and averaging.");
 
+DEFINE_bool(continue_choosing_keyframes, true,
+            "If set to false, the system only does initalization and then "
+            "tracks new frames wrt the initialized ones.");
+
 bool validateDepthsPart(const char *flagname, double value) {
   if (value >= 0 && value <= 1)
     return true;
@@ -129,5 +135,9 @@ DEFINE_double(blue_depths_part, 0.7,
               "(i.e. they are not too far to be distinguished)");
 DEFINE_validator(blue_depths_part, validateDepthsPart);
 
+DEFINE_bool(show_interpolation, false,
+            "Show interpolated depths after initialization?");
+DEFINE_bool(write_files, true,
+            "Do we need to write output files into output_directory?");
 DEFINE_string(output_directory, "output/default",
               "CO: \"it's dso's output directory!\"");

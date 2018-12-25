@@ -62,15 +62,17 @@ StereoGeometryEstimator::depths() {
 }
 
 void StereoGeometryEstimator::outputInlierCorresps() {
-  std::ofstream out(FLAGS_output_directory + "/corresps.txt");
-  for (int i : _inliersInds) {
-    out << i << std::endl;
-    out << rays[i].first.transpose() << std::endl;
-    out << rays[i].second.transpose() << std::endl;
-    out << motion.translation().transpose() << std::endl;
-    out << motion.unit_quaternion().coeffs().transpose() << std::endl;
+  if (FLAGS_write_files) {
+    std::ofstream out(FLAGS_output_directory + "/corresps.txt");
+    for (int i : _inliersInds) {
+      out << i << std::endl;
+      out << rays[i].first.transpose() << std::endl;
+      out << rays[i].second.transpose() << std::endl;
+      out << motion.translation().transpose() << std::endl;
+      out << motion.unit_quaternion().coeffs().transpose() << std::endl;
+    }
+    out.close();
   }
-  out.close();
 }
 
 int StereoGeometryEstimator::inliersNum() { return _inliersInds.size(); }
@@ -285,7 +287,7 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
   coarseFound = true;
   motion = bestMotion;
 
-  if (FLAGS_output_reproj_CDF) {
+  if (FLAGS_write_files && FLAGS_output_reproj_CDF) {
     std::vector<double> values = reservedVector<double>(rays.size());
     Mat33 E = toEssential(motion);
     Mat33 Et = E.transpose();

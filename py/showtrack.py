@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from numpy.linalg import norm
 
+arr_len = 0.05
+
 def extract_motions(fname):
     tbl = pd.read_csv(fname, sep='\s+', header=None,
                       index_col=0, dtype=np.float64)
@@ -25,7 +27,7 @@ def draw_motions(axes, motions, color, label):
     axes.quiver(centers[:, 0], centers[:, 1], centers[:, 2],
               dir_vects[:, 0], dir_vects[:, 1], dir_vects[:, 2], 
                 color=color, normalize=True, arrow_length_ratio=0.2, 
-                length=0.15, label=label)
+                length=arr_len, label=label)
 
 def main(argv):
     if (len(argv) != 2):
@@ -71,14 +73,14 @@ def main(argv):
 
     ax.view_init(azim=-90, elev=0)
 
-    xylim = 4
+    xylim = 1
     ax.set_xlim3d(-xylim, xylim)
     ax.set_ylim3d(-xylim, xylim)
     ax.set_zlim3d(0, 2 * xylim)
 
     draw_motions(ax, actual, 'orange', 'полученая оценка')
-    if has_predicted:
-        draw_motions(ax, predicted, 'blue')
+    #  if has_predicted:
+        #  draw_motions(ax, predicted, 'blue', 'предсказанная траектория')
     if has_ground_truth:
         draw_motions(ax, ground_truth, 'green', 'точная траектория')
     elif has_stereo_matched:

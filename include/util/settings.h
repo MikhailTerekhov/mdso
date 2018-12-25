@@ -22,7 +22,6 @@ extern int settingKeyPointsCount;
 extern int settingRansacMaxIter;
 extern double settingInitKeypointsObserveAngle;
 extern double settingMatchNonMove;
-extern int settingFirstFramesSkip;
 extern bool settingUsePlainTriangulation;
 
 constexpr int settingEssentialMinimalSolveN = 5;
@@ -74,6 +73,7 @@ extern int settingMaxKeyFrames;
 
 DECLARE_int32(num_threads);
 
+DECLARE_int32(first_frames_skip);
 DECLARE_bool(use_ORB_initialization);
 DECLARE_bool(run_max_RANSAC_iterations);
 DECLARE_bool(average_ORB_motion);
@@ -91,9 +91,13 @@ DECLARE_bool(use_grad_weights_on_tracking);
 
 DECLARE_bool(fixed_motion_on_first_ba);
 
+DECLARE_bool(continue_choosing_keyframes);
+
 DECLARE_double(red_depths_part);
 DECLARE_double(blue_depths_part);
 
+DECLARE_bool(show_interpolation);
+DECLARE_bool(write_files);
 DECLARE_string(output_directory);
 
 #endif

@@ -9,8 +9,10 @@
 namespace fishdso {
 
 DelaunayDsoInitializer::DelaunayDsoInitializer(
-    CameraModel *cam, DelaunayDsoInitializer::DebugOutputType debugOutputType)
-    : cam(cam), stereoMatcher(cam), hasFirstFrame(false), framesSkipped(0) {}
+    DsoSystem *dsoSystem, CameraModel *cam,
+    DelaunayDsoInitializer::DebugOutputType debugOutputType)
+    : dsoSystem(dsoSystem), cam(cam), stereoMatcher(cam), hasFirstFrame(false),
+      framesSkipped(0) {}
 
 bool DelaunayDsoInitializer::addFrame(const cv::Mat &frame,
                                       int globalFrameNum) {
@@ -20,7 +22,7 @@ bool DelaunayDsoInitializer::addFrame(const cv::Mat &frame,
     hasFirstFrame = true;
     return false;
   } else {
-    if (framesSkipped < settingFirstFramesSkip) {
+    if (framesSkipped < FLAGS_first_frames_skip) {
       ++framesSkipped;
       return false;
     }
@@ -36,6 +38,12 @@ std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFrames() {
   std::vector<double> depths[2];
   SE3 motion = stereoMatcher.match(frames, keyPoints, depths);
 
+  StdVector<std::pair<Vec2, double>> lastKeyPointDepths;
+  lastKeyPointDepths.reserve(keyPoints[1].size());
+  for (int i = 0; i < keyPoints[1].size(); ++i)
+    lastKeyPointDepths.push_back({keyPoints[1][i], depths[1][i]});
+  dsoSystem->lastKeyPointDepths = std::move(lastKeyPointDepths);
+
   return createKeyFramesDelaunay(cam, frames, globalFrameNums, keyPoints,
                                  depths, motion, debugOutputType);
 }
@@ -48,6 +56,8 @@ std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFramesDelaunay(
   for (int i = 0; i < 2; ++i) {
     keyFrames.push_back(KeyFrame(cam, frames[i], frameNums[i]));
     keyFrames.back().activateAllImmature();
+    for (const auto &op : keyFrames.back().optimizedPoints)
+      op->stddev = 1;
   }
 
   keyFrames[0].preKeyFrame->worldToThis = SE3();
@@ -150,9 +160,9 @@ std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFramesDelaunay(
       // cv::imwrite(FLAGS_output_directory + "/keypoints2.jpg", kpOnly1);
 
       kpTerrains[1].draw(img, cam, CV_GREEN, minDepthCol, maxDepthCol);
+      insertDepths(img, pnts, d, minDepthCol, maxDepthCol, false);
 
       if (debugOutputType == SPARSE_DEPTHS) {
-        insertDepths(img, pnts, d, minDepthCol, maxDepthCol, false);
 
         // for (auto ip : keyFrames[1].interestPoints)
         // kpTerrains[1].checkAllSectors(cam->unmap(ip.p.data()), cam, img);
@@ -184,8 +194,12 @@ std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFramesDelaunay(
       // cv::imwrite("../../../../test/data/maps/uncovered/frame5.jpg", img);
       // cv::imshow("tangent", tangImg);
 
-      // cv::imshow("interpolated", img);
-      cv::imwrite(FLAGS_output_directory + "/triangulated.jpg", img);
+      if (FLAGS_show_interpolation) {
+        cv::imshow("interpolated", img);
+        cv::waitKey();
+      }
+      if (FLAGS_write_files)
+        cv::imwrite(FLAGS_output_directory + "/interpolated.jpg", img);
 
       // int pyrDW = frames[1].cols / 2, pyrDH = frames[1].rows / 2;
       // for (int pi = 0; pi < settingPyrLevels; ++pi) {
