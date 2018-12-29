@@ -187,10 +187,10 @@ void BundleAdjuster::adjust(int maxNumIterations) {
 
         for (int i = 0; i < settingResidualPatternSize; ++i) {
           const Vec2 &pos = op->p + settingResidualPattern[i];
-          DirectResidual *newResidual =
-              new DirectResidual(&baseFrame->preKeyFrame->frameInterpolator,
-                                 &refFrame->preKeyFrame->frameInterpolator, cam,
-                                 op.get(), pos, baseFrame, refFrame);
+          DirectResidual *newResidual = new DirectResidual(
+              &baseFrame->preKeyFrame->framePyr.interpolator(0),
+              &refFrame->preKeyFrame->framePyr.interpolator(0), cam, op.get(),
+              pos, baseFrame, refFrame);
 
           double gradNorm = baseFrame->gradNorm(toCvPoint(pos));
           double c = settingGradientWeighingConstant;

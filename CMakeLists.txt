@@ -84,6 +84,9 @@ set_source_files_properties(essietial_5pt_estimator_SOURCE_FILES
                            PROPERTIES COMPILE_FLAGS -O3
 )
 
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -march=native")
+
 add_library(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES}
     ${essietial_5pt_estimator_SOURCE_FILES}
 )

@@ -23,7 +23,7 @@ img1 and img2 name files with two frames to track.)abacaba";
   }
 
   CameraModel cam(1920, 1208, argv[1]);
-  DelaunayDsoInitializer initializer(&cam, DelaunayDsoInitializer::NO_DEBUG);
+  DelaunayDsoInitializer initializer(nullptr, &cam, DelaunayDsoInitializer::NO_DEBUG);
   cv::Mat frame1, frame2;
   frame1 = cv::imread(argv[2]);
   if (frame1.data == NULL) {
@@ -37,7 +37,8 @@ img1 and img2 name files with two frames to track.)abacaba";
     return 0;
   }
 
-  settingFirstFramesSkip = 0;
+  FLAGS_first_frames_skip = 0;
+  FLAGS_perform_full_tracing = true;
   initializer.addFrame(frame1, 1);
   initializer.addFrame(frame2, 2);
   std::vector<KeyFrame> keyFrames =

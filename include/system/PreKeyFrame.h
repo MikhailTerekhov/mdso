@@ -25,8 +25,6 @@ struct PreKeyFrame {
   EIGEN_STRONG_INLINE cv::Mat1b &frame() { return framePyr[0]; }
   EIGEN_STRONG_INLINE const cv::Mat1b &frame() const { return framePyr[0]; }
 
-  ceres::Grid2D<unsigned char, 1> frameGrid;
-  ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> frameInterpolator;
   CameraModel *cam;
   SE3 worldToThis;
   AffineLightTransform<double> lightWorldToThis;

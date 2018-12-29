@@ -57,8 +57,9 @@ void KeyFrame::activateAllImmature() {
 }
 
 void KeyFrame::deactivateAllOptimized() {
-  for (const auto &op : optimizedPoints)  {
-    std::unique_ptr<ImmaturePoint> ip(new ImmaturePoint(preKeyFrame.get(), op->p));
+  for (const auto &op : optimizedPoints) {
+    std::unique_ptr<ImmaturePoint> ip(
+        new ImmaturePoint(preKeyFrame.get(), op->p));
     ip->depth = op->depth();
     immaturePoints.insert(std::move(ip));
   }
@@ -144,8 +145,9 @@ cv::Mat KeyFrame::drawDepthedFrame(double minDepth, double maxDepth) {
   cv::Mat res = preKeyFrame->frameColored.clone();
 
   for (const auto &ip : immaturePoints)
-    putSquare(res, toCvPoint(ip->p), 5,
-              toCvVec3bDummy(depthCol(ip->depth, minDepth, maxDepth)), 2);
+    if (ip->state == ImmaturePoint::ACTIVE)
+      putSquare(res, toCvPoint(ip->p), 5,
+                toCvVec3bDummy(depthCol(ip->depth, minDepth, maxDepth)), 2);
   for (const auto &op : optimizedPoints)
     cv::circle(res, toCvPoint(op->p), 5,
                toCvVec3bDummy(depthCol(op->depth(), minDepth, maxDepth)), 2);

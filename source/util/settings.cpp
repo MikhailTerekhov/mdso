@@ -31,9 +31,12 @@ double settingEpsSamePoints = 1e-9;
 double settingTriangulationDrawPadding = 0.1;
 
 int settingEpipolarOnImageTestCount = 100;
+int settingEpipolarMaxSearchCount = 50;
 double settingEpipolarOutlierIntencityDiff = settingBAOutlierIntensityDiff;
-double settingMinSecondBestDistance = 4.0;
-double settingMinOptimizedQuality = 2.0;
+double settingMinSecondBestDistance = 9.0;
+double settingOutlierEpipolarEnergy = 16 * settingEpipolarOutlierIntencityDiff *
+                                      settingEpipolarOutlierIntencityDiff;
+double settingOutlierEpipolarQuality = 2.0;
 
 double settingMinAffineLigthtA = -std::log(1.1);
 double settingMaxAffineLigthtA = std::log(1.1);
@@ -86,6 +89,9 @@ DEFINE_bool(draw_inlier_matches, false, "Debug output stereo inlier matches.");
 
 DEFINE_bool(optimize_affine_light, true,
             "Perform affine light transform optimization while tracking?");
+
+DEFINE_bool(perform_full_tracing, false, 
+    "Do we need to search through full epipolar curve?");
 
 DEFINE_bool(
     perform_tracking_check_stereo, false,

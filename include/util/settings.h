@@ -39,9 +39,11 @@ extern double settingTriangulationDrawPadding;
 
 // epipolar curve search
 extern int settingEpipolarOnImageTestCount;
+extern int settingEpipolarMaxSearchCount;
 extern double settingEpipolarOutlierIntencityDiff;
 extern double settingMinSecondBestDistance;
-extern double settingMinOptimizedQuality;
+extern double settingOutlierEpipolarEnergy;
+extern double settingOutlierEpipolarQuality;
 
 // common direct alignment parameters
 extern double settingMinAffineLigthtA;
@@ -82,6 +84,8 @@ DECLARE_bool(switch_first_motion_to_GT);
 DECLARE_bool(draw_inlier_matches);
 
 DECLARE_bool(optimize_affine_light);
+
+DECLARE_bool(perform_full_tracing);
 
 DECLARE_bool(perform_tracking_check_stereo);
 DECLARE_bool(perform_tracking_check_GT);

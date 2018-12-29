@@ -42,7 +42,9 @@ std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFrames() {
   lastKeyPointDepths.reserve(keyPoints[1].size());
   for (int i = 0; i < keyPoints[1].size(); ++i)
     lastKeyPointDepths.push_back({keyPoints[1][i], depths[1][i]});
-  dsoSystem->lastKeyPointDepths = std::move(lastKeyPointDepths);
+
+  if (dsoSystem)
+    dsoSystem->lastKeyPointDepths = std::move(lastKeyPointDepths);
 
   return createKeyFramesDelaunay(cam, frames, globalFrameNums, keyPoints,
                                  depths, motion, debugOutputType);
@@ -126,104 +128,36 @@ std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFramesDelaunay(
     setDepthColBounds(opDepths);
 
     if (debugOutputType != NO_DEBUG) {
-      cv::Mat img = keyFrames[1].preKeyFrame->frameColored.clone();
-      // KpTerrains[1].draw(img, CV_GREEN);
+      if (FLAGS_show_interpolation || FLAGS_write_files) {
+        cv::Mat img = keyFrames[1].preKeyFrame->frameColored.clone();
+        insertDepths(img, initialPoints[1], initialDepths[1], minDepthCol,
+                     maxDepthCol, true);
 
-      insertDepths(img, initialPoints[1], initialDepths[1], minDepthCol,
-                   maxDepthCol, true);
+        // cv::circle(img, cv::Point(1268, 173), 7, CV_BLACK, 2);
 
-      // cv::circle(img, cv::Point(1268, 173), 7, CV_BLACK, 2);
+        auto &ops = keyFrames[1].optimizedPoints;
+        StdVector<Vec2> pnts;
+        pnts.reserve(ops.size());
+        std::vector<double> d;
+        d.reserve(ops.size());
+        for (const auto &op : ops) {
+          pnts.push_back(op->p);
+          d.push_back(op->depth());
+        }
 
-      auto &ops = keyFrames[1].optimizedPoints;
-      StdVector<Vec2> pnts;
-      pnts.reserve(ops.size());
-      std::vector<double> d;
-      d.reserve(ops.size());
-      for (const auto &op : ops) {
-        pnts.push_back(op->p);
-        d.push_back(op->depth());
+        kpTerrains[1].draw(img, cam, CV_GREEN, minDepthCol, maxDepthCol);
+        insertDepths(img, pnts, d, minDepthCol, maxDepthCol, false);
+
+        if (FLAGS_show_interpolation) {
+          cv::imshow("interpolated", img);
+          cv::waitKey();
+        }
+
+        if (FLAGS_write_files)
+          cv::imwrite(FLAGS_output_directory + "/interpolated.jpg", img);
       }
-
-      //    drawCurvedInternal(cam, Vec2(100.0, 100.0), Vec2(1000.0, 500.0),
-      //    img,
-      //                       CV_BLACK);
-
-      // KpTerrains[1].drawCurved(cam, img, CV_GREEN);
-
-      // cv::Mat kpOnly0 = keyFrames[0].preKeyFrame->frameColored.clone();
-      // insertDepths(kpOnly0, keyPoints[0], depths[0], minDepth, maxDepth,
-      // true); cv::imshow("kp only first", kpOnly0);
-      // cv::imwrite(FLAGS_output_directory + "/keypoints1.jpg", kpOnly0);
-
-      // cv::Mat kpOnly1 = img.clone();
-      // cv::imshow("keypoints only second", kpOnly1);
-      // cv::imwrite(FLAGS_output_directory + "/keypoints2.jpg", kpOnly1);
-
-      kpTerrains[1].draw(img, cam, CV_GREEN, minDepthCol, maxDepthCol);
-      insertDepths(img, pnts, d, minDepthCol, maxDepthCol, false);
-
-      if (debugOutputType == SPARSE_DEPTHS) {
-
-        // for (auto ip : keyFrames[1].interestPoints)
-        // kpTerrains[1].checkAllSectors(cam->unmap(ip.p.data()), cam, img);
-
-      } else if (debugOutputType == FILLED_DEPTHS) {
-        //        if (interpolationType == PLAIN)
-        //          kpTerrains[1].drawDensePlainDepths(img, minDepth,
-        //          maxDepth);
-        // KpTerrains[1].draw(img, CV_BLACK);
-      }
-
-      // cv::Mat tangImg = kpTerrains[1].drawTangentTri(800, 800);
-      //      cv::imwrite("../../../../test/data/maps/badtri/frame505tangentTriang.jpg",
-      //                  tangImg);
-
-      //      kpTerrains[1].fillUncovered(img, cam, CV_BLACK);
-
-      //      cv::Mat img3;
-      //      cv::Mat maskb = stereoMatcher.getMask();
-      //      cv::Mat mask;
-      //      cv::cvtColor(maskb, mask, cv::COLOR_GRAY2BGR);
-      //      cv::addWeighted(mask, 0.5, img, 0.5, 0, img3, img.depth());
-      // cv::imshow("masked", img3);
-      //      cv::imwrite("../../../../test/data/maps/badtri_removed/frame5Masked.jpg",
-      //                  img3);
-
-      // cv::imshow("first frame", keyFrames[0].preKeyFrame->frameColored);
-
-      // cv::imwrite("../../../../test/data/maps/uncovered/frame5.jpg", img);
-      // cv::imshow("tangent", tangImg);
-
-      if (FLAGS_show_interpolation) {
-        cv::imshow("interpolated", img);
-        cv::waitKey();
-      }
-      if (FLAGS_write_files)
-        cv::imwrite(FLAGS_output_directory + "/interpolated.jpg", img);
-
-      // int pyrDW = frames[1].cols / 2, pyrDH = frames[1].rows / 2;
-      // for (int pi = 0; pi < settingPyrLevels; ++pi) {
-      // cv::Mat pyrD =
-      // keyFrames[1].preKeyFrame->drawDepthedFrame(pi, minDepth, maxDepth);
-      // cv::Mat sizedPyrD;
-      // cv::resize(pyrD, sizedPyrD, cv::Size(pyrDW, pyrDH), 0, 0,
-      // cv::INTER_NEAREST);
-
-      // cv::imshow("pyr " + std::to_string(pi) + " depths", sizedPyrD);
-
-      // cv::Mat img2;
-      // cv::resize(img, img2, cv::Size(), 0.5, 0.5);
-      // }
-
-      // cv::waitKey();
-
-      // cv::destroyWindow("interpolated");
     }
   }
-
-  // cv::imshow("f1", frames[0]);
-  // cv::imshow("f2", frames[1]);
-  // cv::waitKey();
 
   return keyFrames;
 }

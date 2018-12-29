@@ -39,7 +39,7 @@ KittiReader::KittiReader(const std::string &newKittiDir, int sequenceNum,
   SE3 startToWorld = worldToFrameGT[startFrame].inverse();
   for (SE3 &worldToThis : worldToFrameGT)
     worldToThis = worldToThis * startToWorld;
-  double scale = 1.0 / worldToFrameGT[startFrame + settingFirstFramesSkip + 1]
+  double scale = 1.0 / worldToFrameGT[startFrame + FLAGS_first_frames_skip + 1]
                            .translation()
                            .norm();
   for (SE3 &worldToThis : worldToFrameGT)
