@@ -32,7 +32,6 @@ struct KeyFrame {
   cv::Mat drawDepthedFrame(double minDepth, double maxDepth);
 
   std::shared_ptr<PreKeyFrame> preKeyFrame;
-  cv::Mat1d gradX, gradY, gradNorm;
 
   StdUnorderedSet<std::unique_ptr<ImmaturePoint>> immaturePoints;
   StdUnorderedSet<std::unique_ptr<OptimizedPoint>> optimizedPoints;

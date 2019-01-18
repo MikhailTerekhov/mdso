@@ -17,8 +17,6 @@ struct ImmaturePoint {
 
   ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p);
 
-  void pointsToTrace(const SE3 &baseToRef, StdVector<Vec2> &points,
-                     std::vector<Vec3> &directions);
   void traceOn(const PreKeyFrame &refFrame, TracingDebugType debugType);
 
   static void
@@ -29,6 +27,8 @@ struct ImmaturePoint {
   Vec2 p;
   Vec3 baseDirections[settingResidualPatternSize];
   double baseIntencities[settingResidualPatternSize];
+  Vec2 baseGrad[settingResidualPatternSize];
+  Vec2 baseGradNorm[settingResidualPatternSize];
   double minDepth, maxDepth;
   double depth;
   double bestQuality;
@@ -36,6 +36,15 @@ struct ImmaturePoint {
   const PreKeyFrame *baseFrame;
   CameraModel *cam;
   State state;
+
+  //output only
+  double lastIntVar, lastGeomVar, lastFullVar;
+
+private:
+  bool pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth,
+                     Vec3 &dirMaxDepth, StdVector<Vec2> &points,
+                     std::vector<Vec3> &directions);
+  double estVariance(const Vec2 &searchDirection);
 };
 
 } // namespace fishdso

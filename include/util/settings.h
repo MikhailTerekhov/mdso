@@ -39,7 +39,10 @@ extern double settingTriangulationDrawPadding;
 
 // epipolar curve search
 extern int settingEpipolarOnImageTestCount;
-extern int settingEpipolarMaxSearchCount;
+extern double settingEpipolarMaxSearchRel;
+extern double settingEpipolarPositionVariance;
+extern double settingEpipolarIntencityVariance;
+extern double settingEpipolarMinImprovementFactor;
 extern double settingEpipolarOutlierIntencityDiff;
 extern double settingMinSecondBestDistance;
 extern double settingOutlierEpipolarEnergy;

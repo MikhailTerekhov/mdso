@@ -12,8 +12,6 @@ KeyFrame::KeyFrame(CameraModel *cam, const cv::Mat &frameColored,
                    int globalFrameNum)
     : preKeyFrame(std::shared_ptr<PreKeyFrame>(
           new PreKeyFrame(cam, frameColored, globalFrameNum))) {
-  grad(preKeyFrame->frame(), gradX, gradY, gradNorm);
-
   int foundTotal = selectPoints(adaptiveBlockSize, settingInterestPointsUsed);
   lastBlockSize = adaptiveBlockSize;
   updateAdaptiveBlockSize(foundTotal);
@@ -21,8 +19,6 @@ KeyFrame::KeyFrame(CameraModel *cam, const cv::Mat &frameColored,
 
 KeyFrame::KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame)
     : preKeyFrame(newPreKeyFrame) {
-  grad(preKeyFrame->frame(), gradX, gradY, gradNorm);
-
   int foundTotal = selectPoints(adaptiveBlockSize, settingInterestPointsUsed);
   lastBlockSize = adaptiveBlockSize;
   updateAdaptiveBlockSize(foundTotal);
@@ -94,7 +90,7 @@ int KeyFrame::selectPoints(int blockSize, int pointsNeeded) {
     pointsOverThres[i].reserve(settingInterestPointsAdaptTo);
 
   for (int i = 0; i < LI; ++i) {
-    selectInterestPointsInternal(gradNorm, (1 << i) * blockSize,
+    selectInterestPointsInternal(preKeyFrame->gradNorm, (1 << i) * blockSize,
                                  settingGradThreshold[i], pointsOverThres[i]);
     std::random_shuffle(pointsOverThres[i].begin(), pointsOverThres[i].end());
     // std::cout << "over thres " << i << " are " << pointsOverThres[i].size()

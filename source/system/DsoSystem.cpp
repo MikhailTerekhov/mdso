@@ -12,7 +12,8 @@ DsoSystem::DsoSystem(CameraModel *cam)
     : cam(cam), camPyr(cam->camPyr()),
       dsoInitializer(std::unique_ptr<DsoInitializer>(new DelaunayDsoInitializer(
           this, cam, DelaunayDsoInitializer::SPARSE_DEPTHS))),
-      isInitialized(false), lastInitialized(nullptr) {
+      isInitialized(false), lastInitialized(nullptr),
+      adaptiveBlockSize(settingInitialAdaptiveBlockSize) {
   LOG(INFO) << "create DsoSystem" << std::endl;
 }
 
@@ -252,8 +253,7 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
     bundleAdjuster.adjust(settingMaxBAIterations);
 
     int kfNum = preKeyFrame->globalFrameNum;
-    keyFrames.insert(
-        std::pair<int, KeyFrame>(kfNum, KeyFrame(std::move(preKeyFrame))));
+    keyFrames.insert(std::pair<int, KeyFrame>(kfNum, KeyFrame(preKeyFrame)));
 
     frameTracker = std::unique_ptr<FrameTracker>(
         new FrameTracker(camPyr, optimizedPointsOntoBaseKf()));

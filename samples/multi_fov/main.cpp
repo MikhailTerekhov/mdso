@@ -146,55 +146,16 @@ std::array<KeyFrame, 2> kfFromEpipolar(CameraModel *cam, const cv::Mat &frame1,
                                        const SE3 &fToSUsed) {
   std::array<KeyFrame, 2> result{KeyFrame(cam, frame1, 0),
                                  KeyFrame(cam, frame2, 1)};
-  // std::cout << "matched" << std::endl;
   result[1].preKeyFrame->worldToThis = fToSUsed;
-  // result[1].preKeyFrame->worldToThis = fToSGT;
 
   for (int kfInd : {0, 1}) {
-    // std::cout << "sz=" << result[kfInd].immaturePoints.size() << std::endl;
     int ipInd = 0;
     int intPrc = 0;
     for (const auto &ip : result[kfInd].immaturePoints) {
-      // double prc =
-      // double(ipInd++) / result[kfInd].immaturePoints.size() * 100.0;
-      // if (int(prc) != intPrc) {
-      // intPrc = int(prc);
-      // std::cout << intPrc << "%" << std::endl;
-      // }
-
       ip->traceOn(*result[(kfInd + 1) % 2].preKeyFrame,
                   ImmaturePoint::NO_DEBUG);
     }
   }
-
-  // std::vector<double> allQ;
-  // std::vector<double> allE;
-
-  // for (const auto &kf : result)
-  // for (const auto &ip : kf.immaturePoints) {
-  // allQ.push_back(ip->bestQuality);
-  // allE.push_back(ip->lastEnergy);
-  // }
-
-  // std::sort(allQ.begin(), allQ.end());
-  // std::sort(allE.begin(), allE.end());
-
-  // std::ofstream qs("allq.txt");
-  // for (double q : allQ)
-  // qs << q << ' ';
-  // qs << std::endl;
-  // qs.close();
-  // std::ofstream es("alle.txt");
-  // for (double e : allE)
-  // es << e << ' ';
-  // es << std::endl;
-  // es.close();
-
-  // setDepthColBounds(depths[1]);
-  // cv::Mat kpDrawn = frame2.clone();
-  // insertDepths(kpDrawn, keyPoints[1], depths[1], minDepthCol, maxDepthCol,
-  // false);
-  // cv::imshow("key points", kpDrawn);
 
   return result;
 }
@@ -427,6 +388,9 @@ DEFINE_bool(collect_BA, true,
             "Do we need to collect post-stereo optimizations errors?");
 DEFINE_bool(collect_full_DSO, false,
             "Do we need to collect errors on full DSO run?");
+DEFINE_bool(collect_disparities, false,
+            "Do we need to collect disparity errors when tracing?");
+
 DEFINE_int32(dso_test_count, 100,
              "Number of tests to collect full DSO errors from");
 DEFINE_bool(
@@ -640,16 +604,18 @@ private:
   std::vector<double> *depthErrors;
   std::vector<double> *kpDepthErrors;
   std::vector<double> *epipolarDepthErrors;
+  std::vector<std::pair<double, double>> *trackedDisp;
 
 public:
   CollectFullDSO(const MultiFovReader *reader, int *startFrames,
                  int *correctlyTracked, std::vector<double> *depthErrors,
                  std::vector<double> *kpDepthErrors,
-                 std::vector<double> *epipolarDepthErrors)
+                 std::vector<double> *epipolarDepthErrors,
+                 std::vector<std::pair<double, double>> *trackedDisp)
       : reader(reader), startFrames(startFrames),
         correctlyTracked(correctlyTracked), depthErrors(depthErrors),
-        kpDepthErrors(kpDepthErrors), epipolarDepthErrors(epipolarDepthErrors) {
-  }
+        kpDepthErrors(kpDepthErrors), epipolarDepthErrors(epipolarDepthErrors),
+        trackedDisp(trackedDisp) {}
 
   void operator()(const tbb::blocked_range<int> &range) const {
     for (int ind = range.begin(); ind < range.end(); ++ind) {
@@ -730,6 +696,11 @@ public:
               reader->getFrame(initFrameNum), firstToLastInit);
 
           for (int kfNum = 0; kfNum < 1; ++kfNum) {
+            SE3 curToOther =
+                (kfNum == 0 ? firstToLastInit : firstToLastInit.inverse());
+            SE3 curToOtherGT =
+                (kfNum == 0 ? firstToLastInitGT : firstToLastInitGT.inverse());
+
             cv::Mat1f dGT =
                 reader->getDepths(kfNum == 0 ? startFrames[ind] : initFrameNum);
             for (const auto &ip : kf[kfNum].immaturePoints) {
@@ -738,6 +709,16 @@ public:
               double depthGT = dGT(toCvPoint(ip->p));
               epipolarDepthErrors[ind].push_back(
                   std::abs(scale * ip->depth - depthGT) / depthGT);
+
+              if (FLAGS_collect_disparities) {
+                Vec2 reprojGT = reader->cam->map(
+                    curToOtherGT * (depthGT * reader->cam->unmap(ip->p)));
+                Vec2 reproj = reader->cam->map(
+                    curToOther * (ip->depth * reader->cam->unmap(ip->p)));
+                double predDev = std::sqrt(ip->lastFullVar);
+                double realDev = (reprojGT - reproj).norm();
+                trackedDisp[ind].push_back({predDev, realDev});
+              }
             }
           }
           if (FLAGS_show_all) {
@@ -896,6 +877,7 @@ void collectStatistics(const MultiFovReader &reader) {
     std::vector<double> depthErrors[testCount];
     std::vector<double> kpDepthErrors[testCount];
     std::vector<double> epipolarDepthErrors[testCount];
+    std::vector<std::pair<double, double>> trackedDisp[testCount];
     int lastFrameNum =
         std::min(FLAGS_end_frame, lastFrameNumGlobal - FLAGS_max_DSO_input);
 
@@ -907,16 +889,18 @@ void collectStatistics(const MultiFovReader &reader) {
       tbb::parallel_for(tbb::blocked_range<int>(0, testCount),
                         CollectFullDSO(&reader, startFrames, correctlyTracked,
                                        depthErrors, kpDepthErrors,
-                                       epipolarDepthErrors));
+                                       epipolarDepthErrors, trackedDisp));
     } else {
       CollectFullDSO(&reader, startFrames, correctlyTracked, depthErrors,
-                     kpDepthErrors, epipolarDepthErrors)(
-          tbb::blocked_range<int>(0, testCount));
+                     kpDepthErrors, epipolarDepthErrors,
+                     trackedDisp)(tbb::blocked_range<int>(0, testCount));
     }
 
     std::vector<double> allErrors;
     std::vector<double> allKpErrors;
     std::vector<double> allEpipolarErrors;
+    std::vector<std::pair<double, double>> allDisp;
+
     for (int it = 0; it < testCount; ++it)
       for (double e : depthErrors[it])
         allErrors.push_back(e);
@@ -930,6 +914,32 @@ void collectStatistics(const MultiFovReader &reader) {
     std::sort(allErrors.begin(), allErrors.end());
     std::sort(allKpErrors.begin(), allKpErrors.end());
     std::sort(allEpipolarErrors.begin(), allEpipolarErrors.end());
+
+
+    for (int it = 0; it < testCount; ++it)
+      for (const auto &e : trackedDisp[it])
+        allDisp.push_back(e);
+    std::sort(allDisp.begin(), allDisp.end(),
+              [](const auto &a, const auto &b) { return a.first < b.first; });
+    const double step = 1.0;
+    const double maxDev = 15.0;
+    double upDev = step;
+    std::vector<double> curErr;
+    std::vector<double> med;
+    for (const auto &e : allDisp) {
+      if (upDev > maxDev || e.first < upDev)
+        curErr.push_back(e.second);
+      else {
+        upDev += step;
+        std::sort(curErr.begin(), curErr.end());
+        med.push_back(curErr.empty() ? -1 : curErr[curErr.size() / 2]);
+        curErr.resize(0);
+      }
+    }
+    std::sort(curErr.begin(), curErr.end());
+    med.push_back(curErr.empty() ? -1 : curErr[curErr.size() / 2]);
+    outputArray("med.txt", med);
+
 
     std::ofstream depthErr("dso_depth_err.txt");
     for (double e : allErrors)

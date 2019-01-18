@@ -38,15 +38,29 @@ img1 and img2 name files with two frames to track.)abacaba";
   }
 
   FLAGS_first_frames_skip = 0;
-  FLAGS_perform_full_tracing = true;
+  // FLAGS_perform_full_tracing = true;
   initializer.addFrame(frame1, 1);
   initializer.addFrame(frame2, 2);
   std::vector<KeyFrame> keyFrames =
       initializer.createKeyFrames();
   keyFrames[0].deactivateAllOptimized();
 
-  for (auto &ip : keyFrames[0].immaturePoints)
-    ip->traceOn(*keyFrames[1].preKeyFrame, ImmaturePoint::DRAW_EPIPOLE);
+  std::vector<double> intVars, geomVars, fullVars;
+  for (auto &ip : keyFrames[0].immaturePoints) {
+    // ip->traceOn(*keyFrames[1].preKeyFrame, ImmaturePoint::DRAW_EPIPOLE);
+    ip->traceOn(*keyFrames[1].preKeyFrame, ImmaturePoint::NO_DEBUG);
+    intVars.push_back(ip->lastIntVar);
+    geomVars.push_back(ip->lastGeomVar);
+    fullVars.push_back(ip->lastFullVar);
+  }
+
+  std::sort(intVars.begin(), intVars.end());
+  std::sort(geomVars.begin(), geomVars.end());
+  std::sort(fullVars.begin(), fullVars.end());
+
+  outputArray("int.txt", intVars);
+  outputArray("geo.txt", geomVars);
+  outputArray("full.txt", fullVars);
 
 
   return 0;

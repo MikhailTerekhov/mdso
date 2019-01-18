@@ -31,7 +31,10 @@ double settingEpsSamePoints = 1e-9;
 double settingTriangulationDrawPadding = 0.1;
 
 int settingEpipolarOnImageTestCount = 100;
-int settingEpipolarMaxSearchCount = 50;
+double settingEpipolarMaxSearchRel = 0.027;
+double settingEpipolarPositionVariance = settingResidualPatternSize * 16.0;
+double settingEpipolarIntencityVariance = settingResidualPatternSize * 2.0;
+double settingEpipolarMinImprovementFactor = 1.5;
 double settingEpipolarOutlierIntencityDiff = settingBAOutlierIntensityDiff;
 double settingMinSecondBestDistance = 9.0;
 double settingOutlierEpipolarEnergy = 16 * settingEpipolarOutlierIntencityDiff *

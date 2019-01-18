@@ -17,6 +17,15 @@ EIGEN_STRONG_INLINE std::vector<T> reservedVector(int toReserve) {
   return res;
 }
 
+template <typename T>
+void outputArray(const std::string &fname, const std::vector<T> &array) {
+  std::ofstream ofs(fname);
+  for (const T &a : array)
+    ofs << a << ' ';
+  ofs << std::endl;
+  ofs.close();
+}
+
 void setDepthColBounds(const std::vector<double> &depths);
 
 void putMotion(std::ostream &out, const SE3 &motion);

@@ -15,25 +15,25 @@ ImmaturePoint::ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p)
     return;
   }
   for (int i = 0; i < settingResidualPatternSize; ++i) {
-    baseDirections[i] = cam->unmap(p + settingResidualPattern[i]).normalized();
-    baseIntencities[i] =
-        baseFrame->frame()(toCvPoint(p + settingResidualPattern[i]));
+    Vec2 curP = p + settingResidualPattern[i];
+    cv::Point curPCV = toCvPoint(curP);
+    baseDirections[i] = cam->unmap(curP).normalized();
+    baseIntencities[i] = baseFrame->frame()(curPCV);
+
+    baseGrad[i] = Vec2(baseFrame->gradX(curPCV), baseFrame->gradY(curPCV));
+    baseGradNorm[i] = baseGrad[i].normalized();
   }
 }
 
-void ImmaturePoint::pointsToTrace(const SE3 &baseToRef, StdVector<Vec2> &points,
+bool ImmaturePoint::pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth,
+                                  Vec3 &dirMaxDepth, StdVector<Vec2> &points,
                                   std::vector<Vec3> &directions) {
   points.resize(0);
   directions.resize(0);
 
-  Vec3 dirMin = (baseToRef * (minDepth * baseDirections[0])).normalized();
-  Vec3 dirMax = maxDepth == INF
-                    ? baseToRef.so3() * baseDirections[0]
-                    : (baseToRef * (maxDepth * baseDirections[0])).normalized();
-
-  if (M_PI - angle(dirMin, dirMax) < 1e-3) {
+  if (M_PI - angle(dirMinDepth, dirMaxDepth) < 1e-3) {
     LOG(INFO) << "ret by angle" << std::endl;
-    return;
+    return false;
   }
 
   if (FLAGS_perform_full_tracing) {
@@ -42,27 +42,19 @@ void ImmaturePoint::pointsToTrace(const SE3 &baseToRef, StdVector<Vec2> &points,
     // only when angle between the mapped ray and Oz is smaller then certain
     // maxAngle, we want to intersect the segment of search with the
     // "well-mapped" part of the sphere, i.e. z > z0.
-    if (!intersectOnSphere(cam->getMaxAngle(), dirMin, dirMax)) {
+    if (!intersectOnSphere(cam->getMaxAngle(), dirMinDepth, dirMaxDepth)) {
       LOG(INFO) << "ret by no itersection" << std::endl;
       state = OUTLIER;
-      return;
+      return false;
     }
   }
 
-  double alpha = 0;
-  Vec2 curPoint;
-  Vec3 curDir = dirMax;
-  ceres::Jet<double, 3> curDirJet[3];
-  for (int i = 0; i < 3; ++i) {
-    curDirJet[i].a = curDir[i];
-    curDirJet[i].v[i] = 1;
-  }
-  Eigen::Matrix<ceres::Jet<double, 3>, 2, 1> pointJet = cam->map(curDirJet);
-
+  int maxSearchCount =
+      settingEpipolarMaxSearchRel * (cam->getWidth() + cam->getHeight());
   double alpha0 = 0;
   double step = 1.0 / (settingEpipolarOnImageTestCount - 1);
   while (alpha0 <= 1) {
-    Vec3 curDir = (1 - alpha0) * dirMax + alpha0 * dirMin;
+    Vec3 curDir = (1 - alpha0) * dirMaxDepth + alpha0 * dirMinDepth;
     Vec2 curP = cam->map(curDir);
     if (!cam->isOnImage(curP, settingResidualPatternHeight)) {
       if (!FLAGS_perform_full_tracing)
@@ -77,39 +69,52 @@ void ImmaturePoint::pointsToTrace(const SE3 &baseToRef, StdVector<Vec2> &points,
       Vec2 point;
       int pointCnt = 0;
       do {
-        Vec3 curDir = (1 - alpha) * dirMax + alpha * dirMin;
-        ceres::Jet<double, 3> curDirJet[3];
-        for (int i = 0; i < 3; ++i) {
-          curDirJet[i].a = curDir[i];
-          curDirJet[i].v.setZero();
-          curDirJet[i].v[i] = 1;
-        }
-        Eigen::Matrix<ceres::Jet<double, 3>, 2, 1> pointJet =
-            cam->map(curDirJet);
-        point[0] = pointJet[0].a;
-        point[1] = pointJet[1].a;
+        Vec3 curDir = (1 - alpha) * dirMaxDepth + alpha * dirMinDepth;
+        Mat23 mapJacobian;
+        std::tie(point, mapJacobian) = cam->diffMap(curDir);
 
         points.push_back(point);
         directions.push_back(curDir);
 
-        Mat23 mapJacobian;
-        mapJacobian << pointJet[0].v.transpose(), pointJet[1].v.transpose();
-        double deltaAlpha = 1. / (mapJacobian * (dirMax - dirMin)).norm();
+        double deltaAlpha =
+            1. / (mapJacobian * (dirMaxDepth - dirMinDepth)).norm();
         alpha += deltaAlpha;
 
         pointCnt++;
-        if (!FLAGS_perform_full_tracing &&
-            pointCnt >= settingEpipolarMaxSearchCount)
+        if (!FLAGS_perform_full_tracing && pointCnt >= maxSearchCount)
           break;
       } while (alpha >= 0 && alpha <= 1 &&
                cam->isOnImage(point, settingResidualPatternHeight));
     }
 
     if (!FLAGS_perform_full_tracing)
-
       break;
+
     alpha0 = alpha + step;
   }
+
+  return points.size() > 1;
+}
+
+double ImmaturePoint::estVariance(const Vec2 &searchDirection) {
+  double sum1 = 0;
+  for (const Vec2 &gN : baseGradNorm) {
+    double s = gN.dot(searchDirection);
+    sum1 += s * s;
+  }
+
+  // double sum2 = 0;
+  // for (const Vec2 &g : baseGrad) {
+    // double s = g.dot(searchDirection);
+    // sum2 += s * s;
+  // }
+
+  lastGeomVar = settingEpipolarPositionVariance / sum1;
+  // lastIntVar = settingEpipolarIntencityVariance / sum2;
+  lastIntVar = 0;
+  lastFullVar = lastGeomVar + lastIntVar;
+
+  return settingEpipolarPositionVariance / sum1;
 }
 
 void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
@@ -118,18 +123,44 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
       baseFrame->lightWorldToThis * refFrame.lightWorldToThis.inverse();
   SE3 baseToRef = refFrame.worldToThis * baseFrame->worldToThis.inverse();
 
+  Vec3 dirMin = (baseToRef * (minDepth * baseDirections[0])).normalized();
+  Vec3 dirMax = maxDepth == INF
+                    ? baseToRef.so3() * baseDirections[0]
+                    : (baseToRef * (maxDepth * baseDirections[0])).normalized();
+  Vec2 pointMin = cam->map(dirMin);
+  Vec2 pointMax = cam->map(dirMax);
+
+  Mat23 jacobian = cam->diffMap(dirMax).second;
+  Vec2 searchDirection = jacobian * (dirMin - dirMax);
+  searchDirection.normalize();
+
+  double variance = estVariance(searchDirection);
+  double dev = 2 * std::sqrt(variance);
+
+  if (!FLAGS_perform_full_tracing) {
+
+    double searchLength =
+        maxDepth == INF
+            ? settingEpipolarMaxSearchRel * (cam->getWidth() + cam->getHeight())
+            : (pointMax - pointMin).norm();
+    if (dev * settingEpipolarMinImprovementFactor > searchLength)
+      return;
+  }
+
+  StdVector<Vec2> points;
+  std::vector<Vec3> directions;
+  if (!pointsToTrace(baseToRef, dirMin, dirMax, points, directions))
+    return;
+
   StdVector<std::pair<Vec2, double>> energiesFound;
   double bestEnergy = INF;
   Vec2 bestPoint;
   double bestDepth;
+  int bestInd;
 
-  StdVector<Vec2> points;
-  std::vector<Vec3> directions;
-  pointsToTrace(baseToRef, points, directions);
-
-  for (int i = 0; i < directions.size(); ++i) {
-    Vec3 curDir = directions[i];
-    Vec2 point = points[i];
+  for (int dirInd = 0; dirInd < directions.size(); ++dirInd) {
+    Vec3 curDir = directions[dirInd];
+    Vec2 point = points[dirInd];
     curDir.normalize();
     Vec2 depths = triangulate(baseToRef, baseDirections[0], curDir);
     Vec2 reproj[settingResidualPatternSize];
@@ -171,11 +202,37 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
       bestEnergy = energy;
       bestPoint = point;
       bestDepth = depths[0];
+      bestInd = dirInd;
     }
   }
 
-  minDepth = bestDepth - 0.5;
-  maxDepth = bestDepth + 0.5;
+  double devFloor = std::floor(dev);
+  double devFrac = dev - devFloor;
+
+  int minDepthInd = bestInd + devFloor;
+  Vec2 minDepthPos = points[minDepthInd];
+  if (minDepthInd >= points.size() - 1) {
+    minDepthInd = points.size() - 1;
+    minDepthPos += devFrac * (points[minDepthInd] - points[minDepthInd - 1]);
+  } else
+    minDepthPos += devFrac * (points[minDepthInd + 1] - points[minDepthInd]);
+  Vec2 depthsTemp1 =
+      triangulate(baseToRef, baseDirections[0], cam->unmap(minDepthPos));
+  minDepth = depthsTemp1[0];
+
+  int maxDepthInd = bestInd - devFloor;
+  Vec2 maxDelta;
+  if (maxDepthInd <= 0)
+    maxDepth = INF;
+  else {
+    Vec2 maxDepthPos =
+        points[maxDepthInd] +
+        devFrac * (points[maxDepthInd - 1] - points[maxDepthInd]);
+    Vec2 depthTemp2 =
+        triangulate(baseToRef, baseDirections[0], cam->unmap(maxDepthPos));
+    maxDepth = depthTemp2[0];
+  }
+
   depth = bestDepth;
 
   double secondBestEnergy = INF;

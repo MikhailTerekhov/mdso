@@ -106,6 +106,8 @@ public:
     return result;
   }
 
+  std::pair<Vec2, Mat23> diffMap(const Vec3 &ray) const;
+
   EIGEN_STRONG_INLINE int getWidth() const { return width; }
   EIGEN_STRONG_INLINE int getHeight() const { return height; }
   EIGEN_STRONG_INLINE Vec2 getImgCenter() const { return scale * center; }

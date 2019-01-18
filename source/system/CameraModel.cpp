@@ -66,6 +66,19 @@ void CameraModel::normalize() {
   maxAngle = std::atan2(maxRadius, minZUnnorm);
 }
 
+std::pair<Vec2, Mat23> CameraModel::diffMap(const Vec3 &ray) const {
+  ceres::Jet<double, 3> rayJet[3];
+  for (int i = 0; i < 3; ++i) {
+    rayJet[i].a = ray[i];
+    rayJet[i].v.setZero();
+    rayJet[i].v[i] = 1;
+  }
+  Eigen::Matrix<ceres::Jet<double, 3>, 2, 1> pointJet = map(rayJet);
+  Mat23 mapJacobian;
+  mapJacobian << pointJet[0].v.transpose(), pointJet[1].v.transpose();
+  return {Vec2(pointJet[0].a, pointJet[1].a), mapJacobian};
+}
+
 bool CameraModel::isOnImage(const Vec2 &p, int border) {
   return p[0] >= border && p[0] < (width - border) && p[1] >= border &&
          p[1] <= (height - border);

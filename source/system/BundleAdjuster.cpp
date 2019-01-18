@@ -192,7 +192,7 @@ void BundleAdjuster::adjust(int maxNumIterations) {
               &refFrame->preKeyFrame->framePyr.interpolator(0), cam, op.get(),
               pos, baseFrame, refFrame);
 
-          double gradNorm = baseFrame->gradNorm(toCvPoint(pos));
+          double gradNorm = baseFrame->preKeyFrame->gradNorm(toCvPoint(pos));
           double c = settingGradientWeighingConstant;
           double weight = c / std::hypot(c, gradNorm);
           ceres::LossFunction *lossFunc = new ceres::ScaledLoss(

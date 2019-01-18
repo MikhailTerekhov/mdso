@@ -21,6 +21,7 @@ struct PreKeyFrame {
               int globalFrameNum);
 
   cv::Mat frameColored;
+  cv::Mat1d gradX, gradY, gradNorm;
   ImagePyramid framePyr;
   EIGEN_STRONG_INLINE cv::Mat1b &frame() { return framePyr[0]; }
   EIGEN_STRONG_INLINE const cv::Mat1b &frame() const { return framePyr[0]; }

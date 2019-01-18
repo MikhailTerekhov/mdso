@@ -11,7 +11,6 @@
 #include <map>
 #include <memory>
 #include <opencv2/core.hpp>
-#include <bits/vector.tcc>
 
 namespace fishdso {
 
@@ -75,6 +74,9 @@ private:
   StdMap<int, SE3> worldToFrameGT;
 
   AffineLightTransform<double> lightKfToLast;
+
+  // block size for contrast point selection algorithm
+  int adaptiveBlockSize;
 };
 
 } // namespace fishdso
