@@ -9,9 +9,9 @@
 namespace fishdso {
 
 DsoSystem::DsoSystem(CameraModel *cam)
-    : cam(cam), camPyr(cam->camPyr()),
+    : cam(cam), camPyr(cam->camPyr()), pixelSelector(),
       dsoInitializer(std::unique_ptr<DsoInitializer>(new DelaunayDsoInitializer(
-          this, cam, DelaunayDsoInitializer::SPARSE_DEPTHS))),
+          this, cam, &pixelSelector, DelaunayDsoInitializer::SPARSE_DEPTHS))),
       isInitialized(false), lastInitialized(nullptr),
       adaptiveBlockSize(settingInitialAdaptiveBlockSize) {
   LOG(INFO) << "create DsoSystem" << std::endl;
@@ -253,7 +253,8 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
     bundleAdjuster.adjust(settingMaxBAIterations);
 
     int kfNum = preKeyFrame->globalFrameNum;
-    keyFrames.insert(std::pair<int, KeyFrame>(kfNum, KeyFrame(preKeyFrame)));
+    keyFrames.insert(
+        std::pair<int, KeyFrame>(kfNum, KeyFrame(preKeyFrame, pixelSelector)));
 
     frameTracker = std::unique_ptr<FrameTracker>(
         new FrameTracker(camPyr, optimizedPointsOntoBaseKf()));

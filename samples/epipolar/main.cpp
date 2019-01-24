@@ -9,7 +9,7 @@ DEFINE_int32(x, 100, "x-coordinate of the point on base frame");
 DEFINE_int32(y, 100, "y-coordinate of the point on base frame");
 
 int main(int argc, char **argv) {
-  std::string usage = R"abacaba(Usage: "stereo cam img1 img2"
+  std::string usage = R"abacaba(Usage: "epipolar cam img1 img2"
 Where cam names a file with camera calibration;
 img1 and img2 name files with two frames to track.)abacaba";
 
@@ -23,7 +23,9 @@ img1 and img2 name files with two frames to track.)abacaba";
   }
 
   CameraModel cam(1920, 1208, argv[1]);
-  DelaunayDsoInitializer initializer(nullptr, &cam, DelaunayDsoInitializer::NO_DEBUG);
+  PixelSelector pixelSelector;
+  DelaunayDsoInitializer initializer(nullptr, &cam, &pixelSelector,
+                                     DelaunayDsoInitializer::NO_DEBUG);
   cv::Mat frame1, frame2;
   frame1 = cv::imread(argv[2]);
   if (frame1.data == NULL) {
@@ -41,14 +43,13 @@ img1 and img2 name files with two frames to track.)abacaba";
   // FLAGS_perform_full_tracing = true;
   initializer.addFrame(frame1, 1);
   initializer.addFrame(frame2, 2);
-  std::vector<KeyFrame> keyFrames =
-      initializer.createKeyFrames();
+  std::vector<KeyFrame> keyFrames = initializer.createKeyFrames();
   keyFrames[0].deactivateAllOptimized();
 
   std::vector<double> intVars, geomVars, fullVars;
   for (auto &ip : keyFrames[0].immaturePoints) {
-    // ip->traceOn(*keyFrames[1].preKeyFrame, ImmaturePoint::DRAW_EPIPOLE);
-    ip->traceOn(*keyFrames[1].preKeyFrame, ImmaturePoint::NO_DEBUG);
+    ip->traceOn(*keyFrames[1].preKeyFrame, ImmaturePoint::DRAW_EPIPOLE);
+    // ip->traceOn(*keyFrames[1].preKeyFrame, ImmaturePoint::NO_DEBUG);
     intVars.push_back(ip->lastIntVar);
     geomVars.push_back(ip->lastGeomVar);
     fullVars.push_back(ip->lastFullVar);
@@ -61,7 +62,6 @@ img1 and img2 name files with two frames to track.)abacaba";
   outputArray("int.txt", intVars);
   outputArray("geo.txt", geomVars);
   outputArray("full.txt", fullVars);
-
 
   return 0;
 }

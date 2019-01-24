@@ -44,7 +44,6 @@ bool ImmaturePoint::pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth,
     // "well-mapped" part of the sphere, i.e. z > z0.
     if (!intersectOnSphere(cam->getMaxAngle(), dirMinDepth, dirMaxDepth)) {
       LOG(INFO) << "ret by no itersection" << std::endl;
-      state = OUTLIER;
       return false;
     }
   }
@@ -105,8 +104,8 @@ double ImmaturePoint::estVariance(const Vec2 &searchDirection) {
 
   // double sum2 = 0;
   // for (const Vec2 &g : baseGrad) {
-    // double s = g.dot(searchDirection);
-    // sum2 += s * s;
+  // double s = g.dot(searchDirection);
+  // sum2 += s * s;
   // }
 
   lastGeomVar = settingEpipolarPositionVariance / sum1;
@@ -119,6 +118,9 @@ double ImmaturePoint::estVariance(const Vec2 &searchDirection) {
 
 void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
                             TracingDebugType debugType) {
+  if (state != ACTIVE)
+    return;
+
   AffineLightTransform<double> lightRefToBase =
       baseFrame->lightWorldToThis * refFrame.lightWorldToThis.inverse();
   SE3 baseToRef = refFrame.worldToThis * baseFrame->worldToThis.inverse();
@@ -137,20 +139,18 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
   double variance = estVariance(searchDirection);
   double dev = 2 * std::sqrt(variance);
 
-  if (!FLAGS_perform_full_tracing) {
-
-    double searchLength =
-        maxDepth == INF
-            ? settingEpipolarMaxSearchRel * (cam->getWidth() + cam->getHeight())
-            : (pointMax - pointMin).norm();
-    if (dev * settingEpipolarMinImprovementFactor > searchLength)
+  if (!FLAGS_perform_full_tracing && maxDepth != INF) {
+    double searchLength = (pointMax - pointMin).norm();
+    if (dev * settingEpipolarMinImprovementFactor > searchLength) {
       return;
+    }
   }
 
   StdVector<Vec2> points;
   std::vector<Vec3> directions;
-  if (!pointsToTrace(baseToRef, dirMin, dirMax, points, directions))
+  if (!pointsToTrace(baseToRef, dirMin, dirMax, points, directions)) {
     return;
+  }
 
   StdVector<std::pair<Vec2, double>> energiesFound;
   double bestEnergy = INF;
@@ -261,7 +261,7 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
     base = baseFrame->frameColored.clone();
     curved = refFrame.frameColored.clone();
 
-    cv::circle(base, toCvPoint(p), 10, CV_GREEN, cv::FILLED);
+    cv::circle(base, toCvPoint(p), 10, CV_GREEN, 2);
     drawTracing(curved, energiesFound, 8);
 
     cv::Mat curv2;

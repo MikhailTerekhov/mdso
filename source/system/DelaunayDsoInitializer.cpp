@@ -9,10 +9,10 @@
 namespace fishdso {
 
 DelaunayDsoInitializer::DelaunayDsoInitializer(
-    DsoSystem *dsoSystem, CameraModel *cam,
+    DsoSystem *dsoSystem, CameraModel *cam, PixelSelector *pixelSelector,
     DelaunayDsoInitializer::DebugOutputType debugOutputType)
-    : dsoSystem(dsoSystem), cam(cam), stereoMatcher(cam), hasFirstFrame(false),
-      framesSkipped(0) {}
+    : cam(cam), dsoSystem(dsoSystem), pixelSelector(pixelSelector),
+      stereoMatcher(cam), hasFirstFrame(false), framesSkipped(0) {}
 
 bool DelaunayDsoInitializer::addFrame(const cv::Mat &frame,
                                       int globalFrameNum) {
@@ -47,16 +47,18 @@ std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFrames() {
     dsoSystem->lastKeyPointDepths = std::move(lastKeyPointDepths);
 
   return createKeyFramesDelaunay(cam, frames, globalFrameNums, keyPoints,
-                                 depths, motion, debugOutputType);
+                                 depths, motion, pixelSelector,
+                                 debugOutputType);
 }
 
 std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFramesDelaunay(
     CameraModel *cam, cv::Mat frames[2], int frameNums[2],
     StdVector<Vec2> initialPoints[2], std::vector<double> initialDepths[2],
-    const SE3 &firstToSecond, DebugOutputType debugOutputType) {
+    const SE3 &firstToSecond, PixelSelector *pixelSelector,
+    DebugOutputType debugOutputType) {
   std::vector<KeyFrame> keyFrames;
   for (int i = 0; i < 2; ++i) {
-    keyFrames.push_back(KeyFrame(cam, frames[i], frameNums[i]));
+    keyFrames.push_back(KeyFrame(cam, frames[i], frameNums[i], *pixelSelector));
     keyFrames.back().activateAllImmature();
     for (const auto &op : keyFrames.back().optimizedPoints)
       op->stddev = 1;
@@ -115,7 +117,7 @@ std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFramesDelaunay(
         int pointsNeeded = settingInterestPointsUsed *
                            (static_cast<double>(pointsTotal) / pointsInTriang);
         if (i != reselectCount) {
-          keyFrames[kfInd].selectPointsDenser(pointsNeeded);
+          keyFrames[kfInd].selectPointsDenser(*pixelSelector, pointsNeeded);
           keyFrames[kfInd].activateAllImmature();
         }
       }

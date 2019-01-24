@@ -26,6 +26,15 @@ void outputArray(const std::string &fname, const std::vector<T> &array) {
   ofs.close();
 }
 
+template <typename T>
+void outputArray(const std::string &fname, const T array[], int size) {
+  std::ofstream ofs(fname);
+  for (int i = 0; i < size; ++i)
+    ofs << array[i] << ' ';
+  ofs << std::endl;
+  ofs.close();
+}
+
 void setDepthColBounds(const std::vector<double> &depths);
 
 void putMotion(std::ostream &out, const SE3 &motion);

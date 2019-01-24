@@ -5,6 +5,7 @@
 #include "system/OptimizedPoint.h"
 #include "system/PreKeyFrame.h"
 #include "util/DepthedImagePyramid.h"
+#include "util/PixelSelector.h"
 #include "util/settings.h"
 #include <Eigen/StdVector>
 #include <memory>
@@ -14,20 +15,20 @@
 namespace fishdso {
 
 struct KeyFrame {
-  static constexpr int LI = settingInterestPointLayers;
-  static constexpr int PL = settingPyrLevels;
-  static int adaptiveBlockSize;
-
   KeyFrame(const KeyFrame &other) = delete;
   KeyFrame(KeyFrame &&other) = default;
-  KeyFrame(CameraModel *cam, const cv::Mat &frameColored, int globalFrameNum);
-  KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame);
+  KeyFrame(CameraModel *cam, const cv::Mat &frameColored, int globalFrameNum,
+           PixelSelector &pixelSelector);
+  KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame,
+           PixelSelector &pixelSelector);
 
   void activateAllImmature();
   void deactivateAllOptimized();
 
+  void addImmatures(const std::vector<cv::Point> &points);
+
   std::unique_ptr<DepthedImagePyramid> makePyramid();
-  void selectPointsDenser(int pointsNeeded);
+  void selectPointsDenser(PixelSelector &pixelSelector, int pointsNeeded);
 
   cv::Mat drawDepthedFrame(double minDepth, double maxDepth);
 
@@ -35,15 +36,6 @@ struct KeyFrame {
 
   StdUnorderedSet<std::unique_ptr<ImmaturePoint>> immaturePoints;
   StdUnorderedSet<std::unique_ptr<OptimizedPoint>> optimizedPoints;
-
-private:
-  static void updateAdaptiveBlockSize(int pointsFound);
-
-  int selectPoints(int blockSize, int pointsNeeded);
-
-  int lastBlockSize;
-  int lastPointsFound;
-  int lastPointsUsed;
 };
 
 } // namespace fishdso

@@ -8,7 +8,7 @@ namespace fishdso {
 double settingGradThreshold[settingInterestPointLayers] = {30.0, 6.0, 3.0};
 
 int settingInitialAdaptiveBlockSize = 25;
-int settingInterestPointsAdaptTo = 2150;
+double settingInterestPointsAdaptFactor = 1.1;
 int settingInterestPointsUsed = 2000;
 
 int settingCameraMapPolyDegree = 10;
@@ -93,8 +93,8 @@ DEFINE_bool(draw_inlier_matches, false, "Debug output stereo inlier matches.");
 DEFINE_bool(optimize_affine_light, true,
             "Perform affine light transform optimization while tracking?");
 
-DEFINE_bool(perform_full_tracing, false, 
-    "Do we need to search through full epipolar curve?");
+DEFINE_bool(perform_full_tracing, false,
+            "Do we need to search through full epipolar curve?");
 
 DEFINE_bool(
     perform_tracking_check_stereo, false,

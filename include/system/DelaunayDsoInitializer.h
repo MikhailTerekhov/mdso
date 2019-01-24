@@ -15,6 +15,7 @@ public:
   enum DebugOutputType { NO_DEBUG, SPARSE_DEPTHS, FILLED_DEPTHS };
 
   DelaunayDsoInitializer(DsoSystem *dsoSystem, CameraModel *cam,
+                         PixelSelector *pixelSelector,
                          DebugOutputType debugOutputType);
 
   // returns true if initialization is completed
@@ -25,11 +26,13 @@ public:
   static std::vector<KeyFrame> createKeyFramesDelaunay(
       CameraModel *cam, cv::Mat frames[2], int frameNums[2],
       StdVector<Vec2> initialPoints[2], std::vector<double> initialDepths[2],
-      const SE3 &firstToSecond, DebugOutputType debugOutputType);
+      const SE3 &firstToSecond, PixelSelector *pixelSelector,
+      DebugOutputType debugOutputType);
 
 private:
   CameraModel *cam;
   DsoSystem *dsoSystem;
+  PixelSelector *pixelSelector;
   StereoMatcher stereoMatcher;
   bool hasFirstFrame;
   int framesSkipped;

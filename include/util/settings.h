@@ -10,7 +10,7 @@ namespace fishdso {
 constexpr int settingInterestPointLayers = 3;
 extern double settingGradThreshold[settingInterestPointLayers];
 extern int settingInitialAdaptiveBlockSize;
-extern int settingInterestPointsAdaptTo;
+extern double settingInterestPointsAdaptFactor;
 extern int settingInterestPointsUsed;
 
 // catadioptric camera projection algorithm

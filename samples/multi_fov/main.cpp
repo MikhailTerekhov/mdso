@@ -2,6 +2,7 @@
 #include "system/DelaunayDsoInitializer.h"
 #include "system/DsoSystem.h"
 #include "system/StereoMatcher.h"
+#include "util/defs.h"
 #include "util/geometry.h"
 #include "util/settings.h"
 #include <atomic>
@@ -23,9 +24,10 @@ void runTracker(const MultiFovReader &reader, int startFrameNum,
                 StdVector<SE3> &worldToTracked,
                 std::vector<AffineLightTransform<double>> &trackedAffLights) {
   StdVector<CameraModel> camPyr = reader.cam->camPyr();
+  PixelSelector pixelSelector;
 
   KeyFrame startFrame(reader.cam.get(), reader.getFrame(startFrameNum),
-                      startFrameNum);
+                      startFrameNum, pixelSelector);
   startFrame.activateAllImmature();
   cv::Mat1f depths = reader.getDepths(startFrameNum);
   StdVector<Vec2> pnts;
@@ -143,9 +145,10 @@ void visualizeTracking(const std::string &dataDir, int baseFrame,
 
 std::array<KeyFrame, 2> kfFromEpipolar(CameraModel *cam, const cv::Mat &frame1,
                                        const cv::Mat &frame2,
-                                       const SE3 &fToSUsed) {
-  std::array<KeyFrame, 2> result{KeyFrame(cam, frame1, 0),
-                                 KeyFrame(cam, frame2, 1)};
+                                       const SE3 &fToSUsed,
+                                       PixelSelector &pixelSelector) {
+  std::array<KeyFrame, 2> result{KeyFrame(cam, frame1, 0, pixelSelector),
+                                 KeyFrame(cam, frame2, 1, pixelSelector)};
   result[1].preKeyFrame->worldToThis = fToSUsed;
 
   for (int kfInd : {0, 1}) {
@@ -162,6 +165,9 @@ std::array<KeyFrame, 2> kfFromEpipolar(CameraModel *cam, const cv::Mat &frame1,
 
 void testEpipolar(const MultiFovReader &reader, int fnum1, int fnum2) {
   std::cout << "start" << std::endl;
+
+  PixelSelector pixelSelector;
+
   SE3 firstToSecondGT = reader.getWorldToFrameGT(fnum2) *
                         reader.getWorldToFrameGT(fnum1).inverse();
   cv::Mat frames[2] = {reader.getFrame(fnum1), reader.getFrame(fnum2)};
@@ -172,8 +178,8 @@ void testEpipolar(const MultiFovReader &reader, int fnum1, int fnum2) {
 
   setDepthColBounds(depths[1]);
 
-  auto kf =
-      kfFromEpipolar(reader.cam.get(), frames[0], frames[1], firstToSecondGT);
+  auto kf = kfFromEpipolar(reader.cam.get(), frames[0], frames[1],
+                           firstToSecondGT, pixelSelector);
 
   double scale = firstToSecondGT.translation().norm() /
                  kf[1].preKeyFrame->worldToThis.translation().norm();
@@ -277,6 +283,8 @@ void compareDirectThresholds(const MultiFovReader &reader) {
   std::uniform_int_distribution<> startDistr(2, framesCount - trackCount);
   int starts[testCount];
 
+  PixelSelector pixelSelector;
+
   std::vector<std::pair<int, double>> places;
   for (int st = 2; st < framesCount - trackCount - 2; ++st) {
     SE3 nextMotion = reader.getWorldToFrameGT(st + 1) *
@@ -306,7 +314,8 @@ void compareDirectThresholds(const MultiFovReader &reader) {
     for (int st : starts) {
       LOG(INFO) << it << ") val = " << val << " firstFrame = " << st
                 << std::endl;
-      KeyFrame startFrame(reader.cam.get(), reader.getFrame(st), st);
+      KeyFrame startFrame(reader.cam.get(), reader.getFrame(st), st,
+                          pixelSelector);
       cv::Mat1f depths = reader.getDepths(st);
       StdVector<Vec2> pnts;
 
@@ -450,6 +459,7 @@ class CollectStereo {
 private:
   const MultiFovReader *reader;
   const StereoMatcher *matcher;
+
   // transErrors and rotErrors are arrays of two MatXX, in which first ones
   // stand for errors before BA, and the second ones -- after
   MatXX *transErrors;
@@ -472,6 +482,8 @@ public:
         rotErrors(rotErrors), depthErrors(depthErrors), performBA(performBA) {}
 
   void operator()(const tbb::blocked_range<int> &range) const {
+    PixelSelector pixelSelector;
+
     for (int baseFrameNum = range.begin(); baseFrameNum < range.end();
          ++baseFrameNum)
       for (int refFrameNum = baseFrameNum + FLAGS_min_stereo_displ;
@@ -537,7 +549,7 @@ public:
           std::vector<KeyFrame> keyFrames =
               DelaunayDsoInitializer::createKeyFramesDelaunay(
                   reader->cam.get(), frames, frameNums, pnts, depths, estim,
-                  DelaunayDsoInitializer::NO_DEBUG);
+                  &pixelSelector, DelaunayDsoInitializer::NO_DEBUG);
 
           std::vector<double> errorsAfterTri;
           errorsAfterTri.reserve(keyFrames[0].optimizedPoints.size() +
@@ -596,6 +608,19 @@ public:
 
 std::atomic_int collectedCounter(0);
 
+struct EpiErr {
+  double disparity;
+  double expectedErr;
+  double realErr;
+  double depthGT;
+  double depth;
+
+  friend std::ostream &operator<<(std::ostream &os, const EpiErr &epiErr) {
+    return os << epiErr.disparity << ' ' << epiErr.expectedErr << ' '
+              << epiErr.realErr << ' ' << epiErr.depthGT << ' ' << epiErr.depth;
+  }
+};
+
 class CollectFullDSO {
 private:
   const MultiFovReader *reader;
@@ -604,20 +629,22 @@ private:
   std::vector<double> *depthErrors;
   std::vector<double> *kpDepthErrors;
   std::vector<double> *epipolarDepthErrors;
-  std::vector<std::pair<double, double>> *trackedDisp;
+  std::vector<EpiErr> *trackedDisp;
 
 public:
   CollectFullDSO(const MultiFovReader *reader, int *startFrames,
                  int *correctlyTracked, std::vector<double> *depthErrors,
                  std::vector<double> *kpDepthErrors,
                  std::vector<double> *epipolarDepthErrors,
-                 std::vector<std::pair<double, double>> *trackedDisp)
+                 std::vector<EpiErr> *trackedDisp)
       : reader(reader), startFrames(startFrames),
         correctlyTracked(correctlyTracked), depthErrors(depthErrors),
         kpDepthErrors(kpDepthErrors), epipolarDepthErrors(epipolarDepthErrors),
         trackedDisp(trackedDisp) {}
 
   void operator()(const tbb::blocked_range<int> &range) const {
+    PixelSelector pixelSelector;
+
     for (int ind = range.begin(); ind < range.end(); ++ind) {
       bool isInit = false;
       int initFrameNum = 0;
@@ -693,7 +720,7 @@ public:
           // collect epipolar
           auto kf = kfFromEpipolar(
               reader->cam.get(), reader->getFrame(startFrames[ind]),
-              reader->getFrame(initFrameNum), firstToLastInit);
+              reader->getFrame(initFrameNum), firstToLastInit, pixelSelector);
 
           for (int kfNum = 0; kfNum < 1; ++kfNum) {
             SE3 curToOther =
@@ -704,7 +731,7 @@ public:
             cv::Mat1f dGT =
                 reader->getDepths(kfNum == 0 ? startFrames[ind] : initFrameNum);
             for (const auto &ip : kf[kfNum].immaturePoints) {
-              if (ip->state != ImmaturePoint::ACTIVE)
+              if (ip->state != ImmaturePoint::ACTIVE || ip->maxDepth == INF)
                 continue;
               double depthGT = dGT(toCvPoint(ip->p));
               epipolarDepthErrors[ind].push_back(
@@ -715,9 +742,15 @@ public:
                     curToOtherGT * (depthGT * reader->cam->unmap(ip->p)));
                 Vec2 reproj = reader->cam->map(
                     curToOther * (ip->depth * reader->cam->unmap(ip->p)));
-                double predDev = std::sqrt(ip->lastFullVar);
-                double realDev = (reprojGT - reproj).norm();
-                trackedDisp[ind].push_back({predDev, realDev});
+                Vec2 reprojInfD = reader->cam->map(curToOther.so3() *
+                                                   reader->cam->unmap(ip->p));
+                EpiErr e;
+                e.disparity = (reproj - reprojInfD).norm();
+                e.expectedErr = std::sqrt(ip->lastFullVar);
+                e.realErr = (reprojGT - reproj).norm();
+                e.depthGT = depthGT;
+                e.depth = scale * ip->depth;
+                trackedDisp[ind].push_back(e);
               }
             }
           }
@@ -726,18 +759,22 @@ public:
                        kf[1].drawDepthedFrame(minDepthCol, maxDepthCol));
             cv::waitKey();
           }
+
+          continue;
         }
 
-        SE3 firstToCur = nextFrame->worldToThis;
-        double err =
-            ((scale * firstToCur.translation()) - firstToCurGT.translation())
-                .norm() /
-            firstToCurGT.translation().norm();
+        if (FLAGS_collect_tracking) {
+          SE3 firstToCur = nextFrame->worldToThis;
+          double err =
+              ((scale * firstToCur.translation()) - firstToCurGT.translation())
+                  .norm() /
+              firstToCurGT.translation().norm();
 
-        if (err > FLAGS_occlusion_thres) {
-          correctlyTracked[ind] = curFrameNum - initFrameNum;
-          didOcclude = true;
-          break;
+          if (err > FLAGS_occlusion_thres) {
+            correctlyTracked[ind] = curFrameNum - initFrameNum;
+            didOcclude = true;
+            break;
+          }
         }
       }
 
@@ -745,7 +782,8 @@ public:
         correctlyTracked[ind] = lastFrameNum - initFrameNum;
 
       LOG(WARNING) << "complete count " << ++collectedCounter
-                   << "(ind = " << ind << ")" << std::endl
+                   << "(ind = " << ind << ", start frame = " << startFrames[ind]
+                   << ")" << std::endl
                    << "corrtracked = " << correctlyTracked[ind] << std::endl;
     }
   }
@@ -839,13 +877,13 @@ void collectStatistics(const MultiFovReader &reader) {
   if (FLAGS_collect_full_DSO) {
     std::cout << "Start collecting full system run errors..." << std::endl;
 
-    // const int testCount = 9;
+    const int testCount = 9;
     // const int testCount = FLAGS_dso_test_count;
-    const int testCount = FLAGS_end_frame - FLAGS_start_frame + 1;
+    // const int testCount = FLAGS_end_frame - FLAGS_start_frame + 1;
     int lastF = 2300;
-    int startFrames[testCount];
-    // int startFrames[testCount] = {543,  542,  544,  2208, 2209,
-    // 2210, 1072, 1073, 1074};
+    // int startFrames[testCount];
+    int startFrames[testCount] = {410, 530,  570,  650, 1000,
+                                  810, 1170, 1115, 1400};
 
     // std::vector<int> framesRot, framesStill;
     // framesRot.reserve(lastF);
@@ -870,20 +908,19 @@ void collectStatistics(const MultiFovReader &reader) {
     // for (int i = 0; i < testCount / 2; ++i)
     // startFrames[i + testCount / 2] = framesStill[i];
 
-    for (int st = FLAGS_start_frame; st <= FLAGS_end_frame; ++st)
-      startFrames[st - FLAGS_start_frame] = st;
+    // for (int st = FLAGS_start_frame; st <= FLAGS_end_frame; ++st)
+    // startFrames[st - FLAGS_start_frame] = st;
 
     int correctlyTracked[testCount];
     std::vector<double> depthErrors[testCount];
     std::vector<double> kpDepthErrors[testCount];
     std::vector<double> epipolarDepthErrors[testCount];
-    std::vector<std::pair<double, double>> trackedDisp[testCount];
+    std::vector<EpiErr> trackedDisp[testCount];
     int lastFrameNum =
         std::min(FLAGS_end_frame, lastFrameNumGlobal - FLAGS_max_DSO_input);
 
     FLAGS_continue_choosing_keyframes = false;
     FLAGS_write_files = false;
-    FLAGS_perform_full_tracing = true;
 
     if (FLAGS_run_parallel) {
       tbb::parallel_for(tbb::blocked_range<int>(0, testCount),
@@ -899,7 +936,7 @@ void collectStatistics(const MultiFovReader &reader) {
     std::vector<double> allErrors;
     std::vector<double> allKpErrors;
     std::vector<double> allEpipolarErrors;
-    std::vector<std::pair<double, double>> allDisp;
+    std::vector<EpiErr> allDisp;
 
     for (int it = 0; it < testCount; ++it)
       for (double e : depthErrors[it])
@@ -915,52 +952,16 @@ void collectStatistics(const MultiFovReader &reader) {
     std::sort(allKpErrors.begin(), allKpErrors.end());
     std::sort(allEpipolarErrors.begin(), allEpipolarErrors.end());
 
-
     for (int it = 0; it < testCount; ++it)
       for (const auto &e : trackedDisp[it])
         allDisp.push_back(e);
-    std::sort(allDisp.begin(), allDisp.end(),
-              [](const auto &a, const auto &b) { return a.first < b.first; });
-    const double step = 1.0;
-    const double maxDev = 15.0;
-    double upDev = step;
-    std::vector<double> curErr;
-    std::vector<double> med;
-    for (const auto &e : allDisp) {
-      if (upDev > maxDev || e.first < upDev)
-        curErr.push_back(e.second);
-      else {
-        upDev += step;
-        std::sort(curErr.begin(), curErr.end());
-        med.push_back(curErr.empty() ? -1 : curErr[curErr.size() / 2]);
-        curErr.resize(0);
-      }
-    }
-    std::sort(curErr.begin(), curErr.end());
-    med.push_back(curErr.empty() ? -1 : curErr[curErr.size() / 2]);
-    outputArray("med.txt", med);
 
+    outputArray("disp_err.txt", allDisp);
 
-    std::ofstream depthErr("dso_depth_err.txt");
-    for (double e : allErrors)
-      depthErr << e << ' ';
-    depthErr.close();
-
-    std::ofstream kpDepthErr("dso_kp_depth_err.txt");
-    for (double e : allKpErrors)
-      kpDepthErr << e << ' ';
-    kpDepthErr.close();
-
-    std::ofstream epipolarDepthErr("dso_epi_depth_err.txt");
-    for (double e : allEpipolarErrors)
-      epipolarDepthErr << e << ' ';
-    epipolarDepthErr.close();
-
-    std::ofstream trackedOfs("dso_tracked.txt");
-    for (int it = 0; it < testCount; ++it)
-      trackedOfs << correctlyTracked[it] << ' ';
-    trackedOfs << std::endl;
-    trackedOfs.close();
+    outputArray("dso_depth_err.txt", allErrors);
+    outputArray("dso_kp_depth_err.txt", allKpErrors);
+    outputArray("dso_epi_depth_err.txt", allEpipolarErrors);
+    outputArray("dso_tracked.txt", correctlyTracked, testCount);
 
     std::cout << "Full system errors collected." << std::endl;
   }

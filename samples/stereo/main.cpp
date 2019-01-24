@@ -15,7 +15,9 @@ img1 and img2 name files with two frames to track.)abacaba";
   }
 
   CameraModel cam(1920, 1208, argv[1]);
-  DelaunayDsoInitializer initializer(nullptr, &cam, DelaunayDsoInitializer::SPARSE_DEPTHS);
+  PixelSelector pixelSelector;
+  DelaunayDsoInitializer initializer(nullptr, &cam, &pixelSelector,
+                                     DelaunayDsoInitializer::SPARSE_DEPTHS);
   cv::Mat frame1, frame2;
   frame1 = cv::imread(argv[2]);
   if (frame1.data == NULL) {

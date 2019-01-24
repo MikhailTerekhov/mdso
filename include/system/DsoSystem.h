@@ -19,7 +19,8 @@ public:
   DsoSystem(CameraModel *cam);
   ~DsoSystem();
 
-  std::shared_ptr<PreKeyFrame> addFrame(const cv::Mat &frame, int globalFrameNum);
+  std::shared_ptr<PreKeyFrame> addFrame(const cv::Mat &frame,
+                                        int globalFrameNum);
   void addGroundTruthPose(int globalFrameNum, const SE3 &worldToThat);
 
   void printLastKfInPly(std::ostream &out);
@@ -60,6 +61,8 @@ private:
 
   CameraModel *cam;
   StdVector<CameraModel> camPyr;
+
+  PixelSelector pixelSelector;
 
   std::unique_ptr<DsoInitializer> dsoInitializer;
   bool isInitialized;

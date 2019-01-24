@@ -37,13 +37,12 @@ struct ImmaturePoint {
   CameraModel *cam;
   State state;
 
-  //output only
+  // output only
   double lastIntVar, lastGeomVar, lastFullVar;
 
 private:
-  bool pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth,
-                     Vec3 &dirMaxDepth, StdVector<Vec2> &points,
-                     std::vector<Vec3> &directions);
+  bool pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth, Vec3 &dirMaxDepth,
+                     StdVector<Vec2> &points, std::vector<Vec3> &directions);
   double estVariance(const Vec2 &searchDirection);
 };
 

@@ -1,5 +1,5 @@
-#include "util/defs.h"
 #include "util/Triangulation.h"
+#include "util/defs.h"
 #include "util/geometry.h"
 #include <gtest/gtest.h>
 #include <set>
@@ -43,20 +43,19 @@ TEST_P(TriangulationTest, IsPlanar) {
       if (e1 == e2)
         continue;
       bool test = doesABIntersectCD(e1->vert[0]->pos, e1->vert[1]->pos,
-                                     e2->vert[0]->pos, e2->vert[1]->pos);
+                                    e2->vert[0]->pos, e2->vert[1]->pos);
       if (test) {
         cv::Mat img = tester.draw(800, 800, CV_WHITE, CV_BLACK);
         cv::imshow("failed tri", img);
         cv::waitKey();
       }
 
-      ASSERT_FALSE(test)
-          << "these do intersect:\n"
-          << "a = " << e1->vert[0]->pos.transpose()
-          << " b = " << e1->vert[1]->pos.transpose() << "\n"
-          << "and\n"
-          << "a = " << e2->vert[0]->pos.transpose()
-          << " b = " << e2->vert[1]->pos.transpose() << "\n";
+      ASSERT_FALSE(test) << "these do intersect:\n"
+                         << "a = " << e1->vert[0]->pos.transpose()
+                         << " b = " << e1->vert[1]->pos.transpose() << "\n"
+                         << "and\n"
+                         << "a = " << e2->vert[0]->pos.transpose()
+                         << " b = " << e2->vert[1]->pos.transpose() << "\n";
     }
 }
 
