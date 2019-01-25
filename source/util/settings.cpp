@@ -5,7 +5,7 @@
 
 namespace fishdso {
 
-double settingGradThreshold[settingInterestPointLayers] = {30.0, 6.0, 3.0};
+double settingGradThreshold[settingInterestPointLayers] = {20.0, 8.0, 3.0};
 
 int settingInitialAdaptiveBlockSize = 25;
 double settingInterestPointsAdaptFactor = 1.1;

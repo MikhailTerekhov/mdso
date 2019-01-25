@@ -11,7 +11,7 @@ KeyFrame::KeyFrame(CameraModel *cam, const cv::Mat &frameColored,
     : preKeyFrame(std::shared_ptr<PreKeyFrame>(
           new PreKeyFrame(cam, frameColored, globalFrameNum))) {
   std::vector<cv::Point> points = pixelSelector.select(
-      frameColored, preKeyFrame->gradNorm, settingInterestPointsUsed);
+      frameColored, preKeyFrame->gradNorm, settingInterestPointsUsed, nullptr);
   addImmatures(points);
 }
 
@@ -20,7 +20,7 @@ KeyFrame::KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame,
     : preKeyFrame(newPreKeyFrame) {
   std::vector<cv::Point> points =
       pixelSelector.select(newPreKeyFrame->frameColored, preKeyFrame->gradNorm,
-                           settingInterestPointsUsed);
+                           settingInterestPointsUsed, nullptr);
   addImmatures(points);
 }
 
@@ -36,7 +36,7 @@ void KeyFrame::addImmatures(const std::vector<cv::Point> &points) {
 void KeyFrame::selectPointsDenser(PixelSelector &pixelSelector,
                                   int pointsNeeded) {
   std::vector<cv::Point> points = pixelSelector.select(
-      preKeyFrame->frameColored, preKeyFrame->gradNorm, pointsNeeded);
+      preKeyFrame->frameColored, preKeyFrame->gradNorm, pointsNeeded, nullptr);
   immaturePoints.clear();
   optimizedPoints.clear();
   addImmatures(points);

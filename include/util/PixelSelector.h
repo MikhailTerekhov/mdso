@@ -11,7 +11,7 @@ public:
   PixelSelector();
 
   std::vector<cv::Point> select(const cv::Mat &frame, const cv::Mat1d &gradNorm,
-                                int pointsNeeded);
+                                int pointsNeeded, cv::Mat *debugOut);
 
 private:
   static constexpr int LI = settingInterestPointLayers;
@@ -19,7 +19,8 @@ private:
 
   std::vector<cv::Point> selectInternal(const cv::Mat &frame,
                                         const cv::Mat1d &gradNorm,
-                                        int pointsNeeded, int blockSize);
+                                        int pointsNeeded, int blockSize,
+                                        cv::Mat *debugOut);
 
   int lastBlockSize;
   int lastPointsFound;

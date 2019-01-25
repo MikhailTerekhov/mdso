@@ -397,9 +397,6 @@ DEFINE_bool(collect_BA, true,
             "Do we need to collect post-stereo optimizations errors?");
 DEFINE_bool(collect_full_DSO, false,
             "Do we need to collect errors on full DSO run?");
-DEFINE_bool(collect_disparities, false,
-            "Do we need to collect disparity errors when tracing?");
-
 DEFINE_int32(dso_test_count, 100,
              "Number of tests to collect full DSO errors from");
 DEFINE_bool(
@@ -407,9 +404,101 @@ DEFINE_bool(
     "Do we need to show every step as an image when collecting full DSO?");
 DEFINE_bool(collect_tracing, true, "Do we need to collect tracing errors?");
 
-DEFINE_bool(run_parallel, true, "Collect all in parallel?");
+DEFINE_bool(collect_disparities, false,
+            "Do we need to collect disparity errors?");
+DEFINE_int32(disparity_shift, 15,
+             "Number of frames to skip between the tested ones when collecting "
+             "disparity errors.");
+DEFINE_double(disparity_trans_error, 0.02,
+              "Relative mean square deviation for translation  noize when "
+              "collecing disparity errors.");
+DEFINE_double(disparity_rot_error, 3,
+              "Mean square deviation for rotation noize in degrees when "
+              "collecing disparity errors.");
+"
+
+    DEFINE_bool(run_parallel, true, "Collect all in parallel?");
 
 const int lastFrameNumGlobal = 2500;
+
+struct EpiErr {
+  double disparity;
+  double expectedErr;
+  double realErr;
+  double depthGT;
+  double depth;
+
+  friend std::ostream &operator<<(std::ostream &os, const EpiErr &epiErr) {
+    return os << epiErr.disparity << ' ' << epiErr.expectedErr << ' '
+              << epiErr.realErr << ' ' << epiErr.depthGT << ' ' << epiErr.depth;
+  }
+};
+
+class CollectDisparities {
+private:
+  const MultiFovReader *reader;
+  std::vector<EpiErr> *errors;
+
+public:
+  CollectDisparities(const MultiFovReader *reader, std::vector<EpiErr> *errors)
+      : reader(reader), errors(errors) {}
+
+  void operator()(const tbb::blocked_range<int> &range) const {
+    PixelSelector pixelSelector;
+    std::mt19937 mt;
+    std::normal_distribution<double> rotd(
+        M_PI / 180.0 * FLAGS_disparity_rot_error / std::sqrt(3));
+    std::normal_distribution<double> transd(1, FLAGS_disparity_trans_error);
+
+    int end = range.end();
+    end = std::min(end, lastFrameNumGlobal - FLAGS_disparity_shift + 2);
+    for (int firstFrameNum = range.begin(); firstFrameNum < end;
+         ++firstFrameNum) {
+      int secondFrameNum = firstFrameNum + FLAGS_disparity_shift;
+      SE3 firstToSecondGT = reader->getWorldToFrameGT(secondFrameNum) *
+                            reader->getWorldToFrameGT(firstFrameNum).inverse();
+
+      SO3 rot =
+          SO3::exp(Vec3(rotd(mt), rotd(mt), rotd(mt))) * firstToSecondGT.so3();
+      Vec3 trans = firstToSecondGT.translation();
+      for (int i = 0; i < 3; ++i)
+        trans[i] *= transd(mt);
+      SE3 firstToSecond(rot, trans);
+
+      auto kf = kfFromEpipolar(
+          reader->cam.get(), reader->getFrame(firstFrameNum),
+          reader->getFrame(secondFrameNum), firstToSecond, pixelSelector);
+
+      for (int kfNum : {0, 1}) {
+        SE3 curToOther = (kfNum == 0 ? firstToSecond : firstToSecond.inverse());
+        SE3 curToOtherGT =
+            (kfNum == 0 ? firstToSecondGT : firstToSecondGT.inverse());
+
+        cv::Mat1f dGT =
+            reader->getDepths(kfNum == 0 ? firstFrameNum : secondFrameNum);
+        for (const auto &ip : kf[kfNum].immaturePoints) {
+          if (ip->state != ImmaturePoint::ACTIVE || ip->maxDepth == INF)
+            continue;
+          double depthGT = dGT(toCvPoint(ip->p));
+          Vec2 reprojGT = reader->cam->map(
+              curToOtherGT * (depthGT * reader->cam->unmap(ip->p)));
+          Vec2 reproj = reader->cam->map(
+              curToOther * (ip->depth * reader->cam->unmap(ip->p)));
+          Vec2 reprojInfD =
+              reader->cam->map(curToOther.so3() * reader->cam->unmap(ip->p));
+          EpiErr e;
+          e.disparity = (reproj - reprojInfD).norm();
+          e.expectedErr = std::sqrt(ip->lastFullVar);
+          e.realErr = (reprojGT - reproj).norm();
+
+          e.depthGT = depthGT;
+          e.depth = ip->depth;
+          errors[firstFrameNum].push_back(e);
+        }
+      }
+    }
+  }
+};
 
 class CollectTracking {
 private:
@@ -607,19 +696,6 @@ public:
 };
 
 std::atomic_int collectedCounter(0);
-
-struct EpiErr {
-  double disparity;
-  double expectedErr;
-  double realErr;
-  double depthGT;
-  double depth;
-
-  friend std::ostream &operator<<(std::ostream &os, const EpiErr &epiErr) {
-    return os << epiErr.disparity << ' ' << epiErr.expectedErr << ' '
-              << epiErr.realErr << ' ' << epiErr.depthGT << ' ' << epiErr.depth;
-  }
-};
 
 class CollectFullDSO {
 private:

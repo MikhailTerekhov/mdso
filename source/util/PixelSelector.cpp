@@ -1,4 +1,6 @@
 #include "util/PixelSelector.h"
+#include "util/defs.h"
+#include <glog/logging.h>
 
 namespace fishdso {
 
@@ -8,12 +10,13 @@ PixelSelector::PixelSelector()
 
 std::vector<cv::Point> PixelSelector::select(const cv::Mat &frame,
                                              const cv::Mat1d &gradNorm,
-                                             int pointsNeeded) {
+                                             int pointsNeeded,
+                                             cv::Mat *debugOut) {
   int newBlockSize =
       lastBlockSize *
       std::sqrt(static_cast<double>(lastPointsFound) /
                 (pointsNeeded * settingInterestPointsAdaptFactor));
-  return selectInternal(frame, gradNorm, pointsNeeded, newBlockSize);
+  return selectInternal(frame, gradNorm, pointsNeeded, newBlockSize, debugOut);
 }
 
 void selectLayer(const cv::Mat &gradNorm, int selBlockSize, double threshold,
@@ -34,7 +37,8 @@ void selectLayer(const cv::Mat &gradNorm, int selBlockSize, double threshold,
 std::vector<cv::Point> PixelSelector::selectInternal(const cv::Mat &frame,
                                                      const cv::Mat1d &gradNorm,
                                                      int pointsNeeded,
-                                                     int blockSize) {
+                                                     int blockSize,
+                                                     cv::Mat *debugOut) {
   std::vector<cv::Point> pointsOverThres[LI];
   std::vector<cv::Point> pointsAll;
 
@@ -55,6 +59,13 @@ std::vector<cv::Point> PixelSelector::selectInternal(const cv::Mat &frame,
         return accumulated + b.size();
       });
 
+  std::stringstream levLog;
+  for (int i = 0; i < LI - 1; ++i)
+    levLog << pointsOverThres[i].size() << " + ";
+  levLog << pointsOverThres[LI - 1].size();
+  LOG(INFO) << "pixel selector: found " << foundTotal << " (= " << levLog.str()
+            << ")" << std::endl;
+
   if (foundTotal > settingInterestPointsUsed) {
     int sz = 0;
     for (int i = 1; i < LI; ++i) {
@@ -63,6 +74,14 @@ std::vector<cv::Point> PixelSelector::selectInternal(const cv::Mat &frame,
       sz += pointsOverThres[i].size();
     }
     pointsOverThres[0].resize(pointsNeeded - sz);
+  }
+
+  if (debugOut) {
+    const cv::Scalar colors[LI] = {CV_GREEN, CV_BLUE, CV_RED};
+    const int rad = int(5e-3 * debugOut->cols);
+    for (int i = 0; i < LI; ++i)
+      for (const cv::Point &p : pointsOverThres[i])
+        cv::circle(*debugOut, p, rad, colors[i], 2);
   }
 
   for (int curL = 0; curL < LI; ++curL)
