@@ -18,6 +18,10 @@ bool isABDelaunay(const Vec2 &a, const Vec2 &b, const Vec2 &c, const Vec2 &d);
 bool doesABIntersectCD(const Vec2 &a, const Vec2 &b, const Vec2 &c,
                        const Vec2 &d);
 
+// approximates a point with a given coordinate along the curve given points on
+// the curve with integer coordinates
+Vec2 approxOnCurve(const StdVector<Vec2> &points, double displ);
+
 bool isInSector(const Vec3 &ray, Vec3 *s[3]);
 
 // intersects a spherical segment [dir1, dir2] with a sector around (0, 0, 1)

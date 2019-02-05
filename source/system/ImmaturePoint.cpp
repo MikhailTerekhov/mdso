@@ -7,14 +7,18 @@
 
 namespace fishdso {
 
+const int ImmaturePoint::PH = settingResidualPatternHeight;
+const double ImmaturePoint::TH = settingEpipolarOutlierIntencityDiff;
+const double ImmaturePoint::SBD = settingMinSecondBestDistance * settingMinSecondBestDistance;
+
 ImmaturePoint::ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p)
     : p(p), minDepth(0), maxDepth(INF), bestQuality(-1), lastEnergy(INF),
       baseFrame(baseFrame), cam(baseFrame->cam), state(ACTIVE) {
-  if (!cam->isOnImage(p, settingResidualPatternHeight)) {
+  if (!cam->isOnImage(p, PH)) {
     state = OOB;
     return;
   }
-  for (int i = 0; i < settingResidualPatternSize; ++i) {
+  for (int i = 0; i < PS; ++i) {
     Vec2 curP = p + settingResidualPattern[i];
     cv::Point curPCV = toCvPoint(curP);
     baseDirections[i] = cam->unmap(curP).normalized();
@@ -55,7 +59,7 @@ bool ImmaturePoint::pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth,
   while (alpha0 <= 1) {
     Vec3 curDir = (1 - alpha0) * dirMaxDepth + alpha0 * dirMinDepth;
     Vec2 curP = cam->map(curDir);
-    if (!cam->isOnImage(curP, settingResidualPatternHeight)) {
+    if (!cam->isOnImage(curP, PH)) {
       if (!FLAGS_perform_full_tracing)
         break;
       alpha0 += step;
@@ -82,8 +86,7 @@ bool ImmaturePoint::pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth,
         pointCnt++;
         if (!FLAGS_perform_full_tracing && pointCnt >= maxSearchCount)
           break;
-      } while (alpha >= 0 && alpha <= 1 &&
-               cam->isOnImage(point, settingResidualPatternHeight));
+      } while (alpha >= 0 && alpha <= 1 && cam->isOnImage(point, PH));
     }
 
     if (!FLAGS_perform_full_tracing)
@@ -93,6 +96,54 @@ bool ImmaturePoint::pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth,
   }
 
   return points.size() > 1;
+}
+
+Vec2 ImmaturePoint::tracePrecise(
+    const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> &refFrame,
+    const Vec2 &from, const Vec2 &to, double intencities[PS], Vec2 pattern[PS],
+    double &bestDispl, double &bestEnergy) {
+  Vec2 dir = to - from;
+  dir.normalize();
+  Vec2 bestPoint = (from + to) * 0.5;
+  bestEnergy = INF;
+  bestDispl = 0;
+  double step = 0;
+  for (int it = 0; it < FLAGS_tracing_GN_iter + 1; ++it) {
+    double newEnergy = 0;
+    double H = 0, b = 0;
+    Vec2 curPoint = bestPoint + step * dir;
+    for (int i = 0; i < PS; ++i) {
+      double intencity;
+      Vec2 p = curPoint + pattern[i];
+      Vec2 grad;
+      refFrame.Evaluate(p[1], p[0], &intencity, &grad[1], &grad[0]);
+      double r = intencity - intencities[i];
+      double ar = std::abs(r);
+      double wb = ar > TH ? TH / ar : 1;
+      newEnergy += wb * (2 - wb) * ar * ar;
+      double dr = grad.dot(dir);
+      b += wb * r * dr;
+      if (FLAGS_use_alt_H_weighting) {
+        double wh = wb / (2 - wb);
+        H += wh * dr * dr;
+      } else
+        H += wb * dr * dr;
+    }
+
+    if (newEnergy < bestEnergy) {
+      bestEnergy = newEnergy;
+      bestPoint = curPoint;
+      bestDispl += step;
+      step = -b / H;
+      if (bestDispl + step > 1)
+        step = (1 - bestDispl) * 0.5;
+      else if (bestDispl + step < -1)
+        step = (-1 - bestDispl) * 0.5;
+    } else
+      step *= 0.5;
+  }
+
+  return bestPoint;
 }
 
 double ImmaturePoint::estVariance(const Vec2 &searchDirection) {
@@ -121,8 +172,8 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
   if (state != ACTIVE)
     return;
 
-  AffineLightTransform<double> lightRefToBase =
-      baseFrame->lightWorldToThis * refFrame.lightWorldToThis.inverse();
+  AffineLightTransform<double> lightBaseToRef =
+      refFrame.lightWorldToThis * baseFrame->lightWorldToThis.inverse();
   SE3 baseToRef = refFrame.worldToThis * baseFrame->worldToThis.inverse();
 
   Vec3 dirMin = (baseToRef * (minDepth * baseDirections[0])).normalized();
@@ -152,48 +203,56 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
     return;
   }
 
+  double intencities[PS];
+  for (int i = 0; i < PS; ++i)
+    intencities[i] = lightBaseToRef(baseIntencities[i]);
+
   StdVector<std::pair<Vec2, double>> energiesFound;
   double bestEnergy = INF;
   Vec2 bestPoint;
   double bestDepth;
   int bestInd;
+  pyrChanged = false;
+  bestPyrLevel = -1;
+  int lastPyrLevel = -1;
 
   for (int dirInd = 0; dirInd < directions.size(); ++dirInd) {
     Vec3 curDir = directions[dirInd];
     Vec2 point = points[dirInd];
     curDir.normalize();
     Vec2 depths = triangulate(baseToRef, baseDirections[0], curDir);
-    Vec2 reproj[settingResidualPatternSize];
+    Vec2 reproj[PS];
     reproj[0] = point;
-    for (int i = 1; i < settingResidualPatternSize; ++i)
+    for (int i = 1; i < PS; ++i)
       reproj[i] = cam->map(baseToRef * (depths[0] * baseDirections[i]));
 
     double maxReprojDist = -1;
-    for (int i = 1; i < settingResidualPatternSize; ++i) {
+    for (int i = 1; i < PS; ++i) {
       double dist = (reproj[i] - point).norm();
       if (maxReprojDist < dist)
         maxReprojDist = dist;
     }
-    int pyrLevel =
-        std::round(std::log2(maxReprojDist / settingResidualPatternHeight));
+    int pyrLevel = std::round(std::log2(maxReprojDist / PH));
     if (pyrLevel < 0)
       pyrLevel = 0;
     if (pyrLevel >= settingPyrLevels)
       pyrLevel = settingPyrLevels - 1;
+
+    if (lastPyrLevel != -1 && lastPyrLevel != pyrLevel)
+      pyrChanged = true;
+
+    lastPyrLevel = pyrLevel;
+
     for (Vec2 &r : reproj)
-      r /= static_cast<double>(1 << pyrLevel);
+      r /= double(1 << pyrLevel);
 
     double energy = 0;
-    for (int i = 0; i < settingResidualPatternSize; ++i) {
+    for (int i = 0; i < PS; ++i) {
       double refIntencity;
       refFrame.framePyr.interpolator(pyrLevel).Evaluate(
           reproj[i][1], reproj[i][0], &refIntencity);
-      double residual = baseIntencities[i] - lightRefToBase(refIntencity);
-      energy += residual > settingEpipolarOutlierIntencityDiff
-                    ? settingEpipolarOutlierIntencityDiff *
-                          (2 * std::abs(residual) -
-                           settingEpipolarOutlierIntencityDiff)
-                    : residual * residual;
+      double residual = std::abs(intencities[i] - refIntencity);
+      energy += residual > TH ? TH * (2 * residual - TH) : residual * residual;
     }
 
     energiesFound.push_back({point, energy});
@@ -203,41 +262,49 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
       bestPoint = point;
       bestDepth = depths[0];
       bestInd = dirInd;
+      bestPyrLevel = pyrLevel;
     }
   }
 
-  double devFloor = std::floor(dev);
-  double devFrac = dev - devFloor;
+  eBeforeSubpixel = bestEnergy;
 
-  int minDepthInd = bestInd + devFloor;
-  Vec2 minDepthPos = points[minDepthInd];
-  if (minDepthInd >= points.size() - 1) {
-    minDepthInd = points.size() - 1;
-    minDepthPos += devFrac * (points[minDepthInd] - points[minDepthInd - 1]);
+  double bestDispl = 0;
+  if (FLAGS_tracing_GN_iter > 0) {
+    int fromInd = std::max(0, bestInd - 1);
+    int toInd = std::min(int(points.size()) - 1, bestInd + 1);
+    Vec2 from = points[fromInd];
+    Vec2 to = points[toInd];
+    Vec2 pattern[PS];
+    double scale = 1.0 / (1 << bestPyrLevel);
+    pattern[0] = scale * points[bestInd];
+    for (int i = 1; i < PS; ++i)
+      pattern[i] =
+          scale * cam->map(baseToRef * (bestDepth * baseDirections[i]));
+    bestPoint = tracePrecise(refFrame.framePyr.interpolator(bestPyrLevel), from,
+                             to, intencities, pattern, bestDispl, bestEnergy);
+    depth = triangulate(baseToRef, baseDirections[0],
+                        cam->unmap(bestPoint / scale))[0];
   } else
-    minDepthPos += devFrac * (points[minDepthInd + 1] - points[minDepthInd]);
-  Vec2 depthsTemp1 =
-      triangulate(baseToRef, baseDirections[0], cam->unmap(minDepthPos));
-  minDepth = depthsTemp1[0];
+    depth = bestDepth;
 
-  int maxDepthInd = bestInd - devFloor;
-  Vec2 maxDelta;
-  if (maxDepthInd <= 0)
+  eAfterSubpixel = bestEnergy;
+
+  Vec2 minDepthPos = approxOnCurve(points, bestInd + dev);
+  minDepth =
+      triangulate(baseToRef, baseDirections[0], cam->unmap(minDepthPos))[0];
+
+  double maxDepthDispl = bestInd - dev;
+  if (maxDepthDispl <= 0)
     maxDepth = INF;
   else {
-    Vec2 maxDepthPos =
-        points[maxDepthInd] +
-        devFrac * (points[maxDepthInd - 1] - points[maxDepthInd]);
-    Vec2 depthTemp2 =
-        triangulate(baseToRef, baseDirections[0], cam->unmap(maxDepthPos));
-    maxDepth = depthTemp2[0];
+    Vec2 maxDepthPos = approxOnCurve(points, maxDepthDispl);
+    maxDepth =
+        triangulate(baseToRef, baseDirections[0], cam->unmap(maxDepthPos))[0];
   }
-
-  depth = bestDepth;
 
   double secondBestEnergy = INF;
   for (const auto &p : energiesFound) {
-    if ((p.first - bestPoint).norm() < settingMinSecondBestDistance)
+    if ((p.first - bestPoint).squaredNorm() < SBD)
       continue;
     if (p.second < secondBestEnergy)
       secondBestEnergy = p.second;
@@ -255,21 +322,25 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
       bestQuality < settingOutlierEpipolarQuality)
     state = OUTLIER;
 
-  if (debugType == DRAW_EPIPOLE) {
+  if (state == ACTIVE && debugType == DRAW_EPIPOLE) {
     cv::Mat base;
     cv::Mat curved;
     base = baseFrame->frameColored.clone();
     curved = refFrame.frameColored.clone();
 
-    cv::circle(base, toCvPoint(p), 10, CV_GREEN, 2);
-    drawTracing(curved, energiesFound, 8);
+    cv::circle(base, toCvPoint(p), 4, CV_GREEN, 1);
+    drawTracing(curved, energiesFound, 5);
 
+    int wantedHeight = 600;
+    int wantedWidth = double(cam->getWidth()) / cam->getHeight() * wantedHeight;
+    double fx = double(wantedWidth) / cam->getWidth();
+    double fy = double(wantedHeight) / cam->getHeight();
     cv::Mat curv2;
-    cv::resize(curved, curv2, cv::Size(), 0.5, 0.5);
+    cv::resize(curved, curv2, cv::Size(), fx, fy);
     cv::imshow("epipolar curve", curv2);
 
     cv::Mat base2;
-    cv::resize(base, base2, cv::Size(), 0.5, 0.5);
+    cv::resize(base, base2, cv::Size(), fx, fy);
     cv::imshow("base frame", base2);
 
     cv::waitKey();

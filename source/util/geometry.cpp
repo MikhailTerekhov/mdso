@@ -87,6 +87,23 @@ bool doesABIntersectCD(const Vec2 &a, const Vec2 &b, const Vec2 &c,
   return !isSameSide(a, b, c, d) && !isSameSide(c, d, a, b);
 }
 
+// approximates a point with a given coordinate along the curve given points on
+// the curve with integer coordinates
+Vec2 approxOnCurve(const StdVector<Vec2> &points, double displ) {
+  CHECK(points.size() >= 2);
+  if (displ <= 0)
+    return points[0] - displ * (points[0] - points[1]);
+  if (displ + 1 >= points.size()) {
+    const Vec2& last = points.back();
+    const Vec2& lbo = points[points.size() - 2];
+    double res = displ - points.size() + 1;
+    return  last + res * (last - lbo);
+  }
+  int intDispl = displ;
+  double fracDispl = displ - intDispl;
+  return points[intDispl] + fracDispl * (points[intDispl + 1] - points[intDispl]);
+}
+
 bool isInSector(const Vec3 &ray, Vec3 *s[3]) {
   Mat33 A;
   for (int i = 0; i < 3; ++i)

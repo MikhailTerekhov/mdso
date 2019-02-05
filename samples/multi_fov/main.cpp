@@ -415,9 +415,8 @@ DEFINE_double(disparity_trans_error, 0.02,
 DEFINE_double(disparity_rot_error, 3,
               "Mean square deviation for rotation noize in degrees when "
               "collecing disparity errors.");
-"
 
-    DEFINE_bool(run_parallel, true, "Collect all in parallel?");
+DEFINE_bool(run_parallel, true, "Collect all in parallel?");
 
 const int lastFrameNumGlobal = 2500;
 
@@ -427,33 +426,35 @@ struct EpiErr {
   double realErr;
   double depthGT;
   double depth;
+  double eBeforeSubpixel, eAfterSubpixel;
 
   friend std::ostream &operator<<(std::ostream &os, const EpiErr &epiErr) {
     return os << epiErr.disparity << ' ' << epiErr.expectedErr << ' '
-              << epiErr.realErr << ' ' << epiErr.depthGT << ' ' << epiErr.depth;
+              << epiErr.realErr << ' ' << epiErr.depthGT << ' ' << epiErr.depth
+              << ' ' << epiErr.eBeforeSubpixel << ' ' << epiErr.eAfterSubpixel;
   }
 };
 
 class CollectDisparities {
 private:
+  int *startFrames;
   const MultiFovReader *reader;
   std::vector<EpiErr> *errors;
 
 public:
-  CollectDisparities(const MultiFovReader *reader, std::vector<EpiErr> *errors)
-      : reader(reader), errors(errors) {}
+  CollectDisparities(const MultiFovReader *reader, int *startFrames,
+                     std::vector<EpiErr> *errors)
+      : reader(reader), startFrames(startFrames), errors(errors) {}
 
   void operator()(const tbb::blocked_range<int> &range) const {
     PixelSelector pixelSelector;
     std::mt19937 mt;
     std::normal_distribution<double> rotd(
-        M_PI / 180.0 * FLAGS_disparity_rot_error / std::sqrt(3));
+        0, M_PI / 180.0 * FLAGS_disparity_rot_error / std::sqrt(3));
     std::normal_distribution<double> transd(1, FLAGS_disparity_trans_error);
 
-    int end = range.end();
-    end = std::min(end, lastFrameNumGlobal - FLAGS_disparity_shift + 2);
-    for (int firstFrameNum = range.begin(); firstFrameNum < end;
-         ++firstFrameNum) {
+    for (int ind = range.begin(); ind < range.end(); ++ind) {
+      int firstFrameNum = startFrames[ind];
       int secondFrameNum = firstFrameNum + FLAGS_disparity_shift;
       SE3 firstToSecondGT = reader->getWorldToFrameGT(secondFrameNum) *
                             reader->getWorldToFrameGT(firstFrameNum).inverse();
@@ -468,6 +469,17 @@ public:
       auto kf = kfFromEpipolar(
           reader->cam.get(), reader->getFrame(firstFrameNum),
           reader->getFrame(secondFrameNum), firstToSecond, pixelSelector);
+
+      if (FLAGS_show_all) {
+        std::vector<double> depths;
+        for (const auto &ip : kf[0].immaturePoints)
+          if (ip->state == ImmaturePoint::ACTIVE && ip->maxDepth != INF)
+            depths.push_back(ip->depth);
+        setDepthColBounds(depths);
+        cv::imshow("traced points",
+                   kf[0].drawDepthedFrame(minDepthCol, maxDepthCol));
+        cv::waitKey();
+      }
 
       for (int kfNum : {0, 1}) {
         SE3 curToOther = (kfNum == 0 ? firstToSecond : firstToSecond.inverse());
@@ -490,10 +502,11 @@ public:
           e.disparity = (reproj - reprojInfD).norm();
           e.expectedErr = std::sqrt(ip->lastFullVar);
           e.realErr = (reprojGT - reproj).norm();
-
           e.depthGT = depthGT;
           e.depth = ip->depth;
-          errors[firstFrameNum].push_back(e);
+          e.eBeforeSubpixel = ip->eBeforeSubpixel;
+          e.eAfterSubpixel = ip->eAfterSubpixel;
+          errors[ind].push_back(e);
         }
       }
     }
@@ -948,6 +961,30 @@ void collectStatistics(const MultiFovReader &reader) {
     stereoTable.close();
 
     std::cout << "Stereo errors collected." << std::endl;
+  }
+
+  if (FLAGS_collect_disparities) {
+    std::cout << "Start collecting dispaity errors..." << std::endl;
+    const int testCount = FLAGS_end_frame - FLAGS_start_frame + 1;
+    int startFrames[testCount];
+    std::vector<EpiErr> errors[testCount];
+    for (int i = 0; i < testCount; ++i)
+      startFrames[i] = FLAGS_start_frame + i;
+
+    if (FLAGS_run_parallel) {
+      tbb::parallel_for(tbb::blocked_range<int>(0, testCount),
+                        CollectDisparities(&reader, startFrames, errors));
+    } else {
+      CollectDisparities(&reader, startFrames,
+                         errors)(tbb::blocked_range<int>(0, testCount));
+    }
+
+    std::vector<EpiErr> allErr;
+    for (int it = 0; it < testCount; ++it)
+      for (const auto &e : errors[it])
+        allErr.push_back(e);
+
+    outputArray("pure_disp_err.txt", allErr);
   }
 
   if (FLAGS_collect_full_DSO) {

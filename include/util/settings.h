@@ -89,6 +89,8 @@ DECLARE_bool(draw_inlier_matches);
 DECLARE_bool(optimize_affine_light);
 
 DECLARE_bool(perform_full_tracing);
+DECLARE_bool(use_alt_H_weighting);
+DECLARE_int32(tracing_GN_iter);
 
 DECLARE_bool(perform_tracking_check_stereo);
 DECLARE_bool(perform_tracking_check_GT);

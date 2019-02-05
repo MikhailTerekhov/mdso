@@ -81,7 +81,7 @@ cv::Mat KeyFrame::drawDepthedFrame(double minDepth, double maxDepth) {
   cv::Mat res = preKeyFrame->frameColored.clone();
 
   for (const auto &ip : immaturePoints)
-    if (ip->state == ImmaturePoint::ACTIVE)
+    if (ip->state == ImmaturePoint::ACTIVE && ip->maxDepth != INF)
       putSquare(res, toCvPoint(ip->p), 5,
                 toCvVec3bDummy(depthCol(ip->depth, minDepth, maxDepth)), 2);
   for (const auto &op : optimizedPoints)

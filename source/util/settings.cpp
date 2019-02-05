@@ -36,7 +36,7 @@ double settingEpipolarPositionVariance = settingResidualPatternSize * 16.0;
 double settingEpipolarIntencityVariance = settingResidualPatternSize * 2.0;
 double settingEpipolarMinImprovementFactor = 1.5;
 double settingEpipolarOutlierIntencityDiff = settingBAOutlierIntensityDiff;
-double settingMinSecondBestDistance = 9.0;
+double settingMinSecondBestDistance = 3.0;
 double settingOutlierEpipolarEnergy = 16 * settingEpipolarOutlierIntencityDiff *
                                       settingEpipolarOutlierIntencityDiff;
 double settingOutlierEpipolarQuality = 2.0;
@@ -95,6 +95,12 @@ DEFINE_bool(optimize_affine_light, true,
 
 DEFINE_bool(perform_full_tracing, false,
             "Do we need to search through full epipolar curve?");
+DEFINE_bool(use_alt_H_weighting, true,
+            "Do we need to use alternative formula for H robust weighting when "
+            "performing subpixel tracing?");
+DEFINE_int32(tracing_GN_iter, 5,
+             "Max number of GN iterations when performing subpixel tracing. "
+             "Set to 0 to disable subpixel tracing.");
 
 DEFINE_bool(
     perform_tracking_check_stereo, false,
