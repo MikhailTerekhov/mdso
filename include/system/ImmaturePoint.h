@@ -43,6 +43,7 @@ struct ImmaturePoint {
   State state;
 
   // output only
+  double depthBeforeSubpixel;
   double lastIntVar, lastGeomVar, lastFullVar;
   int bestPyrLevel;
   bool pyrChanged;

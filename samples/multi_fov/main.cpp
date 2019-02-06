@@ -143,6 +143,9 @@ void visualizeTracking(const std::string &dataDir, int baseFrame,
   }
 }
 
+DEFINE_bool(show_epipolar, false,
+            "Do we need to show epipolar curves searched?");
+
 std::array<KeyFrame, 2> kfFromEpipolar(CameraModel *cam, const cv::Mat &frame1,
                                        const cv::Mat &frame2,
                                        const SE3 &fToSUsed,
@@ -151,12 +154,13 @@ std::array<KeyFrame, 2> kfFromEpipolar(CameraModel *cam, const cv::Mat &frame1,
                                  KeyFrame(cam, frame2, 1, pixelSelector)};
   result[1].preKeyFrame->worldToThis = fToSUsed;
 
+  auto deb = FLAGS_show_epipolar ? ImmaturePoint::DRAW_EPIPOLE
+                                 : ImmaturePoint::NO_DEBUG;
   for (int kfInd : {0, 1}) {
     int ipInd = 0;
     int intPrc = 0;
     for (const auto &ip : result[kfInd].immaturePoints) {
-      ip->traceOn(*result[(kfInd + 1) % 2].preKeyFrame,
-                  ImmaturePoint::NO_DEBUG);
+      ip->traceOn(*result[(kfInd + 1) % 2].preKeyFrame, deb);
     }
   }
 
@@ -415,6 +419,7 @@ DEFINE_double(disparity_trans_error, 0.02,
 DEFINE_double(disparity_rot_error, 3,
               "Mean square deviation for rotation noize in degrees when "
               "collecing disparity errors.");
+DEFINE_string(disparity_output, "disp_err.txt", "Disparity errors output file");
 
 DEFINE_bool(run_parallel, true, "Collect all in parallel?");
 
@@ -423,15 +428,19 @@ const int lastFrameNumGlobal = 2500;
 struct EpiErr {
   double disparity;
   double expectedErr;
+  double realErrBef;
   double realErr;
   double depthGT;
   double depth;
+  double depthBeforeSubpixel;
   double eBeforeSubpixel, eAfterSubpixel;
 
   friend std::ostream &operator<<(std::ostream &os, const EpiErr &epiErr) {
     return os << epiErr.disparity << ' ' << epiErr.expectedErr << ' '
-              << epiErr.realErr << ' ' << epiErr.depthGT << ' ' << epiErr.depth
-              << ' ' << epiErr.eBeforeSubpixel << ' ' << epiErr.eAfterSubpixel;
+              << epiErr.realErrBef << ' ' << epiErr.realErr << ' '
+              << epiErr.depthGT << ' ' << epiErr.depth << ' '
+              << epiErr.depthBeforeSubpixel << ' ' << epiErr.eBeforeSubpixel
+              << ' ' << epiErr.eAfterSubpixel;
   }
 };
 
@@ -496,14 +505,20 @@ public:
               curToOtherGT * (depthGT * reader->cam->unmap(ip->p)));
           Vec2 reproj = reader->cam->map(
               curToOther * (ip->depth * reader->cam->unmap(ip->p)));
+          Vec2 reprojBef =
+              reader->cam->map(curToOther * (ip->depthBeforeSubpixel *
+                                             reader->cam->unmap(ip->p)));
+
           Vec2 reprojInfD =
               reader->cam->map(curToOther.so3() * reader->cam->unmap(ip->p));
           EpiErr e;
           e.disparity = (reproj - reprojInfD).norm();
           e.expectedErr = std::sqrt(ip->lastFullVar);
+          e.realErrBef = (reprojGT - reprojBef).norm();
           e.realErr = (reprojGT - reproj).norm();
           e.depthGT = depthGT;
           e.depth = ip->depth;
+          e.depthBeforeSubpixel = ip->depthBeforeSubpixel;
           e.eBeforeSubpixel = ip->eBeforeSubpixel;
           e.eAfterSubpixel = ip->eAfterSubpixel;
           errors[ind].push_back(e);
@@ -984,7 +999,7 @@ void collectStatistics(const MultiFovReader &reader) {
       for (const auto &e : errors[it])
         allErr.push_back(e);
 
-    outputArray("pure_disp_err.txt", allErr);
+    outputArray(FLAGS_disparity_output, allErr);
   }
 
   if (FLAGS_collect_full_DSO) {
@@ -1069,7 +1084,7 @@ void collectStatistics(const MultiFovReader &reader) {
       for (const auto &e : trackedDisp[it])
         allDisp.push_back(e);
 
-    outputArray("disp_err.txt", allDisp);
+    outputArray("full_" + FLAGS_disparity_output, allDisp);
 
     outputArray("dso_depth_err.txt", allErrors);
     outputArray("dso_kp_depth_err.txt", allKpErrors);

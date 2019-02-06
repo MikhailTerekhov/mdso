@@ -16,6 +16,8 @@ cv::Mat dbg;
 double minDepthCol = 0, maxDepthCol = 0;
 
 void setDepthColBounds(const std::vector<double> &depths) {
+  if (depths.empty())
+    return;
   std::vector<double> sorted = depths;
   std::sort(sorted.begin(), sorted.end());
   int redInd = FLAGS_red_depths_part * int(sorted.size());

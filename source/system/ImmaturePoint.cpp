@@ -9,7 +9,8 @@ namespace fishdso {
 
 const int ImmaturePoint::PH = settingResidualPatternHeight;
 const double ImmaturePoint::TH = settingEpipolarOutlierIntencityDiff;
-const double ImmaturePoint::SBD = settingMinSecondBestDistance * settingMinSecondBestDistance;
+const double ImmaturePoint::SBD =
+    settingMinSecondBestDistance * settingMinSecondBestDistance;
 
 ImmaturePoint::ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p)
     : p(p), minDepth(0), maxDepth(INF), bestQuality(-1), lastEnergy(INF),
@@ -267,6 +268,8 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
   }
 
   eBeforeSubpixel = bestEnergy;
+  depthBeforeSubpixel =
+      triangulate(baseToRef, baseDirections[0], cam->unmap(bestPoint))[0];
 
   double bestDispl = 0;
   if (FLAGS_tracing_GN_iter > 0) {
@@ -276,10 +279,11 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
     Vec2 to = points[toInd];
     Vec2 pattern[PS];
     double scale = 1.0 / (1 << bestPyrLevel);
-    pattern[0] = scale * points[bestInd];
-    for (int i = 1; i < PS; ++i)
-      pattern[i] =
-          scale * cam->map(baseToRef * (bestDepth * baseDirections[i]));
+    pattern[0] = Vec2::Zero();
+    for (int i = 1; i < PS; ++i) {
+      Vec2 reproj = cam->map(baseToRef * (bestDepth * baseDirections[i]));
+      pattern[i] = scale * (reproj - points[bestInd]);
+    }
     bestPoint = tracePrecise(refFrame.framePyr.interpolator(bestPyrLevel), from,
                              to, intencities, pattern, bestDispl, bestEnergy);
     depth = triangulate(baseToRef, baseDirections[0],
@@ -315,12 +319,20 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
     bestQuality = newQuality;
   lastEnergy = bestEnergy;
 
-  if (bestEnergy == INF || secondBestEnergy == INF || secondBestEnergy <= 1.0)
+  if (bestEnergy == INF || secondBestEnergy == INF || secondBestEnergy <= 1.0) {
+    // std::cerr << "out by INF energy or small second (e=" << bestEnergy
+    // << " se=" << secondBestEnergy << ")" << std::endl;
     state = OUTLIER;
+  }
 
   if (lastEnergy > settingOutlierEpipolarEnergy ||
-      bestQuality < settingOutlierEpipolarQuality)
+      bestQuality < settingOutlierEpipolarQuality) {
     state = OUTLIER;
+    // std::cerr << "out by quality (e=" << lastEnergy << " q=" << bestQuality
+    // << ")" << std::endl;
+    // std::cerr << "bef=" << eBeforeSubpixel << ' ' << "aft=" << eAfterSubpixel
+    // << std::endl;
+  }
 
   if (state == ACTIVE && debugType == DRAW_EPIPOLE) {
     cv::Mat base;
