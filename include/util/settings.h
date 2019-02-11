@@ -74,6 +74,9 @@ extern int settingMaxBAIterations;
 
 extern int settingMaxKeyFrames;
 
+extern int settingMaxDistMapW;
+extern int settingMaxDistMapH;
+
 } // namespace fishdso
 
 DECLARE_int32(num_threads);

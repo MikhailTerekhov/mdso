@@ -64,6 +64,9 @@ Vec2 settingResidualPattern[settingResidualPatternSize] = {
 
 int settingMaxKeyFrames = 3;
 
+int settingMaxDistMapW = 480;
+int settingMaxDistMapH = 302;
+
 } // namespace fishdso
 
 DEFINE_int32(num_threads, 3, "Number of threads for Ceres Solver to use.");

@@ -4,6 +4,7 @@
 #include <Eigen/Core>
 #include <Eigen/StdVector>
 #include <map>
+#include <queue>
 #include <sophus/se3.hpp>
 #include <sophus/sim3.hpp>
 #include <unordered_set>
@@ -19,6 +20,8 @@ typedef Eigen::Matrix<double, 5, 1> Vec5;
 typedef Eigen::Matrix<double, 9, 1> Vec9;
 typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VecX;
 
+typedef Eigen::Matrix<int, 2, 1> Vec2i;
+
 typedef Eigen::Matrix<double, 2, 2> Mat22;
 typedef Eigen::Matrix<double, 2, 3> Mat23;
 typedef Eigen::Matrix<double, 3, 2> Mat32;
@@ -31,6 +34,8 @@ typedef Eigen::Matrix<double, Eigen::Dynamic, 5> MatX5;
 typedef Eigen::Matrix<double, Eigen::Dynamic, 9> MatX9;
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatXX;
 
+typedef Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic> MatXXi;
+
 typedef Eigen::Quaterniond Quaternion;
 
 typedef Sophus::Sim3d Sim3;
@@ -39,6 +44,9 @@ typedef Sophus::SO3d SO3;
 
 template <typename T>
 using StdVector = std::vector<T, Eigen::aligned_allocator<T>>;
+
+template <typename T>
+using StdQueue = std::queue<T, std::deque<T, Eigen::aligned_allocator<T>>>;
 
 template <typename T>
 using StdUnorderedSet = std::unordered_set<T, std::hash<T>, std::equal_to<T>,

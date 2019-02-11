@@ -38,6 +38,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/util/DepthedImagePyramid.h
     ${PROJECT_SOURCE_DIR}/include/util/ObjectPool.h
     ${PROJECT_SOURCE_DIR}/include/util/PixelSelector.h
+    ${PROJECT_SOURCE_DIR}/include/util/DistanceMap.h
     ${PROJECT_SOURCE_DIR}/include/system/AffineLightTransform.h
     ${PROJECT_SOURCE_DIR}/include/system/SphericalPlus.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoSystem.h
@@ -65,6 +66,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/util/ImagePyramid.cpp
     ${PROJECT_SOURCE_DIR}/source/util/DepthedImagePyramid.cpp
     ${PROJECT_SOURCE_DIR}/source/util/PixelSelector.cpp
+    ${PROJECT_SOURCE_DIR}/source/util/DistanceMap.cpp
     ${PROJECT_SOURCE_DIR}/source/system/SphericalPlus.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoSystem.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DelaunayDsoInitializer.cpp

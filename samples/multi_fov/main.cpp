@@ -1116,7 +1116,25 @@ It should contain "info" and "data" subdirectories.)abacaba";
   // FLAGS_depths_noize);
 
   MultiFovReader reader(argv[1]);
-  collectStatistics(reader);
+  cv::Mat frame = reader.getFrame(1);
+  cv::Point p1(300, 400), p2(400, 400), p3(300, 450);
+  cv::Mat1d d = reader.getDepths(1);
+  std::cout << "depths = " << d(p1) << ' ' << d(p2) << ' ' << d(p3)
+            << std::endl;
+  Vec3 v1 = d(p1) * reader.cam->unmap(toVec2(p1));
+  Vec3 v2 = d(p2) * reader.cam->unmap(toVec2(p2));
+  Vec3 v3 = d(p3) * reader.cam->unmap(toVec2(p3));
+  Vec3 n = (v3 - v1).cross(v2 - v1);
+  double dp = -n.dot(v1);
+  std::cout << "n, dp = " << n.transpose() << ' ' << dp << std::endl;
+  std::cout << "dist = " << dp / n.norm() << std::endl;
+
+  cv::circle(frame, p1, 5, CV_BLACK, cv::FILLED);
+  cv::circle(frame, p2, 5, CV_BLACK, cv::FILLED);
+  cv::circle(frame, p3, 5, CV_BLACK, cv::FILLED);
+  cv::imshow("frame", frame);
+  cv::waitKey();
+  // collectStatistics(reader);
   // testEpipolar(reader, 410, 420);
 
   return 0;
