@@ -3,7 +3,7 @@
 Aquire errors of some of our methods from a range of MultiFoV dataset frames. 
 Call it with
 ```
-multi_fov data_dir
+stat data_dir
 ```
 where `data_dir` stands for MultiFoV dataset directory.
 

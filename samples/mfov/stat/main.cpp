@@ -1,4 +1,4 @@
-#include "MultiFovReader.h"
+#include "../reader/MultiFovReader.h"
 #include "system/DelaunayDsoInitializer.h"
 #include "system/DsoSystem.h"
 #include "system/StereoMatcher.h"
@@ -31,7 +31,6 @@ void runTracker(const MultiFovReader &reader, int startFrameNum,
   startFrame.activateAllImmature();
   cv::Mat1f depths = reader.getDepths(startFrameNum);
   StdVector<Vec2> pnts;
-  std::vector<cv::Point> cvPnts;
   std::vector<double> weights;
   std::vector<double> depthsVec;
 
@@ -44,7 +43,6 @@ void runTracker(const MultiFovReader &reader, int startFrameNum,
     // double usedDepth = gtDepth;
 
     pnts.push_back(op->p);
-    cvPnts.push_back(toCvPoint(op->p));
     weights.push_back(1.0);
     depthsVec.push_back(usedDepth);
   }
@@ -68,7 +66,7 @@ void runTracker(const MultiFovReader &reader, int startFrameNum,
 
   FrameTracker tracker(
       camPyr, std::make_unique<DepthedImagePyramid>(
-                  startFrame.preKeyFrame->frame(), cvPnts, depthsVec, weights));
+                  startFrame.preKeyFrame->frame(), pnts, depthsVec, weights));
   AffineLightTransform<double> affLight;
   SE3 baseToLbo;
   SE3 baseToLast = reader.getWorldToFrameGT(startFrameNum) *
@@ -1099,7 +1097,7 @@ void collectStatistics(const MultiFovReader &reader) {
 
 int main(int argc, char **argv) {
   std::string usage =
-      R"abacaba(Usage: multi_fov data_dir
+      R"abacaba(Usage: stat data_dir
 Where data_dir names a directory with MultiFoV fishseye dataset.
 It should contain "info" and "data" subdirectories.)abacaba";
 
@@ -1116,25 +1114,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
   // FLAGS_depths_noize);
 
   MultiFovReader reader(argv[1]);
-  cv::Mat frame = reader.getFrame(1);
-  cv::Point p1(300, 400), p2(400, 400), p3(300, 450);
-  cv::Mat1d d = reader.getDepths(1);
-  std::cout << "depths = " << d(p1) << ' ' << d(p2) << ' ' << d(p3)
-            << std::endl;
-  Vec3 v1 = d(p1) * reader.cam->unmap(toVec2(p1));
-  Vec3 v2 = d(p2) * reader.cam->unmap(toVec2(p2));
-  Vec3 v3 = d(p3) * reader.cam->unmap(toVec2(p3));
-  Vec3 n = (v3 - v1).cross(v2 - v1);
-  double dp = -n.dot(v1);
-  std::cout << "n, dp = " << n.transpose() << ' ' << dp << std::endl;
-  std::cout << "dist = " << dp / n.norm() << std::endl;
-
-  cv::circle(frame, p1, 5, CV_BLACK, cv::FILLED);
-  cv::circle(frame, p2, 5, CV_BLACK, cv::FILLED);
-  cv::circle(frame, p3, 5, CV_BLACK, cv::FILLED);
-  cv::imshow("frame", frame);
-  cv::waitKey();
-  // collectStatistics(reader);
+  collectStatistics(reader);
   // testEpipolar(reader, 410, 420);
 
   return 0;

@@ -12,7 +12,8 @@ DelaunayDsoInitializer::DelaunayDsoInitializer(
     DsoSystem *dsoSystem, CameraModel *cam, PixelSelector *pixelSelector,
     DelaunayDsoInitializer::DebugOutputType debugOutputType)
     : cam(cam), dsoSystem(dsoSystem), pixelSelector(pixelSelector),
-      stereoMatcher(cam), hasFirstFrame(false), framesSkipped(0) {}
+      stereoMatcher(cam), hasFirstFrame(false), framesSkipped(0),
+      debugOutputType(debugOutputType) {}
 
 bool DelaunayDsoInitializer::addFrame(const cv::Mat &frame,
                                       int globalFrameNum) {
@@ -59,9 +60,8 @@ std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFramesDelaunay(
   std::vector<KeyFrame> keyFrames;
   for (int i = 0; i < 2; ++i) {
     keyFrames.push_back(KeyFrame(cam, frames[i], frameNums[i], *pixelSelector));
-    keyFrames.back().activateAllImmature();
-    for (const auto &op : keyFrames.back().optimizedPoints)
-      op->stddev = 1;
+    for (const auto &ip : keyFrames.back().immaturePoints)
+      ip->stddev = 1;
   }
 
   keyFrames[0].preKeyFrame->worldToThis = SE3();
@@ -71,12 +71,13 @@ std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFramesDelaunay(
     Terrain kpTerrains[2] = {Terrain(cam, initialPoints[0], initialDepths[0]),
                              Terrain(cam, initialPoints[1], initialDepths[1])};
     for (int i = 0; i < 2; ++i) {
-      for (const auto &op : keyFrames[i].optimizedPoints) {
+      for (const auto &ip : keyFrames[i].immaturePoints) {
         double depth;
-        if (kpTerrains[i](op->p, depth))
-          op->activate(depth);
-        else
-          op->state = OptimizedPoint::OOB;
+        if (kpTerrains[i](ip->p, depth)) {
+          ip->state = ImmaturePoint::ACTIVE;
+          ip->depth = depth;
+        } else
+          ip->state = ImmaturePoint::OOB;
       }
     }
   } else {
@@ -95,39 +96,40 @@ std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFramesDelaunay(
     for (int kfInd = 0; kfInd < 2; ++kfInd) {
       const int reselectCount = 1;
       for (int i = 0; i < reselectCount + 1; ++i) {
-        for (const auto &ip : keyFrames[kfInd].optimizedPoints) {
+        for (const auto &ip : keyFrames[kfInd].immaturePoints) {
           double depth;
-          if (kpTerrains[kfInd](cam->unmap(ip->p.data()), depth))
-            ip->activate(depth);
-          else
-            ip->state = OptimizedPoint::OOB;
+          if (ip->state == ImmaturePoint::ACTIVE &&
+              kpTerrains[kfInd](cam->unmap(ip->p.data()), depth)) {
+            ip->state = ImmaturePoint::ACTIVE;
+            ip->depth = depth;
+          } else
+            ip->state = ImmaturePoint::OOB;
         }
 
-        int pointsTotal = keyFrames[kfInd].optimizedPoints.size();
+        int pointsTotal = keyFrames[kfInd].immaturePoints.size();
 
-        auto it = keyFrames[kfInd].optimizedPoints.begin();
-        while (it != keyFrames[kfInd].optimizedPoints.end()) {
-          if ((*it)->state != OptimizedPoint::ACTIVE)
-            it = keyFrames[kfInd].optimizedPoints.erase(it);
+        auto it = keyFrames[kfInd].immaturePoints.begin();
+        while (it != keyFrames[kfInd].immaturePoints.end()) {
+          if ((*it)->state != ImmaturePoint::ACTIVE)
+            it = keyFrames[kfInd].immaturePoints.erase(it);
           else
             it++;
         }
 
-        int pointsInTriang = keyFrames[kfInd].optimizedPoints.size();
+        int pointsInTriang = keyFrames[kfInd].immaturePoints.size();
         int pointsNeeded = settingInterestPointsUsed *
                            (static_cast<double>(pointsTotal) / pointsInTriang);
         if (i != reselectCount) {
           keyFrames[kfInd].selectPointsDenser(*pixelSelector, pointsNeeded);
-          keyFrames[kfInd].activateAllImmature();
         }
       }
     }
 
-    std::vector<double> opDepths;
-    opDepths.reserve(keyFrames[1].optimizedPoints.size());
-    for (const auto &op : keyFrames[1].optimizedPoints)
-      opDepths.push_back(op->depth());
-    setDepthColBounds(opDepths);
+    std::vector<double> ipDepths;
+    ipDepths.reserve(keyFrames[1].immaturePoints.size());
+    for (const auto &ip : keyFrames[1].immaturePoints)
+      ipDepths.push_back(ip->depth);
+    setDepthColBounds(ipDepths);
 
     if (debugOutputType != NO_DEBUG) {
       if (FLAGS_show_interpolation || FLAGS_write_files) {
@@ -137,14 +139,14 @@ std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFramesDelaunay(
 
         // cv::circle(img, cv::Point(1268, 173), 7, CV_BLACK, 2);
 
-        auto &ops = keyFrames[1].optimizedPoints;
+        auto &ips = keyFrames[1].immaturePoints;
         StdVector<Vec2> pnts;
-        pnts.reserve(ops.size());
+        pnts.reserve(ips.size());
         std::vector<double> d;
-        d.reserve(ops.size());
-        for (const auto &op : ops) {
-          pnts.push_back(op->p);
-          d.push_back(op->depth());
+        d.reserve(ips.size());
+        for (const auto &ip : ips) {
+          pnts.push_back(ip->p);
+          d.push_back(ip->depth);
         }
 
         kpTerrains[1].draw(img, cam, CV_GREEN, minDepthCol, maxDepthCol);

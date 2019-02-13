@@ -4,9 +4,7 @@
 #include "util/types.h"
 #include <gflags/gflags.h>
 
-namespace fishdso {
-
-// candidate point selection
+namespace fishdso { // candidate point selection
 constexpr int settingInterestPointLayers = 3;
 extern double settingGradThreshold[settingInterestPointLayers];
 extern int settingInitialAdaptiveBlockSize;
@@ -67,6 +65,8 @@ extern double settingTrackingOutlierIntensityDiff;
 constexpr int settingResidualPatternSize = 9;
 extern Vec2 settingResidualPattern[settingResidualPatternSize];
 extern int settingResidualPatternHeight;
+extern double settingMaxOptimizedStddev;
+extern int settingMaxOptimizedPoints;
 extern double settingBAOutlierIntensityDiff;
 extern double settingMaxPointDepth;
 extern int settingMaxFirstBAIterations;
@@ -101,6 +101,7 @@ DECLARE_bool(track_from_lask_kf);
 DECLARE_bool(predict_using_screw);
 DECLARE_bool(use_grad_weights_on_tracking);
 
+DECLARE_bool(run_ba);
 DECLARE_bool(fixed_motion_on_first_ba);
 
 DECLARE_bool(continue_choosing_keyframes);
@@ -109,6 +110,7 @@ DECLARE_double(red_depths_part);
 DECLARE_double(blue_depths_part);
 
 DECLARE_bool(show_interpolation);
+DECLARE_bool(show_track_base);
 DECLARE_bool(write_files);
 DECLARE_string(output_directory);
 

@@ -62,14 +62,15 @@ DistanceMap::DistanceMap(int givenW, int givenH,
   }
 }
 
-std::vector<bool> DistanceMap::choose(const StdVector<Vec2> &otherPoints,
-                                      int pointsNeeded) {
-  std::vector<bool> used(otherPoints.size(), false);
+std::vector<int> DistanceMap::choose(const StdVector<Vec2> &otherPoints,
+                                     int pointsNeeded) {
+  std::vector<int> chosen;
   std::vector<std::pair<int, int>> otherDist(otherPoints.size());
   for (int i = 0; i < otherPoints.size(); ++i) {
     const Vec2 &p = otherPoints[i];
     Vec2i pi = otherPoints[i].cast<int>() / pyrDown;
-    if (!(pi[0] >= 0 && pi[0] < dist.cols() && pi[1] >= 0 && pi[1] < dist.rows())) {
+    if (!(pi[0] >= 0 && pi[0] < dist.cols() && pi[1] >= 0 &&
+          pi[1] < dist.rows())) {
       LOG(WARNING) << "point in DistanceMap::choose OOB! w, h = " << dist.cols()
                    << ' ' << dist.rows() << " p = " << pi.transpose()
                    << std::endl;
@@ -85,9 +86,9 @@ std::vector<bool> DistanceMap::choose(const StdVector<Vec2> &otherPoints,
   int total = std::min(pointsNeeded, int(otherPoints.size()));
   for (int i = 0; i < total; ++i)
     if (otherDist[i].second != -1)
-      used[otherDist[i].first] = true;
+      chosen.push_back(otherDist[i].first);
 
-  return used;
+  return chosen;
 }
 
 } // namespace fishdso

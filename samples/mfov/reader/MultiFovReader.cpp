@@ -1,5 +1,5 @@
 #include "MultiFovReader.h"
-#include "util/settings.h"
+#include "util/types.h"
 
 MultiFovReader::MultiFovReader(const std::string &newMultiFovDir)
     : datasetDir(newMultiFovDir) {

@@ -27,7 +27,7 @@ KeyFrame::KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame,
 void KeyFrame::addImmatures(const std::vector<cv::Point> &points) {
   immaturePoints.reserve(immaturePoints.size() + points.size());
   for (const cv::Point &p : points) {
-    std::unique_ptr<ImmaturePoint> ip(
+    SetUniquePtr<ImmaturePoint> ip(
         new ImmaturePoint(preKeyFrame.get(), toVec2(p)));
     immaturePoints.insert(std::move(ip));
   }
@@ -45,14 +45,13 @@ void KeyFrame::selectPointsDenser(PixelSelector &pixelSelector,
 void KeyFrame::activateAllImmature() {
   for (const auto &ip : immaturePoints)
     optimizedPoints.insert(
-        std::unique_ptr<OptimizedPoint>(new OptimizedPoint(*ip)));
+        SetUniquePtr<OptimizedPoint>(new OptimizedPoint(*ip)));
   immaturePoints.clear();
 }
 
 void KeyFrame::deactivateAllOptimized() {
   for (const auto &op : optimizedPoints) {
-    std::unique_ptr<ImmaturePoint> ip(
-        new ImmaturePoint(preKeyFrame.get(), op->p));
+    SetUniquePtr<ImmaturePoint> ip(new ImmaturePoint(preKeyFrame.get(), op->p));
     ip->depth = op->depth();
     immaturePoints.insert(std::move(ip));
   }
@@ -60,15 +59,17 @@ void KeyFrame::deactivateAllOptimized() {
 }
 
 std::unique_ptr<DepthedImagePyramid> KeyFrame::makePyramid() {
-  std::vector<cv::Point> points =
-      reservedVector<cv::Point>(optimizedPoints.size());
-  std::vector<double> depths = reservedVector<double>(optimizedPoints.size());
-  std::vector<double> weights = reservedVector<double>(optimizedPoints.size());
+  StdVector<Vec2> points;
+  points.reserve(optimizedPoints.size());
+  std::vector<double> depths;
+  depths.reserve(optimizedPoints.size());
+  std::vector<double> weights;
+  weights.reserve(optimizedPoints.size());
 
   for (const auto &op : optimizedPoints) {
     if (op->state != OptimizedPoint::ACTIVE)
       continue;
-    points.push_back(toCvPoint(op->p));
+    points.push_back(op->p);
     depths.push_back(op->depth());
     weights.push_back(1 / op->stddev);
   }

@@ -35,6 +35,9 @@ void outputArray(const std::string &fname, const T array[], int size) {
   ofs.close();
 }
 
+void printInPly(std::ostream &out, const std::vector<Vec3> &points,
+                const std::vector<cv::Vec3b> &colors);
+
 void setDepthColBounds(const std::vector<double> &depths);
 
 void putMotion(std::ostream &out, const SE3 &motion);

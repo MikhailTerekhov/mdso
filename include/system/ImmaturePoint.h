@@ -13,9 +13,6 @@ struct ImmaturePoint {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   static constexpr int PS = settingResidualPatternSize;
-  static const int PH;     // pattern height
-  static const double TH;  // outlier intencity difference threshold
-  static const double SBD; // minimum second best distance squared
 
   enum State { ACTIVE, OOB, OUTLIER };
   enum TracingDebugType { NO_DEBUG, DRAW_EPIPOLE };
@@ -38,6 +35,7 @@ struct ImmaturePoint {
   double depth;
   double bestQuality;
   double lastEnergy;
+  double stddev; // predicted disparity error on last successful tracing
   const PreKeyFrame *baseFrame;
   CameraModel *cam;
   State state;

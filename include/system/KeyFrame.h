@@ -34,8 +34,8 @@ struct KeyFrame {
 
   std::shared_ptr<PreKeyFrame> preKeyFrame;
 
-  StdUnorderedSet<std::unique_ptr<ImmaturePoint>> immaturePoints;
-  StdUnorderedSet<std::unique_ptr<OptimizedPoint>> optimizedPoints;
+  StdUnorderedSetOfPtrs<ImmaturePoint> immaturePoints;
+  StdUnorderedSetOfPtrs<OptimizedPoint> optimizedPoints;
 };
 
 } // namespace fishdso

@@ -35,11 +35,11 @@ double settingEpipolarMaxSearchRel = 0.027;
 double settingEpipolarPositionVariance = settingResidualPatternSize * 16.0;
 double settingEpipolarIntencityVariance = settingResidualPatternSize * 2.0;
 double settingEpipolarMinImprovementFactor = 1.5;
-double settingEpipolarOutlierIntencityDiff = settingBAOutlierIntensityDiff;
+double settingEpipolarOutlierIntencityDiff = 12.0;
 double settingMinSecondBestDistance = 3.0;
-double settingOutlierEpipolarEnergy = 16 * settingEpipolarOutlierIntencityDiff *
+double settingOutlierEpipolarEnergy = 5 * settingEpipolarOutlierIntencityDiff *
                                       settingEpipolarOutlierIntencityDiff;
-double settingOutlierEpipolarQuality = 2.0;
+double settingOutlierEpipolarQuality = 3.0;
 
 double settingMinAffineLigthtA = -std::log(1.1);
 double settingMaxAffineLigthtA = std::log(1.1);
@@ -51,7 +51,7 @@ double settingMaxDepth = 1e4;
 
 double settingGradientWeighingConstant = 50.0;
 
-double settingTrackingOutlierIntensityDiff = settingBAOutlierIntensityDiff;
+double settingTrackingOutlierIntensityDiff = 12.0;
 double settingBAOutlierIntensityDiff = 12.0;
 double settingMaxPointDepth = 1e4;
 int settingMaxFirstBAIterations = 15;
@@ -61,8 +61,10 @@ int settingResidualPatternHeight = 2;
 Vec2 settingResidualPattern[settingResidualPatternSize] = {
     Vec2(0, 0), Vec2(0, -2), Vec2(-1, -1), Vec2(1, -1), Vec2(-2, 0),
     Vec2(2, 0), Vec2(-1, 1), Vec2(1, 1),   Vec2(0, 2)};
+double settingMaxOptimizedStddev = 12.0;
+int settingMaxOptimizedPoints = 2000;
 
-int settingMaxKeyFrames = 3;
+int settingMaxKeyFrames = 6;
 
 int settingMaxDistMapW = 480;
 int settingMaxDistMapH = 302;
@@ -126,6 +128,8 @@ DEFINE_bool(
 DEFINE_bool(use_grad_weights_on_tracking, false,
             "Use gradient-dependent residual weights when tracking");
 
+DEFINE_bool(run_ba, true, "Do we need to run bundle adjustment?");
+
 DEFINE_bool(fixed_motion_on_first_ba, false,
             "Optimize only depths when running bundle adjustment on first two "
             "keyframes? We could assume that a good motion estimation is "
@@ -155,6 +159,8 @@ DEFINE_validator(blue_depths_part, validateDepthsPart);
 
 DEFINE_bool(show_interpolation, false,
             "Show interpolated depths after initialization?");
+DEFINE_bool(show_track_base, false,
+            "Show depths used for tracking after the new kf is inserted?");
 DEFINE_bool(write_files, true,
             "Do we need to write output files into output_directory?");
 DEFINE_string(output_directory, "output/default",

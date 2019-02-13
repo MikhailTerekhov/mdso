@@ -4,6 +4,7 @@
 #include <Eigen/Core>
 #include <Eigen/StdVector>
 #include <map>
+#include <memory>
 #include <queue>
 #include <sophus/se3.hpp>
 #include <sophus/sim3.hpp>
@@ -55,6 +56,26 @@ using StdUnorderedSet = std::unordered_set<T, std::hash<T>, std::equal_to<T>,
 template <typename K, typename T>
 using StdMap =
     std::map<K, T, std::less<K>, Eigen::aligned_allocator<std::pair<K, T>>>;
+
+class OptionalDeleter {
+  bool doDelete;
+
+public:
+  OptionalDeleter(bool newDoDelete = true) : doDelete(newDoDelete) {}
+  template <typename T> void operator()(T *p) const {
+    if (doDelete)
+      delete p;
+  }
+};
+
+template <typename T> using SetUniquePtr = std::unique_ptr<T, OptionalDeleter>;
+
+template <typename T> SetUniquePtr<T> makeFindPtr(T *ptr) {
+  return SetUniquePtr<T>(ptr, false);
+}
+
+template <typename T>
+using StdUnorderedSetOfPtrs = std::unordered_set<SetUniquePtr<T>>;
 
 } // namespace fishdso
 

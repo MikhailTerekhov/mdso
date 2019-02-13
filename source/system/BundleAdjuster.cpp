@@ -250,13 +250,15 @@ void BundleAdjuster::adjust(int maxNumIterations) {
 
   LOG(INFO) << "aff light:\n" << secondKeyFrame->preKeyFrame->lightWorldToThis;
 
-  auto p = std::minmax_element(secondKeyFrame->optimizedPoints.begin(),
-                               secondKeyFrame->optimizedPoints.end(),
-                               [](const auto &op1, const auto &op2) {
-                                 return op1->depth() < op2->depth();
-                               });
-  LOG(INFO) << "minmax d = " << (*p.first)->depth() << ' '
-            << (*p.second)->depth() << std::endl;
+  if (secondKeyFrame->optimizedPoints.size() > 0) {
+    auto p = std::minmax_element(secondKeyFrame->optimizedPoints.begin(),
+                                 secondKeyFrame->optimizedPoints.end(),
+                                 [](const auto &op1, const auto &op2) {
+                                   return op1->depth() < op2->depth();
+                                 });
+    LOG(INFO) << "minmax d = " << (*p.first)->depth() << ' '
+              << (*p.second)->depth() << std::endl;
+  }
 
   std::vector<double> depthsVec;
   depthsVec.reserve(secondKeyFrame->optimizedPoints.size());

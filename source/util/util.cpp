@@ -13,7 +13,49 @@
 namespace fishdso {
 
 cv::Mat dbg;
-double minDepthCol = 0, maxDepthCol = 0;
+double minDepthCol = 0, maxDepthCol = 1;
+
+void printInPly(std::ostream &out, const std::vector<Vec3> &points,
+                const std::vector<cv::Vec3b> &colors) {
+  std::vector<Vec3> pf;
+  std::vector<cv::Vec3b> cf;
+
+  for (int i = 0; i < points.size(); ++i) {
+    const Vec3 &p = points[i];
+    const cv::Vec3b &color = colors[i];
+    bool ok = true;
+    for (int it = 0; it < 3; ++it)
+      if (!std::isfinite(p[it]))
+        ok = false;
+    if (ok) {
+      pf.push_back(p);
+      cf.push_back(color);
+    }
+  }
+
+  out.precision(15);
+  out << R"__(ply
+format ascii 1.0
+element vertex )__"
+      << pf.size() << R"__(
+property float x
+property float y
+property float z
+property uchar red
+property uchar green
+property uchar blue
+end_header
+)__";
+
+  for (int i = 0; i < pf.size(); ++i) {
+    const Vec3 &p = pf[i];
+    const cv::Vec3b &color = cf[i];
+    
+    out << p[0] << ' ' << p[1] << ' ' << p[2] << ' ';
+    out << int(color[2]) << ' ' << int(color[1]) << ' ' << int(color[0])
+        << std::endl;
+  }
+}
 
 void setDepthColBounds(const std::vector<double> &depths) {
   if (depths.empty())

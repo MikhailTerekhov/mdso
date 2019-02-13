@@ -73,7 +73,7 @@ def main(argv):
 
     ax.view_init(azim=-90, elev=0)
 
-    xylim = 1
+    xylim = 3
     ax.set_xlim3d(-xylim, xylim)
     ax.set_ylim3d(-xylim, xylim)
     ax.set_zlim3d(0, 2 * xylim)

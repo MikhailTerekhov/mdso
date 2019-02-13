@@ -7,6 +7,7 @@
 #include "system/FrameTracker.h"
 #include "system/KeyFrame.h"
 #include "util/DepthedImagePyramid.h"
+#include "util/DistanceMap.h"
 #include "util/settings.h"
 #include <map>
 #include <memory>
@@ -23,6 +24,9 @@ public:
                                         int globalFrameNum);
   void addGroundTruthPose(int globalFrameNum, const SE3 &worldToThat);
 
+  void fillRemainedHistory();
+
+  void printPointsInPly(std::ostream &out);
   void printLastKfInPly(std::ostream &out);
   void printTrackingInfo(std::ostream &out);
   void printPredictionInfo(std::ostream &out);
@@ -44,7 +48,12 @@ private:
     return FLAGS_track_from_lask_kf ? lastKeyFrame() : lboKeyFrame();
   }
 
-  std::unique_ptr<DepthedImagePyramid> optimizedPointsOntoBaseKf();
+  template <typename PointT>
+  void projectOntoBaseKf(StdVector<Vec2> *points, std::vector<double> *depths,
+                         std::vector<PointT *> *ptrs,
+                         std::vector<KeyFrame *> *kfs);
+
+  void alignGTPoses();
 
   SE3 predictBaseKfToCur();
   SE3 purePredictBaseKfToCur();
@@ -69,7 +78,10 @@ private:
 
   std::unique_ptr<FrameTracker> frameTracker;
 
-  StdVector<std::shared_ptr<PreKeyFrame>> frameHistory;
+  std::vector<Vec3> pointHistory;
+  std::vector<cv::Vec3b> pointHistoryCol;
+  std::vector<std::shared_ptr<PreKeyFrame>> frameHistory;
+
   std::map<int, KeyFrame> keyFrames;
   StdMap<int, SE3> worldToFrame;
   StdMap<int, SE3> worldToFramePredict;
@@ -80,6 +92,9 @@ private:
 
   // block size for contrast point selection algorithm
   int adaptiveBlockSize;
+
+  double scaleGTToOur;
+  SE3 gtToOur;
 };
 
 } // namespace fishdso

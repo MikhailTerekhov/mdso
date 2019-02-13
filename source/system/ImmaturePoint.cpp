@@ -7,14 +7,13 @@
 
 namespace fishdso {
 
-const int ImmaturePoint::PH = settingResidualPatternHeight;
-const double ImmaturePoint::TH = settingEpipolarOutlierIntencityDiff;
-const double ImmaturePoint::SBD =
-    settingMinSecondBestDistance * settingMinSecondBestDistance;
+#define PH settingResidualPatternHeight
+#define TH settingEpipolarOutlierIntencityDiff
+#define SBD settingMinSecondBestDistance
 
 ImmaturePoint::ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p)
     : p(p), minDepth(0), maxDepth(INF), bestQuality(-1), lastEnergy(INF),
-      baseFrame(baseFrame), cam(baseFrame->cam), state(ACTIVE) {
+      baseFrame(baseFrame), cam(baseFrame->cam), state(ACTIVE), stddev(INF) {
   if (!cam->isOnImage(p, PH)) {
     state = OOB;
     return;
@@ -170,8 +169,10 @@ double ImmaturePoint::estVariance(const Vec2 &searchDirection) {
 
 void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
                             TracingDebugType debugType) {
-  if (state != ACTIVE)
+  if (state == OOB)
     return;
+
+  double oldDepth = depth;
 
   AffineLightTransform<double> lightBaseToRef =
       refFrame.lightWorldToThis * baseFrame->lightWorldToThis.inverse();
@@ -221,11 +222,18 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
     Vec3 curDir = directions[dirInd];
     Vec2 point = points[dirInd];
     curDir.normalize();
-    Vec2 depths = triangulate(baseToRef, baseDirections[0], curDir);
     Vec2 reproj[PS];
     reproj[0] = point;
-    for (int i = 1; i < PS; ++i)
-      reproj[i] = cam->map(baseToRef * (depths[0] * baseDirections[i]));
+    double depth = INF;
+    if (maxDepth == INF && dirInd == 0) {
+      for (int i = 1; i < PS; ++i)
+        reproj[i] = cam->map(baseToRef.so3() * baseDirections[i]);
+    } else {
+      Vec2 depths = triangulate(baseToRef, baseDirections[0], curDir);
+      depth = depths[0];
+      for (int i = 1; i < PS; ++i)
+        reproj[i] = cam->map(baseToRef * (depths[0] * baseDirections[i]));
+    }
 
     double maxReprojDist = -1;
     for (int i = 1; i < PS; ++i) {
@@ -261,16 +269,48 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
     if (energy < bestEnergy) {
       bestEnergy = energy;
       bestPoint = point;
-      bestDepth = depths[0];
+      bestDepth = depth;
       bestInd = dirInd;
       bestPyrLevel = pyrLevel;
     }
   }
 
+  // tracing reliability checks
+  if (bestDepth == INF) {
+    depth = oldDepth;
+    return;
+  }
+
   eBeforeSubpixel = bestEnergy;
+  double secondBestEnergy = INF;
+  for (const auto &p : energiesFound) {
+    if ((p.first - bestPoint).squaredNorm() < SBD * SBD)
+      continue;
+    if (p.second < secondBestEnergy)
+      secondBestEnergy = p.second;
+  }
+
+  if (bestEnergy == INF || secondBestEnergy == INF || secondBestEnergy <= 1.0) {
+    depth = oldDepth;
+    return;
+  }
+
+  double newQuality = secondBestEnergy / bestEnergy;
+  if (newQuality > bestQuality)
+    bestQuality = newQuality;
+  lastEnergy = bestEnergy;
+
+  if (lastEnergy > settingOutlierEpipolarEnergy ||
+      newQuality < settingOutlierEpipolarQuality) {
+    depth = oldDepth;
+    return;
+  }
+
+
   depthBeforeSubpixel =
       triangulate(baseToRef, baseDirections[0], cam->unmap(bestPoint))[0];
 
+  // subpixel refinement
   double bestDispl = 0;
   if (FLAGS_tracing_GN_iter > 0) {
     int fromInd = std::max(0, bestInd - 1);
@@ -293,6 +333,7 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
 
   eAfterSubpixel = bestEnergy;
 
+  // depth bounds
   Vec2 minDepthPos = approxOnCurve(points, bestInd + dev);
   minDepth =
       triangulate(baseToRef, baseDirections[0], cam->unmap(minDepthPos))[0];
@@ -306,33 +347,7 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
         triangulate(baseToRef, baseDirections[0], cam->unmap(maxDepthPos))[0];
   }
 
-  double secondBestEnergy = INF;
-  for (const auto &p : energiesFound) {
-    if ((p.first - bestPoint).squaredNorm() < SBD)
-      continue;
-    if (p.second < secondBestEnergy)
-      secondBestEnergy = p.second;
-  }
-
-  double newQuality = secondBestEnergy / bestEnergy;
-  if (newQuality > bestQuality)
-    bestQuality = newQuality;
-  lastEnergy = bestEnergy;
-
-  if (bestEnergy == INF || secondBestEnergy == INF || secondBestEnergy <= 1.0) {
-    // std::cerr << "out by INF energy or small second (e=" << bestEnergy
-    // << " se=" << secondBestEnergy << ")" << std::endl;
-    state = OUTLIER;
-  }
-
-  if (lastEnergy > settingOutlierEpipolarEnergy ||
-      bestQuality < settingOutlierEpipolarQuality) {
-    state = OUTLIER;
-    // std::cerr << "out by quality (e=" << lastEnergy << " q=" << bestQuality
-    // << ")" << std::endl;
-    // std::cerr << "bef=" << eBeforeSubpixel << ' ' << "aft=" << eAfterSubpixel
-    // << std::endl;
-  }
+  stddev = dev / 2;
 
   if (state == ACTIVE && debugType == DRAW_EPIPOLE) {
     cv::Mat base;

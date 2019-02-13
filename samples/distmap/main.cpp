@@ -1,8 +1,8 @@
 #include "util/DistanceMap.h"
-#include <gflags/gflags.h>
-#include <opencv2/opencv.hpp>
 #include "util/defs.h"
 #include "util/util.h"
+#include <gflags/gflags.h>
+#include <opencv2/opencv.hpp>
 
 DEFINE_int32(w, 1920, "Width of the test image.");
 DEFINE_int32(h, 1208, "Height of the test image.");
@@ -34,13 +34,12 @@ int main() {
     added.push_back(toVec2(p));
     putCross(f, p, 4, CV_GREEN, 1);
   }
-  std::vector<bool> chosen = map.choose(added, FLAGS_chosen);
-  for (int i = 0; i < FLAGS_added; ++i)
-    if (chosen[i])
-      cv::circle(f, toCvPoint(added[i]), 6, CV_GREEN, 1);
+  std::vector<int> chosen = map.choose(added, FLAGS_chosen);
+  for (int i : chosen)
+    cv::circle(f, toCvPoint(added[i]), 6, CV_GREEN, 1);
 
   cv::imshow("frame", f);
   cv::waitKey();
-  
+
   return 0;
 }
