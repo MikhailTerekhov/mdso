@@ -26,6 +26,8 @@ struct ImmaturePoint {
               const StdVector<std::pair<Vec2, double>> &energiesFound,
               int lineWidth);
 
+  bool isReady(); // checks if the point is good enough to be optimized
+
   Vec2 p;
   Vec3 baseDirections[PS];
   double baseIntencities[PS];
@@ -41,9 +43,11 @@ struct ImmaturePoint {
   State state;
 
   // output only
+  bool lastTraced;
+  int numTraced;
   double depthBeforeSubpixel;
   double lastIntVar, lastGeomVar, lastFullVar;
-  int bestPyrLevel;
+  int tracedPyrLevel;
   bool pyrChanged;
   double eBeforeSubpixel, eAfterSubpixel;
 

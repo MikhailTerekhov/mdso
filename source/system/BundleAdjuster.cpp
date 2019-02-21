@@ -117,6 +117,9 @@ void BundleAdjuster::adjust(int maxNumIterations) {
     problem.SetParameterLowerBound(affLight, 1, settingMinAffineLigthtB);
     problem.SetParameterUpperBound(affLight, 1, settingMaxAffineLigthtB);
 
+    if (!FLAGS_optimize_affine_light)
+      problem.SetParameterBlockConstant(affLight);
+
     ordering->AddElementToGroup(
         keyFrame->preKeyFrame->worldToThis.translation().data(), 1);
     ordering->AddElementToGroup(keyFrame->preKeyFrame->worldToThis.so3().data(),

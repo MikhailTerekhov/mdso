@@ -38,13 +38,9 @@ extern double settingTriangulationDrawPadding;
 // epipolar curve search
 extern int settingEpipolarOnImageTestCount;
 extern double settingEpipolarMaxSearchRel;
-extern double settingEpipolarPositionVariance;
 extern double settingEpipolarIntencityVariance;
-extern double settingEpipolarMinImprovementFactor;
 extern double settingEpipolarOutlierIntencityDiff;
 extern double settingMinSecondBestDistance;
-extern double settingOutlierEpipolarEnergy;
-extern double settingOutlierEpipolarQuality;
 
 // common direct alignment parameters
 extern double settingMinAffineLigthtA;
@@ -65,7 +61,6 @@ extern double settingTrackingOutlierIntensityDiff;
 constexpr int settingResidualPatternSize = 9;
 extern Vec2 settingResidualPattern[settingResidualPatternSize];
 extern int settingResidualPatternHeight;
-extern double settingMaxOptimizedStddev;
 extern int settingMaxOptimizedPoints;
 extern double settingBAOutlierIntensityDiff;
 extern double settingMaxPointDepth;
@@ -94,6 +89,10 @@ DECLARE_bool(optimize_affine_light);
 DECLARE_bool(perform_full_tracing);
 DECLARE_bool(use_alt_H_weighting);
 DECLARE_int32(tracing_GN_iter);
+DECLARE_double(pos_variance);
+DECLARE_double(tracing_impr_factor);
+DECLARE_double(epi_outlier_e);
+DECLARE_double(epi_outlier_q);
 
 DECLARE_bool(perform_tracking_check_stereo);
 DECLARE_bool(perform_tracking_check_GT);
@@ -101,13 +100,25 @@ DECLARE_bool(track_from_lask_kf);
 DECLARE_bool(predict_using_screw);
 DECLARE_bool(use_grad_weights_on_tracking);
 
+DECLARE_bool(gt_poses);
+
 DECLARE_bool(run_ba);
 DECLARE_bool(fixed_motion_on_first_ba);
+DECLARE_double(optimized_stddev);
 
 DECLARE_bool(continue_choosing_keyframes);
 
+DECLARE_bool(debug_video);
+
+DECLARE_double(rel_point_size);
+DECLARE_int32(debug_width);
+
+DECLARE_double(debug_max_residual);
+DECLARE_double(debug_max_stddev);
 DECLARE_double(red_depths_part);
 DECLARE_double(blue_depths_part);
+DECLARE_string(debug_img_dir);
+DECLARE_string(track_img_dir);
 
 DECLARE_bool(show_interpolation);
 DECLARE_bool(show_track_base);

@@ -41,9 +41,9 @@ void DepthedImagePyramid::draw(cv::Mat3b &img) {
         points.push_back(Vec2(double(x), double(y)));
         dVec.push_back(d(y, x));
       }
-  
+
   // if (maxDepthCol < 2)
-    setDepthColBounds(dVec);
+  setDepthColBounds(dVec);
   insertDepths(img, points, dVec, minDepthCol, maxDepthCol, false);
 }
 

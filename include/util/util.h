@@ -90,6 +90,8 @@ extern template cv::Mat boxFilterPyrUp<unsigned char>(const cv::Mat &img);
 extern template cv::Mat boxFilterPyrUp<cv::Vec3b>(const cv::Mat &img);
 
 cv::Mat1b cvtBgrToGray(const cv::Mat &coloredImg);
+cv::Mat3b cvtBgrToGray3(const cv::Mat3b coloredImg);
+
 cv::Mat pyrNUpDepth(const cv::Mat1d &integralWeightedDepths,
                     const cv::Mat1d &integralWeights, int levelNum);
 

@@ -50,10 +50,10 @@ end_header
   for (int i = 0; i < pf.size(); ++i) {
     const Vec3 &p = pf[i];
     const cv::Vec3b &color = cf[i];
-    
+
     out << p[0] << ' ' << p[1] << ' ' << p[2] << ' ';
     out << int(color[2]) << ' ' << int(color[1]) << ' ' << int(color[0])
-        << std::endl;
+        << '\n';
   }
 }
 
@@ -171,6 +171,14 @@ cv::Mat1b cvtBgrToGray(const cv::Mat &coloredImg) {
   cv::Mat result;
   cv::cvtColor(coloredImg, result, cv::COLOR_BGR2GRAY);
   return result;
+}
+
+cv::Mat3b cvtBgrToGray3(const cv::Mat3b coloredImg) {
+  cv::Mat1b result1C;
+  cv::cvtColor(coloredImg, result1C, cv::COLOR_BGR2GRAY);
+  cv::Mat3b result3C;
+  cv::cvtColor(result1C, result3C, cv::COLOR_GRAY2BGR);
+  return result3C;
 }
 
 cv::Mat pyrNUpDepth(const cv::Mat1d &integralWeightedDepths,

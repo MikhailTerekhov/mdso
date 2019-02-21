@@ -26,6 +26,9 @@ public:
 
   void fillRemainedHistory();
 
+  cv::Mat3b drawDebugImage(const std::shared_ptr<PreKeyFrame> &lastFrame);
+  cv::Mat3b drawTrackLevels();
+
   void printPointsInPly(std::ostream &out);
   void printLastKfInPly(std::ostream &out);
   void printTrackingInfo(std::ostream &out);
@@ -36,6 +39,11 @@ public:
   // output only
   KeyFrame *lastInitialized;
   StdVector<std::pair<Vec2, double>> lastKeyPointDepths;
+  std::vector<Vec3> pointHistory;
+  std::vector<cv::Vec3b> pointHistoryCol;
+
+  double scaleGTToOur;
+  SE3 gtToOur;
 
 private:
   EIGEN_STRONG_INLINE KeyFrame &lastKeyFrame() {
@@ -61,7 +69,11 @@ private:
   void checkLastTrackedStereo(PreKeyFrame *lastFrame);
   void checkLastTrackedGT(PreKeyFrame *lastFrame);
 
-  bool checkNeedKf(PreKeyFrame *lastFrame);
+  bool didTrackFail();
+  std::pair<SE3, AffineLightTransform<double>>
+  recoverTrack(PreKeyFrame *lastFrame);
+
+  bool doNeedKf(PreKeyFrame *lastFrame);
   void marginalizeFrames();
   void activateNewOptimizedPoints();
 
@@ -78,8 +90,6 @@ private:
 
   std::unique_ptr<FrameTracker> frameTracker;
 
-  std::vector<Vec3> pointHistory;
-  std::vector<cv::Vec3b> pointHistoryCol;
   std::vector<std::shared_ptr<PreKeyFrame>> frameHistory;
 
   std::map<int, KeyFrame> keyFrames;
@@ -90,11 +100,7 @@ private:
 
   AffineLightTransform<double> lightKfToLast;
 
-  // block size for contrast point selection algorithm
-  int adaptiveBlockSize;
-
-  double scaleGTToOur;
-  SE3 gtToOur;
+  double lastTrackRmse;
 };
 
 } // namespace fishdso

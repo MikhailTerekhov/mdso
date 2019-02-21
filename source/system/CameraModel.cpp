@@ -79,7 +79,7 @@ std::pair<Vec2, Mat23> CameraModel::diffMap(const Vec3 &ray) const {
   return {Vec2(pointJet[0].a, pointJet[1].a), mapJacobian};
 }
 
-bool CameraModel::isOnImage(const Vec2 &p, int border) {
+bool CameraModel::isOnImage(const Vec2 &p, int border) const {
   return p[0] >= border && p[0] < (width - border) && p[1] >= border &&
          p[1] <= (height - border);
 }

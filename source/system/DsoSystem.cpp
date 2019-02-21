@@ -13,8 +13,8 @@ DsoSystem::DsoSystem(CameraModel *cam)
     : cam(cam), camPyr(cam->camPyr()), pixelSelector(),
       dsoInitializer(std::unique_ptr<DsoInitializer>(new DelaunayDsoInitializer(
           this, cam, &pixelSelector, DelaunayDsoInitializer::SPARSE_DEPTHS))),
-      isInitialized(false), lastInitialized(nullptr),
-      adaptiveBlockSize(settingInitialAdaptiveBlockSize), scaleGTToOur(1.0) {
+      isInitialized(false), lastInitialized(nullptr), scaleGTToOur(1.0),
+      lastTrackRmse(INF) {
   LOG(INFO) << "create DsoSystem" << std::endl;
 }
 
@@ -177,22 +177,34 @@ void DsoSystem::addGroundTruthPose(int ind, const SE3 &worldToThat) {
 }
 
 void DsoSystem::fillRemainedHistory() {
-  for (const auto &kfp : keyFrames) {
-    auto &kf = kfp.second;
-    for (const auto &op : kf.optimizedPoints) {
-      pointHistory.push_back(kf.preKeyFrame->worldToThis.inverse() *
-                             (op->depth() * cam->unmap(op->p)));
-      pointHistoryCol.push_back(
-          kf.preKeyFrame->frameColored.at<cv::Vec3b>(toCvPoint(op->p)));
-    }
-    for (const auto &ip : kf.immaturePoints) {
-      if (ip->state == ImmaturePoint::ACTIVE &&
-          ip->stddev < settingMaxOptimizedStddev * 1.2) {
-        pointHistory.push_back(kf.preKeyFrame->worldToThis.inverse() *
-                               (ip->depth * cam->unmap(ip->p)));
-        pointHistoryCol.push_back(
-            kf.preKeyFrame->frameColored.at<cv::Vec3b>(toCvPoint(ip->p)));
+  if (FLAGS_write_files) {
+    for (const auto &kfp : keyFrames) {
+      auto &kf = kfp.second;
+      std::vector<Vec3> points;
+      std::vector<cv::Vec3b> colors;
+      for (const auto &op : kf.optimizedPoints) {
+        points.push_back(kf.preKeyFrame->worldToThis.inverse() *
+                         (op->depth() * cam->unmap(op->p).normalized()));
+        colors.push_back(
+            kf.preKeyFrame->frameColored.at<cv::Vec3b>(toCvPoint(op->p)));
       }
+      for (const auto &ip : kf.immaturePoints) {
+        if (ip->numTraced > 0) {
+          points.push_back(kf.preKeyFrame->worldToThis.inverse() *
+                           (ip->depth * cam->unmap(ip->p).normalized()));
+          colors.push_back(
+              kf.preKeyFrame->frameColored.at<cv::Vec3b>(toCvPoint(ip->p)));
+        }
+      }
+
+      int kfnum = kf.preKeyFrame->globalFrameNum;
+      std::ofstream out(FLAGS_output_directory + "/kf" + std::to_string(kfnum) +
+                        ".ply");
+      printInPly(out, points, colors);
+
+      pointHistory.insert(pointHistory.end(), points.begin(), points.end());
+      pointHistoryCol.insert(pointHistoryCol.end(), colors.begin(),
+                             colors.end());
     }
   }
 }
@@ -231,7 +243,7 @@ void DsoSystem::alignGTPoses() {
   }
 }
 
-bool DsoSystem::checkNeedKf(PreKeyFrame *lastFrame) {
+bool DsoSystem::doNeedKf(PreKeyFrame *lastFrame) {
   int shift = lastFrame->globalFrameNum - frameHistory[0]->globalFrameNum;
   return shift > 0 && shift % 10 == 0;
 }
@@ -241,21 +253,40 @@ void DsoSystem::marginalizeFrames() {
     for (int i = 0;
          i < static_cast<int>(keyFrames.size()) - settingMaxKeyFrames; ++i) {
       auto &kf = keyFrames.begin()->second;
-      for (const auto &op : kf.optimizedPoints) {
-        pointHistory.push_back(kf.preKeyFrame->worldToThis.inverse() *
-                               (op->depth() * cam->unmap(op->p)));
-        pointHistoryCol.push_back(
-            kf.preKeyFrame->frameColored.at<cv::Vec3b>(toCvPoint(op->p)));
-      }
-      for (const auto &ip : kf.immaturePoints) {
-        if (ip->state == ImmaturePoint::ACTIVE &&
-            ip->stddev < settingMaxOptimizedStddev * 1.2) {
-          pointHistory.push_back(kf.preKeyFrame->worldToThis.inverse() *
-                                 (ip->depth * cam->unmap(ip->p)));
-          pointHistoryCol.push_back(
-              kf.preKeyFrame->frameColored.at<cv::Vec3b>(toCvPoint(ip->p)));
+
+      if (FLAGS_write_files) {
+        std::vector<Vec3> points;
+        std::vector<cv::Vec3b> colors;
+        for (const auto &op : kf.optimizedPoints) {
+          points.push_back(kf.preKeyFrame->worldToThis.inverse() *
+                           (op->depth() * cam->unmap(op->p).normalized()));
+          colors.push_back(
+              kf.preKeyFrame->frameColored.at<cv::Vec3b>(toCvPoint(op->p)));
         }
+        for (const auto &ip : kf.immaturePoints) {
+          if (ip->numTraced > 0) {
+            points.push_back(kf.preKeyFrame->worldToThis.inverse() *
+                             (ip->depth * cam->unmap(ip->p).normalized()));
+            colors.push_back(
+                kf.preKeyFrame->frameColored.at<cv::Vec3b>(toCvPoint(ip->p)));
+          }
+        }
+
+        int kfnum = kf.preKeyFrame->globalFrameNum;
+        std::ofstream out(FLAGS_output_directory + "/kf" +
+                          std::to_string(kfnum) + ".ply");
+        printInPly(out, points, colors);
+
+        pointHistory.insert(pointHistory.end(), points.begin(), points.end());
+        pointHistoryCol.insert(pointHistoryCol.end(), colors.begin(),
+                               colors.end());
+
+        cv::Mat kfimg = kf.drawDepthedFrame(minDepthCol, maxDepthCol);
+        cv::imwrite(FLAGS_output_directory + "/kf" + std::to_string(kfnum) +
+                        ".jpg",
+                    kfimg);
       }
+
       keyFrames.erase(keyFrames.begin());
     }
 }
@@ -275,8 +306,7 @@ void DsoSystem::activateNewOptimizedPoints() {
     if (immRefs[oldIt]->state == ImmaturePoint::ACTIVE)
       totalActive++;
 
-    if (immRefs[oldIt]->state == ImmaturePoint::ACTIVE &&
-        immRefs[oldIt]->stddev < settingMaxOptimizedStddev) {
+    if (immRefs[oldIt]->isReady()) {
       immPoints[newIt] = immPoints[oldIt];
       kfs[newIt] = kfs[oldIt];
       immRefs[newIt++] = immRefs[oldIt];
@@ -306,9 +336,15 @@ void DsoSystem::activateNewOptimizedPoints() {
   }
 }
 
-DEFINE_bool(gt_poses, false,
-            "Fix all poses of frames to GT. Enabled to check if tracing got "
-            "problems on its own, or these problems lie in poor tracking.");
+bool DsoSystem::didTrackFail() {
+  return frameTracker->lastRmse > lastTrackRmse * 2;
+}
+
+std::pair<SE3, AffineLightTransform<double>>
+DsoSystem::recoverTrack(PreKeyFrame *lastFrame) {
+  SE3 baseToLbo = frameHistory.back()->worldToThis *
+                  baseKeyFrame().preKeyFrame->worldToThis.inverse();
+}
 
 std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
                                                  int globalFrameNum) {
@@ -344,7 +380,7 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
 
       // bundleAdjuster.adjust(settingMaxFirstBAIterations);
 
-      if (FLAGS_switch_first_motion_to_GT) {
+      if (FLAGS_switch_first_motion_to_GT || FLAGS_gt_poses) {
         SE3 worldToSecondKfGT =
             worldToFrameGT[keyFrames.rbegin()
                                ->second.preKeyFrame->globalFrameNum];
@@ -402,6 +438,9 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
   PreKeyFrame *baseKf = baseKeyFrame().preKeyFrame.get();
   preKeyFrame->lightWorldToThis = lightBaseKfToCur * baseKf->lightWorldToThis;
 
+  LOG(INFO) << "aff light: (fnum=" << preKeyFrame->globalFrameNum << ")\n"
+            << preKeyFrame->lightWorldToThis << std::endl;
+
   worldToFrame[globalFrameNum] = baseKfToCur * baseKf->worldToThis;
   worldToFramePredict[globalFrameNum] = purePredicted * baseKf->worldToThis;
   preKeyFrame->worldToThis = worldToFrame[globalFrameNum];
@@ -432,20 +471,49 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
   }
 
   int totalActive = 0, totalGood = 0;
+  constexpr int maxTraced = 5;
+  std::array<int, maxTraced> numTraced;
+  numTraced.fill(0);
+  std::array<int, settingPyrLevels> numOnLevel;
+  numOnLevel.fill(0);
   for (const auto &kfp : keyFrames)
     for (auto &ip : kfp.second.immaturePoints) {
       ip->traceOn(*preKeyFrame, ImmaturePoint::NO_DEBUG);
+      if (!ip->lastTraced)
+        continue;
+      if (ip->numTraced < maxTraced)
+        numTraced[ip->numTraced]++;
+      if (ip->tracedPyrLevel >= 0)
+        numOnLevel[ip->tracedPyrLevel]++;
       if (ip->state == ImmaturePoint::ACTIVE)
         totalActive++;
-      if (ip->state == ImmaturePoint::ACTIVE &&
-          ip->stddev < settingMaxOptimizedStddev) {
+      if (ip->isReady())
         totalGood++;
-      }
     }
   std::cout << "active = " << totalActive << " good = " << totalGood
             << std::endl;
+  std::cout << "succ traced = ";
+  for (int i = 0; i < maxTraced; ++i)
+    std::cout << numTraced[i] << ' ';
+  std::cout << std::endl;
+  std::cout << "traced on levels = ";
+  for (int i = 0; i < settingPyrLevels; ++i)
+    std::cout << numOnLevel[i] << ' ';
+  std::cout << std::endl;
 
-  if (FLAGS_continue_choosing_keyframes && checkNeedKf(preKeyFrame.get())) {
+  cv::Mat3b debugImg = drawDebugImage(preKeyFrame);
+  cv::Mat3b trackLevels = drawTrackLevels();
+  if (FLAGS_write_files) {
+    std::string filename =
+        "/frame" + std::to_string(preKeyFrame->globalFrameNum) + ".jpg";
+    cv::imwrite(FLAGS_debug_img_dir + filename, debugImg);
+    cv::imwrite(FLAGS_track_img_dir + filename, trackLevels);
+  }
+  cv::imshow("debug", debugImg);
+  cv::imshow("tracking", trackLevels);
+  cv::waitKey(1);
+
+  if (FLAGS_continue_choosing_keyframes && doNeedKf(preKeyFrame.get())) {
     int kfNum = preKeyFrame->globalFrameNum;
     keyFrames.insert(
         std::pair<int, KeyFrame>(kfNum, KeyFrame(preKeyFrame, pixelSelector)));
@@ -479,6 +547,11 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
       cv::Mat3b trackImg = baseKeyFrame().preKeyFrame->frameColored.clone();
       baseForTrack->draw(trackImg);
       cv::imshow("tracking base", trackImg);
+      int fnum = baseKeyFrame().preKeyFrame->globalFrameNum;
+      if (FLAGS_write_files)
+        cv::imwrite(FLAGS_output_directory + "/frame" + std::to_string(fnum) +
+                        ".jpg",
+                    trackImg);
       cv::waitKey();
       cv::destroyAllWindows();
     }
@@ -609,6 +682,91 @@ void DsoSystem::printMatcherInfo(std::ostream &out) {
 
 void DsoSystem::printGroundTruthInfo(std::ostream &out) {
   printMotionInfo(out, worldToFrameGT);
+}
+
+cv::Mat3b
+DsoSystem::drawDebugImage(const std::shared_ptr<PreKeyFrame> &lastFrame) {
+  int w = cam->getWidth(), h = cam->getHeight();
+  int s = FLAGS_rel_point_size * (w + h) / 2;
+
+  cv::Mat3b base = cvtBgrToGray3(baseKeyFrame().preKeyFrame->frameColored);
+  StdVector<Vec2> immPt;
+  std::vector<double> immD;
+  std::vector<ImmaturePoint *> immRef;
+  projectOntoBaseKf<ImmaturePoint>(&immPt, &immD, &immRef, nullptr);
+  StdVector<Vec2> optPt;
+  std::vector<double> optD;
+  std::vector<OptimizedPoint *> optRef;
+  projectOntoBaseKf<OptimizedPoint>(&optPt, &optD, &optRef, nullptr);
+
+  cv::Mat3b depths = base.clone();
+  for (int i = 0; i < immPt.size(); ++i)
+    if (immRef[i]->numTraced > 0)
+      putSquare(depths, toCvPoint(immPt[i]), s,
+                depthCol(immD[i], minDepthCol, maxDepthCol), cv::FILLED);
+  for (int i = 0; i < optPt.size(); ++i)
+    putSquare(depths, toCvPoint(optPt[i]), s,
+              depthCol(optD[i], minDepthCol, maxDepthCol), cv::FILLED);
+
+  cv::Mat3b usefulImg = base.clone();
+  SE3 baseToLast = lastFrame->worldToThis *
+                   baseKeyFrame().preKeyFrame->worldToThis.inverse();
+  for (int i = 0; i < optPt.size(); ++i) {
+    Vec3 p = optD[i] * cam->unmap(optPt[i]).normalized();
+    Vec2 reproj = cam->map(baseToLast * p);
+    cv::Scalar col =
+        cam->isOnImage(reproj, settingResidualPatternSize) ? CV_GREEN : CV_RED;
+    putSquare(usefulImg, toCvPoint(optPt[i]), s, col, cv::FILLED);
+  }
+
+  cv::Mat3b stddevs = base.clone();
+  for (int i = 0; i < immPt.size(); ++i) {
+    double dev = immRef[i]->stddev;
+    if (immRef[i]->numTraced > 0)
+      putSquare(stddevs, toCvPoint(immPt[i]), s,
+                depthCol(dev, 0, FLAGS_debug_max_stddev), cv::FILLED);
+  }
+  for (int i = 0; i < optPt.size(); ++i) {
+    double dev = optRef[i]->stddev;
+    putSquare(stddevs, toCvPoint(optPt[i]), s,
+              depthCol(dev, 0, FLAGS_debug_max_stddev), cv::FILLED);
+  }
+
+  cv::Mat3b row1, row2, resultBig, result;
+  cv::hconcat(depths, usefulImg, row1);
+  cv::hconcat(stddevs, frameTracker->residualsImg[0], row2);
+  cv::vconcat(row1, row2, resultBig);
+  int newh = double(resultBig.rows) / resultBig.cols * FLAGS_debug_width;
+  cv::resize(resultBig, result, cv::Size(FLAGS_debug_width, newh));
+  return result;
+}
+
+cv::Mat3b DsoSystem::drawTrackLevels() {
+  int w = cam->getWidth(), h = cam->getHeight();
+  int downCnt = settingPyrLevels / 2;
+  int upCnt = settingPyrLevels - downCnt;
+
+  int upW = FLAGS_debug_width / upCnt;
+  int upH = double(h) / w * upW;
+  int downW = FLAGS_debug_width / downCnt;
+  int downH = double(h) / w * downW;
+  std::vector<cv::Mat> upRes(upCnt);
+  std::vector<cv::Mat> downRes(downCnt);
+
+  int pl = settingPyrLevels - 1;
+  for (; pl >= upCnt; --pl)
+    cv::resize(frameTracker->residualsImg[pl], upRes[settingPyrLevels - pl - 1], 
+               cv::Size(upW, upH), 0, 0, cv::INTER_NEAREST);
+  for (; pl >= 0; --pl)
+    cv::resize(frameTracker->residualsImg[pl], downRes[downCnt - pl - 1], 
+               cv::Size(upW, upH), 0, 0, cv::INTER_NEAREST);
+  cv::Mat upImg;
+  cv::hconcat(upRes, upImg);
+  cv::Mat downImg;
+  cv::hconcat(downRes, downImg);
+  cv::Mat result;
+  cv::vconcat(upImg, downImg, result);
+  return result;
 }
 
 } // namespace fishdso

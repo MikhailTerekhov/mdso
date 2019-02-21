@@ -13,7 +13,8 @@ namespace fishdso {
 
 ImmaturePoint::ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p)
     : p(p), minDepth(0), maxDepth(INF), bestQuality(-1), lastEnergy(INF),
-      baseFrame(baseFrame), cam(baseFrame->cam), state(ACTIVE), stddev(INF) {
+      baseFrame(baseFrame), cam(baseFrame->cam), state(ACTIVE), stddev(INF),
+      lastTraced(false), numTraced(0), tracedPyrLevel(0) {
   if (!cam->isOnImage(p, PH)) {
     state = OOB;
     return;
@@ -27,6 +28,10 @@ ImmaturePoint::ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p)
     baseGrad[i] = Vec2(baseFrame->gradX(curPCV), baseFrame->gradY(curPCV));
     baseGradNorm[i] = baseGrad[i].normalized();
   }
+}
+
+bool ImmaturePoint::isReady() {
+  return state == ACTIVE && stddev < FLAGS_optimized_stddev;
 }
 
 bool ImmaturePoint::pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth,
@@ -153,18 +158,8 @@ double ImmaturePoint::estVariance(const Vec2 &searchDirection) {
     sum1 += s * s;
   }
 
-  // double sum2 = 0;
-  // for (const Vec2 &g : baseGrad) {
-  // double s = g.dot(searchDirection);
-  // sum2 += s * s;
-  // }
-
-  lastGeomVar = settingEpipolarPositionVariance / sum1;
-  // lastIntVar = settingEpipolarIntencityVariance / sum2;
-  lastIntVar = 0;
-  lastFullVar = lastGeomVar + lastIntVar;
-
-  return settingEpipolarPositionVariance / sum1;
+  lastGeomVar = FLAGS_pos_variance / sum1;
+  return lastGeomVar;
 }
 
 void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
@@ -190,14 +185,11 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
   searchDirection.normalize();
 
   double variance = estVariance(searchDirection);
-  double dev = 2 * std::sqrt(variance);
+  double curDev = std::sqrt(variance);
 
-  if (!FLAGS_perform_full_tracing && maxDepth != INF) {
-    double searchLength = (pointMax - pointMin).norm();
-    if (dev * settingEpipolarMinImprovementFactor > searchLength) {
+  if (!FLAGS_perform_full_tracing && numTraced > 0)
+    if (curDev * FLAGS_tracing_impr_factor > stddev)
       return;
-    }
-  }
 
   StdVector<Vec2> points;
   std::vector<Vec3> directions;
@@ -215,7 +207,7 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
   double bestDepth;
   int bestInd;
   pyrChanged = false;
-  bestPyrLevel = -1;
+  int bestPyrLevel = -1;
   int lastPyrLevel = -1;
 
   for (int dirInd = 0; dirInd < directions.size(); ++dirInd) {
@@ -275,13 +267,19 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
     }
   }
 
+  lastTraced = false;
+
   // tracing reliability checks
+  if (bestPyrLevel == settingPyrLevels - 1) {
+    depth = oldDepth;
+    return;
+  }
+
   if (bestDepth == INF) {
     depth = oldDepth;
     return;
   }
 
-  eBeforeSubpixel = bestEnergy;
   double secondBestEnergy = INF;
   for (const auto &p : energiesFound) {
     if ((p.first - bestPoint).squaredNorm() < SBD * SBD)
@@ -290,7 +288,7 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
       secondBestEnergy = p.second;
   }
 
-  if (bestEnergy == INF || secondBestEnergy == INF || secondBestEnergy <= 1.0) {
+  if (bestEnergy == INF || secondBestEnergy == INF || secondBestEnergy <= 5.0) {
     depth = oldDepth;
     return;
   }
@@ -300,13 +298,14 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
     bestQuality = newQuality;
   lastEnergy = bestEnergy;
 
-  if (lastEnergy > settingOutlierEpipolarEnergy ||
-      newQuality < settingOutlierEpipolarQuality) {
+  if (lastEnergy > FLAGS_epi_outlier_e || newQuality < FLAGS_epi_outlier_q) {
     depth = oldDepth;
     return;
   }
 
+  numTraced++;
 
+  eBeforeSubpixel = bestEnergy;
   depthBeforeSubpixel =
       triangulate(baseToRef, baseDirections[0], cam->unmap(bestPoint))[0];
 
@@ -333,12 +332,13 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
 
   eAfterSubpixel = bestEnergy;
 
+  double displ = 2 * curDev;
   // depth bounds
-  Vec2 minDepthPos = approxOnCurve(points, bestInd + dev);
+  Vec2 minDepthPos = approxOnCurve(points, bestInd + displ);
   minDepth =
       triangulate(baseToRef, baseDirections[0], cam->unmap(minDepthPos))[0];
 
-  double maxDepthDispl = bestInd - dev;
+  double maxDepthDispl = bestInd - displ;
   if (maxDepthDispl <= 0)
     maxDepth = INF;
   else {
@@ -347,7 +347,9 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
         triangulate(baseToRef, baseDirections[0], cam->unmap(maxDepthPos))[0];
   }
 
-  stddev = dev / 2;
+  lastTraced = true;
+  stddev = curDev;
+  tracedPyrLevel = bestPyrLevel;
 
   if (state == ACTIVE && debugType == DRAW_EPIPOLE) {
     cv::Mat base;

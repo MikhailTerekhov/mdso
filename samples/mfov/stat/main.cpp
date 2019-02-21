@@ -500,15 +500,17 @@ public:
             continue;
           double depthGT = dGT(toCvPoint(ip->p));
           Vec2 reprojGT = reader->cam->map(
-              curToOtherGT * (depthGT * reader->cam->unmap(ip->p)));
+              curToOtherGT *
+              (depthGT * reader->cam->unmap(ip->p).normalized()));
           Vec2 reproj = reader->cam->map(
-              curToOther * (ip->depth * reader->cam->unmap(ip->p)));
-          Vec2 reprojBef =
-              reader->cam->map(curToOther * (ip->depthBeforeSubpixel *
-                                             reader->cam->unmap(ip->p)));
+              curToOther *
+              (ip->depth * reader->cam->unmap(ip->p).normalized()));
+          Vec2 reprojBef = reader->cam->map(
+              curToOther * (ip->depthBeforeSubpixel *
+                            reader->cam->unmap(ip->p).normalized()));
 
-          Vec2 reprojInfD =
-              reader->cam->map(curToOther.so3() * reader->cam->unmap(ip->p));
+          Vec2 reprojInfD = reader->cam->map(
+              curToOther.so3() * reader->cam->unmap(ip->p).normalized());
           EpiErr e;
           e.disparity = (reproj - reprojInfD).norm();
           e.expectedErr = std::sqrt(ip->lastFullVar);
@@ -841,11 +843,13 @@ public:
 
               if (FLAGS_collect_disparities) {
                 Vec2 reprojGT = reader->cam->map(
-                    curToOtherGT * (depthGT * reader->cam->unmap(ip->p)));
+                    curToOtherGT *
+                    (depthGT * reader->cam->unmap(ip->p).normalized()));
                 Vec2 reproj = reader->cam->map(
-                    curToOther * (ip->depth * reader->cam->unmap(ip->p)));
-                Vec2 reprojInfD = reader->cam->map(curToOther.so3() *
-                                                   reader->cam->unmap(ip->p));
+                    curToOther *
+                    (ip->depth * reader->cam->unmap(ip->p).normalized()));
+                Vec2 reprojInfD = reader->cam->map(
+                    curToOther.so3() * reader->cam->unmap(ip->p).normalized());
                 EpiErr e;
                 e.disparity = (reproj - reprojInfD).norm();
                 e.expectedErr = std::sqrt(ip->lastFullVar);

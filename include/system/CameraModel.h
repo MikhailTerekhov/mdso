@@ -113,7 +113,7 @@ public:
   EIGEN_STRONG_INLINE Vec2 getImgCenter() const { return scale * center; }
   EIGEN_STRONG_INLINE double getMaxAngle() const { return maxAngle; }
 
-  bool isOnImage(const Vec2 &p, int border);
+  bool isOnImage(const Vec2 &p, int border) const;
 
   double getImgRadiusByAngle(double observeAngle) const;
   void getRectByAngle(double observeAngle, int &width, int &height) const;

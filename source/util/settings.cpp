@@ -34,12 +34,8 @@ int settingEpipolarOnImageTestCount = 100;
 double settingEpipolarMaxSearchRel = 0.027;
 double settingEpipolarPositionVariance = settingResidualPatternSize * 16.0;
 double settingEpipolarIntencityVariance = settingResidualPatternSize * 2.0;
-double settingEpipolarMinImprovementFactor = 1.5;
 double settingEpipolarOutlierIntencityDiff = 12.0;
 double settingMinSecondBestDistance = 3.0;
-double settingOutlierEpipolarEnergy = 5 * settingEpipolarOutlierIntencityDiff *
-                                      settingEpipolarOutlierIntencityDiff;
-double settingOutlierEpipolarQuality = 3.0;
 
 double settingMinAffineLigthtA = -std::log(1.1);
 double settingMaxAffineLigthtA = std::log(1.1);
@@ -61,7 +57,6 @@ int settingResidualPatternHeight = 2;
 Vec2 settingResidualPattern[settingResidualPatternSize] = {
     Vec2(0, 0), Vec2(0, -2), Vec2(-1, -1), Vec2(1, -1), Vec2(-2, 0),
     Vec2(2, 0), Vec2(-1, 1), Vec2(1, 1),   Vec2(0, 2)};
-double settingMaxOptimizedStddev = 12.0;
 int settingMaxOptimizedPoints = 2000;
 
 int settingMaxKeyFrames = 6;
@@ -106,6 +101,14 @@ DEFINE_bool(use_alt_H_weighting, true,
 DEFINE_int32(tracing_GN_iter, 5,
              "Max number of GN iterations when performing subpixel tracing. "
              "Set to 0 to disable subpixel tracing.");
+DEFINE_double(pos_variance, 9 * 3.2,
+              "Expected epipolar curve placement deviation");
+DEFINE_double(tracing_impr_factor, 1.2,
+              "Minimum predicted stddev improvement for tracing to happen.");
+DEFINE_double(epi_outlier_e, 4 * 12.0 * 12.0,
+              "Max residual energy for tracing to be considered successful.");
+DEFINE_double(epi_outlier_q, 3.0,
+              "Min quality for tracing to be cponsidered successful.");
 
 DEFINE_bool(
     perform_tracking_check_stereo, false,
@@ -128,6 +131,10 @@ DEFINE_bool(
 DEFINE_bool(use_grad_weights_on_tracking, false,
             "Use gradient-dependent residual weights when tracking");
 
+DEFINE_bool(gt_poses, false,
+            "Fix all poses of frames to GT. Enabled to check if tracing got "
+            "problems on its own, or these problems lie in poor tracking.");
+
 DEFINE_bool(run_ba, true, "Do we need to run bundle adjustment?");
 
 DEFINE_bool(fixed_motion_on_first_ba, false,
@@ -135,9 +142,23 @@ DEFINE_bool(fixed_motion_on_first_ba, false,
             "keyframes? We could assume that a good motion estimation is "
             "already availible due to RANSAC initialization and averaging.");
 
+DEFINE_double(optimized_stddev, 2.4,
+              "Max disparity error for a point to become optimized.");
+
 DEFINE_bool(continue_choosing_keyframes, true,
             "If set to false, the system only does initalization and then "
             "tracks new frames wrt the initialized ones.");
+
+DEFINE_bool(debug_video, true, "Do we need to output debug video?");
+
+DEFINE_double(rel_point_size, 0.004,
+              "Relative to w+h point size on debug images.");
+DEFINE_int32(debug_width, 1200, "Width of the debug image.");
+
+DEFINE_double(debug_max_residual, 12.0,
+              "Max tracking residual when displaying debug image.");
+DEFINE_double(debug_max_stddev, 6.0,
+              "Max predicted stddev when displaying debug image with stddevs.");
 
 bool validateDepthsPart(const char *flagname, double value) {
   if (value >= 0 && value <= 1)
@@ -156,6 +177,12 @@ DEFINE_double(blue_depths_part, 0.7,
               "Part of contrast points that will NOT be drawn completely blue "
               "(i.e. they are not too far to be distinguished)");
 DEFINE_validator(blue_depths_part, validateDepthsPart);
+
+DEFINE_string(debug_img_dir, "output/default/debug",
+              "Directory for debug images to be put into.");
+DEFINE_string(
+    track_img_dir, "output/default/track",
+    "Directory for tracking residuals on all pyr levels to be put into.");
 
 DEFINE_bool(show_interpolation, false,
             "Show interpolated depths after initialization?");
