@@ -2,13 +2,19 @@ cmake_minimum_required(VERSION 3.0.2)
 
 project(dso-fisheye-ceres)
 
-set(TBB_ROOT ${PROJECT_SOURCE_DIR}/thirdparty/tbb)
-include(${TBB_ROOT}/cmake/TBBBuild.cmake)
-tbb_build(TBB_ROOT ${TBB_ROOT} CONFIG_DIR TBB_DIR MAKE_ARGS -j2)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/modules")
+
+if (ASAN_BUILD)
+    add_compile_options("-fsanitize=address")
+    link_libraries("-fsanitize=address")
+endif()
 
 find_package(TBB REQUIRED)
 find_package(gflags REQUIRED)
-find_package(glog REQUIRED)
+find_package(Glog REQUIRED)
 find_package(Ceres REQUIRED)
 find_package(OpenCV REQUIRED)
 
@@ -21,7 +27,6 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
     ${PROJECT_SOURCE_DIR}/thirdparty/relative_pose_solver
-    ${PROJECT_SOURCE_DIR}/thirdparty/tbb/include
 )
 
 set(dso_HEADER_FILES
@@ -95,7 +100,7 @@ add_library(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES}
     ${essietial_5pt_estimator_SOURCE_FILES}
 )
 
-target_link_libraries(dso ${OpenCV_LIBS} ${CERES_LIBRARIES} ${GLOG_LIBRARIES})
+target_link_libraries(dso ${OpenCV_LIBS} ${CERES_LIBRARIES} ${GLOG_LIBRARIES} ${TBB_LIBRARIES})
 
 add_subdirectory(samples)
 
