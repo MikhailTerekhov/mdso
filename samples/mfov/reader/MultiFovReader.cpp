@@ -59,7 +59,7 @@ cv::Mat MultiFovReader::getFrame(int globalFrameNum) const {
   return result;
 }
 
-cv::Mat1f MultiFovReader::getDepths(int globalFrameNum) const {
+cv::Mat1d MultiFovReader::getDepths(int globalFrameNum) const {
   char depthsFName[256];
   sprintf(depthsFName, "%s/data/depth/img%04i_0.depth", datasetDir.c_str(),
           globalFrameNum);
@@ -67,7 +67,7 @@ cv::Mat1f MultiFovReader::getDepths(int globalFrameNum) const {
   if (!depthsIfs.is_open())
     throw std::runtime_error("could not open depths file \"" +
                              std::string(depthsFName) + "\"");
-  cv::Mat1f depths(cam->getHeight(), cam->getWidth());
+  cv::Mat1d depths(cam->getHeight(), cam->getWidth());
   for (int y = 0; y < depths.rows; ++y)
     for (int x = 0; x < depths.cols; ++x)
       depthsIfs >> depths(y, x);

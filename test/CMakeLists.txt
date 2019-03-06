@@ -1,4 +1,4 @@
-set(TESTS test_cameramodel test_stereo test_triangulation test_geometry)
+set(TESTS test_cameramodel test_stereo test_triangulation test_geometry test_util)
 
 foreach(CUR_TEST ${TESTS})
     add_executable(${CUR_TEST} ${CUR_TEST}.cpp)

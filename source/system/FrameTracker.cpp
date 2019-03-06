@@ -2,6 +2,7 @@
 #include "util/defs.h"
 #include "util/util.h"
 #include <ceres/cubic_interpolation.h>
+#include <ceres/problem.h>
 #include <chrono>
 #include <cmath>
 
@@ -76,9 +77,8 @@ struct PointTrackingResidual {
 bool isPointTrackable(const CameraModel &cam, const Vec3 &basePos,
                       const SE3 &coarseBaseToCur) {
   Vec3 coarseCurPos = coarseBaseToCur * basePos;
-  Vec2 coarseCurOnImg = cam.map(coarseCurPos.data());
-  return coarseCurOnImg[0] >= 0 && coarseCurOnImg[0] < cam.getWidth() &&
-         coarseCurOnImg[1] >= 0 && coarseCurOnImg[1] < cam.getHeight();
+  Vec2 coarseCurOnImg = cam.map(coarseCurPos);
+  return cam.isOnImage(coarseCurOnImg, 0);
 }
 
 std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
@@ -239,7 +239,7 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
     lossFunc->Evaluate(res * res, robustified);
     robustified[0] = std::sqrt(robustified[0]);
     Vec2 onTracked = cam.map(motion * rsd->pos);
-    if (cam.isOnImage(onTracked, settingResidualPatternHeight))
+    if (cam.isOnImage(onTracked, 0))
       putSquare(residualsImg[pyrLevel], toCvPoint(onTracked), s,
                 depthCol(robustified[0], 0, FLAGS_debug_max_residual),
                 cv::FILLED);

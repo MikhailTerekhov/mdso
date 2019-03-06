@@ -200,6 +200,9 @@ Triangulation::findThirdVert(Triangle *tri, Edge *edge) {
   for (int i = 0; i < 3; ++i)
     if (tri->vert[i] != edge->vert[0] && tri->vert[i] != edge->vert[1])
       return tri->vert[i];
+
+  CHECK(false);
+  return nullptr;
 }
 
 EIGEN_STRONG_INLINE Triangulation::Edge *
@@ -219,6 +222,9 @@ Triangulation::findOppositeEdge(Triangulation::Triangle *tri,
   for (const auto &triSide : tri->edges)
     if (triSide->vert[0] != vert && triSide->vert[1] != vert)
       return triSide;
+
+  CHECK(false);
+  return nullptr;
 }
 
 EIGEN_STRONG_INLINE bool Triangulation::isIncident(Vertex *vert, Edge *edge) {

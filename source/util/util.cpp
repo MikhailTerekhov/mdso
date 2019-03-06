@@ -4,6 +4,7 @@
 #include <Eigen/Eigen>
 #include <RelativePoseEstimator.h>
 #include <algorithm>
+#include <glog/logging.h>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 #include <sophus/se3.hpp>
@@ -76,6 +77,33 @@ void setDepthColBounds(const std::vector<double> &depths) {
 
   minDepthCol = sorted[redInd];
   maxDepthCol = sorted[blueInd];
+}
+
+cv::Mat drawLeveled(cv::Mat3b *images, int num, int w, int h) {
+  int downCnt = num / 2;
+  int upCnt = num - downCnt;
+
+  int upW = FLAGS_debug_width / upCnt;
+  int upH = double(h) / w * upW;
+  int downW = FLAGS_debug_width / downCnt;
+  int downH = double(h) / w * downW;
+  std::vector<cv::Mat> upRes(upCnt);
+  std::vector<cv::Mat> downRes(downCnt);
+
+  int pl = num - 1;
+  for (; pl >= upCnt; --pl)
+    cv::resize(images[pl], upRes[num - pl - 1], cv::Size(upW, upH), 0, 0,
+               cv::INTER_NEAREST);
+  for (; pl >= 0; --pl)
+    cv::resize(images[pl], downRes[downCnt - pl - 1], cv::Size(upW, upH), 0, 0,
+               cv::INTER_NEAREST);
+  cv::Mat upImg;
+  cv::hconcat(upRes, upImg);
+  cv::Mat downImg;
+  cv::hconcat(downRes, downImg);
+  cv::Mat result;
+  cv::vconcat(upImg, downImg, result);
+  return result;
 }
 
 void putMotion(std::ostream &out, const SE3 &motion) {
@@ -181,8 +209,8 @@ cv::Mat3b cvtBgrToGray3(const cv::Mat3b coloredImg) {
   return result3C;
 }
 
-cv::Mat pyrNUpDepth(const cv::Mat1d &integralWeightedDepths,
-                    const cv::Mat1d &integralWeights, int levelNum) {
+cv::Mat1d pyrNUpDepth(const cv::Mat1d &integralWeightedDepths,
+                      const cv::Mat1d &integralWeights, int levelNum) {
   cv::Mat1d res = cv::Mat1d((integralWeightedDepths.rows - 1) >> levelNum,
                             (integralWeightedDepths.cols - 1) >> levelNum);
   int d = (1 << levelNum);
@@ -206,8 +234,8 @@ cv::Mat pyrNUpDepth(const cv::Mat1d &integralWeightedDepths,
   return res;
 }
 
-cv::Mat drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
-                         double minDepth, double maxDepth) {
+cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
+                           double minDepth, double maxDepth) {
   int w = frame.cols, h = frame.rows;
   cv::Mat3b res(h, w);
   cv::cvtColor(frame, res, cv::COLOR_GRAY2BGR);

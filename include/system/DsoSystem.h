@@ -8,10 +8,12 @@
 #include "system/KeyFrame.h"
 #include "util/DepthedImagePyramid.h"
 #include "util/DistanceMap.h"
+#include "util/PlyHolder.h"
 #include "util/settings.h"
 #include <map>
 #include <memory>
 #include <opencv2/core.hpp>
+#include <optional>
 
 namespace fishdso {
 
@@ -27,20 +29,18 @@ public:
   void fillRemainedHistory();
 
   cv::Mat3b drawDebugImage(const std::shared_ptr<PreKeyFrame> &lastFrame);
-  cv::Mat3b drawTrackLevels();
 
-  void printPointsInPly(std::ostream &out);
   void printLastKfInPly(std::ostream &out);
   void printTrackingInfo(std::ostream &out);
   void printPredictionInfo(std::ostream &out);
   void printGroundTruthInfo(std::ostream &out);
   void printMatcherInfo(std::ostream &out);
 
+  void saveOldKfs(int count);
+
   // output only
   KeyFrame *lastInitialized;
   StdVector<std::pair<Vec2, double>> lastKeyPointDepths;
-  std::vector<Vec3> pointHistory;
-  std::vector<cv::Vec3b> pointHistoryCol;
 
   double scaleGTToOur;
   SE3 gtToOur;
@@ -90,8 +90,6 @@ private:
 
   std::unique_ptr<FrameTracker> frameTracker;
 
-  std::vector<std::shared_ptr<PreKeyFrame>> frameHistory;
-
   std::map<int, KeyFrame> keyFrames;
   StdMap<int, SE3> worldToFrame;
   StdMap<int, SE3> worldToFramePredict;
@@ -101,6 +99,10 @@ private:
   AffineLightTransform<double> lightKfToLast;
 
   double lastTrackRmse;
+
+  std::optional<PlyHolder> cloudHolder;
+
+  int firstFrameNum;
 };
 
 } // namespace fishdso

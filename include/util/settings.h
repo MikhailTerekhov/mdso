@@ -2,9 +2,12 @@
 #define INCLUDE_SETTINGS
 
 #include "util/types.h"
+#include <cmath>
 #include <gflags/gflags.h>
 
-namespace fishdso { // candidate point selection
+namespace fishdso {
+
+// candidate point selection
 constexpr int settingInterestPointLayers = 3;
 extern double settingGradThreshold[settingInterestPointLayers];
 extern int settingInitialAdaptiveBlockSize;
@@ -89,7 +92,10 @@ DECLARE_bool(optimize_affine_light);
 DECLARE_bool(perform_full_tracing);
 DECLARE_bool(use_alt_H_weighting);
 DECLARE_int32(tracing_GN_iter);
+
 DECLARE_double(pos_variance);
+#define MIN_STDDEV (std::sqrt(FLAGS_pos_variance / settingResidualPatternSize))
+
 DECLARE_double(tracing_impr_factor);
 DECLARE_double(epi_outlier_e);
 DECLARE_double(epi_outlier_q);
@@ -99,6 +105,7 @@ DECLARE_bool(perform_tracking_check_GT);
 DECLARE_bool(track_from_lask_kf);
 DECLARE_bool(predict_using_screw);
 DECLARE_bool(use_grad_weights_on_tracking);
+DECLARE_double(track_fail_factor);
 
 DECLARE_bool(gt_poses);
 
@@ -122,6 +129,8 @@ DECLARE_string(track_img_dir);
 
 DECLARE_bool(show_interpolation);
 DECLARE_bool(show_track_base);
+DECLARE_bool(show_track_res);
+DECLARE_bool(show_debug_image);
 DECLARE_bool(write_files);
 DECLARE_string(output_directory);
 

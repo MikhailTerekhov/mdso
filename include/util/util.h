@@ -40,6 +40,8 @@ void printInPly(std::ostream &out, const std::vector<Vec3> &points,
 
 void setDepthColBounds(const std::vector<double> &depths);
 
+cv::Mat drawLeveled(cv::Mat3b *images, int num, int w, int h);
+
 void putMotion(std::ostream &out, const SE3 &motion);
 
 void putDot(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col);
@@ -92,11 +94,11 @@ extern template cv::Mat boxFilterPyrUp<cv::Vec3b>(const cv::Mat &img);
 cv::Mat1b cvtBgrToGray(const cv::Mat &coloredImg);
 cv::Mat3b cvtBgrToGray3(const cv::Mat3b coloredImg);
 
-cv::Mat pyrNUpDepth(const cv::Mat1d &integralWeightedDepths,
-                    const cv::Mat1d &integralWeights, int levelNum);
+cv::Mat1d pyrNUpDepth(const cv::Mat1d &integralWeightedDepths,
+                      const cv::Mat1d &integralWeights, int levelNum);
 
-cv::Mat drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
-                         double minDepth, double maxDepth);
+cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
+                           double minDepth, double maxDepth);
 
 } // namespace fishdso
 

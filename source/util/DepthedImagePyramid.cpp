@@ -30,21 +30,21 @@ DepthedImagePyramid::DepthedImagePyramid(const cv::Mat1b &baseImage,
     depths[il] = pyrNUpDepth(integralWeightedDepths, integralWeights, il);
 }
 
-void DepthedImagePyramid::draw(cv::Mat3b &img) {
-  const cv::Mat1d &d = depths[0];
-
-  StdVector<Vec2> points;
-  std::vector<double> dVec;
-  for (int y = 0; y < d.rows; ++y)
-    for (int x = 0; x < d.cols; ++x)
-      if (d(y, x) > 0) {
-        points.push_back(Vec2(double(x), double(y)));
-        dVec.push_back(d(y, x));
-      }
-
-  // if (maxDepthCol < 2)
-  setDepthColBounds(dVec);
-  insertDepths(img, points, dVec, minDepthCol, maxDepthCol, false);
+cv::Mat3b DepthedImagePyramid::draw() {
+  int w = images[0].cols, h = images[0].rows;
+  cv::Mat3b depthed[settingPyrLevels];
+  for (int i = 0; i < settingPyrLevels; ++i) {
+    int lw = images[i].cols, lh = images[i].rows;
+    int s = FLAGS_rel_point_size * (lw + lh) / 2;
+    cv::cvtColor(images[i], depthed[i], cv::COLOR_GRAY2BGR);
+    for (int y = 0; y < images[i].rows; ++y)
+      for (int x = 0; x < images[i].cols; ++x)
+        if (depths[i](y, x) > -0.5)
+          putSquare(depthed[i], cv::Point(x, y), s,
+                    depthCol(depths[i](y, x), minDepthCol, maxDepthCol),
+                    cv::FILLED);
+  }
+  return drawLeveled(depthed, settingPyrLevels, w, h);
 }
 
 } // namespace fishdso

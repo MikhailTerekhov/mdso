@@ -130,6 +130,9 @@ DEFINE_bool(
     "only on rotation, and trnslational part is simply divided");
 DEFINE_bool(use_grad_weights_on_tracking, false,
             "Use gradient-dependent residual weights when tracking");
+DEFINE_double(track_fail_factor, 1.5,
+              "If RMSE after tracking another frame grew by this factor, "
+              "tracking is considered failed.");
 
 DEFINE_bool(gt_poses, false,
             "Fix all poses of frames to GT. Enabled to check if tracing got "
@@ -188,6 +191,21 @@ DEFINE_bool(show_interpolation, false,
             "Show interpolated depths after initialization?");
 DEFINE_bool(show_track_base, false,
             "Show depths used for tracking after the new kf is inserted?");
+DEFINE_bool(show_track_res, false,
+            "Show tracking residuals on all levels of the pyramind?");
+DEFINE_bool(show_debug_image, true,
+            R"__(Show debug image? Structure of debug image:
++---+---+
+| A | B |
++---+---+
+| C | D |
++---+---+
+Where
+A displays color-coded depths projected onto the base frame;
+B -- visible vs invizible OptimizedPoint-s projected onto the base frame;
+C -- color-coded predicted disparities;
+D -- color-coded tracking residuals on the finest pyramid level.)__");
+
 DEFINE_bool(write_files, true,
             "Do we need to write output files into output_directory?");
 DEFINE_string(output_directory, "output/default",

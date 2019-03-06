@@ -78,7 +78,7 @@ std::unique_ptr<DepthedImagePyramid> KeyFrame::makePyramid() {
                                                depths, weights);
 }
 
-cv::Mat KeyFrame::drawDepthedFrame(double minDepth, double maxDepth) {
+cv::Mat3b KeyFrame::drawDepthedFrame(double minDepth, double maxDepth) const {
   cv::Mat res = preKeyFrame->frameColored.clone();
 
   for (const auto &ip : immaturePoints)

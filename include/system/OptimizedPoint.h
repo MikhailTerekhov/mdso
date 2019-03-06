@@ -19,8 +19,7 @@ struct OptimizedPoint {
   OptimizedPoint(const Vec2 &p)
       : p(p), logInvDepth(std::nan("")), stddev(1), state(OUTLIER) {}
   OptimizedPoint(const ImmaturePoint &immaturePoint)
-      : p(immaturePoint.p),
-        stddev((immaturePoint.maxDepth - immaturePoint.minDepth) / 2) {
+      : p(immaturePoint.p), stddev(immaturePoint.stddev) {
     activate(immaturePoint.depth);
   }
 

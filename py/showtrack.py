@@ -1,5 +1,6 @@
 import sys
 import os
+import argparse
 
 import numpy as np
 import pandas as pd
@@ -53,7 +54,7 @@ def extract_motions(fname):
     return list(zip(fnums, motions))
 
 
-def draw_motions(axes, motions, color, label):
+def draw_arrowed(axes, motions, color, label):
     centers = np.array([-np.matmul(mot[1].T, mot[0]) for mot in motions])
     dir_vects = np.array([mot[1][2, :] for mot in motions])
 
@@ -62,90 +63,96 @@ def draw_motions(axes, motions, color, label):
                 color=color, normalize=True, arrow_length_ratio=0.2, 
                 length=arr_len, label=label)
 
+def draw_track(axes, motions, color, label):
+    centers = np.array([-np.matmul(mot[1].T, mot[0]) for mot in motions])
+    axes.plot(centers[:, 0], centers[:, 1], centers[:, 2], color=color, label=label)
+
 def select(indexed, first, last):
     return [val for (ind, val) in indexed 
                   if ind >= first and ind <= last]
 
-def main(argv):
-    if (len(argv) < 2):
-        print("I need at least one argument -- dso output directory")
-        return 0
 
-    out_dir = argv[1]
-    if (out_dir[-1] == '/'):
-        out_dir = out_dir[0:-1]
+parser = argparse.ArgumentParser()
+parser.add_argument("dir", help="DSO output directory")
+parser.add_argument("-q", "--quiver", help="plot camera directions"
+                    " (if not specified, only draw position curve)", 
+                    action="store_true")
+parser.add_argument("-f", "--first", help="truncate frames with nums less than this", 
+                    type=int)
+parser.add_argument("-l", "--last", help="truncate frames with nums bigger than this", 
+                    type=int)
+args = parser.parse_args()
 
-    actual = extract_motions(out_dir + '/tracked_pos.txt')
+out_dir = args.dir
 
-    pred_path = out_dir + '/predicted_pos.txt'
-    has_predicted = os.path.isfile(pred_path)
-    if has_predicted:
-        predicted = extract_motions(pred_path)
-    else:
-        print('no prediction provided')
+if (out_dir[-1] == '/'):
+    out_dir = out_dir[0:-1]
 
-    sm_path = out_dir + '/matched_pos.txt'
-    has_stereo_matched = os.path.isfile(sm_path)
-    if has_stereo_matched:
-        stereo_matched = extract_motions(sm_path)
-    else:
-        print('no stereo-matching provided')
-    
-    gt_path = out_dir + '/ground_truth_pos.txt'
-    has_ground_truth = os.path.exists(gt_path)
-    if has_ground_truth:
-        ground_truth = extract_motions(gt_path)
-    else:
-        print('no ground truth provided')
+actual = extract_motions(out_dir + '/tracked_pos.txt')
 
-    if len(argv) > 2:
-        if len(argv) == 3:
-            print('3rd and 4th args are expected to be first and last frame to draw')
-        first = int(argv[2])
-        last = int(argv[3])
-    else:
-        first = 0
-        last = np.inf
+pred_path = out_dir + '/predicted_pos.txt'
+has_predicted = os.path.isfile(pred_path)
+if has_predicted:
+    predicted = extract_motions(pred_path)
+else:
+    print('no prediction provided')
 
-    print(f'f={first} l={last}')
-    print(f'act elem={actual[0]}')
-    actual = select(actual, first, last)
-    print(f'total selected = {len(actual)}')
-    if has_predicted:
-        predicted = select(predicted, first, last)
-    if has_stereo_matched:
-        stereo_matched = select(stereo_matched, first, last)
-    if has_ground_truth:
-        ground_truth = select(ground_truth, first, last)
+sm_path = out_dir + '/matched_pos.txt'
+has_stereo_matched = os.path.isfile(sm_path)
+if has_stereo_matched:
+    stereo_matched = extract_motions(sm_path)
+else:
+    print('no stereo-matching provided')
+
+gt_path = out_dir + '/ground_truth_pos.txt'
+has_ground_truth = os.path.exists(gt_path)
+if has_ground_truth:
+    ground_truth = extract_motions(gt_path)
+else:
+    print('no ground truth provided')
+
+first = 0 if args.first is None else args.first
+last = np.inf if args.last is None else args.last;
+
+print(f'f={first} l={last}')
+print(f'act elem={actual[0]}')
+actual = select(actual, first, last)
+print(f'total selected = {len(actual)}')
+
+if has_predicted:
+    predicted = select(predicted, first, last)
+if has_stereo_matched:
+    stereo_matched = select(stereo_matched, first, last)
+if has_ground_truth:
+    ground_truth = select(ground_truth, first, last)
 
 
-    fig = plt.figure()
-    ax = Axes3D(fig)
-    ax.set_aspect('equal')
+fig = plt.figure()
+ax = Axes3D(fig)
+ax.set_aspect('equal')
 
-    ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
-    ax.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
-    ax.zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+ax.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+ax.zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
 
-    ax.yaxis._axinfo["grid"]['color'] =  (1,1,1,0)
-    ax.set_yticks([])
+ax.yaxis._axinfo["grid"]['color'] =  (1,1,1,0)
+ax.set_yticks([])
 
-    ax.view_init(azim=-90, elev=0)
+ax.view_init(azim=-90, elev=0)
 
-    draw_motions(ax, actual, 'orange', 'полученая оценка')
-    #  if has_predicted:
-        #  draw_motions(ax, predicted, 'blue', 'предсказанная траектория')
-    if has_ground_truth:
-        draw_motions(ax, ground_truth, 'green', 'точная траектория')
-    elif has_stereo_matched:
-        draw_motions(ax, stereo_matched, 'green', 'ORB + five point')
+draw_proc = draw_arrowed if args.quiver else draw_track
 
-    #  ax.scatter3D([0], [0], [0], color='black', label='базовый кадр')
+draw_proc(ax, actual, 'orange', 'полученая оценка')
+#  if has_predicted:
+    #  draw_motions(ax, predicted, 'blue', 'предсказанная траектория')
+if has_ground_truth:
+    draw_proc(ax, ground_truth, 'green', 'точная траектория')
+elif has_stereo_matched:
+    draw_proc(ax, stereo_matched, 'green', 'ORB + five point')
 
-    ax.legend()
+#  ax.scatter3D([0], [0], [0], color='black', label='базовый кадр')
 
-    set_axes_equal(ax)
-    plt.show()
+ax.legend()
 
-if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+set_axes_equal(ax)
+plt.show()

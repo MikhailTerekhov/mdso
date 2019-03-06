@@ -12,7 +12,7 @@ struct DepthedImagePyramid : ImagePyramid {
                       const std::vector<double> &depthsVec,
                       const std::vector<double> &weightsVec);
 
-  void draw(cv::Mat3b &img);
+  cv::Mat3b draw();
 
   std::array<cv::Mat1d, settingPyrLevels> depths;
 };

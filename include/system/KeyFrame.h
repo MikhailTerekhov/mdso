@@ -30,7 +30,7 @@ struct KeyFrame {
   std::unique_ptr<DepthedImagePyramid> makePyramid();
   void selectPointsDenser(PixelSelector &pixelSelector, int pointsNeeded);
 
-  cv::Mat drawDepthedFrame(double minDepth, double maxDepth);
+  cv::Mat3b drawDepthedFrame(double minDepth, double maxDepth) const;
 
   std::shared_ptr<PreKeyFrame> preKeyFrame;
 
