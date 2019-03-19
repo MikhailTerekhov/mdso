@@ -42,20 +42,6 @@ StereoGeometryEstimator::depths() {
       _depths[i].first = curDepths[0];
       _depths[i].second = curDepths[1];
     }
-
-    // int neededInd = *std::min_element(
-    // _inliersInds.begin(), _inliersInds.end(), [this](int i1, int i2) {
-    // if (imgCorresps[i1].second[0] <= 600 &&
-    // imgCorresps[i2].second[0] > 600)
-    // return true;
-    // else if (imgCorresps[i1].second[0] > 600 &&
-    // imgCorresps[i2].second[0] <= 600)
-    // return false;
-
-    // return imgCorresps[i1].second[1] > imgCorresps[i2].second[1];
-    // });
-    // Vec2 unm = cam->map(rays[neededInd].second);
-    // std::cout << "min depth position = " << unm.transpose();
   }
 
   return _depths;
@@ -226,35 +212,6 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
     int foundN = est.estimate(hypotesis, N, results);
     int maxInliers = 0, maxInliersInd = 0;
 
-    //    for (int i = 0; i < foundN; ++i) {
-
-    //      std::cout << "ok, errors on input vectors for E" << i << ": ";
-    //      for (int j = 0; j < N; ++j)
-    //        std::cout << std::abs(hypotesis[j].second->transpose() *
-    //        results[i] *
-    //                              (*hypotesis[j].first))
-    //                  << ' ';
-    //      std::cout << std::endl;
-    //    }
-
-    //    std::cout << "now same stuff but E is transposed:\n";
-
-    //    for (int i = 0; i < foundN; ++i) {
-
-    //      std::cout << "ok, errors on input vectors for E" << i << ": ";
-    //      for (int j = 0; j < N; ++j)
-    //        std::cout << std::abs(hypotesis[j].second->transpose() *
-    //                              results[i].transpose() *
-    //                              (*hypotesis[j].first))
-    //                  << ' ';
-    //      std::cout << std::endl;
-    //    }
-
-    //    std::cout << "resulting norms = ";
-    //    for (int i = 0; i < foundN; ++i)
-    //      std::cout << results[i].norm() << ' ';
-    //    std::cout << std::endl;
-
     for (int i = 0; i < foundN; ++i) {
       int inliers = findInliersEssential(results[i], curInliersInds);
       if (inliers > maxInliers) {
@@ -372,56 +329,6 @@ SE3 StereoGeometryEstimator::findPreciseMotion() {
 
   SE3 coarseMotion = motion;
 
-  //  std::vector<int> inlierInds;
-  //  inlierInds.reserve(inliersNum);
-  //  std::cout << "inliers before cleanup = " << inliersNum << std::endl;
-  //  for (int i = 0; i < inliersMask.size(); ++i)
-  //    if (inliersMask[i])
-  //      inlierInds.push_back(i);
-  //  std::cout << "inliers in inds = " << inlierInds.size() << std::endl;
-
-  //  std::sort(inlierInds.begin(), inlierInds.end(), [&](int i1, int i2) {
-  //    ReprojectionResidual res1(cam, raysNorm[i1].first,
-  //    raysNorm[i1].second,
-  //                              imgCorresps[i1].first,
-  //                              imgCorresps[i1].second);
-  //    ReprojectionResidual res2(cam, raysNorm[i2].first,
-  //    raysNorm[i2].second,
-  //                              imgCorresps[i2].first,
-  //                              imgCorresps[i2].second);
-  //    double results1[4], results2[4];
-  //    res1(motion.unit_quaternion().coeffs().data(),
-  //    motion.translation().data(),
-  //         results1);
-  //    res2(motion.unit_quaternion().coeffs().data(),
-  //    motion.translation().data(),
-  //         results2);
-
-  //    double norm1 = std::hypot(std::hypot(results1[0], results1[1]),
-  //                              std::hypot(results1[2], results1[3]));
-  //    double norm2 = std::hypot(std::hypot(results2[0], results2[1]),
-  //                              std::hypot(results2[2], results2[3]));
-  //    return norm1 < norm2;
-  //  });
-
-  //  std::cout << inlierInds.size() << ' ' << settingRemoveResidualsRatio <<
-  //  '
-  //  '
-  //            << int(inlierInds.size() * settingRemoveResidualsRatio)
-  //            << std::endl;
-
-  //  int toRemove = int(inlierInds.size() * settingRemoveResidualsRatio);
-  //  for (int i = 0; i < toRemove; ++i)
-  //    inlierInds.pop_back();
-  //  std::cout << inlierInds.size() << std::endl;
-
-  //  std::fill(inliersMask.begin(), inliersMask.end(), 0);
-  //  for (int i = 0; i < inlierInds.size(); ++i)
-  //    inliersMask[inlierInds[i]] = true;
-  //  inliersNum = inlierInds.size();
-
-  //  std::cout << "corresps in optim = " << inliersNum << std::endl;
-
   ceres::Problem problem;
 
   problem.AddParameterBlock(motion.so3().data(), 4,
@@ -453,13 +360,6 @@ SE3 StereoGeometryEstimator::findPreciseMotion() {
   ceres::Solve(options, &problem, &summary);
 
   LOG(INFO) << "post-RANSAC averaging:\n" << summary.FullReport() << std::endl;
-
-  // std::cout << summary.FullReport() << "\n";
-  //  std::cout << "avg residual before = "
-  //            << std::sqrt(summary.initial_cost / summary.num_residuals)
-  //            << "\navg residual after = "
-  //            << std::sqrt(summary.final_cost / summary.num_residuals)
-  //            << std::endl;
 
   findInliersEssential(toEssential(motion), _inliersInds);
   findInliersMotion(motion, _inliersInds);

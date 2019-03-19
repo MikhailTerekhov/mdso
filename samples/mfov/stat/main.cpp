@@ -246,15 +246,6 @@ void compareReprojThresholds(const MultiFovReader &reader) {
       std::cout << it << ") trans, rot errors = " << transErr << ' ' << rotErr
                 << std::endl;
 
-      // setDepthColBounds(depths[0]);
-      // cv::Mat depthed0 = frames[0].clone();
-      // insertDepths(depthed0, pnts[0], depths[0], minDepth, maxDepth, true);
-      // cv::Mat depthed1 = frames[1].clone();
-      // insertDepths(depthed1, pnts[1], depths[1], minDepth, maxDepth, true);
-      // cv::imshow("frame 0", depthed0);
-      // cv::imshow("frame 1", depthed1);
-      // cv::waitKey();
-
       ++it;
     }
 
@@ -320,17 +311,6 @@ void compareDirectThresholds(const MultiFovReader &reader) {
                           pixelSelector);
       cv::Mat1f depths = reader.getDepths(st);
       StdVector<Vec2> pnts;
-
-      // minDepth = 4;
-      // maxDepth = 40;
-      // cv::Mat3b dimg(reader.cam->getHeight(), reader.cam->getWidth());
-      // for (int y = 0; y < dimg.rows; ++y)
-      // for (int x = 0; x < dimg.cols; ++x)
-      // dimg(y, x) = toCvVec3bDummy(depthCol(depths(y, x), minDepth,
-      // maxDepth));
-      // cv::imshow("depths!", dimg);
-      // cv::waitKey();
-      // exit(0);
 
       StdVector<SE3> worldToTracked;
       std::vector<AffineLightTransform<double>> trackedAffLights;

@@ -9,17 +9,9 @@ namespace fishdso {
 StereoMatcher::StereoMatcher(CameraModel *cam)
     : cam(cam),
       descriptorsMask(cam->getHeight(), cam->getWidth(), CV_8U, CV_WHITE_BYTE),
-      altMask(cam->getHeight(), cam->getWidth(), CV_8U, CV_BLACK_BYTE),
       orb(cv::ORB::create(settingKeyPointsCount)),
       descriptorMatcher(std::unique_ptr<cv::DescriptorMatcher>(
           new cv::BFMatcher(cv::NORM_HAMMING, true))) {
-
-  // cv::circle(descriptorsMask, cv::Point(960, 200), 700, CV_WHITE_BYTE,
-  // cv::FILLED);
-  // cv::rectangle(descriptorsMask, cv::Rect(0, 200, 1920, 600), CV_WHITE_BYTE,
-  // cv::FILLED);
-  // cv::circle(altMask, toCvPoint(cam->getImgCenter()),
-  // int(cam->getImgRadiusByAngle(M_PI_2)), CV_WHITE_BYTE, CV_FILLED);
 }
 
 void filterOutStillMatches(std::vector<cv::DMatch> &matches,
@@ -114,7 +106,5 @@ SE3 StereoMatcher::match(cv::Mat frames[2], StdVector<Vec2> resPoints[2],
 
   return motion;
 }
-
-cv::Mat StereoMatcher::getMask() { return altMask; }
 
 } // namespace fishdso

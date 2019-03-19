@@ -72,16 +72,7 @@ std::shared_ptr<Triangulation> getSimpleTriang() {
   pnt.push_back(Vec2(1.75, 1.5));
 
   std::shared_ptr<Triangulation> triang(new Triangulation(pnt));
-  std::cout << "points:" << std::endl;
-  for (auto p : *triang) {
-    std::cout << p->pos.transpose() << std::endl;
-  }
-
-  std::cout << "edges:" << std::endl;
-  for (auto e : triang->edges())
-    std::cout << e->vert[0]->pos.transpose() << " to "
-              << e->vert[1]->pos.transpose() << std::endl;
-
+  
   // cv::Mat img = triang->draw(800, 800);
   // cv::imshow("simple", img);
   // cv::waitKey();

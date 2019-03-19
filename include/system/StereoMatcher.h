@@ -19,8 +19,6 @@ public:
 
   std::shared_ptr<Terrain> getBaseTerrain();
 
-  cv::Mat getMask();
-
 private:
   void createEstimations(const std::vector<cv::KeyPoint> keyPoints[2],
                          const cv::Mat decriptors[2]);

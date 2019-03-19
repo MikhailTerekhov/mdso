@@ -91,22 +91,6 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
 
   cv::Size displSz = cv::Size(displayHeight, displayWidth);
   cv::Mat1b resMask(baseImg.size(), CV_WHITE_BYTE);
-  // cv::rectangle(resMask, cv::Point(0.15 * baseImg.cols, 0.3 * baseImg.rows),
-  // cv::Point(0.85 * baseImg.cols, baseImg.rows), CV_WHITE_BYTE,
-  // cv::FILLED);
-  // cv::circle(resMask, cv::Point(0.5 * baseImg.cols, 0.5 * baseImg.rows),
-  // 0.4 * baseImg.rows, CV_WHITE_BYTE, cv::FILLED);
-
-  // cv::Mat mcol;
-  // cv::cvtColor(resMask, mcol, cv::COLOR_GRAY2BGR);
-  // cv::Mat mskDepthed;
-  // cv::addWeighted(depthed, 0.5, mcol, 0.5, 0, mskDepthed);
-  // cv::Mat mskdr;
-  // cv::resize(mskDepthed, mskdr, displSz, 0, 0, cv::INTER_NEAREST);
-
-  // cv::Mat1b rmr;
-  // cv::resize(resMask, rmr, displSz, 0, 0, cv::INTER_NEAREST);
-  // cv::imshow("masked", mskdr);
 
   ceres::Grid2D<unsigned char, 1> imgGrid(trackedImg.data, 0, trackedImg.rows,
                                           0, trackedImg.cols);
@@ -191,42 +175,10 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
   // options.max_num_iterations = 10;
   ceres::Solver::Summary summary;
 
-  std::chrono::time_point<std::chrono::system_clock> start, end;
-  start = std::chrono::system_clock::now();
   ceres::Solve(options, &problem, &summary);
-  end = std::chrono::system_clock::now();
-  int mcs = std::chrono::duration_cast<std::chrono::microseconds>(end - start)
-                .count();
-  LOG(INFO) << "time (mcs) = " << mcs << std::endl;
+  LOG(INFO) << "time (mcs) = " << summary.total_time_in_seconds * 1000 << std::endl;
 
   LOG(INFO) << summary.BriefReport() << std::endl;
-
-  // cv::Mat depthed =
-  // drawDepthedFrame(baseImg, baseDepths, minDepthCol, maxDepthCol);
-  // cv::Mat dfr;
-  // cv::resize(depthed, dfr, displSz, 0, 0, cv::INTER_NEAREST);
-  // double scaleX = static_cast<double>(dfr.cols) / depthed.cols;
-  // double scaleY = static_cast<double>(dfr.rows) / depthed.rows;
-
-  // for (Vec2 p : gotOutside) {
-  // putCross(
-  // dfr,
-  // toCvPoint(p, scaleX, scaleY, cv::Point(0.5 * scaleX, 0.5 * scaleY)), 4,
-  // CV_BLACK, 2);
-  // }
-
-  // for (auto rsd : residuals) {
-  // double result = -1;
-  // rsd->operator()(motion.unit_quaternion().coeffs().data(),
-  // motion.translation().data(), affLight.data, &result);
-  // if (std::abs(result) > settingTrackingOutlierIntensityDiff) {
-  // pntOutlier++;
-  // Vec2 mapped = cam.map(rsd->pos.data());
-  // cv::Point pnt = toCvPoint(mapped, scaleX, scaleY,
-  // cv::Point(0.5 * scaleX, 0.5 * scaleY));
-  // cv::circle(dfr, pnt, 4, CV_BLACK, 2);
-  // }
-  // }
 
   int w = cam.getWidth(), h = cam.getHeight();
   int s = FLAGS_rel_point_size * (w + h) / 2;

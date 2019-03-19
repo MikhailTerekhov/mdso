@@ -5,6 +5,7 @@
 #include "util/geometry.h"
 #include "util/util.h"
 #include <ceres/ceres.h>
+#include <ceres/local_parameterization.h>
 #include <ceres/cubic_interpolation.h>
 
 namespace fishdso {
@@ -298,7 +299,7 @@ void BundleAdjuster::adjust(int maxNumIterations) {
       continue;
     }
 
-    std::sort(values.begin(), values.end());
+    std::nth_element(values.begin(), values.begin() + values.size() / 2, values.end());
     double median = values[values.size() / 2];
     if (median > settingBAOutlierIntensityDiff) {
       op->state = OptimizedPoint::OUTLIER;
