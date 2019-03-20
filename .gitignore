@@ -4,6 +4,7 @@ compile_commands.json
 .ycm_extra_conf.py
 *.sh
 *.autosave
+samples/kitti/**
 test/data/**
 output/**
 results/**
