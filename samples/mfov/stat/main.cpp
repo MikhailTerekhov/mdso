@@ -431,7 +431,9 @@ private:
 public:
   CollectDisparities(const MultiFovReader *reader, int *startFrames,
                      std::vector<EpiErr> *errors)
-      : reader(reader), startFrames(startFrames), errors(errors) {}
+      : reader(reader)
+      , startFrames(startFrames)
+      , errors(errors) {}
 
   void operator()(const tbb::blocked_range<int> &range) const {
     PixelSelector pixelSelector;
@@ -517,7 +519,9 @@ private:
 public:
   CollectTracking(const MultiFovReader *reader, MatXX *transErrors,
                   MatXX *rotErrors)
-      : reader(reader), transErrors(transErrors), rotErrors(rotErrors) {}
+      : reader(reader)
+      , transErrors(transErrors)
+      , rotErrors(rotErrors) {}
 
   void operator()(const tbb::blocked_range<int> &range) const {
     for (int baseFrameNum = range.begin(); baseFrameNum < range.end();
@@ -575,8 +579,12 @@ public:
   CollectStereo(const MultiFovReader *reader, const StereoMatcher *matcher,
                 MatXX *transErrors, MatXX *rotErrors, MatXX *depthErrors,
                 bool performBA)
-      : reader(reader), matcher(matcher), transErrors(transErrors),
-        rotErrors(rotErrors), depthErrors(depthErrors), performBA(performBA) {}
+      : reader(reader)
+      , matcher(matcher)
+      , transErrors(transErrors)
+      , rotErrors(rotErrors)
+      , depthErrors(depthErrors)
+      , performBA(performBA) {}
 
   void operator()(const tbb::blocked_range<int> &range) const {
     PixelSelector pixelSelector;
@@ -721,10 +729,13 @@ public:
                  std::vector<double> *kpDepthErrors,
                  std::vector<double> *epipolarDepthErrors,
                  std::vector<EpiErr> *trackedDisp)
-      : reader(reader), startFrames(startFrames),
-        correctlyTracked(correctlyTracked), depthErrors(depthErrors),
-        kpDepthErrors(kpDepthErrors), epipolarDepthErrors(epipolarDepthErrors),
-        trackedDisp(trackedDisp) {}
+      : reader(reader)
+      , startFrames(startFrames)
+      , correctlyTracked(correctlyTracked)
+      , depthErrors(depthErrors)
+      , kpDepthErrors(kpDepthErrors)
+      , epipolarDepthErrors(epipolarDepthErrors)
+      , trackedDisp(trackedDisp) {}
 
   void operator()(const tbb::blocked_range<int> &range) const {
     PixelSelector pixelSelector;

@@ -4,13 +4,14 @@
 #include "util/geometry.h"
 #include "util/util.h"
 #include <ceres/ceres.h>
-#include <ceres/local_parameterization.h>
 #include <ceres/cubic_interpolation.h>
+#include <ceres/local_parameterization.h>
 
 namespace fishdso {
 
 BundleAdjuster::BundleAdjuster(CameraModel *cam)
-    : cam(cam), firstKeyFrame(nullptr) {}
+    : cam(cam)
+    , firstKeyFrame(nullptr) {}
 
 bool BundleAdjuster::isOOB(const SE3 &worldToBase, const SE3 &worldToRef,
                            const OptimizedPoint &baseOP) {
@@ -31,9 +32,12 @@ struct DirectResidual {
       ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> *refFrame,
       const CameraModel *cam, OptimizedPoint *optimizedPoint, const Vec2 &pos,
       KeyFrame *baseKf, KeyFrame *refKf)
-      : cam(cam), baseDirection(cam->unmap(pos).normalized()),
-        refFrame(refFrame), optimizedPoint(optimizedPoint), baseKf(baseKf),
-        refKf(refKf) {
+      : cam(cam)
+      , baseDirection(cam->unmap(pos).normalized())
+      , refFrame(refFrame)
+      , optimizedPoint(optimizedPoint)
+      , baseKf(baseKf)
+      , refKf(refKf) {
     baseFrame->Evaluate(pos[1], pos[0], &baseIntencity);
   }
 
@@ -297,7 +301,8 @@ void BundleAdjuster::adjust(int maxNumIterations) {
       continue;
     }
 
-    std::nth_element(values.begin(), values.begin() + values.size() / 2, values.end());
+    std::nth_element(values.begin(), values.begin() + values.size() / 2,
+                     values.end());
     double median = values[values.size() / 2];
     if (median > settingBAOutlierIntensityDiff) {
       op->state = OptimizedPoint::OUTLIER;

@@ -16,11 +16,15 @@ const int ransacCurInliers = 5;
 
 StereoGeometryEstimator::StereoGeometryEstimator(
     CameraModel *cam, const StdVector<std::pair<Vec2, Vec2>> &imgCorresps)
-    : cam(cam), imgCorresps(imgCorresps), rays(imgCorresps.size()),
-      _depths(imgCorresps.size()),
-      inlierVectorsPool(reservedVector<int>(settingKeyPointsCount),
-                        inlierVectorsUsed),
-      coarseFound(false), preciseFound(false), depthsEvaluated(false) {
+    : cam(cam)
+    , imgCorresps(imgCorresps)
+    , rays(imgCorresps.size())
+    , _depths(imgCorresps.size())
+    , inlierVectorsPool(reservedVector<int>(settingKeyPointsCount),
+                        inlierVectorsUsed)
+    , coarseFound(false)
+    , preciseFound(false)
+    , depthsEvaluated(false) {
   for (int i = 0; i < int(imgCorresps.size()); ++i) {
     rays[i].first = cam->unmap(imgCorresps[i].first.data()).normalized();
     rays[i].second = cam->unmap(imgCorresps[i].second.data()).normalized();
@@ -270,7 +274,11 @@ struct ReprojectionResidual {
 
   ReprojectionResidual(CameraModel *cam, const Vec3 &p, const Vec3 &q,
                        const Vec2 &pMapped, const Vec2 &qMapped)
-      : cam(cam), p(p), q(q), pMapped(pMapped), qMapped(qMapped) {}
+      : cam(cam)
+      , p(p)
+      , q(q)
+      , pMapped(pMapped)
+      , qMapped(qMapped) {}
 
   template <typename T>
   bool operator()(const T *const rotP, const T *const transP, T *res) const {

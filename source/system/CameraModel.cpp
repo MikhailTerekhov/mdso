@@ -14,15 +14,20 @@ namespace fishdso {
 
 CameraModel::CameraModel(int width, int height, double scale,
                          const Vec2 &center, VecX unmapPolyCoeffs)
-    : width(width), height(height), unmapPolyDeg(unmapPolyCoeffs.rows()),
-      unmapPolyCoeffs(unmapPolyCoeffs), center(center), scale(scale) {
+    : width(width)
+    , height(height)
+    , unmapPolyDeg(unmapPolyCoeffs.rows())
+    , unmapPolyCoeffs(unmapPolyCoeffs)
+    , center(center)
+    , scale(scale) {
   normalize();
   setMapPolyCoeffs();
 }
 
 CameraModel::CameraModel(int width, int height,
                          const std::string &calibFileName)
-    : width(width), height(height) {
+    : width(width)
+    , height(height) {
   std::ifstream ifs(calibFileName, std::ifstream::in);
   if (!ifs.is_open()) {
     throw std::runtime_error("camera model file could not be open!");
@@ -33,7 +38,11 @@ CameraModel::CameraModel(int width, int height,
 }
 
 CameraModel::CameraModel(int width, int height, double f, double cx, double cy)
-    : width(width), height(height), unmapPolyDeg(0), center(cx, cy), scale(1) {
+    : width(width)
+    , height(height)
+    , unmapPolyDeg(0)
+    , center(cx, cy)
+    , scale(1) {
   unmapPolyCoeffs.resize(1, 1);
   unmapPolyCoeffs[0] = f;
   normalize();

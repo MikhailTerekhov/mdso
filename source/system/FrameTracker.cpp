@@ -13,9 +13,11 @@ int dbg1 = 0, dbg2 = 0;
 
 FrameTracker::FrameTracker(const StdVector<CameraModel> &camPyr,
                            std::unique_ptr<DepthedImagePyramid> baseFrame)
-    : camPyr(camPyr), baseFrame(std::move(baseFrame)),
-      displayWidth(camPyr[1].getWidth()), displayHeight(camPyr[1].getHeight()),
-      lastRmse(INF) {}
+    : camPyr(camPyr)
+    , baseFrame(std::move(baseFrame))
+    , displayWidth(camPyr[1].getWidth())
+    , displayHeight(camPyr[1].getHeight())
+    , lastRmse(INF) {}
 
 std::pair<SE3, AffineLightTransform<double>>
 FrameTracker::trackFrame(const ImagePyramid &frame, const SE3 &coarseMotion,
@@ -39,8 +41,10 @@ struct PointTrackingResidual {
   PointTrackingResidual(
       Vec3 pos, double baseIntensity, const CameraModel *cam,
       ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> *trackedFrame)
-      : pos(pos), baseIntensity(baseIntensity), cam(cam),
-        trackedFrame(trackedFrame) {}
+      : pos(pos)
+      , baseIntensity(baseIntensity)
+      , cam(cam)
+      , trackedFrame(trackedFrame) {}
 
   template <typename T>
   bool operator()(const T *const rotP, const T *const transP,
@@ -176,7 +180,8 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
   ceres::Solver::Summary summary;
 
   ceres::Solve(options, &problem, &summary);
-  LOG(INFO) << "time (mcs) = " << summary.total_time_in_seconds * 1000 << std::endl;
+  LOG(INFO) << "time (mcs) = " << summary.total_time_in_seconds * 1000
+            << std::endl;
 
   LOG(INFO) << summary.BriefReport() << std::endl;
 

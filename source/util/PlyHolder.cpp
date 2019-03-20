@@ -5,7 +5,9 @@ namespace fishdso {
 
 const int countSpace = 19;
 
-PlyHolder::PlyHolder(const std::string &fname) : fname(fname), pointCount(0) {
+PlyHolder::PlyHolder(const std::string &fname)
+    : fname(fname)
+    , pointCount(0) {
   std::ofstream fs(fname);
   fs << R"__(ply
 format ascii 1.0

@@ -12,9 +12,18 @@ namespace fishdso {
 #define SBD settingMinSecondBestDistance
 
 ImmaturePoint::ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p)
-    : p(p), minDepth(0), maxDepth(INF), bestQuality(-1), lastEnergy(INF),
-      baseFrame(baseFrame), cam(baseFrame->cam), state(ACTIVE), stddev(INF),
-      lastTraced(false), numTraced(0), tracedPyrLevel(0) {
+    : p(p)
+    , minDepth(0)
+    , maxDepth(INF)
+    , bestQuality(-1)
+    , lastEnergy(INF)
+    , baseFrame(baseFrame)
+    , cam(baseFrame->cam)
+    , state(ACTIVE)
+    , stddev(INF)
+    , lastTraced(false)
+    , numTraced(0)
+    , tracedPyrLevel(0) {
   if (!cam->isOnImage(p, PH)) {
     state = OOB;
     return;

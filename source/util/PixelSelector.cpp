@@ -5,8 +5,8 @@
 namespace fishdso {
 
 PixelSelector::PixelSelector()
-    : lastBlockSize(settingInitialAdaptiveBlockSize),
-      lastPointsFound(settingInterestPointsUsed) {}
+    : lastBlockSize(settingInitialAdaptiveBlockSize)
+    , lastPointsFound(settingInterestPointsUsed) {}
 
 std::vector<cv::Point> PixelSelector::select(const cv::Mat &frame,
                                              const cv::Mat1d &gradNorm,

@@ -6,8 +6,10 @@ namespace fishdso {
 
 PreKeyFrame::PreKeyFrame(CameraModel *cam, const cv::Mat &frameColored,
                          int globalFrameNum)
-    : frameColored(frameColored), framePyr(cvtBgrToGray(frameColored)),
-      cam(cam), globalFrameNum(globalFrameNum) {
+    : frameColored(frameColored)
+    , framePyr(cvtBgrToGray(frameColored))
+    , cam(cam)
+    , globalFrameNum(globalFrameNum) {
   grad(frame(), gradX, gradY, gradNorm);
 }
 

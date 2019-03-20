@@ -61,7 +61,8 @@ class OptionalDeleter {
   bool doDelete;
 
 public:
-  OptionalDeleter(bool newDoDelete = true) : doDelete(newDoDelete) {}
+  OptionalDeleter(bool newDoDelete = true)
+      : doDelete(newDoDelete) {}
   template <typename T> void operator()(T *p) const {
     if (doDelete)
       delete p;

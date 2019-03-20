@@ -10,11 +10,16 @@
 namespace fishdso {
 
 DsoSystem::DsoSystem(CameraModel *cam)
-    : lastInitialized(nullptr), scaleGTToOur(1.0), cam(cam),
-      camPyr(cam->camPyr()), pixelSelector(),
-      dsoInitializer(std::unique_ptr<DsoInitializer>(new DelaunayDsoInitializer(
-          this, cam, &pixelSelector, DelaunayDsoInitializer::SPARSE_DEPTHS))),
-      isInitialized(false), lastTrackRmse(INF), firstFrameNum(-1) {
+    : lastInitialized(nullptr)
+    , scaleGTToOur(1.0)
+    , cam(cam)
+    , camPyr(cam->camPyr())
+    , pixelSelector()
+    , dsoInitializer(std::unique_ptr<DsoInitializer>(new DelaunayDsoInitializer(
+          this, cam, &pixelSelector, DelaunayDsoInitializer::SPARSE_DEPTHS)))
+    , isInitialized(false)
+    , lastTrackRmse(INF)
+    , firstFrameNum(-1) {
   LOG(INFO) << "create DsoSystem" << std::endl;
 
   if (FLAGS_write_files)

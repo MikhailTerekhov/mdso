@@ -9,8 +9,10 @@
 namespace fishdso {
 
 template <typename T> struct AffineLightTransform {
-  AffineLightTransform() : data{T(0.0), T(0.0)} {}
-  AffineLightTransform(const T &a, const T &b) : data{a, b} {}
+  AffineLightTransform()
+      : data{T(0.0), T(0.0)} {}
+  AffineLightTransform(const T &a, const T &b)
+      : data{a, b} {}
 
   AffineLightTransform<T> &operator=(const AffineLightTransform<T> &other) {
     memcpy(data, other.data, 2 * sizeof(T));

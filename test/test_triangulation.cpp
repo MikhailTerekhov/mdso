@@ -72,7 +72,7 @@ std::shared_ptr<Triangulation> getSimpleTriang() {
   pnt.push_back(Vec2(1.75, 1.5));
 
   std::shared_ptr<Triangulation> triang(new Triangulation(pnt));
-  
+
   // cv::Mat img = triang->draw(800, 800);
   // cv::imshow("simple", img);
   // cv::waitKey();

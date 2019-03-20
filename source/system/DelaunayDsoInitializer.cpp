@@ -11,9 +11,13 @@ namespace fishdso {
 DelaunayDsoInitializer::DelaunayDsoInitializer(
     DsoSystem *dsoSystem, CameraModel *cam, PixelSelector *pixelSelector,
     DelaunayDsoInitializer::DebugOutputType debugOutputType)
-    : cam(cam), dsoSystem(dsoSystem), pixelSelector(pixelSelector),
-      stereoMatcher(cam), hasFirstFrame(false), framesSkipped(0),
-      debugOutputType(debugOutputType) {}
+    : cam(cam)
+    , dsoSystem(dsoSystem)
+    , pixelSelector(pixelSelector)
+    , stereoMatcher(cam)
+    , hasFirstFrame(false)
+    , framesSkipped(0)
+    , debugOutputType(debugOutputType) {}
 
 bool DelaunayDsoInitializer::addFrame(const cv::Mat &frame,
                                       int globalFrameNum) {

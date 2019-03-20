@@ -7,12 +7,11 @@
 namespace fishdso {
 
 StereoMatcher::StereoMatcher(CameraModel *cam)
-    : cam(cam),
-      descriptorsMask(cam->getHeight(), cam->getWidth(), CV_8U, CV_WHITE_BYTE),
-      orb(cv::ORB::create(settingKeyPointsCount)),
-      descriptorMatcher(std::unique_ptr<cv::DescriptorMatcher>(
-          new cv::BFMatcher(cv::NORM_HAMMING, true))) {
-}
+    : cam(cam)
+    , descriptorsMask(cam->getHeight(), cam->getWidth(), CV_8U, CV_WHITE_BYTE)
+    , orb(cv::ORB::create(settingKeyPointsCount))
+    , descriptorMatcher(std::unique_ptr<cv::DescriptorMatcher>(
+          new cv::BFMatcher(cv::NORM_HAMMING, true))) {}
 
 void filterOutStillMatches(std::vector<cv::DMatch> &matches,
                            std::vector<cv::DMatch> &stillMatches,

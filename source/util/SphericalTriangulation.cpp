@@ -29,7 +29,8 @@ StdVector<Vec2> projectAll(const std::vector<Vec3> &rays) {
 }
 
 SphericalTriangulation::SphericalTriangulation(const std::vector<Vec3> &rays)
-    : tangentTriang(projectAll(rays)), _rays(rays) {
+    : tangentTriang(projectAll(rays))
+    , _rays(rays) {
   for (auto tri : tangentTriang.triangles()) {
     for (int i = 0; i < 3; ++i)
       _sectors[tri].rays[i] = &_rays[tri->vert[i]->index];
