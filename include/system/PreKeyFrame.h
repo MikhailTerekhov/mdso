@@ -15,10 +15,8 @@ namespace fishdso {
 struct PreKeyFrame {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  static constexpr int PL = settingPyrLevels;
-
-  PreKeyFrame(CameraModel *cam, const cv::Mat &frameColored,
-              int globalFrameNum);
+  PreKeyFrame(CameraModel *cam, const cv::Mat &frameColored, int globalFrameNum,
+              const Settings::Pyramid &_pyrSettings = {});
 
   cv::Mat frameColored;
   cv::Mat1d gradX, gradY, gradNorm;
@@ -30,6 +28,8 @@ struct PreKeyFrame {
   SE3 worldToThis;
   AffineLightTransform<double> lightWorldToThis;
   int globalFrameNum;
+
+  Settings::Pyramid pyrSettings;
 };
 
 } // namespace fishdso

@@ -18,9 +18,20 @@ struct KeyFrame {
   KeyFrame(const KeyFrame &other) = delete;
   KeyFrame(KeyFrame &&other) = default;
   KeyFrame(CameraModel *cam, const cv::Mat &frameColored, int globalFrameNum,
-           PixelSelector &pixelSelector);
+           PixelSelector &pixelSelector,
+           const Settings::KeyFrame &kfSettings = {},
+           const Settings::PointTracer &tracingSettings = {},
+           const Settings::Intencity &intencitySettings = {},
+           const Settings::ResidualPattern &rpSettings = {},
+           const Settings::Pyramid &pyrSettings = {});
+
   KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame,
-           PixelSelector &pixelSelector);
+           PixelSelector &pixelSelector,
+           const Settings::KeyFrame &kfSettings = {},
+           const Settings::PointTracer &tracingSettings = {},
+           const Settings::Intencity &intencitySettings = {},
+           const Settings::ResidualPattern &rpSettings = {},
+           const Settings::Pyramid &pyrSettings = {});
 
   void activateAllImmature();
   void deactivateAllOptimized();
@@ -36,6 +47,12 @@ struct KeyFrame {
 
   StdUnorderedSetOfPtrs<ImmaturePoint> immaturePoints;
   StdUnorderedSetOfPtrs<OptimizedPoint> optimizedPoints;
+
+  Settings::KeyFrame kfSettings;
+  Settings::PointTracer tracingSettings;
+  Settings::Intencity intencitySettings;
+  Settings::ResidualPattern rpSettings;
+  Settings::Pyramid pyrSettings;
 };
 
 } // namespace fishdso

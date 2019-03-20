@@ -16,7 +16,7 @@ bool doesABcontain(const Vec2 &a, const Vec2 &b, const Vec2 &p, double eps);
 bool isABDelaunay(const Vec2 &a, const Vec2 &b, const Vec2 &c, const Vec2 &d);
 // doesn't count intersections by segment ends
 bool doesABIntersectCD(const Vec2 &a, const Vec2 &b, const Vec2 &c,
-                       const Vec2 &d);
+                       const Vec2 &d, double eps);
 
 // approximates a point with a given coordinate along the curve given points on
 // the curve with integer coordinates

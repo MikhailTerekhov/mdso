@@ -13,21 +13,25 @@
 namespace fishdso {
 
 CameraModel::CameraModel(int width, int height, double scale,
-                         const Vec2 &center, VecX unmapPolyCoeffs)
+                         const Vec2 &center, VecX unmapPolyCoeffs,
+                         const Settings::CameraModel &settings)
     : width(width)
     , height(height)
     , unmapPolyDeg(unmapPolyCoeffs.rows())
     , unmapPolyCoeffs(unmapPolyCoeffs)
     , center(center)
-    , scale(scale) {
+    , scale(scale)
+    , settings(settings) {
   normalize();
   setMapPolyCoeffs();
 }
 
 CameraModel::CameraModel(int width, int height,
-                         const std::string &calibFileName)
+                         const std::string &calibFileName,
+                         const Settings::CameraModel &settings)
     : width(width)
-    , height(height) {
+    , height(height)
+    , settings(settings) {
   std::ifstream ifs(calibFileName, std::ifstream::in);
   if (!ifs.is_open()) {
     throw std::runtime_error("camera model file could not be open!");
@@ -37,12 +41,14 @@ CameraModel::CameraModel(int width, int height,
   setMapPolyCoeffs();
 }
 
-CameraModel::CameraModel(int width, int height, double f, double cx, double cy)
+CameraModel::CameraModel(int width, int height, double f, double cx, double cy,
+                         const Settings::CameraModel &settings)
     : width(width)
     , height(height)
     , unmapPolyDeg(0)
     , center(cx, cy)
-    , scale(1) {
+    , scale(1)
+    , settings(settings) {
   unmapPolyCoeffs.resize(1, 1);
   unmapPolyCoeffs[0] = f;
   normalize();
@@ -125,8 +131,8 @@ std::istream &operator>>(std::istream &is, CameraModel &cc) {
 void CameraModel::setMapPolyCoeffs() {
   // points of type (r, \theta), where r stands for scaled radius of a point
   // in the image and \theta stands for angle to z-axis of the unprojected ray
-  int nPnts = settingCameraMapPolyPoints;
-  int deg = settingCameraMapPolyDegree;
+  int nPnts = settings.mapPolyPoints;
+  int deg = settings.mapPolyDegree;
   StdVector<Vec2> funcGraph;
   funcGraph.reserve(nPnts);
   std::mt19937 gen;
@@ -173,9 +179,9 @@ void CameraModel::setMapPolyCoeffs() {
   //           mapPolyCoeffs.rows() * mapPolyCoeffs.cols() * sizeof(double));
 }
 
-StdVector<CameraModel> CameraModel::camPyr() {
-  StdVector<CameraModel> result(settingPyrLevels, *this);
-  for (int i = 0; i < settingPyrLevels; ++i) {
+StdVector<CameraModel> CameraModel::camPyr(int pyrLevels) {
+  StdVector<CameraModel> result(pyrLevels, *this);
+  for (int i = 0; i < pyrLevels; ++i) {
     result[i].scale /= (1 << i);
     result[i].width /= (1 << i);
     result[i].height /= (1 << i);

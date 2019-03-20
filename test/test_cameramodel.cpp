@@ -63,19 +63,20 @@ TEST(CameraModelTest, CamerasPyramid) {
   double scale = 604.0;
   Vec2 center(1.58447, 1.07353);
   int unmapPolyDeg = 7;
+  int pyrLevels = 6;
   VecX unmapPolyCoeffs(unmapPolyDeg, 1);
   unmapPolyCoeffs << 1.14544, -0.146714, -0.967996, 2.13329, -2.42001, 1.33018,
       -0.292722;
   int width = 1920, height = 1208;
   CameraModel cam(width, height, scale, center, unmapPolyCoeffs);
-  StdVector<CameraModel> camPyr = cam.camPyr();
+  StdVector<CameraModel> camPyr = cam.camPyr(pyrLevels);
 
   std::mt19937 mt;
   std::uniform_real_distribution<> xs(0, width - 1);
   std::uniform_real_distribution<> ys(0, height - 1);
 
   const int testCount = 1000;
-  for (int lvl = 0; lvl < settingPyrLevels; ++lvl)
+  for (int lvl = 0; lvl < pyrLevels; ++lvl)
     for (int it = 0; it < testCount; ++it) {
       double x = xs(mt), y = ys(mt);
       Vec2 pnt(x, y);

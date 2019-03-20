@@ -8,16 +8,26 @@
 
 namespace fishdso {
 
-int settingPyrLevelsUnused = 0;
-int dbg1 = 0, dbg2 = 0;
-
 FrameTracker::FrameTracker(const StdVector<CameraModel> &camPyr,
-                           std::unique_ptr<DepthedImagePyramid> baseFrame)
-    : camPyr(camPyr)
+                           std::unique_ptr<DepthedImagePyramid> baseFrame,
+                           const Settings::FrameTracker &frameTrackerSettings,
+                           const Settings::Pyramid &pyrSettings,
+                           const Settings::AffineLight &affineLightSettings,
+                           const Settings::Intencity &intencitySettings,
+                           const Settings::GradWeighting &gradWeightingSettings,
+                           const Settings::Threading &threadingSettings)
+    : residualsImg(pyrSettings.levelNum)
+    , lastRmse(INF)
+    , camPyr(camPyr)
     , baseFrame(std::move(baseFrame))
     , displayWidth(camPyr[1].getWidth())
     , displayHeight(camPyr[1].getHeight())
-    , lastRmse(INF) {}
+    , frameTrackerSettings(frameTrackerSettings)
+    , pyrSettings(pyrSettings)
+    , affineLightSettings(affineLightSettings)
+    , intencitySettings(intencitySettings)
+    , gradWeightingSettings(gradWeightingSettings)
+    , threadingSettings(threadingSettings) {}
 
 std::pair<SE3, AffineLightTransform<double>>
 FrameTracker::trackFrame(const ImagePyramid &frame, const SE3 &coarseMotion,
@@ -25,7 +35,7 @@ FrameTracker::trackFrame(const ImagePyramid &frame, const SE3 &coarseMotion,
   SE3 motion = coarseMotion;
   AffineLightTransform<double> affLight;
 
-  for (int i = settingPyrLevels - 1; i >= settingPyrLevelsUnused; --i) {
+  for (int i = pyrSettings.levelNum - 1; i >= 0; --i) {
     LOG(INFO) << "track level #" << i << std::endl;
     std::tie(motion, affLight) =
         trackPyrLevel(camPyr[i], baseFrame->images[i], baseFrame->depths[i],
@@ -108,18 +118,19 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
   problem.AddParameterBlock(motion.translation().data(), 3);
 
   problem.AddParameterBlock(affLight.data, 2);
-  problem.SetParameterLowerBound(affLight.data, 0, settingMinAffineLigthtA);
-  problem.SetParameterUpperBound(affLight.data, 0, settingMaxAffineLigthtA);
-  problem.SetParameterLowerBound(affLight.data, 1, settingMinAffineLigthtB);
-  problem.SetParameterUpperBound(affLight.data, 1, settingMaxAffineLigthtB);
+  problem.SetParameterLowerBound(affLight.data, 0,
+                                 affineLightSettings.minAffineLightA);
+  problem.SetParameterUpperBound(affLight.data, 0,
+                                 affineLightSettings.maxAffineLightA);
+  problem.SetParameterLowerBound(affLight.data, 1,
+                                 affineLightSettings.minAffineLightB);
+  problem.SetParameterUpperBound(affLight.data, 1,
+                                 affineLightSettings.maxAffineLightB);
 
-  if (!FLAGS_optimize_affine_light)
+  if (!affineLightSettings.optimizeAffineLight)
     problem.SetParameterBlockConstant(affLight.data);
 
   std::vector<double> pixUsed;
-
-  ceres::LossFunction *lossFunc =
-      new ceres::HuberLoss(settingTrackingOutlierIntensityDiff);
 
   double pnt[2] = {0.0, 0.0};
 
@@ -146,15 +157,15 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
         pixUsed.push_back(baseImg(y, x));
 
         ceres::LossFunction *lossFunc = nullptr;
-        if (FLAGS_use_grad_weights_on_tracking) {
+        if (frameTrackerSettings.useGradWeighting) {
           double gradNorm = gradNormAt(baseImg, cv::Point(x, y));
-          double c = settingGradientWeighingConstant;
+          double c = gradWeightingSettings.c;
           double weight = c / std::hypot(c, gradNorm);
           lossFunc = new ceres::ScaledLoss(
-              new ceres::HuberLoss(settingTrackingOutlierIntensityDiff), weight,
+              new ceres::HuberLoss(intencitySettings.outlierDiff), weight,
               ceres::Ownership::TAKE_OWNERSHIP);
         } else
-          lossFunc = new ceres::HuberLoss(settingTrackingOutlierIntensityDiff);
+          lossFunc = new ceres::HuberLoss(intencitySettings.outlierDiff);
 
         residuals.push_back(new PointTrackingResidual(
             pos, static_cast<double>(baseImg(y, x)), &cam, &trackedFrame));
@@ -165,16 +176,9 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
             affLight.data);
       }
 
-  double meanIntens =
-      std::accumulate(pixUsed.begin(), pixUsed.end(), 0.0) / pixUsed.size();
-  double sumSqDev = 0;
-  for (double p : pixUsed)
-    sumSqDev += (p - meanIntens) * (p - meanIntens);
-  double meanSqDev = std::sqrt(sumSqDev / pixUsed.size());
-
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_QR;
-  options.num_threads = FLAGS_num_threads;
+  options.num_threads = threadingSettings.numThreads;
   // options.minimizer_progress_to_stdout = true;
   // options.max_num_iterations = 10;
   ceres::Solver::Summary summary;
@@ -188,6 +192,10 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
   int w = cam.getWidth(), h = cam.getHeight();
   int s = FLAGS_rel_point_size * (w + h) / 2;
   cv::cvtColor(trackedImg, residualsImg[pyrLevel], cv::COLOR_GRAY2BGR);
+
+  // TODO extract lossFunc from ceres::Problem
+  std::unique_ptr<ceres::LossFunction> lossFunc(
+      new ceres::HuberLoss(intencitySettings.outlierDiff));
   for (auto rsd : residuals) {
     double res = -1;
     double robustified[3] = {INF, 0, 0};

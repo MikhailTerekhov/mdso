@@ -14,20 +14,23 @@ class DelaunayDsoInitializer : public DsoInitializer {
 public:
   enum DebugOutputType { NO_DEBUG, SPARSE_DEPTHS, FILLED_DEPTHS };
 
-  DelaunayDsoInitializer(DsoSystem *dsoSystem, CameraModel *cam,
-                         PixelSelector *pixelSelector,
-                         DebugOutputType debugOutputType);
+  DelaunayDsoInitializer(
+      DsoSystem *dsoSystem, CameraModel *cam, PixelSelector *pixelSelector,
+      int pointsNeeded, DebugOutputType debugOutputType,
+      const Settings::DelaunayDsoInitializer &initSettings = {},
+      const Settings::StereoMatcher &smSettings = {},
+      const Settings::Threading &threadingSettings = {},
+      const Settings::Triangulation &triangulationSettings = {},
+      const Settings::KeyFrame &kfSettings = {},
+      const Settings::PointTracer &tracingSettings = {},
+      const Settings::Intencity &intencitySettings = {},
+      const Settings::ResidualPattern &rpSettings = {},
+      const Settings::Pyramid &pyrSettings = {});
 
   // returns true if initialization is completed
   bool addFrame(const cv::Mat &frame, int globalFrameNum);
 
   std::vector<KeyFrame> createKeyFrames();
-
-  static std::vector<KeyFrame> createKeyFramesDelaunay(
-      CameraModel *cam, cv::Mat frames[2], int frameNums[2],
-      StdVector<Vec2> initialPoints[2], std::vector<double> initialDepths[2],
-      const SE3 &firstToSecond, PixelSelector *pixelSelector,
-      DebugOutputType debugOutputType);
 
 private:
   CameraModel *cam;
@@ -38,7 +41,20 @@ private:
   int framesSkipped;
   cv::Mat frames[2];
   int globalFrameNums[2];
+  int pointsNeeded;
   DebugOutputType debugOutputType;
+
+  Settings::DelaunayDsoInitializer initSettings;
+  Settings::StereoMatcher smSettigns;
+  Settings::Threading threadingSettings;
+  Settings::Triangulation triangulationSettings;
+  Settings::KeyFrame kfSettings;
+
+  // TODO create PointTracer!!!
+  Settings::PointTracer tracingSettings;
+  Settings::Intencity intencitySettings;
+  Settings::ResidualPattern rpSettings;
+  Settings::Pyramid pyrSettings;
 };
 
 } // namespace fishdso

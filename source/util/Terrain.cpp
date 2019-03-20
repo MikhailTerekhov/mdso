@@ -3,9 +3,10 @@
 namespace fishdso {
 
 Terrain::Terrain(CameraModel *cam, const StdVector<Vec2> &points,
-                 const std::vector<double> &depths)
+                 const std::vector<double> &depths,
+                 const Settings::Triangulation &triangulationSettings)
     : depths(depths)
-    , triang(points) {
+    , triang(points, triangulationSettings) {
   if (points.size() != depths.size())
     throw std::runtime_error("bad Terrain initialization!");
   refRays.resize(points.size());

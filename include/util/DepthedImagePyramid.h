@@ -8,13 +8,14 @@
 namespace fishdso {
 
 struct DepthedImagePyramid : ImagePyramid {
-  DepthedImagePyramid(const cv::Mat1b &baseImage, const StdVector<Vec2> &points,
+  DepthedImagePyramid(const cv::Mat1b &baseImage, int levelNum,
+                      const StdVector<Vec2> &points,
                       const std::vector<double> &depthsVec,
                       const std::vector<double> &weightsVec);
 
   cv::Mat3b draw();
 
-  std::array<cv::Mat1d, settingPyrLevels> depths;
+  std::vector<cv::Mat1d> depths;
 };
 
 } // namespace fishdso

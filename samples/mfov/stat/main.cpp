@@ -23,7 +23,8 @@ void runTracker(const MultiFovReader &reader, int startFrameNum,
                 int framesCount, double depthsNoiseLevel,
                 StdVector<SE3> &worldToTracked,
                 std::vector<AffineLightTransform<double>> &trackedAffLights) {
-  StdVector<CameraModel> camPyr = reader.cam->camPyr();
+  const int pyrLevels = 6;
+  StdVector<CameraModel> camPyr = reader.cam->camPyr(pyrLevels);
   PixelSelector pixelSelector;
 
   KeyFrame startFrame(reader.cam.get(), reader.getFrame(startFrameNum),
@@ -289,7 +290,8 @@ void compareDirectThresholds(const MultiFovReader &reader) {
   for (int i = 0; i < testCount; ++i)
     starts[i] = places[i].first;
 
-  StdVector<CameraModel> camPyr = reader.cam->camPyr();
+  const int pyrLevels = 6;
+  StdVector<CameraModel> camPyr = reader.cam->camPyr(pyrLevels);
 
   std::ofstream tbl("direct_err4.csv");
   tbl << "reproj thres, avg trans err, avg rot err" << std::endl;

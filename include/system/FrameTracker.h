@@ -11,14 +11,21 @@ namespace fishdso {
 class FrameTracker {
 public:
   FrameTracker(const StdVector<CameraModel> &camPyr,
-               std::unique_ptr<DepthedImagePyramid> baseFrame);
+               std::unique_ptr<DepthedImagePyramid> baseFrame,
+               const Settings::FrameTracker &frameTrackerSettings = {},
+               const Settings::Pyramid &pyrSettings = {},
+               const Settings::AffineLight &affineLightSettings = {},
+               const Settings::Intencity &intencitySettings = {},
+               const Settings::GradWeighting &gradWeightingSettings = {},
+               const Settings::Threading &threadingSettings = {});
 
   std::pair<SE3, AffineLightTransform<double>>
   trackFrame(const ImagePyramid &frame, const SE3 &coarseMotion,
              const AffineLightTransform<double> &coarseAffLight);
 
   // output only
-  cv::Mat3b residualsImg[settingPyrLevels];
+  std::vector<cv::Mat3b> residualsImg;
+
   double lastRmse;
 
 private:
@@ -32,6 +39,13 @@ private:
   const StdVector<CameraModel> &camPyr;
   std::unique_ptr<DepthedImagePyramid> baseFrame;
   int displayWidth, displayHeight;
+
+  Settings::FrameTracker frameTrackerSettings;
+  Settings::Pyramid pyrSettings;
+  Settings::AffineLight affineLightSettings;
+  Settings::Intencity intencitySettings;
+  Settings::GradWeighting gradWeightingSettings;
+  Settings::Threading threadingSettings;
 };
 
 } // namespace fishdso

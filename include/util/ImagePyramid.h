@@ -8,7 +8,7 @@
 namespace fishdso {
 
 struct ImagePyramid {
-  ImagePyramid(const cv::Mat1b &baseImage);
+  ImagePyramid(const cv::Mat1b &baseImage, int levelNum);
 
   inline cv::Mat1b &operator[](int ind) { return images[ind]; }
   inline const cv::Mat1b &operator[](int ind) const { return images[ind]; }
@@ -21,12 +21,10 @@ struct ImagePyramid {
     return *interpolators[ind];
   }
 
-  std::array<cv::Mat1b, settingPyrLevels> images;
-  std::array<std::unique_ptr<ceres::Grid2D<unsigned char, 1>>, settingPyrLevels>
-      grids;
-  std::array<std::unique_ptr<
-                 ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>>,
-             settingPyrLevels>
+  std::vector<cv::Mat1b> images;
+  std::vector<std::unique_ptr<ceres::Grid2D<unsigned char, 1>>> grids;
+  std::vector<std::unique_ptr<
+      ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>>>
       interpolators;
 };
 

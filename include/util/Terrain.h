@@ -10,7 +10,8 @@ class Terrain {
 
 public:
   Terrain(CameraModel *cam, const StdVector<Vec2> &points,
-          const std::vector<double> &depths);
+          const std::vector<double> &depths,
+          const Settings::Triangulation &triangulationSettings = {});
 
   bool hasInterpolatedDepth(Vec2 p);
   bool operator()(Vec2 p, double &resDepth);

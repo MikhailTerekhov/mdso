@@ -15,7 +15,8 @@ public:
     Vec3 *rays[3];
   };
 
-  SphericalTriangulation(const std::vector<Vec3> &rays);
+  SphericalTriangulation(const std::vector<Vec3> &rays,
+                         const Settings::Triangulation &settings = {});
 
   TrihedralSector *enclosingSector(Vec3 ray);
 

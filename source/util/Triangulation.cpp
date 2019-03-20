@@ -8,8 +8,10 @@
 
 namespace fishdso {
 
-Triangulation::Triangulation(const StdVector<Vec2> &newPoints)
-    : indicesInv(newPoints.size()) {
+Triangulation::Triangulation(const StdVector<Vec2> &newPoints,
+                             const Settings::Triangulation &settings)
+    : indicesInv(newPoints.size())
+    , settings(settings) {
   //_vertices.reserve(newPoints.size() + 3);
 
   double minx = std::numeric_limits<double>::infinity(),
@@ -254,7 +256,7 @@ EIGEN_STRONG_INLINE bool Triangulation::isInsideBound(const Vec2 &point) const {
 EIGEN_STRONG_INLINE bool Triangulation::doesContain(Triangulation::Edge *edge,
                                                     const Vec2 &point) const {
   return doesABcontain(edge->vert[0]->pos, edge->vert[1]->pos, point,
-                       settingEpsPointIsOnSegment * maxDim);
+                       settings.epsPointIsOnSegment * maxDim);
 }
 
 EIGEN_STRONG_INLINE bool Triangulation::isFromBoundingTri(Vertex *vert) const {
@@ -494,7 +496,7 @@ Triangulation::Vertex *Triangulation::addPoint(Triangulation::Vertex *newVert) {
   // std::cout << "add vert " << newVert->pos.transpose() << std::endl;
 
   for (const auto &vert : tri->vert)
-    if (areEqual(vert->pos, newVert->pos, settingEpsSamePoints * maxDim))
+    if (areEqual(vert->pos, newVert->pos, settings.epsSamePoints * maxDim))
       return vert;
 
   Edge *enclosingSide = nullptr;
@@ -588,7 +590,7 @@ cv::Mat Triangulation::draw(int imgWidth, int imgHeight, cv::Scalar bgCol,
                             cv::Scalar edgeCol) const {
   cv::Mat res(imgHeight, imgWidth, CV_8UC3, bgCol);
 
-  double p = settingTriangulationDrawPadding;
+  double p = settings.drawPadding;
 
   Vec2 diag = (bottomRight - upperLeft) * (1 + 2 * p);
   double scaleX = double(imgWidth) / diag[1];

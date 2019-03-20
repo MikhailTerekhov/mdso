@@ -76,8 +76,7 @@ bool isABDelaunay(const Vec2 &a, const Vec2 &b, const Vec2 &c, const Vec2 &d) {
 }
 
 bool doesABIntersectCD(const Vec2 &a, const Vec2 &b, const Vec2 &c,
-                       const Vec2 &d) {
-  const double eps = settingEpsPointIsOnSegment;
+                       const Vec2 &d, double eps) {
   if (!(((a[0] + eps < c[0] && c[0] < b[0] - eps) ||
          (a[0] + eps < d[0] && d[0] < b[0] - eps)) &&
         (((a[1] + eps < c[1] && c[1] < b[1] - eps) ||

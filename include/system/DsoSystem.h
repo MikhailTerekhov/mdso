@@ -19,7 +19,7 @@ namespace fishdso {
 
 class DsoSystem {
 public:
-  DsoSystem(CameraModel *cam);
+  DsoSystem(CameraModel *cam, const Settings &settings = {});
   ~DsoSystem();
 
   std::shared_ptr<PreKeyFrame> addFrame(const cv::Mat &frame,
@@ -53,7 +53,7 @@ private:
     return (++keyFrames.rbegin())->second;
   }
   EIGEN_STRONG_INLINE KeyFrame &baseKeyFrame() {
-    return FLAGS_track_from_lask_kf ? lastKeyFrame() : lboKeyFrame();
+    return settings.trackFromLastKf ? lastKeyFrame() : lboKeyFrame();
   }
 
   template <typename PointT>
@@ -63,6 +63,8 @@ private:
 
   void alignGTPoses();
 
+  SE3 predictInternal(int prevFramesSkipped, const SE3 &worldToBaseKf,
+                      const SE3 &worldToLbo, const SE3 &worldToLast);
   SE3 predictBaseKfToCur();
   SE3 purePredictBaseKfToCur();
 
@@ -103,6 +105,8 @@ private:
   std::optional<PlyHolder> cloudHolder;
 
   int firstFrameNum;
+
+  Settings settings;
 };
 
 } // namespace fishdso

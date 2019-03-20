@@ -7,8 +7,10 @@ class StereoGeometryEstimator {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  StereoGeometryEstimator(CameraModel *cam,
-                          const StdVector<std::pair<Vec2, Vec2>> &imgCorresps);
+  StereoGeometryEstimator(
+      CameraModel *cam, const StdVector<std::pair<Vec2, Vec2>> &imgCorresps,
+      const Settings::StereoMatcher::StereoGeometryEstimator &settings = {},
+      const Settings::Threading &threadingSettings = {});
 
   SE3 findCoarseMotion();
   SE3 findPreciseMotion();
@@ -36,6 +38,9 @@ private:
 
   SE3 motion;
   bool coarseFound, preciseFound, depthsEvaluated;
+
+  Settings::StereoMatcher::StereoGeometryEstimator settings;
+  Settings::Threading threadingSettings;
 };
 
 } // namespace fishdso

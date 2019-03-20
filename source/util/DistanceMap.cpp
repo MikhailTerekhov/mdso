@@ -17,15 +17,16 @@ unsigned clp2(unsigned x) {
   return x + 1;
 }
 
-DistanceMap::DistanceMap(int givenW, int givenH,
-                         const StdVector<Vec2> &points) {
-  const int wdiv = 1 + (givenW - 1) / settingMaxDistMapW;
-  const int hdiv = 1 + (givenH - 1) / settingMaxDistMapH;
+DistanceMap::DistanceMap(int givenW, int givenH, const StdVector<Vec2> &points,
+                         const Settings::DistanceMap &settings)
+    : settings(settings) {
+  const int wdiv = 1 + (givenW - 1) / settings.maxWidth;
+  const int hdiv = 1 + (givenH - 1) / settings.maxHeight;
   pyrDown = std::min(clp2(wdiv), clp2(hdiv));
   const int w = givenW / pyrDown, h = givenH / pyrDown;
 
-  std::cout << "w, h = " << w << ' ' << h << "\npyrDown = " << pyrDown
-            << std::endl;
+  LOG(INFO) << "DistanceMap: w, h = " << w << ' ' << h
+            << "\npyrDown = " << pyrDown << std::endl;
 
   dist = MatXXi::Constant(h, w, std::numeric_limits<int>::max());
 
@@ -68,7 +69,7 @@ std::vector<int> DistanceMap::choose(const StdVector<Vec2> &otherPoints,
   std::vector<std::pair<int, int>> otherDist(otherPoints.size());
   for (int i = 0; i < otherPoints.size(); ++i) {
     const Vec2 &p = otherPoints[i];
-    Vec2i pi = otherPoints[i].cast<int>() / pyrDown;
+    Vec2i pi = p.cast<int>() / pyrDown;
     if (!(pi[0] >= 0 && pi[0] < dist.cols() && pi[1] >= 0 &&
           pi[1] < dist.rows())) {
       LOG(WARNING) << "point in DistanceMap::choose OOB! w, h = " << dist.cols()

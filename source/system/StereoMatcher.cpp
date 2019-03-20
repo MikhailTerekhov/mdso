@@ -6,24 +6,28 @@
 
 namespace fishdso {
 
-StereoMatcher::StereoMatcher(CameraModel *cam)
+StereoMatcher::StereoMatcher(CameraModel *cam,
+                             const Settings::StereoMatcher &_settings,
+                             const Settings::Threading &threadingSettings)
     : cam(cam)
     , descriptorsMask(cam->getHeight(), cam->getWidth(), CV_8U, CV_WHITE_BYTE)
-    , orb(cv::ORB::create(settingKeyPointsCount))
+    , orb(cv::ORB::create(_settings.keyPointNum))
     , descriptorMatcher(std::unique_ptr<cv::DescriptorMatcher>(
-          new cv::BFMatcher(cv::NORM_HAMMING, true))) {}
+          new cv::BFMatcher(cv::NORM_HAMMING, true)))
+    , settings(_settings)
+    , threadingSettings(threadingSettings) {}
 
-void filterOutStillMatches(std::vector<cv::DMatch> &matches,
-                           std::vector<cv::DMatch> &stillMatches,
-                           const std::vector<cv::KeyPoint> kp[2]) {
+void StereoMatcher::filterOutStillMatches(
+    std::vector<cv::DMatch> &matches, std::vector<cv::DMatch> &stillMatches,
+    const std::vector<cv::KeyPoint> kp[2]) const {
   stillMatches.reserve(matches.size());
   stillMatches.resize(0);
 
   auto stillIt = std::stable_partition(
-      matches.begin(), matches.end(), [kp](const cv::DMatch &m) {
+      matches.begin(), matches.end(), [this, kp](const cv::DMatch &m) {
         cv::Point2f p1 = kp[0][m.trainIdx].pt;
         cv::Point2f p2 = kp[1][m.queryIdx].pt;
-        return cv::norm(p1 - p2) > settingMatchNonMove;
+        return cv::norm(p1 - p2) > settings.matchNonMoveDist;
       });
   stillMatches.resize(matches.end() - stillIt);
   std::copy_n(stillIt, matches.end() - stillIt, stillMatches.begin());
@@ -61,11 +65,11 @@ SE3 StereoMatcher::match(cv::Mat frames[2], StdVector<Vec2> resPoints[2],
                         toVec2(keyPoints[1][matches[i].queryIdx].pt)});
 
   std::unique_ptr<StereoGeometryEstimator> geometryEstimator =
-      std::unique_ptr<StereoGeometryEstimator>(
-          new StereoGeometryEstimator(cam, corresps));
+      std::unique_ptr<StereoGeometryEstimator>(new StereoGeometryEstimator(
+          cam, corresps, settings.stereoGeometryEstimator, threadingSettings));
 
   SE3 motion;
-  if (FLAGS_average_ORB_motion)
+  if (settings.stereoGeometryEstimator.runAveraging)
     motion = geometryEstimator->findPreciseMotion();
   else
     motion = geometryEstimator->findCoarseMotion();

@@ -1,19 +1,20 @@
 #include "../reader/MultiFovReader.h"
 #include "system/DsoSystem.h"
 #include "util/defs.h"
+#include "util/flags.h"
 #include <iostream>
 
 DEFINE_int32(start, 1, "Number of the starting frame.");
 DEFINE_int32(count, 100, "Number of frames to process.");
 DEFINE_int32(gt_points, 1'000'000,
              "Number of GT points in the generated cloud.");
+
 DEFINE_bool(run_dso, true,
-            "Do we need to rud the system? If set to false, only GT pointcloud "
-            "is generated (if gen_gt set tu true).");
+            "Do we need to run the system? If set to false, only GT pointcloud "
+            "is generated (if gen_gt set to true).");
 
 DEFINE_bool(gen_gt, true,
-            "Do we need to rud the system? If set to false, only GT pointcloud "
-            "is generated.");
+            "Do we need to generate GT pointcloud?");
 
 int main(int argc, char **argv) {
   std::string usage =
@@ -44,8 +45,12 @@ It should contain "info" and "data" subdirectories.)abacaba";
     points.reserve(FLAGS_gt_points + FLAGS_count * 2000);
     colors.reserve(FLAGS_gt_points + FLAGS_count * 2000);
 
+    Settings settings = getFlaggedSettings();
+    settings.stereoMatcher.stereoGeometryEstimator.successProb = 0.999;
+    // settings.pointTracer.positionVariance = 0.001;
+
     std::cout << "running DSO.." << std::endl;
-    DsoSystem dso(reader.cam.get());
+    DsoSystem dso(reader.cam.get(), settings);
     for (int it = FLAGS_start; it < FLAGS_start + FLAGS_count; ++it) {
       std::cout << "add frame #" << it << std::endl;
       dso.addGroundTruthPose(it, reader.getWorldToFrameGT(it));

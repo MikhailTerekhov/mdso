@@ -1,119 +1,352 @@
 #ifndef INCLUDE_SETTINGS
 #define INCLUDE_SETTINGS
 
+#include "util/defs.h"
 #include "util/types.h"
 #include <cmath>
 #include <gflags/gflags.h>
 
 namespace fishdso {
 
-// candidate point selection
-constexpr int settingInterestPointLayers = 3;
-extern double settingGradThreshold[settingInterestPointLayers];
-extern int settingInitialAdaptiveBlockSize;
-extern double settingInterestPointsAdaptFactor;
-extern int settingInterestPointsUsed;
+struct Settings {
+  struct CameraModel {
+    CameraModel()
+        : mapPolyDegree(default_mapPolyDegree)
+        , mapPolyPoints(default_mapPolyPoints) {}
 
-// catadioptric camera projection algorithm
-extern int settingCameraMapPolyDegree;
-extern int settingCameraMapPolyPoints;
+    int mapPolyDegree;
+    static constexpr int default_mapPolyDegree = 10;
 
-// orb-keypoints-based initialization
-extern int settingKeyPointsCount;
-extern int settingRansacMaxIter;
-extern double settingInitKeypointsObserveAngle;
-extern double settingMatchNonMove;
-extern bool settingUsePlainTriangulation;
+    int mapPolyPoints;
+    static constexpr int default_mapPolyPoints = 2000;
+  } cameraModel;
 
-constexpr int settingEssentialMinimalSolveN = 5;
-extern double settingEssentialSuccessProb;
-extern double settingEssentialReprojErrThreshold;
-extern double settingRemoveResidualsRatio;
+  struct PixelSelector {
+    PixelSelector()
+        : initialAdaptiveBlockSize(default_initialAdaptiveBlockSize)
+        , initialPointsFound(default_initialPointsFound)
+        , adaptToFactor(default_adaptToFactor)
+        , gradThresholds(default_gradThresholds)
+        , pointColors(default_pointColors) {}
 
-// undistortion
-extern int settingHalfFillingFilterSize;
+    int initialAdaptiveBlockSize;
+    static constexpr int default_initialAdaptiveBlockSize = 25;
 
-// triangulation
-extern double settingEpsPointIsOnSegment;
-extern double settingEpsSamePoints;
-extern double settingTriangulationDrawPadding;
+    int initialPointsFound;
+    static constexpr int default_initialPointsFound = 1000;
 
-// epipolar curve search
-extern int settingEpipolarOnImageTestCount;
-extern double settingEpipolarMaxSearchRel;
-extern double settingEpipolarIntencityVariance;
-extern double settingEpipolarOutlierIntencityDiff;
-extern double settingMinSecondBestDistance;
+    double adaptToFactor;
+    static constexpr double default_adaptToFactor = 1.1;
 
-// common direct alignment parameters
-extern double settingMinAffineLigthtA;
-extern double settingMaxAffineLigthtA;
-extern double settingMinAffineLigthtB;
-extern double settingMaxAffineLigthtB;
+    std::vector<double> gradThresholds;
+    static const std::vector<double> default_gradThresholds;
 
-extern double settingMinDepth;
-extern double settingMaxDepth;
+    std::vector<cv::Scalar> pointColors;
+    static const std::vector<cv::Scalar> default_pointColors;
+  } pixelSelector;
 
-extern double settingGradientWeighingConstant;
+  struct DistanceMap {
+    DistanceMap()
+        : maxWidth(default_maxWidth)
+        , maxHeight(default_maxHeight) {}
 
-// frame tracking
-constexpr int settingPyrLevels = 6;
-extern double settingTrackingOutlierIntensityDiff;
+    double maxWidth;
+    static constexpr double default_maxWidth = 480;
 
-// bundle adjustment
-constexpr int settingResidualPatternSize = 9;
-extern Vec2 settingResidualPattern[settingResidualPatternSize];
-extern int settingResidualPatternHeight;
-extern int settingMaxOptimizedPoints;
-extern double settingBAOutlierIntensityDiff;
-extern double settingMaxPointDepth;
-extern int settingMaxFirstBAIterations;
-extern int settingMaxBAIterations;
+    double maxHeight;
+    static constexpr double default_maxHeight = 302;
+  } distanceMap;
 
-extern int settingMaxKeyFrames;
+  struct StereoMatcher {
+    StereoMatcher()
+        : matchNonMoveDist(default_matchNonMoveDist)
+        , keyPointNum(default_keyPointNum) {}
 
-extern int settingMaxDistMapW;
-extern int settingMaxDistMapH;
+    struct StereoGeometryEstimator {
+      StereoGeometryEstimator()
+          : outlierReprojError(default_outlierReprojError)
+          , successProb(default_successProb)
+          , maxRansacIter(default_maxRansacIter)
+          , initialInliersCapacity(default_initialInliersCapacity)
+          , runAveraging(default_runAveraging)
+          , runMaxRansacIter(default_runMaxRansacIter) {}
+
+      double outlierReprojError;
+      static constexpr double default_outlierReprojError = 1.25;
+
+      double successProb;
+      static constexpr double default_successProb = 0.95;
+
+      int maxRansacIter;
+      static constexpr int default_maxRansacIter = 100000;
+
+      int initialInliersCapacity;
+      static constexpr int default_initialInliersCapacity = 2000;
+
+      bool runAveraging;
+      static constexpr bool default_runAveraging = true;
+
+      bool runMaxRansacIter;
+      static constexpr bool default_runMaxRansacIter = false;
+
+      static constexpr int minimalSolveN = 5;
+    } stereoGeometryEstimator;
+
+    double matchNonMoveDist;
+    static constexpr double default_matchNonMoveDist = 8.0;
+
+    int keyPointNum;
+    static constexpr int default_keyPointNum = 2000;
+
+    int maxRansacIter;
+    static constexpr int default_maxRansacIter = 100000;
+  } stereoMatcher;
+
+  struct Triangulation {
+    Triangulation()
+        : epsPointIsOnSegment(default_epsPointIsOnSegment)
+        , epsSamePoints(default_epsSamePoints)
+        , drawPadding(default_drawPadding) {}
+
+    double epsPointIsOnSegment;
+    static constexpr double default_epsPointIsOnSegment = 1e-9;
+
+    double epsSamePoints;
+    static constexpr double default_epsSamePoints = 1e-9;
+
+    double drawPadding;
+    static constexpr double default_drawPadding = 0.1;
+  } triangulation;
+
+  struct DelaunayDsoInitializer {
+    DelaunayDsoInitializer()
+        : firstFramesSkip(default_firstFramesSkip)
+        , usePlainTriangulation(default_usePlainTriangulation) {}
+
+    int firstFramesSkip;
+    static constexpr int default_firstFramesSkip = 15;
+
+    bool usePlainTriangulation;
+    static constexpr bool default_usePlainTriangulation = false;
+  } delaunayDsoInitializer;
+
+  struct KeyFrame {
+    KeyFrame()
+        : pointsNum(default_pointsNum) {}
+
+    int pointsNum;
+    static constexpr int default_pointsNum = 2000;
+  } keyFrame;
+
+  struct PointTracer {
+    PointTracer()
+        : onImageTestCount(default_onImageTestCount)
+        , maxSearchRel(default_maxSearchRel)
+        , positionVariance(default_positionVariance)
+        , minSecondBestDistance(default_minSecondBestDistance)
+        , imprFactor(default_imprFactor)
+        , outlierEnergyFactor(default_outlierEnergyFactor)
+        , outlierQuality(default_outlierQuality)
+        , optimizedStddev(default_optimizedStddev)
+        , gnIter(default_gnIter)
+        , performFullTracing(default_performFullTracing)
+        , useAltHWeighting(default_useAltHWeighting) {}
+
+    int onImageTestCount;
+    static constexpr int default_onImageTestCount = 100;
+
+    double maxSearchRel;
+    static constexpr double default_maxSearchRel = 0.027;
+
+    double positionVariance;
+    static constexpr double default_positionVariance = 3.2;
+
+    double minSecondBestDistance;
+    static constexpr double default_minSecondBestDistance = 3.0;
+
+    double imprFactor;
+    static constexpr double default_imprFactor = 1.0;
+
+    double outlierEnergyFactor;
+    static constexpr double default_outlierEnergyFactor = 0.444;
+
+    double outlierQuality;
+    static constexpr double default_outlierQuality = 3.0;
+
+    double optimizedStddev;
+    static constexpr double default_optimizedStddev = 2.4;
+
+    int gnIter;
+    static constexpr int default_gnIter = 3;
+
+    bool performFullTracing;
+    static constexpr bool default_performFullTracing = false;
+
+    bool useAltHWeighting;
+    static constexpr bool default_useAltHWeighting = true;
+  } pointTracer;
+
+  struct FrameTracker {
+    FrameTracker()
+        : trackFailFactor(default_trackFailFactor)
+        , useGradWeighting(default_useGradWeighting)
+        , performTrackingCheckGT(default_performTrackingCheckGT)
+        , performTrackingCheckStereo(default_performTrackingCheckStereo) {}
+
+    double trackFailFactor;
+    static constexpr double default_trackFailFactor = 1.5;
+
+    bool useGradWeighting;
+    static constexpr bool default_useGradWeighting = false;
+
+    bool performTrackingCheckGT;
+    static constexpr bool default_performTrackingCheckGT = false;
+
+    bool performTrackingCheckStereo;
+    static constexpr bool default_performTrackingCheckStereo = false;
+  } frameTracker;
+
+  struct BundleAdjuster {
+    BundleAdjuster()
+        : maxIterations(default_maxIterations)
+        , fixedMotionOnFirstAdjustent(default_fixedMotionOnFirstAdjustent)
+        , runBA(default_runBA) {}
+
+    int maxIterations;
+    static constexpr int default_maxIterations = 10;
+
+    bool fixedMotionOnFirstAdjustent;
+    static constexpr bool default_fixedMotionOnFirstAdjustent = false;
+
+    bool runBA;
+    static constexpr bool default_runBA = true;
+  } bundleAdjuster;
+
+  struct Pyramid {
+    Pyramid()
+        : levelNum(default_levelNum) {}
+
+    int levelNum;
+    static constexpr int default_levelNum = 6;
+  } pyramid;
+
+  struct AffineLight {
+    AffineLight()
+        : minAffineLightA(default_minAffineLightA)
+        , maxAffineLightA(default_maxAffineLightA)
+        , minAffineLightB(default_minAffineLightB)
+        , maxAffineLightB(default_maxAffineLightB)
+        , optimizeAffineLight(default_optimizeAffineLight) {}
+
+    double minAffineLightA;
+    static constexpr double default_minAffineLightA = -0.0953101798;
+
+    double maxAffineLightA;
+    static constexpr double default_maxAffineLightA = 0.0953101798; //ln(1.1)
+
+    double minAffineLightB;
+    static constexpr double default_minAffineLightB = -0.1 * 256;
+
+    double maxAffineLightB;
+    static constexpr double default_maxAffineLightB = 0.1 * 256;
+
+    bool optimizeAffineLight;
+    static constexpr bool default_optimizeAffineLight = false;
+  } affineLight;
+
+  struct Depth {
+    Depth()
+        : min(default_min)
+        , max(default_max) {}
+
+    double min;
+    static constexpr double default_min = 1e-3;
+
+    double max;
+    static constexpr double default_max = 1e4;
+  } depth;
+
+  struct GradWeighting {
+    GradWeighting()
+        : c(default_c) {}
+
+    double c;
+    static constexpr double default_c = 50.0;
+  } gradWeighting;
+
+  struct ResidualPattern {
+    ResidualPattern(const StdVector<Vec2> &newPattern =
+                        default_pattern)
+        : _pattern(newPattern) {
+      height =
+          int(std::ceil(std::max_element(_pattern.begin(), _pattern.end(),
+                                         [](const Vec2 &a, const Vec2 &b) {
+                                           return a.lpNorm<Eigen::Infinity>() <
+                                                  b.lpNorm<Eigen::Infinity>();
+                                         })
+                            ->lpNorm<Eigen::Infinity>()));
+    }
+
+    inline const StdVector<Vec2> &pattern() const { return _pattern; }
+    int height;
+
+  private:
+    StdVector<Vec2> _pattern;
+    static const StdVector<Vec2> default_pattern;
+  } residualPattern;
+
+  struct Intencity {
+    Intencity()
+        : outlierDiff(default_outlierDiff) {}
+
+    double outlierDiff;
+    static constexpr double default_outlierDiff = 12.0;
+  } intencity;
+
+  struct Threading {
+    Threading()
+        : numThreads(4) {}
+
+    int numThreads;
+    static constexpr int default_numThreads = 4;
+  } threading;
+
+  Settings()
+      : maxOptimizedPoints(default_maxOptimizedPoints)
+      , maxKeyFrames(default_maxKeyFrames)
+      , trackFromLastKf(default_trackFromLastKf)
+      , predictUsingScrew(default_predictUsingScrew)
+      , switchFirstMotionToGT(default_switchFirstMotionToGT)
+      , allPosesGT(default_allPosesGT)
+      , continueChoosingKeyFrames(default_continueChoosingKeyFrames) {}
+
+  int maxOptimizedPoints;
+  static constexpr int default_maxOptimizedPoints = 2000;
+
+  int maxKeyFrames;
+  static constexpr int default_maxKeyFrames = 6;
+
+  bool trackFromLastKf;
+  static constexpr bool default_trackFromLastKf = true;
+
+  bool predictUsingScrew;
+  static constexpr bool default_predictUsingScrew = false;
+
+  bool switchFirstMotionToGT;
+  static constexpr bool default_switchFirstMotionToGT = false;
+
+  bool allPosesGT;
+  static constexpr bool default_allPosesGT = false;
+
+  bool continueChoosingKeyFrames;
+  static constexpr bool default_continueChoosingKeyFrames = true;
+};
 
 } // namespace fishdso
 
-DECLARE_int32(num_threads);
-
-DECLARE_int32(first_frames_skip);
-DECLARE_bool(use_ORB_initialization);
-DECLARE_bool(run_max_RANSAC_iterations);
-DECLARE_bool(average_ORB_motion);
 DECLARE_bool(output_reproj_CDF);
-DECLARE_bool(switch_first_motion_to_GT);
+
 DECLARE_bool(draw_inlier_matches);
-
-DECLARE_bool(optimize_affine_light);
-
-DECLARE_bool(perform_full_tracing);
-DECLARE_bool(use_alt_H_weighting);
-DECLARE_int32(tracing_GN_iter);
-
-DECLARE_double(pos_variance);
-#define MIN_STDDEV (std::sqrt(FLAGS_pos_variance / settingResidualPatternSize))
-
-DECLARE_double(tracing_impr_factor);
-DECLARE_double(epi_outlier_e);
-DECLARE_double(epi_outlier_q);
-
-DECLARE_bool(perform_tracking_check_stereo);
-DECLARE_bool(perform_tracking_check_GT);
-DECLARE_bool(track_from_lask_kf);
-DECLARE_bool(predict_using_screw);
-DECLARE_bool(use_grad_weights_on_tracking);
-DECLARE_double(track_fail_factor);
-
-DECLARE_bool(gt_poses);
-
-DECLARE_bool(run_ba);
-DECLARE_bool(fixed_motion_on_first_ba);
-DECLARE_double(optimized_stddev);
-
-DECLARE_bool(continue_choosing_keyframes);
 
 DECLARE_bool(debug_video);
 

@@ -39,7 +39,8 @@ public:
 
   static const int POINT_NOT_FOUND = -4;
 
-  Triangulation(const StdVector<Vec2> &newPoints);
+  Triangulation(const StdVector<Vec2> &newPoints,
+                const Settings::Triangulation &settings = {});
 
   VertexIterator begin() const;
   VertexIterator end() const;
@@ -107,6 +108,8 @@ private:
   //  std::vector<Triangle *> _triangles;
 
   std::mt19937 mt;
+
+  Settings::Triangulation settings;
 };
 
 void drawCurvedInternal(CameraModel *cam, Vec2 ptFrom, Vec2 ptTo, cv::Mat &img,

@@ -9,17 +9,23 @@
 
 namespace fishdso {
 
-DsoSystem::DsoSystem(CameraModel *cam)
+DsoSystem::DsoSystem(CameraModel *cam, const Settings &_settings)
     : lastInitialized(nullptr)
     , scaleGTToOur(1.0)
     , cam(cam)
-    , camPyr(cam->camPyr())
-    , pixelSelector()
+    , camPyr(cam->camPyr(_settings.pyramid.levelNum))
+    , pixelSelector(_settings.pixelSelector)
     , dsoInitializer(std::unique_ptr<DsoInitializer>(new DelaunayDsoInitializer(
-          this, cam, &pixelSelector, DelaunayDsoInitializer::SPARSE_DEPTHS)))
+          this, cam, &pixelSelector, _settings.maxOptimizedPoints,
+          DelaunayDsoInitializer::SPARSE_DEPTHS,
+          _settings.delaunayDsoInitializer, _settings.stereoMatcher,
+          _settings.threading, _settings.triangulation, _settings.keyFrame,
+          _settings.pointTracer, _settings.intencity, _settings.residualPattern,
+          _settings.pyramid)))
     , isInitialized(false)
     , lastTrackRmse(INF)
-    , firstFrameNum(-1) {
+    , firstFrameNum(-1)
+    , settings(_settings) {
   LOG(INFO) << "create DsoSystem" << std::endl;
 
   if (FLAGS_write_files)
@@ -126,11 +132,9 @@ SE3 predictSimpleInternal(int prevFramesSkipped, const SE3 &worldToBaseKf,
          worldToBaseKf.inverse();
 }
 
-EIGEN_STRONG_INLINE SE3 predictInternal(int prevFramesSkipped,
-                                        const SE3 &worldToBaseKf,
-                                        const SE3 &worldToLbo,
-                                        const SE3 &worldToLast) {
-  return FLAGS_predict_using_screw
+SE3 DsoSystem::predictInternal(int prevFramesSkipped, const SE3 &worldToBaseKf,
+                               const SE3 &worldToLbo, const SE3 &worldToLast) {
+  return settings.predictUsingScrew
              ? predictScrewInternal(prevFramesSkipped, worldToBaseKf,
                                     worldToLbo, worldToLast)
              : predictSimpleInternal(prevFramesSkipped, worldToBaseKf,
@@ -281,8 +285,8 @@ void DsoSystem::saveOldKfs(int count) {
 }
 
 void DsoSystem::marginalizeFrames() {
-  if (keyFrames.size() > settingMaxKeyFrames) {
-    int count = static_cast<int>(keyFrames.size()) - settingMaxKeyFrames;
+  if (keyFrames.size() > settings.maxKeyFrames) {
+    int count = static_cast<int>(keyFrames.size()) - settings.maxKeyFrames;
     if (FLAGS_write_files)
       saveOldKfs(count);
     for (int i = 0; i < count; ++i)
@@ -322,7 +326,7 @@ void DsoSystem::activateNewOptimizedPoints() {
       keyFrames.begin(), keyFrames.end(), 0, [](int acc, const auto &kfp) {
         return acc + kfp.second.optimizedPoints.size();
       });
-  int pointsNeeded = settingMaxOptimizedPoints - curOptPoints;
+  int pointsNeeded = settings.maxOptimizedPoints - curOptPoints;
   std::cout << "cur opt = " << curOptPoints << ", needed = " << pointsNeeded
             << std::endl;
   std::vector<int> activatedInd = distMap.choose(immPoints, pointsNeeded);
@@ -336,7 +340,8 @@ void DsoSystem::activateNewOptimizedPoints() {
 }
 
 bool DsoSystem::didTrackFail() {
-  return frameTracker->lastRmse > lastTrackRmse * FLAGS_track_fail_factor;
+  return frameTracker->lastRmse >
+         lastTrackRmse * settings.frameTracker.trackFailFactor;
 }
 
 std::pair<SE3, AffineLightTransform<double>>
@@ -365,10 +370,12 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
         keyFrames.insert(std::pair<int, KeyFrame>(
             keyFrame.preKeyFrame->globalFrameNum, std::move(keyFrame)));
 
-      if (FLAGS_perform_tracking_check_GT)
+      if (settings.frameTracker.performTrackingCheckGT)
         alignGTPoses();
 
-      // BundleAdjuster bundleAdjuster(cam);
+      // BundleAdjuster bundleAdjuster(cam, settings.bundleAdjuster,
+      // settings.residualPattern, settings.gradWeighting, settings.intencity,
+      // settings.affineLight, settings.threading, settings.depth);
       // for (auto &p : keyFrames)
       // bundleAdjuster.addKeyFrame(&p.second);
 
@@ -380,7 +387,7 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
 
       // bundleAdjuster.adjust(settingMaxFirstBAIterations);
 
-      if (FLAGS_switch_first_motion_to_GT || FLAGS_gt_poses) {
+      if (settings.switchFirstMotionToGT || settings.allPosesGT) {
         SE3 worldToSecondKfGT =
             worldToFrameGT[keyFrames.rbegin()
                                ->second.preKeyFrame->globalFrameNum];
@@ -401,10 +408,13 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
       std::vector<double> weights(points.size(), 1.0);
 
       std::unique_ptr<DepthedImagePyramid> initialTrack(new DepthedImagePyramid(
-          baseKeyFrame().preKeyFrame->frame(), points, depths, weights));
+          baseKeyFrame().preKeyFrame->frame(), settings.pyramid.levelNum,
+          points, depths, weights));
 
-      frameTracker = std::unique_ptr<FrameTracker>(
-          new FrameTracker(camPyr, std::move(initialTrack)));
+      frameTracker = std::unique_ptr<FrameTracker>(new FrameTracker(
+          camPyr, std::move(initialTrack), settings.frameTracker,
+          settings.pyramid, settings.affineLight, settings.intencity,
+          settings.gradWeighting, settings.threading));
 
       lastInitialized = &keyFrames.rbegin()->second;
 
@@ -428,7 +438,8 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
   LOG(INFO) << "start tracking this frame" << std::endl;
 
   std::tie(baseKfToCur, lightBaseKfToCur) = frameTracker->trackFrame(
-      ImagePyramid(preKeyFrame->frame()), predicted, lightKfToLast);
+      ImagePyramid(preKeyFrame->frame(), settings.pyramid.levelNum), predicted,
+      lightKfToLast);
 
   LOG(INFO) << "tracking ended" << std::endl;
 
@@ -442,7 +453,7 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
   worldToFramePredict[globalFrameNum] = purePredicted * baseKf->worldToThis;
   preKeyFrame->worldToThis = worldToFrame[globalFrameNum];
 
-  if (FLAGS_gt_poses) {
+  if (settings.allPosesGT) {
     worldToFrame[globalFrameNum] = worldToFrameGT[globalFrameNum];
     preKeyFrame->worldToThis = worldToFrameGT[globalFrameNum];
   }
@@ -459,20 +470,18 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
             << diff.so3().log().norm() << std::endl;
   LOG(INFO) << "estimated aff = \n" << lightBaseKfToCur << std::endl;
 
-  if (FLAGS_perform_tracking_check_GT) {
+  if (settings.frameTracker.performTrackingCheckGT) {
     LOG(INFO) << "perform comparison to ground truth" << std::endl;
     checkLastTrackedGT(preKeyFrame.get());
-  } else if (FLAGS_perform_tracking_check_stereo) {
+  } else if (settings.frameTracker.performTrackingCheckStereo) {
     LOG(INFO) << "perform stereo check" << std::endl;
     checkLastTrackedStereo(preKeyFrame.get());
   }
 
   int totalActive = 0, totalGood = 0;
   constexpr int maxTraced = 5;
-  std::array<int, maxTraced> numTraced;
-  numTraced.fill(0);
-  std::array<int, settingPyrLevels> numOnLevel;
-  numOnLevel.fill(0);
+  std::vector<int> numTraced(maxTraced, 0);
+  std::vector<int> numOnLevel(settings.pyramid.levelNum, 0);
   for (const auto &kfp : keyFrames)
     for (auto &ip : kfp.second.immaturePoints) {
       ip->traceOn(*preKeyFrame, ImmaturePoint::NO_DEBUG);
@@ -494,7 +503,7 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
     std::cout << numTraced[i] << ' ';
   std::cout << std::endl;
   std::cout << "traced on levels = ";
-  for (int i = 0; i < settingPyrLevels; ++i)
+  for (int i = 0; i < settings.pyramid.levelNum; ++i)
     std::cout << numOnLevel[i] << ' ';
   std::cout << std::endl;
 
@@ -511,9 +520,9 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
     }
   }
   if (FLAGS_write_files || FLAGS_show_track_res) {
-    cv::Mat3b trackLevels =
-        drawLeveled(frameTracker->residualsImg, settingPyrLevels,
-                    cam->getWidth(), cam->getHeight());
+    cv::Mat3b trackLevels = drawLeveled(frameTracker->residualsImg.data(),
+                                        settings.pyramid.levelNum,
+                                        cam->getWidth(), cam->getHeight());
     if (FLAGS_write_files) {
       std::string filename =
           "/frame" + std::to_string(preKeyFrame->globalFrameNum) + ".jpg";
@@ -525,19 +534,25 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
     }
   }
 
-  if (FLAGS_continue_choosing_keyframes && doNeedKf(preKeyFrame.get())) {
+  if (settings.continueChoosingKeyFrames && doNeedKf(preKeyFrame.get())) {
     int kfNum = preKeyFrame->globalFrameNum;
-    keyFrames.insert(
-        std::pair<int, KeyFrame>(kfNum, KeyFrame(preKeyFrame, pixelSelector)));
+    keyFrames.insert(std::pair<int, KeyFrame>(
+        kfNum, KeyFrame(preKeyFrame, pixelSelector, settings.keyFrame,
+                        settings.pointTracer, settings.intencity,
+                        settings.residualPattern, settings.pyramid)));
 
     marginalizeFrames();
     activateNewOptimizedPoints();
 
-    if (FLAGS_run_ba) {
-      BundleAdjuster bundleAdjuster(cam);
+    if (settings.bundleAdjuster.runBA) {
+      BundleAdjuster bundleAdjuster(
+          cam, settings.bundleAdjuster, settings.residualPattern,
+          settings.gradWeighting, settings.intencity, settings.affineLight,
+          settings.threading, settings.depth);
+
       for (auto &kfp : keyFrames)
         bundleAdjuster.addKeyFrame(&kfp.second);
-      bundleAdjuster.adjust(settingMaxBAIterations);
+      bundleAdjuster.adjust(settings.bundleAdjuster.maxIterations);
     }
 
     StdVector<Vec2> points;
@@ -548,10 +563,11 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
     for (int i = 0; i < points.size(); ++i)
       weights[i] = 1.0 / refs[i]->stddev;
     std::unique_ptr<DepthedImagePyramid> baseForTrack(new DepthedImagePyramid(
-        baseKeyFrame().preKeyFrame->frame(), points, depths, weights));
+        baseKeyFrame().preKeyFrame->frame(), settings.pyramid.levelNum, points,
+        depths, weights));
 
     for (int i = 0; i < points.size(); ++i) {
-      for (int pl = 0; pl < settingPyrLevels; ++pl) {
+      for (int pl = 0; pl < settings.pyramid.levelNum; ++pl) {
         cv::Point p = toCvPoint(points[i]);
         if (baseForTrack->depths[pl](p / (1 << pl)) <= 0) {
           std::cout << "pl=" << pl << " p=" << p << " psh=" << p / (1 << pl)
@@ -571,8 +587,10 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
                     trackImg);
     }
 
-    frameTracker = std::unique_ptr<FrameTracker>(
-        new FrameTracker(camPyr, std::move(baseForTrack)));
+    frameTracker = std::unique_ptr<FrameTracker>(new FrameTracker(
+        camPyr, std::move(baseForTrack), settings.frameTracker,
+        settings.pyramid, settings.affineLight, settings.intencity,
+        settings.gradWeighting, settings.threading));
   }
 
   return preKeyFrame;
@@ -725,22 +743,25 @@ DsoSystem::drawDebugImage(const std::shared_ptr<PreKeyFrame> &lastFrame) {
   for (int i = 0; i < optPt.size(); ++i) {
     Vec3 p = optD[i] * cam->unmap(optPt[i]).normalized();
     Vec2 reproj = cam->map(baseToLast * p);
-    cv::Scalar col =
-        cam->isOnImage(reproj, settingResidualPatternSize) ? CV_GREEN : CV_RED;
+    cv::Scalar col = cam->isOnImage(reproj, settings.residualPattern.height)
+                         ? CV_GREEN
+                         : CV_RED;
     putSquare(usefulImg, toCvPoint(optPt[i]), s, col, cv::FILLED);
   }
 
   cv::Mat3b stddevs = base.clone();
+  double minStddev = std::sqrt(settings.pointTracer.positionVariance /
+                               settings.residualPattern.pattern().size());
   for (int i = 0; i < immPt.size(); ++i) {
     double dev = immRef[i]->stddev;
     if (immRef[i]->numTraced > 0)
       putSquare(stddevs, toCvPoint(immPt[i]), s,
-                depthCol(dev, MIN_STDDEV, FLAGS_debug_max_stddev), cv::FILLED);
+                depthCol(dev, minStddev, FLAGS_debug_max_stddev), cv::FILLED);
   }
   for (int i = 0; i < optPt.size(); ++i) {
     double dev = optRef[i]->stddev;
     putSquare(stddevs, toCvPoint(optPt[i]), s,
-              depthCol(dev, MIN_STDDEV, FLAGS_debug_max_stddev), cv::FILLED);
+              depthCol(dev, minStddev, FLAGS_debug_max_stddev), cv::FILLED);
   }
 
   cv::Mat3b row1, row2, resultBig, result;

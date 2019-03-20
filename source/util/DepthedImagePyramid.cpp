@@ -5,10 +5,12 @@
 namespace fishdso {
 
 DepthedImagePyramid::DepthedImagePyramid(const cv::Mat1b &baseImage,
+                                         int levelNum,
                                          const StdVector<Vec2> &points,
                                          const std::vector<double> &depthsVec,
                                          const std::vector<double> &weightsVec)
-    : ImagePyramid(baseImage) {
+    : ImagePyramid(baseImage, levelNum)
+    , depths(levelNum) {
   CHECK(points.size() == depthsVec.size() &&
         depthsVec.size() == weightsVec.size());
 
@@ -26,14 +28,14 @@ DepthedImagePyramid::DepthedImagePyramid(const cv::Mat1b &baseImage,
   cv::integral(weights, integralWeights, CV_64F);
   cv::integral(weightedDepths, integralWeightedDepths, CV_64F);
 
-  for (int il = 1; il < settingPyrLevels; ++il)
+  for (int il = 1; il < levelNum; ++il)
     depths[il] = pyrNUpDepth(integralWeightedDepths, integralWeights, il);
 }
 
 cv::Mat3b DepthedImagePyramid::draw() {
   int w = images[0].cols, h = images[0].rows;
-  cv::Mat3b depthed[settingPyrLevels];
-  for (int i = 0; i < settingPyrLevels; ++i) {
+  std::vector<cv::Mat3b> depthed(images.size());
+  for (int i = 0; i < images.size(); ++i) {
     int lw = images[i].cols, lh = images[i].rows;
     int s = FLAGS_rel_point_size * (lw + lh) / 2;
     cv::cvtColor(images[i], depthed[i], cv::COLOR_GRAY2BGR);
@@ -44,7 +46,7 @@ cv::Mat3b DepthedImagePyramid::draw() {
                     depthCol(depths[i](y, x), minDepthCol, maxDepthCol),
                     cv::FILLED);
   }
-  return drawLeveled(depthed, settingPyrLevels, w, h);
+  return drawLeveled(depthed.data(), images.size(), w, h);
 }
 
 } // namespace fishdso

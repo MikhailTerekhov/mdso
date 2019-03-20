@@ -3,8 +3,10 @@
 
 namespace fishdso {
 
-SphericalTerrain::SphericalTerrain(const std::vector<Vec3> &depthedRays)
-    : triang(depthedRays) {}
+SphericalTerrain::SphericalTerrain(
+    const std::vector<Vec3> &depthedRays,
+    const Settings::Triangulation &triangulationSettings)
+    : triang(depthedRays, triangulationSettings) {}
 
 bool SphericalTerrain::operator()(Vec3 direction, double &resDepth) {
   SphericalTriangulation::TrihedralSector *sec =

@@ -9,15 +9,29 @@
 
 namespace fishdso {
 
-BundleAdjuster::BundleAdjuster(CameraModel *cam)
+BundleAdjuster::BundleAdjuster(
+    CameraModel *cam, const Settings::BundleAdjuster &bundleAdjusterSettings,
+    const Settings::ResidualPattern &rpSettings,
+    const Settings::GradWeighting &gradWeightingSettings,
+    const Settings::Intencity &intencitySettings,
+    const Settings::AffineLight &affineLightSettings,
+    const Settings::Threading &threadingSettings,
+    const Settings::Depth &depthSettings)
     : cam(cam)
-    , firstKeyFrame(nullptr) {}
+    , firstKeyFrame(nullptr)
+    , bundleAdjusterSettings(bundleAdjusterSettings)
+    , rpSettings(rpSettings)
+    , gradWeightingSettings(gradWeightingSettings)
+    , intencitySettings(intencitySettings)
+    , affineLightSettings(affineLightSettings)
+    , threadingSettings(threadingSettings)
+    , depthSettings(depthSettings) {}
 
 bool BundleAdjuster::isOOB(const SE3 &worldToBase, const SE3 &worldToRef,
                            const OptimizedPoint &baseOP) {
   Vec3 inBase = cam->unmap(baseOP.p).normalized() * baseOP.depth();
   Vec2 reproj = cam->map(worldToRef * worldToBase.inverse() * inBase);
-  return !cam->isOnImage(reproj, settingResidualPatternHeight);
+  return !cam->isOnImage(reproj, rpSettings.height);
 }
 
 void BundleAdjuster::addKeyFrame(KeyFrame *keyFrame) {
@@ -116,12 +130,16 @@ void BundleAdjuster::adjust(int maxNumIterations) {
                               4, new ceres::EigenQuaternionParameterization());
     auto affLight = keyFrame->preKeyFrame->lightWorldToThis.data;
     problem.AddParameterBlock(affLight, 2);
-    problem.SetParameterLowerBound(affLight, 0, settingMinAffineLigthtA);
-    problem.SetParameterUpperBound(affLight, 0, settingMaxAffineLigthtA);
-    problem.SetParameterLowerBound(affLight, 1, settingMinAffineLigthtB);
-    problem.SetParameterUpperBound(affLight, 1, settingMaxAffineLigthtB);
+    problem.SetParameterLowerBound(affLight, 0,
+                                   affineLightSettings.minAffineLightA);
+    problem.SetParameterUpperBound(affLight, 0,
+                                   affineLightSettings.maxAffineLightA);
+    problem.SetParameterLowerBound(affLight, 1,
+                                   affineLightSettings.minAffineLightB);
+    problem.SetParameterUpperBound(affLight, 1,
+                                   affineLightSettings.maxAffineLightB);
 
-    if (!FLAGS_optimize_affine_light)
+    if (!affineLightSettings.optimizeAffineLight)
       problem.SetParameterBlockConstant(affLight);
 
     ordering->AddElementToGroup(
@@ -143,7 +161,8 @@ void BundleAdjuster::adjust(int maxNumIterations) {
   SE3 secondToFirst = worldToFirst * worldToSecond.inverse();
   Vec3 firstFramePos = worldToFirst.inverse().translation();
 
-  if (FLAGS_fixed_motion_on_first_ba && keyFrames.size() == 2) {
+  if (bundleAdjusterSettings.fixedMotionOnFirstAdjustent &&
+      keyFrames.size() == 2) {
     problem.SetParameterBlockConstant(
         secondKeyFrame->preKeyFrame->worldToThis.translation().data());
     problem.SetParameterBlockConstant(
@@ -166,9 +185,9 @@ void BundleAdjuster::adjust(int maxNumIterations) {
     for (const auto &op : baseFrame->optimizedPoints) {
       problem.AddParameterBlock(&op->logInvDepth, 1);
       problem.SetParameterLowerBound(&op->logInvDepth, 0,
-                                     -std::log(settingMaxDepth));
+                                     -std::log(depthSettings.max));
       problem.SetParameterUpperBound(&op->logInvDepth, 0,
-                                     -std::log(settingMinDepth));
+                                     -std::log(depthSettings.min));
 
       ordering->AddElementToGroup(&op->logInvDepth, 0);
 
@@ -186,18 +205,18 @@ void BundleAdjuster::adjust(int maxNumIterations) {
           continue;
         }
 
-        for (int i = 0; i < settingResidualPatternSize; ++i) {
-          const Vec2 &pos = op->p + settingResidualPattern[i];
+        for (int i = 0; i < rpSettings.pattern().size(); ++i) {
+          const Vec2 &pos = op->p + rpSettings.pattern()[i];
           DirectResidual *newResidual = new DirectResidual(
               &baseFrame->preKeyFrame->framePyr.interpolator(0),
               &refFrame->preKeyFrame->framePyr.interpolator(0), cam, op.get(),
               pos, baseFrame, refFrame);
 
           double gradNorm = baseFrame->preKeyFrame->gradNorm(toCvPoint(pos));
-          double c = settingGradientWeighingConstant;
+          const double c = gradWeightingSettings.c;
           double weight = c / std::hypot(c, gradNorm);
           ceres::LossFunction *lossFunc = new ceres::ScaledLoss(
-              new ceres::HuberLoss(settingBAOutlierIntensityDiff), weight,
+              new ceres::HuberLoss(intencitySettings.outlierDiff), weight,
               ceres::Ownership::TAKE_OWNERSHIP);
 
           residualsFor[op.get()].push_back(newResidual);
@@ -224,7 +243,7 @@ void BundleAdjuster::adjust(int maxNumIterations) {
   options.linear_solver_ordering = ordering;
   // options.minimizer_progress_to_stdout = true;
   options.max_num_iterations = maxNumIterations;
-  options.num_threads = FLAGS_num_threads;
+  options.num_threads = threadingSettings.numThreads;
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
 
@@ -304,7 +323,7 @@ void BundleAdjuster::adjust(int maxNumIterations) {
     std::nth_element(values.begin(), values.begin() + values.size() / 2,
                      values.end());
     double median = values[values.size() / 2];
-    if (median > settingBAOutlierIntensityDiff) {
+    if (median > intencitySettings.outlierDiff) {
       op->state = OptimizedPoint::OUTLIER;
       outliers.push_back(op->p);
     }

@@ -9,7 +9,8 @@ namespace fishdso {
 
 class SphericalTerrain {
 public:
-  SphericalTerrain(const std::vector<Vec3> &depthedRays);
+  SphericalTerrain(const std::vector<Vec3> &depthedRays,
+                   const Settings::Triangulation &triangulationSettings = {});
 
   bool operator()(Vec3 direction, double &resDepth);
 
@@ -28,6 +29,8 @@ private:
                          double minDepth, double maxDepth);
 
   SphericalTriangulation triang;
+
+  Settings::Triangulation settings;
 };
 
 } // namespace fishdso

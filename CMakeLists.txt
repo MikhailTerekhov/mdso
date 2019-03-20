@@ -45,6 +45,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/util/PixelSelector.h
     ${PROJECT_SOURCE_DIR}/include/util/DistanceMap.h
     ${PROJECT_SOURCE_DIR}/include/util/PlyHolder.h
+    ${PROJECT_SOURCE_DIR}/include/util/flags.h
     ${PROJECT_SOURCE_DIR}/include/system/AffineLightTransform.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoSystem.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoInitializer.h
@@ -73,6 +74,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/util/PixelSelector.cpp
     ${PROJECT_SOURCE_DIR}/source/util/DistanceMap.cpp
     ${PROJECT_SOURCE_DIR}/source/util/PlyHolder.cpp
+    ${PROJECT_SOURCE_DIR}/source/util/flags.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoSystem.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DelaunayDsoInitializer.cpp
     ${PROJECT_SOURCE_DIR}/source/system/PreKeyFrame.cpp

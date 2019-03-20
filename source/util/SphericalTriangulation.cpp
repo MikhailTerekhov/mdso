@@ -28,8 +28,9 @@ StdVector<Vec2> projectAll(const std::vector<Vec3> &rays) {
   return result;
 }
 
-SphericalTriangulation::SphericalTriangulation(const std::vector<Vec3> &rays)
-    : tangentTriang(projectAll(rays))
+SphericalTriangulation::SphericalTriangulation(
+    const std::vector<Vec3> &rays, const Settings::Triangulation &settings)
+    : tangentTriang(projectAll(rays), settings)
     , _rays(rays) {
   for (auto tri : tangentTriang.triangles()) {
     for (int i = 0; i < 3; ++i)

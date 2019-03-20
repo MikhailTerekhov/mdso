@@ -18,9 +18,11 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   CameraModel(int width, int height, double scale, const Vec2 &center,
-              VecX unmapPolyCoeffs);
-  CameraModel(int width, int height, const std::string &calibFileName);
-  CameraModel(int width, int height, double f, double cx, double cy);
+              VecX unmapPolyCoeffs, const Settings::CameraModel &settings = {});
+  CameraModel(int width, int height, const std::string &calibFileName,
+              const Settings::CameraModel &settings = {});
+  CameraModel(int width, int height, double f, double cx, double cy,
+              const Settings::CameraModel &settings = {});
 
   template <typename T> Eigen::Matrix<T, 3, 1> unmap(const T *point) const {
     typedef Eigen::Matrix<T, 3, 1> Vec3t;
@@ -120,7 +122,7 @@ public:
 
   void setMapPolyCoeffs();
 
-  StdVector<CameraModel> camPyr();
+  StdVector<CameraModel> camPyr(int pyrLevels);
 
 private:
   friend std::istream &operator>>(std::istream &is, CameraModel &cc);
@@ -156,6 +158,8 @@ private:
   double maxAngle;
 
   VecX mapPolyCoeffs;
+
+  Settings::CameraModel settings;
 };
 
 } // namespace fishdso

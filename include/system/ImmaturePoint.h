@@ -12,12 +12,14 @@ namespace fishdso {
 struct ImmaturePoint {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  static constexpr int PS = settingResidualPatternSize;
-
   enum State { ACTIVE, OOB, OUTLIER };
   enum TracingDebugType { NO_DEBUG, DRAW_EPIPOLE };
 
-  ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p);
+  ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p,
+                const Settings::PointTracer &tracingSettings = {},
+                const Settings::Intencity &intencitySettings = {},
+                const Settings::ResidualPattern &rpSettings = {},
+                const Settings::Pyramid &pyrSettings = {});
 
   void traceOn(const PreKeyFrame &refFrame, TracingDebugType debugType);
 
@@ -29,10 +31,10 @@ struct ImmaturePoint {
   bool isReady(); // checks if the point is good enough to be optimized
 
   Vec2 p;
-  Vec3 baseDirections[PS];
-  double baseIntencities[PS];
-  Vec2 baseGrad[PS];
-  Vec2 baseGradNorm[PS];
+  std::vector<Vec3> baseDirections;
+  std::vector<double> baseIntencities;
+  StdVector<Vec2> baseGrad;
+  StdVector<Vec2> baseGradNorm;
   double minDepth, maxDepth;
   double depth;
   double bestQuality;
@@ -41,6 +43,11 @@ struct ImmaturePoint {
   const PreKeyFrame *baseFrame;
   CameraModel *cam;
   State state;
+
+  Settings::PointTracer tracingSettings;
+  Settings::Intencity intencitySettings;
+  Settings::ResidualPattern rpSettings;
+  Settings::Pyramid pyrSettings;
 
   // output only
   bool lastTraced;
@@ -55,11 +62,11 @@ private:
   bool pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth, Vec3 &dirMaxDepth,
                      StdVector<Vec2> &points, std::vector<Vec3> &directions);
   double estVariance(const Vec2 &searchDirection);
-  Vec2
-  tracePrecise(const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
-                   &refFrame,
-               const Vec2 &from, const Vec2 &to, double intencities[PS],
-               Vec2 pattern[PS], double &bestDispl, double &bestEnergy);
+  Vec2 tracePrecise(
+      const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
+          &refFrame,
+      const Vec2 &from, const Vec2 &to, const std::vector<double> &intencities,
+      const StdVector<Vec2> &pattern, double &bestDispl, double &bestEnergy);
 };
 
 } // namespace fishdso

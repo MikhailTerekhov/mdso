@@ -15,16 +15,20 @@ const int ransacBestInliers = 4;
 const int ransacCurInliers = 5;
 
 StereoGeometryEstimator::StereoGeometryEstimator(
-    CameraModel *cam, const StdVector<std::pair<Vec2, Vec2>> &imgCorresps)
+    CameraModel *cam, const StdVector<std::pair<Vec2, Vec2>> &imgCorresps,
+    const Settings::StereoMatcher::StereoGeometryEstimator &_settings,
+    const Settings::Threading &threadingSettings)
     : cam(cam)
     , imgCorresps(imgCorresps)
     , rays(imgCorresps.size())
     , _depths(imgCorresps.size())
-    , inlierVectorsPool(reservedVector<int>(settingKeyPointsCount),
+    , inlierVectorsPool(reservedVector<int>(_settings.initialInliersCapacity),
                         inlierVectorsUsed)
     , coarseFound(false)
     , preciseFound(false)
-    , depthsEvaluated(false) {
+    , depthsEvaluated(false)
+    , settings(_settings)
+    , threadingSettings(threadingSettings) {
   for (int i = 0; i < int(imgCorresps.size()); ++i) {
     rays[i].first = cam->unmap(imgCorresps[i].first.data()).normalized();
     rays[i].second = cam->unmap(imgCorresps[i].second.data()).normalized();
@@ -91,7 +95,7 @@ int StereoGeometryEstimator::findInliersEssential(
   Mat33 Et = E.transpose();
   for (int i = 0; i < int(rays.size()); ++i) {
     if (reprojectionError(cam, E, Et, imgCorresps[i], rays[i]) <
-        settingEssentialReprojErrThreshold) {
+        settings.outlierReprojError) {
       ++result;
       inliersInds.push_back(i);
     }
@@ -179,8 +183,9 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
     return motion;
 
   relative_pose::GeneralizedCentralRelativePoseEstimator<double> est;
-  constexpr int N = settingEssentialMinimalSolveN;
-  const double p = settingEssentialSuccessProb;
+  constexpr int N =
+      Settings::StereoMatcher::StereoGeometryEstimator::minimalSolveN;
+  const double p = settings.successProb;
 
   SE3 bestMotion;
 
@@ -195,7 +200,7 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
   std::vector<int> curInliersInds = inlierVectorsPool.get(ransacCurInliers),
                    bestInliersInds = inlierVectorsPool.get(ransacBestInliers);
 
-  long long iterNum = settingRansacMaxIter;
+  long long iterNum = settings.maxRansacIter;
   double q = std::pow(1.0 - std::pow(1 - p, 1.0 / iterNum), 1.0 / N);
 
   for (int it = 0; it < iterNum; ++it) {
@@ -235,14 +240,14 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
     if (curQ > q) {
       q = curQ;
       double newIterNum = std::log(1 - p) / std::log(1 - std::pow(curQ, N));
-      if (!FLAGS_run_max_RANSAC_iterations)
+      if (!settings.runMaxRansacIter)
         iterNum = static_cast<long long>(newIterNum);
     }
   }
 
   LOG(INFO) << "iterNum = " << iterNum << std::endl;
   LOG(INFO) << "total inliers on coarse = " << bestInliers << std::endl;
-  if (iterNum == settingRansacMaxIter)
+  if (iterNum == settings.maxRansacIter)
     LOG(WARNING) << "max number of RANSAC iterations reached" << std::endl;
   coarseFound = true;
   motion = bestMotion;
@@ -351,14 +356,13 @@ SE3 StereoGeometryEstimator::findPreciseMotion() {
             new ReprojectionResidual(cam, rays[i].first, rays[i].second,
                                      imgCorresps[i].first,
                                      imgCorresps[i].second)),
-        new ceres::HuberLoss(std::sqrt(2.0) *
-                             settingEssentialReprojErrThreshold),
+        new ceres::HuberLoss(std::sqrt(2.0) * settings.outlierReprojError),
         motion.so3().data(), motion.translation().data());
 
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_QR;
   // options.minimizer_progress_to_stdout = true;
-  options.num_threads = FLAGS_num_threads;
+  options.num_threads = threadingSettings.numThreads;
   options.max_num_iterations = 10;
   ceres::Solver::Summary summary;
 
