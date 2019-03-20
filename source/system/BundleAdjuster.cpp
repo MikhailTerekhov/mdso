@@ -1,6 +1,5 @@
 #include "system/BundleAdjuster.h"
 #include "system/AffineLightTransform.h"
-#include "system/SphericalPlus.h"
 #include "util/defs.h"
 #include "util/geometry.h"
 #include "util/util.h"
@@ -139,12 +138,6 @@ void BundleAdjuster::adjust(int maxNumIterations) {
   SE3 worldToSecond = secondKeyFrame->preKeyFrame->worldToThis;
   SE3 secondToFirst = worldToFirst * worldToSecond.inverse();
   Vec3 firstFramePos = worldToFirst.inverse().translation();
-  double radius = secondToFirst.translation().norm();
-  Vec3 center = -(worldToSecond.so3() * firstFramePos);
-  problem.SetParameterization(
-      secondKeyFrame->preKeyFrame->worldToThis.translation().data(),
-      new ceres::AutoDiffLocalParameterization<SphericalPlus, 3, 2>(
-          new SphericalPlus(center, radius, worldToSecond.translation())));
 
   if (FLAGS_fixed_motion_on_first_ba && keyFrames.size() == 2) {
     problem.SetParameterBlockConstant(
@@ -166,7 +159,15 @@ void BundleAdjuster::adjust(int maxNumIterations) {
   StdVector<Vec2> oobKf1;
 
   for (KeyFrame *baseFrame : keyFrames)
-    for (const auto &op : baseFrame->optimizedPoints)
+    for (const auto &op : baseFrame->optimizedPoints) {
+      problem.AddParameterBlock(&op->logInvDepth, 1);
+      problem.SetParameterLowerBound(&op->logInvDepth, 0,
+                                     -std::log(settingMaxDepth));
+      problem.SetParameterUpperBound(&op->logInvDepth, 0,
+                                     -std::log(settingMinDepth));
+
+      ordering->AddElementToGroup(&op->logInvDepth, 0);
+
       for (KeyFrame *refFrame : keyFrames) {
         if (refFrame == baseFrame)
           continue;
@@ -180,14 +181,6 @@ void BundleAdjuster::adjust(int maxNumIterations) {
             oobKf1.push_back(op->p);
           continue;
         }
-
-        problem.AddParameterBlock(&op->logInvDepth, 1);
-        problem.SetParameterLowerBound(&op->logInvDepth, 0,
-                                       -std::log(settingMaxDepth));
-        problem.SetParameterUpperBound(&op->logInvDepth, 0,
-                                       -std::log(settingMinDepth));
-
-        ordering->AddElementToGroup(&op->logInvDepth, 0);
 
         for (int i = 0; i < settingResidualPatternSize; ++i) {
           const Vec2 &pos = op->p + settingResidualPattern[i];
@@ -216,6 +209,11 @@ void BundleAdjuster::adjust(int maxNumIterations) {
               refFrame->preKeyFrame->lightWorldToThis.data);
         }
       }
+    }
+
+  // TODO normal way of fixing the scale
+  for (const auto &op : firstKeyFrame->optimizedPoints)
+    problem.SetParameterBlockConstant(&op->logInvDepth);
 
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_SCHUR;
