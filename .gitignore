@@ -11,3 +11,16 @@ cmake_install.cmake
 CMakeLists.txt.user
 bin/**
 thirdparty/Sophus/build/**
+
+## LaTeX, latexmk
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.pdf
+*.bbl
+*.cpc
+*.nav
+*.out
+*.snm
+*.toc
