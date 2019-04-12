@@ -5,6 +5,7 @@
 #include "DsoSystem.h"
 #include "system/KeyFrame.h"
 #include "system/StereoMatcher.h"
+#include "output/InitializerObserver.h"
 #include <memory>
 #include <opencv2/opencv.hpp>
 
@@ -17,6 +18,7 @@ public:
   DelaunayDsoInitializer(
       DsoSystem *dsoSystem, CameraModel *cam, PixelSelector *pixelSelector,
       int pointsNeeded, DebugOutputType debugOutputType,
+      const std::vector<InitializerObserver *> &observers = {},
       const Settings::DelaunayDsoInitializer &initSettings = {},
       const Settings::StereoMatcher &smSettings = {},
       const Settings::Threading &threadingSettings = {},
@@ -55,6 +57,8 @@ private:
   Settings::Intencity intencitySettings;
   Settings::ResidualPattern rpSettings;
   Settings::Pyramid pyrSettings;
+
+  std::vector<InitializerObserver *> observers;
 };
 
 } // namespace fishdso

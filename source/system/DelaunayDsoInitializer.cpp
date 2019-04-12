@@ -11,6 +11,7 @@ namespace fishdso {
 DelaunayDsoInitializer::DelaunayDsoInitializer(
     DsoSystem *dsoSystem, CameraModel *cam, PixelSelector *pixelSelector,
     int pointsNeeded, DelaunayDsoInitializer::DebugOutputType debugOutputType,
+    const std::vector<InitializerObserver *> &observers,
     const Settings::DelaunayDsoInitializer &initSettings,
     const Settings::StereoMatcher &smSettings,
     const Settings::Threading &threadingSettings,
@@ -35,7 +36,8 @@ DelaunayDsoInitializer::DelaunayDsoInitializer(
     , tracingSettings(tracingSettings)
     , intencitySettings(intencitySettings)
     , rpSettings(rpSettings)
-    , pyrSettings(pyrSettings) {}
+    , pyrSettings(pyrSettings)
+    , observers(observers) {}
 
 bool DelaunayDsoInitializer::addFrame(const cv::Mat &frame,
                                       int globalFrameNum) {
@@ -140,42 +142,8 @@ std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFrames() {
       }
     }
 
-    std::vector<double> ipDepths;
-    ipDepths.reserve(keyFrames[1].immaturePoints.size());
-    for (const auto &ip : keyFrames[1].immaturePoints)
-      ipDepths.push_back(ip->depth);
-    setDepthColBounds(ipDepths);
-
-    if (debugOutputType != NO_DEBUG) {
-      if (FLAGS_show_interpolation || FLAGS_write_files) {
-        cv::Mat img = keyFrames[1].preKeyFrame->frameColored.clone();
-        insertDepths(img, keyPoints[1], depths[1], minDepthCol, maxDepthCol,
-                     true);
-
-        // cv::circle(img, cv::Point(1268, 173), 7, CV_BLACK, 2);
-
-        auto &ips = keyFrames[1].immaturePoints;
-        StdVector<Vec2> pnts;
-        pnts.reserve(ips.size());
-        std::vector<double> d;
-        d.reserve(ips.size());
-        for (const auto &ip : ips) {
-          pnts.push_back(ip->p);
-          d.push_back(ip->depth);
-        }
-
-        kpTerrains[1].draw(img, cam, CV_GREEN, minDepthCol, maxDepthCol);
-        insertDepths(img, pnts, d, minDepthCol, maxDepthCol, false);
-
-        if (FLAGS_show_interpolation) {
-          cv::imshow("interpolated", img);
-          cv::waitKey();
-        }
-
-        if (FLAGS_write_files)
-          cv::imwrite(FLAGS_output_directory + "/interpolated.jpg", img);
-      }
-    }
+    for (InitializerObserver *obs : observers)
+      obs->initialized(&keyFrames[1], &kpTerrains[1], keyPoints[1], depths[1]);
   }
 
   return keyFrames;

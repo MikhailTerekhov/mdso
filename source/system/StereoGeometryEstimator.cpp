@@ -54,20 +54,6 @@ StereoGeometryEstimator::depths() {
   return _depths;
 }
 
-void StereoGeometryEstimator::outputInlierCorresps() {
-  if (FLAGS_write_files) {
-    std::ofstream out(FLAGS_output_directory + "/corresps.txt");
-    for (int i : _inliersInds) {
-      out << i << std::endl;
-      out << rays[i].first.transpose() << std::endl;
-      out << rays[i].second.transpose() << std::endl;
-      out << motion.translation().transpose() << std::endl;
-      out << motion.unit_quaternion().coeffs().transpose() << std::endl;
-    }
-    out.close();
-  }
-}
-
 int StereoGeometryEstimator::inliersNum() { return _inliersInds.size(); }
 
 double reprojectionError(CameraModel *cam, const Mat33 &E, const Mat33 &Et,
@@ -251,21 +237,6 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
     LOG(WARNING) << "max number of RANSAC iterations reached" << std::endl;
   coarseFound = true;
   motion = bestMotion;
-
-  if (FLAGS_write_files && FLAGS_output_reproj_CDF) {
-    std::vector<double> values = reservedVector<double>(rays.size());
-    Mat33 E = toEssential(motion);
-    Mat33 Et = E.transpose();
-    for (int i = 0; i < rays.size(); ++i)
-      values.push_back(reprojectionError(cam, E, Et, imgCorresps[i], rays[i]));
-    std::sort(values.begin(), values.end());
-
-    std::ofstream ofs(FLAGS_output_directory + "/reproj_err.txt");
-    ofs << values.size() << std::endl;
-    for (double v : values)
-      ofs << v << ' ';
-    ofs.close();
-  }
 
   bestMotion =
       extractMotion(toEssential(bestMotion), _inliersInds, bestInliers, true);

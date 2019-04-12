@@ -75,7 +75,7 @@ struct Settings {
       static constexpr double default_outlierReprojError = 1.25;
 
       double successProb;
-      static constexpr double default_successProb = 0.95;
+      static constexpr double default_successProb = 0.999;
 
       int maxRansacIter;
       static constexpr int default_maxRansacIter = 100000;
@@ -343,28 +343,5 @@ struct Settings {
 };
 
 } // namespace fishdso
-
-DECLARE_bool(output_reproj_CDF);
-
-DECLARE_bool(draw_inlier_matches);
-
-DECLARE_bool(debug_video);
-
-DECLARE_double(rel_point_size);
-DECLARE_int32(debug_width);
-
-DECLARE_double(debug_max_residual);
-DECLARE_double(debug_max_stddev);
-DECLARE_double(red_depths_part);
-DECLARE_double(blue_depths_part);
-DECLARE_string(debug_img_dir);
-DECLARE_string(track_img_dir);
-
-DECLARE_bool(show_interpolation);
-DECLARE_bool(show_track_base);
-DECLARE_bool(show_track_res);
-DECLARE_bool(show_debug_image);
-DECLARE_bool(write_files);
-DECLARE_string(output_directory);
 
 #endif

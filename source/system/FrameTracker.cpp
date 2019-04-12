@@ -1,4 +1,5 @@
 #include "system/FrameTracker.h"
+#include "output/FrameTrackerObserver.h"
 #include "util/defs.h"
 #include "util/util.h"
 #include <ceres/cubic_interpolation.h>
@@ -10,6 +11,7 @@ namespace fishdso {
 
 FrameTracker::FrameTracker(const StdVector<CameraModel> &camPyr,
                            std::unique_ptr<DepthedImagePyramid> baseFrame,
+                           const std::vector<FrameTrackerObserver *> &observers,
                            const Settings::FrameTracker &frameTrackerSettings,
                            const Settings::Pyramid &pyrSettings,
                            const Settings::AffineLight &affineLightSettings,
@@ -22,6 +24,7 @@ FrameTracker::FrameTracker(const StdVector<CameraModel> &camPyr,
     , baseFrame(std::move(baseFrame))
     , displayWidth(camPyr[1].getWidth())
     , displayHeight(camPyr[1].getHeight())
+    , observers(observers)
     , frameTrackerSettings(frameTrackerSettings)
     , pyrSettings(pyrSettings)
     , affineLightSettings(affineLightSettings)
@@ -29,9 +32,16 @@ FrameTracker::FrameTracker(const StdVector<CameraModel> &camPyr,
     , gradWeightingSettings(gradWeightingSettings)
     , threadingSettings(threadingSettings) {}
 
+void FrameTracker::addObserver(FrameTrackerObserver *observer) {
+  observers.push_back(observer);
+}
+
 std::pair<SE3, AffineLightTransform<double>>
 FrameTracker::trackFrame(const ImagePyramid &frame, const SE3 &coarseMotion,
                          const AffineLightTransform<double> &coarseAffLight) {
+  for (FrameTrackerObserver *obs : observers)
+    obs->startTracking(frame);
+
   SE3 motion = coarseMotion;
   AffineLightTransform<double> affLight;
 
@@ -46,47 +56,6 @@ FrameTracker::trackFrame(const ImagePyramid &frame, const SE3 &coarseMotion,
 
   return {motion, affLight};
 }
-
-struct PointTrackingResidual {
-  PointTrackingResidual(
-      Vec3 pos, double baseIntensity, const CameraModel *cam,
-      ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> *trackedFrame)
-      : pos(pos)
-      , baseIntensity(baseIntensity)
-      , cam(cam)
-      , trackedFrame(trackedFrame) {}
-
-  template <typename T>
-  bool operator()(const T *const rotP, const T *const transP,
-                  const T *const affLightP, T *res) const {
-    typedef Eigen::Matrix<T, 2, 1> Vec2t;
-    typedef Eigen::Matrix<T, 3, 1> Vec3t;
-    typedef Eigen::Matrix<T, 3, 3> Mat33t;
-    typedef Eigen::Quaternion<T> Quatt;
-    typedef Sophus::SE3<T> SE3t;
-
-    Eigen::Map<const Vec3t> transM(transP);
-    Vec3t trans(transM);
-    Eigen::Map<const Quatt> rotM(rotP);
-    Quatt rot(rotM);
-    SE3t motion(rot, trans);
-    AffineLightTransform<T> affLight(affLightP[0], affLightP[1]);
-
-    Vec3t newPos = motion * pos.cast<T>();
-    Vec2t newPosProj = cam->map(newPos.data());
-
-    T trackedIntensity;
-    trackedFrame->Evaluate(newPosProj[1], newPosProj[0], &trackedIntensity);
-    res[0] = affLight(trackedIntensity) - baseIntensity;
-
-    return true;
-  }
-
-  Vec3 pos;
-  double baseIntensity;
-  const CameraModel *cam;
-  ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> *trackedFrame;
-};
 
 bool isPointTrackable(const CameraModel &cam, const Vec3 &basePos,
                       const SE3 &coarseBaseToCur) {
@@ -134,10 +103,11 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
 
   double pnt[2] = {0.0, 0.0};
 
-  std::vector<PointTrackingResidual *> residuals;
+  std::map<const ceres::CostFunction *, const PointTrackingResidual *>
+      costFuncToResidual;
   StdVector<Vec2> gotOutside;
 
-  int pntTotal = 0, pntOutside = 0, pntOutlier = 0;
+  int pntTotal = 0;
 
   for (int y = 0; y < baseImg.rows; ++y)
     for (int x = 0; x < baseImg.cols; ++x)
@@ -167,13 +137,14 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
         } else
           lossFunc = new ceres::HuberLoss(intencitySettings.outlierDiff);
 
-        residuals.push_back(new PointTrackingResidual(
-            pos, static_cast<double>(baseImg(y, x)), &cam, &trackedFrame));
-        problem.AddResidualBlock(
+        auto newResidual = new PointTrackingResidual(
+            pos, static_cast<double>(baseImg(y, x)), &cam, &trackedFrame);
+        ceres::CostFunction *newCostFunc =
             new ceres::AutoDiffCostFunction<PointTrackingResidual, 1, 4, 3, 2>(
-                residuals.back()),
-            lossFunc, motion.so3().data(), motion.translation().data(),
-            affLight.data);
+                newResidual);
+        costFuncToResidual[newCostFunc] = newResidual;
+        problem.AddResidualBlock(newCostFunc, lossFunc, motion.so3().data(),
+                                 motion.translation().data(), affLight.data);
       }
 
   ceres::Solver::Options options;
@@ -189,29 +160,9 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
 
   LOG(INFO) << summary.BriefReport() << std::endl;
 
-  int w = cam.getWidth(), h = cam.getHeight();
-  int s = FLAGS_rel_point_size * (w + h) / 2;
-  cv::cvtColor(trackedImg, residualsImg[pyrLevel], cv::COLOR_GRAY2BGR);
-
-  // TODO extract lossFunc from ceres::Problem
-  std::unique_ptr<ceres::LossFunction> lossFunc(
-      new ceres::HuberLoss(intencitySettings.outlierDiff));
-  for (auto rsd : residuals) {
-    double res = -1;
-    double robustified[3] = {INF, 0, 0};
-    rsd->operator()(motion.unit_quaternion().coeffs().data(),
-                    motion.translation().data(), affLight.data, &res);
-    lossFunc->Evaluate(res * res, robustified);
-    robustified[0] = std::sqrt(robustified[0]);
-    Vec2 onTracked = cam.map(motion * rsd->pos);
-    if (cam.isOnImage(onTracked, 0))
-      putSquare(residualsImg[pyrLevel], toCvPoint(onTracked), s,
-                depthCol(robustified[0], 0, FLAGS_debug_max_residual),
-                cv::FILLED);
-  }
-
-  // cv::imshow("deprhs", dfr);
-  // cv::waitKey();
+  for (FrameTrackerObserver *obs : observers)
+    obs->levelTracked(pyrLevel, motion, affLight, problem, summary,
+                      costFuncToResidual);
 
   return {motion, affLight};
 }

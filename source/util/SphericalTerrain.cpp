@@ -32,23 +32,8 @@ void SphericalTerrain::checkAllSectors(Vec3 ray, CameraModel *cam,
 }
 
 void SphericalTerrain::draw(cv::Mat &img, CameraModel *cam, cv::Scalar edgeCol,
-                            double minDepth, double maxDepth) {
+                            double minDepth, double maxDepth) const {
   triang.draw(img, cam, edgeCol);
-
-  SphericalTriangulation::TrihedralSector *sec =
-      triang.enclosingSector(cam->unmap(Vec2(850.0, 250.0).data()));
-  //  if (sec == nullptr)
-  //    std::cout << "no tri found" << std::endl;
-  //  else {
-  //    std::cout << "enclosing tri verts = " << std::endl;
-  //    for (Vec3 *r : sec->rays)
-  //      std::cout << cam->map(r->data()).transpose() << std::endl;
-
-  //    std::cout << "and without mapping:" << std::endl;
-  //    for (Vec3 *r : sec->rays)
-  //      std::cout << r->transpose() << std::endl;
-  //    drawDenseTriangle(img, cam, sec, 0., 1.);
-  //  }
 }
 
 void SphericalTerrain::fillUncovered(cv::Mat &img, CameraModel *cam,

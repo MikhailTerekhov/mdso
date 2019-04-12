@@ -11,6 +11,24 @@
 #include <sophus/sim3.hpp>
 #include <utility>
 
+bool validateDepthsPart(const char *flagname, double value) {
+  if (value >= 0 && value <= 1)
+    return true;
+  std::cerr << "Invalid value for --" << std::string(flagname) << ": " << value
+            << "\nit should be in [0, 1]" << std::endl;
+  return false;
+}
+
+DEFINE_double(red_depths_part, 0,
+              "Part of contrast points that will be drawn red (i.e. they are "
+              "too close to be distinguished)");
+DEFINE_validator(red_depths_part, validateDepthsPart);
+
+DEFINE_double(blue_depths_part, 0.7,
+              "Part of contrast points that will NOT be drawn completely blue "
+              "(i.e. they are not too far to be distinguished)");
+DEFINE_validator(blue_depths_part, validateDepthsPart);
+
 namespace fishdso {
 
 cv::Mat dbg;
@@ -79,13 +97,13 @@ void setDepthColBounds(const std::vector<double> &depths) {
   maxDepthCol = sorted[blueInd];
 }
 
-cv::Mat drawLeveled(cv::Mat3b *images, int num, int w, int h) {
+cv::Mat drawLeveled(cv::Mat3b *images, int num, int w, int h, int resultW) {
   int downCnt = num / 2;
   int upCnt = num - downCnt;
 
-  int upW = FLAGS_debug_width / upCnt;
+  int upW = resultW / upCnt;
   int upH = double(h) / w * upW;
-  int downW = FLAGS_debug_width / downCnt;
+  int downW = resultW / downCnt;
   int downH = double(h) / w * downW;
   std::vector<cv::Mat> upRes(upCnt);
   std::vector<cv::Mat> downRes(downCnt);
@@ -95,8 +113,8 @@ cv::Mat drawLeveled(cv::Mat3b *images, int num, int w, int h) {
     cv::resize(images[pl], upRes[num - pl - 1], cv::Size(upW, upH), 0, 0,
                cv::INTER_NEAREST);
   for (; pl >= 0; --pl)
-    cv::resize(images[pl], downRes[downCnt - pl - 1], cv::Size(upW, upH), 0, 0,
-               cv::INTER_NEAREST);
+    cv::resize(images[pl], downRes[downCnt - pl - 1], cv::Size(downW, downH), 0,
+               0, cv::INTER_NEAREST);
   cv::Mat upImg;
   cv::hconcat(upRes, upImg);
   cv::Mat downImg;
@@ -244,6 +262,13 @@ cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
       if (depths(y, x) > 0)
         res(y, x) = toCvVec3bDummy(depthCol(depths(y, x), minDepth, maxDepth));
   return res;
+}
+
+std::string fileInDir(const std::string &directoryName,
+                      const std::string &fileName) {
+  return directoryName.size() > 1 && directoryName.back() == '/'
+             ? directoryName + fileName
+             : directoryName + "/" + fileName;
 }
 
 } // namespace fishdso

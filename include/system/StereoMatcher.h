@@ -8,6 +8,8 @@
 #include <opencv2/opencv.hpp>
 #include <vector>
 
+DECLARE_bool(draw_inlier_matches);
+
 namespace fishdso {
 
 class StereoMatcher {

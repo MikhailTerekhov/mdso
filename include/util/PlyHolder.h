@@ -1,3 +1,6 @@
+#ifndef INCLUDE_PLYHOLDER
+#define INCLUDE_PLYHOLDER
+
 #include "util/types.h"
 #include <opencv2/opencv.hpp>
 #include <string>
@@ -19,3 +22,5 @@ private:
 };
 
 } // namespace fishdso
+
+#endif

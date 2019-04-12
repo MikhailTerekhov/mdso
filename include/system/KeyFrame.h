@@ -48,6 +48,8 @@ struct KeyFrame {
   StdUnorderedSetOfPtrs<ImmaturePoint> immaturePoints;
   StdUnorderedSetOfPtrs<OptimizedPoint> optimizedPoints;
 
+  std::vector<std::shared_ptr<PreKeyFrame>> trackedFrames;
+
   Settings::KeyFrame kfSettings;
   Settings::PointTracer tracingSettings;
   Settings::Intencity intencitySettings;

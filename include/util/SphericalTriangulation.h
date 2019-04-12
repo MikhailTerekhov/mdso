@@ -26,7 +26,7 @@ public:
 
   cv::Mat drawTangentTri(int imWidth, int imHeight, cv::Scalar bgCol,
                          cv::Scalar edgeCol);
-  void draw(cv::Mat &img, CameraModel *cam, cv::Scalar edgeCol);
+  void draw(cv::Mat &img, CameraModel *cam, cv::Scalar edgeCol) const;
 
 private:
   bool isInConvexDummy(Vec3 ray);

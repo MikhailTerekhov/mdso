@@ -17,7 +17,7 @@ public:
   void checkAllSectors(Vec3 ray, CameraModel *cam, cv::Mat &img);
 
   void draw(cv::Mat &img, CameraModel *cam, cv::Scalar edgeCol, double minDepth,
-            double maxDepth);
+            double maxDepth) const;
 
   void fillUncovered(cv::Mat &img, CameraModel *cam, cv::Scalar fillCol);
   cv::Mat drawTangentTri(int imWidth, int imHeight, cv::Scalar bgCol,

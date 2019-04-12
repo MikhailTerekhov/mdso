@@ -52,8 +52,8 @@ Where dir names a directory with images with .jpg extension
         continue;
       cv::Mat1d gradX, gradY, gradNorm;
       grad(im, gradX, gradY, gradNorm);
-      std::vector<cv::Point> points =
-          pixelSelector.select(im, gradNorm, settingInterestPointsUsed, &imCol);
+      std::vector<cv::Point> points = pixelSelector.select(
+          im, gradNorm, Settings::KeyFrame::default_pointsNum, &imCol);
 
       const int prefW = 1200;
       int prefH = int(double(im.rows) / im.cols * prefW);

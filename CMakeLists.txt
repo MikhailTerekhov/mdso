@@ -45,7 +45,21 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/util/PixelSelector.h
     ${PROJECT_SOURCE_DIR}/include/util/DistanceMap.h
     ${PROJECT_SOURCE_DIR}/include/util/PlyHolder.h
+    ${PROJECT_SOURCE_DIR}/include/util/Sim3Aligner.h
     ${PROJECT_SOURCE_DIR}/include/util/flags.h
+
+    ${PROJECT_SOURCE_DIR}/include/output/Observers.h
+    ${PROJECT_SOURCE_DIR}/include/output/DsoObserver.h
+    ${PROJECT_SOURCE_DIR}/include/output/DebugImageDrawer.h
+    ${PROJECT_SOURCE_DIR}/include/output/TrajectoryWriter.h
+    ${PROJECT_SOURCE_DIR}/include/output/TrajectoryWriterGT.h
+    ${PROJECT_SOURCE_DIR}/include/output/CloudWriter.h
+    ${PROJECT_SOURCE_DIR}/include/output/CloudWriterGT.h
+    ${PROJECT_SOURCE_DIR}/include/output/InitializerObserver.h
+    ${PROJECT_SOURCE_DIR}/include/output/InterpolationDrawer.h
+    ${PROJECT_SOURCE_DIR}/include/output/FrameTrackerObserver.h
+    ${PROJECT_SOURCE_DIR}/include/output/TrackingDebugImageDrawer.h
+
     ${PROJECT_SOURCE_DIR}/include/system/AffineLightTransform.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoSystem.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoInitializer.h
@@ -74,7 +88,17 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/util/PixelSelector.cpp
     ${PROJECT_SOURCE_DIR}/source/util/DistanceMap.cpp
     ${PROJECT_SOURCE_DIR}/source/util/PlyHolder.cpp
+    ${PROJECT_SOURCE_DIR}/source/util/Sim3Aligner.cpp
     ${PROJECT_SOURCE_DIR}/source/util/flags.cpp
+
+    ${PROJECT_SOURCE_DIR}/source/output/DebugImageDrawer.cpp
+    ${PROJECT_SOURCE_DIR}/source/output/TrajectoryWriter.cpp
+    ${PROJECT_SOURCE_DIR}/source/output/TrajectoryWriterGT.cpp
+    ${PROJECT_SOURCE_DIR}/source/output/CloudWriter.cpp
+    ${PROJECT_SOURCE_DIR}/source/output/CloudWriterGT.cpp
+    ${PROJECT_SOURCE_DIR}/source/output/InterpolationDrawer.cpp
+    ${PROJECT_SOURCE_DIR}/source/output/TrackingDebugImageDrawer.cpp
+
     ${PROJECT_SOURCE_DIR}/source/system/DsoSystem.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DelaunayDsoInitializer.cpp
     ${PROJECT_SOURCE_DIR}/source/system/PreKeyFrame.cpp

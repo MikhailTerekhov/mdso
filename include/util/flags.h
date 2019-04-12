@@ -6,6 +6,8 @@
 
 DECLARE_int32(num_threads);
 
+DECLARE_int32(points_per_frame);
+
 DECLARE_int32(first_frames_skip);
 DECLARE_bool(run_max_RANSAC_iterations);
 DECLARE_bool(average_ORB_motion);

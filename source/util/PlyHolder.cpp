@@ -9,6 +9,10 @@ PlyHolder::PlyHolder(const std::string &fname)
     : fname(fname)
     , pointCount(0) {
   std::ofstream fs(fname);
+  
+  if (!fs.good())
+    throw std::runtime_error("File \"" + fname + "\" could not be created.");
+
   fs << R"__(ply
 format ascii 1.0
 element vertex 0)__" +

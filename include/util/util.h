@@ -1,9 +1,13 @@
 #ifndef INCLUDE_UTIL
 #define INCLUDE_UTIL
+
 #include "util/settings.h"
 #include "util/types.h"
 #include <opencv2/opencv.hpp>
 #include <vector>
+
+DECLARE_double(red_depths_part);
+DECLARE_double(blue_depths_part);
 
 namespace fishdso {
 
@@ -40,7 +44,7 @@ void printInPly(std::ostream &out, const std::vector<Vec3> &points,
 
 void setDepthColBounds(const std::vector<double> &depths);
 
-cv::Mat drawLeveled(cv::Mat3b *images, int num, int w, int h);
+cv::Mat drawLeveled(cv::Mat3b *images, int num, int w, int h, int resutW);
 
 void putMotion(std::ostream &out, const SE3 &motion);
 
@@ -99,6 +103,9 @@ cv::Mat1d pyrNUpDepth(const cv::Mat1d &integralWeightedDepths,
 
 cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
                            double minDepth, double maxDepth);
+
+std::string fileInDir(const std::string &directoryName,
+                      const std::string &fileName);
 
 } // namespace fishdso
 

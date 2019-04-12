@@ -1,6 +1,7 @@
 #ifndef INCLUDE_DSOSYSTEM
 #define INCLUDE_DSOSYSTEM
 
+#include "output/Observers.h"
 #include "system/BundleAdjuster.h"
 #include "system/CameraModel.h"
 #include "system/DsoInitializer.h"
@@ -19,24 +20,18 @@ namespace fishdso {
 
 class DsoSystem {
 public:
-  DsoSystem(CameraModel *cam, const Settings &settings = {});
+  DsoSystem(CameraModel *cam, const Observers &observers = {},
+            const Settings &settings = {});
   ~DsoSystem();
 
   std::shared_ptr<PreKeyFrame> addFrame(const cv::Mat &frame,
                                         int globalFrameNum);
-  void addGroundTruthPose(int globalFrameNum, const SE3 &worldToThat);
+  template <typename PointT>
+  void projectOntoBaseKf(StdVector<Vec2> *points, std::vector<double> *depths,
+                         std::vector<PointT *> *ptrs,
+                         std::vector<KeyFrame *> *kfs);
 
-  void fillRemainedHistory();
-
-  cv::Mat3b drawDebugImage(const std::shared_ptr<PreKeyFrame> &lastFrame);
-
-  void printLastKfInPly(std::ostream &out);
-  void printTrackingInfo(std::ostream &out);
-  void printPredictionInfo(std::ostream &out);
-  void printGroundTruthInfo(std::ostream &out);
-  void printMatcherInfo(std::ostream &out);
-
-  void saveOldKfs(int count);
+  void addFrameTrackerObserver(FrameTrackerObserver *observer);
 
   // output only
   KeyFrame *lastInitialized;
@@ -56,13 +51,6 @@ private:
     return settings.trackFromLastKf ? lastKeyFrame() : lboKeyFrame();
   }
 
-  template <typename PointT>
-  void projectOntoBaseKf(StdVector<Vec2> *points, std::vector<double> *depths,
-                         std::vector<PointT *> *ptrs,
-                         std::vector<KeyFrame *> *kfs);
-
-  void alignGTPoses();
-
   SE3 predictInternal(int prevFramesSkipped, const SE3 &worldToBaseKf,
                       const SE3 &worldToLbo, const SE3 &worldToLast);
   SE3 predictBaseKfToCur();
@@ -78,9 +66,6 @@ private:
   bool doNeedKf(PreKeyFrame *lastFrame);
   void marginalizeFrames();
   void activateNewOptimizedPoints();
-
-  static void printMotionInfo(std::ostream &out,
-                              const StdMap<int, SE3> &motions);
 
   CameraModel *cam;
   StdVector<CameraModel> camPyr;
@@ -102,11 +87,11 @@ private:
 
   double lastTrackRmse;
 
-  std::optional<PlyHolder> cloudHolder;
-
   int firstFrameNum;
 
   Settings settings;
+
+  Observers observers;
 };
 
 } // namespace fishdso

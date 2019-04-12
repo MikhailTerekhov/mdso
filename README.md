@@ -44,12 +44,7 @@ Running provided demos
 ----------------------
 Most of the demos support `--help` flag to show the detailed description of flags that could be used.
 ### [Multi-FoV](http://rpg.ifi.uzh.ch/fov.html) dataset
-Fisheye Multi-FoV is currently the main dataset for testing purposes. There are two options for running our system on it:
-
-* Run the odometry to generate trajectory and point cloud 
-* Collect various statistics (mostly errors in camera positions and point depths)
-
-Both need the full dataset to be present, including ground truth poses and depths. Expected structure of the data to be provided:
+Fisheye Multi-FoV is currently the main dataset for testing purposes. You can currently run the odometry to generate trajectory and point cloud. It needs the full dataset to be present, including ground truth poses and depths. Expected structure of the data to be provided:
 ```
 /path/to/MultiFoV
 ├── data
@@ -73,16 +68,10 @@ mkdir -p output/default/debug output/default/track
 ```
 Among the other stuff it generates `output/points.ply` point cloud, which you can inspect, for example, with the [MeshLab](http://www.meshlab.net/) tool. 
 
-#### Collect statistics on MultiFoV dataset
-`stat` demo can collect lots of things, for example:
-
-* Depth and disparity errors in points when searchng along epipolar line
-* Tracking errors when base frame with noized ground truth depths is used
-* Errors of stereo-matching, which is the current initialization method of our system
-* Errors of Bundle Adjustment performed after the stereo-matching has been done
-* ...
-
-Most of its uses are for internal testing, but we will clean it up in the future such that it will be possible to display some of its useful info. For more information about what and how could be generated the user is referred to the output of `./path/to/stat --helpon=main`. 
+If you want to inspect the trajectory that is generated, you can do it with
+```bash
+python3 py/showtrack.py path/to/output/dir
+```
 
 ### Other demos
 

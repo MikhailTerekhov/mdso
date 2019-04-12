@@ -247,9 +247,6 @@ void BundleAdjuster::adjust(int maxNumIterations) {
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
 
-  // std::ofstream ofsReport(FLAGS_output_directory + "/BA_report.txt");
-  // ofsReport << summary.FullReport() << std::endl;
-
   SE3 newMotion = secondKeyFrame->preKeyFrame->worldToThis;
 
   LOG(INFO) << "old motion: "
@@ -351,27 +348,5 @@ void BundleAdjuster::adjust(int maxNumIterations) {
             << std::endl;
 
   LOG(INFO) << summary.FullReport() << std::endl;
-
-  for (const Vec2 &p : outliers)
-    cv::circle(kfDepths, toCvPoint(p), 3, CV_BLACK, cv::FILLED);
-  for (const Vec2 &p : oobPos)
-    putCross(kfDepths, toCvPoint(p), 3, CV_BLACK, 2);
-
-  cv::Mat kf1Depthed =
-      firstKeyFrame->drawDepthedFrame(minDepthCol, maxDepthCol);
-  // for (Vec2 p : oobKf1)
-  // putCross(kf1Depthed, toCvPoint(p), 3, CV_BLACK, 2);
-
-  // cv::imshow("first frame", kf1Depthed);
-  if (FLAGS_write_files) {
-    cv::imwrite(FLAGS_output_directory + "/firstf.jpg", kf1Depthed);
-
-    // cv::imshow("after ba", kfDepths);
-    cv::imwrite(FLAGS_output_directory + "/adjusted.jpg", kfDepths);
-  }
-
-  // cv::waitKey();
-
-  // cv::destroyAllWindows();
 }
 } // namespace fishdso

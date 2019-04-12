@@ -32,21 +32,4 @@ DepthedImagePyramid::DepthedImagePyramid(const cv::Mat1b &baseImage,
     depths[il] = pyrNUpDepth(integralWeightedDepths, integralWeights, il);
 }
 
-cv::Mat3b DepthedImagePyramid::draw() {
-  int w = images[0].cols, h = images[0].rows;
-  std::vector<cv::Mat3b> depthed(images.size());
-  for (int i = 0; i < images.size(); ++i) {
-    int lw = images[i].cols, lh = images[i].rows;
-    int s = FLAGS_rel_point_size * (lw + lh) / 2;
-    cv::cvtColor(images[i], depthed[i], cv::COLOR_GRAY2BGR);
-    for (int y = 0; y < images[i].rows; ++y)
-      for (int x = 0; x < images[i].cols; ++x)
-        if (depths[i](y, x) > -0.5)
-          putSquare(depthed[i], cv::Point(x, y), s,
-                    depthCol(depths[i](y, x), minDepthCol, maxDepthCol),
-                    cv::FILLED);
-  }
-  return drawLeveled(depthed.data(), images.size(), w, h);
-}
-
 } // namespace fishdso

@@ -5,6 +5,8 @@ using namespace fishdso;
 DEFINE_int32(num_threads, Settings::Threading::default_numThreads,
              "Number of threads for Ceres Solver to use.");
 
+DEFINE_int32(points_per_frame, 2000, "Number of points to trace per keyframe.");
+
 DEFINE_int32(first_frames_skip,
              Settings::DelaunayDsoInitializer::default_firstFramesSkip,
              "Number of frames to skip between two frames when initializing "
@@ -93,6 +95,7 @@ Settings getFlaggedSettings() {
   Settings settings;
 
   settings.threading.numThreads = FLAGS_num_threads;
+  settings.keyFrame.pointsNum = FLAGS_points_per_frame;
   settings.delaunayDsoInitializer.firstFramesSkip = FLAGS_first_frames_skip;
   settings.stereoMatcher.stereoGeometryEstimator.runMaxRansacIter =
       FLAGS_run_max_RANSAC_iterations;

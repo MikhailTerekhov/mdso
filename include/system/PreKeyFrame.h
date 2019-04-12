@@ -27,6 +27,8 @@ struct PreKeyFrame {
   CameraModel *cam;
   SE3 worldToThis;
   AffineLightTransform<double> lightWorldToThis;
+  SE3 baseToThis;
+  AffineLightTransform<double> lightBaseToThis;
   int globalFrameNum;
 
   Settings::Pyramid pyrSettings;

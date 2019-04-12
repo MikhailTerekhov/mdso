@@ -63,10 +63,11 @@ TEST(UtilTest, DepthedImagePyramid) {
   }
 
   cv::Mat1b base(h, w, CV_BLACK_BYTE);
-  DepthedImagePyramid tst(base, pnts, dps, ws);
+  DepthedImagePyramid tst(base, Settings::Pyramid::default_levelNum, pnts, dps,
+                          ws);
 
   for (int i = 0; i < pnts.size(); ++i) {
-    for (int pl = 0; pl < settingPyrLevels; ++pl) {
+    for (int pl = 0; pl < Settings::Pyramid::default_levelNum; ++pl) {
       cv::Point p = toCvPoint(pnts[i]);
       ASSERT_GT(tst.depths[pl](p / (1 << pl)), 0)
           << "pl=" << pl << " p=" << p << " psh=" << p / (1 << pl) << " i=" << i

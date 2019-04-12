@@ -78,3 +78,11 @@ cv::Mat1d MultiFovReader::getDepths(int globalFrameNum) const {
 SE3 MultiFovReader::getWorldToFrameGT(int globalFrameNum) const {
   return worldToFrameGT[globalFrameNum];
 }
+
+const StdVector<SE3> &MultiFovReader::getAllWorldToFrameGT() const {
+  return worldToFrameGT;
+}
+
+int MultiFovReader::getFrameCount() const {
+  return worldToFrameGT.size();
+}

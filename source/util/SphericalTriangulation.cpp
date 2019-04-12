@@ -167,7 +167,7 @@ cv::Mat SphericalTriangulation::drawTangentTri(int imWidth, int imHeight,
 }
 
 void SphericalTriangulation::draw(cv::Mat &img, CameraModel *cam,
-                                  cv::Scalar edgeCol) {
+                                  cv::Scalar edgeCol) const {
 
   //  Vec3 rayFrom = cam->unmap(Vec2(90.1058, 539.013).data());
   //  Vec3 rayTo = cam->unmap(Vec2(1606.07, 292.959).data());

@@ -4,6 +4,8 @@
 #include <RelativePoseEstimator.h>
 #include <glog/logging.h>
 
+DEFINE_bool(draw_inlier_matches, false, "Debug output stereo inlier matches.");
+
 namespace fishdso {
 
 StereoMatcher::StereoMatcher(CameraModel *cam,
@@ -73,8 +75,6 @@ SE3 StereoMatcher::match(cv::Mat frames[2], StdVector<Vec2> resPoints[2],
     motion = geometryEstimator->findPreciseMotion();
   else
     motion = geometryEstimator->findCoarseMotion();
-
-  geometryEstimator->outputInlierCorresps();
 
   LOG(INFO) << "inlier matches = " << geometryEstimator->inliersNum()
             << std::endl;

@@ -43,7 +43,7 @@ TEST_P(TriangulationTest, IsPlanar) {
       if (e1 == e2)
         continue;
       bool test = doesABIntersectCD(e1->vert[0]->pos, e1->vert[1]->pos,
-                                    e2->vert[0]->pos, e2->vert[1]->pos);
+                                    e2->vert[0]->pos, e2->vert[1]->pos, 1e-6);
       if (test) {
         cv::Mat img = tester.draw(800, 800, CV_WHITE, CV_BLACK);
         cv::imshow("failed tri", img);

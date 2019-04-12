@@ -75,14 +75,13 @@ TEST_F(StereoPositioningTest, RandomPointsCoarse) {
 
     StdVector<std::pair<Vec2, Vec2>> imgCorresps;
     imgCorresps.reserve((int(npoints * (1 + outlierPart))));
+
     for (int i = 0; i < npoints; ++i) {
       Vec3 p(xdistr(mt), ydistr(mt), zdistr(mt));
       Vec3 mp = mot * p;
       double angleP = std::atan2(std::hypot(p[0], p[1]), p[2]);
       double angleMp = std::atan2(std::hypot(mp[0], mp[1]), mp[2]);
-      if (angleP < settingInitKeypointsObserveAngle &&
-          angleMp < settingInitKeypointsObserveAngle)
-        imgCorresps.push_back({cam->map(p.data()), cam->map(mp.data())});
+      imgCorresps.push_back({cam->map(p.data()), cam->map(mp.data())});
       //        imgCorresps[i] = {
       //            cam->map(p.data()) + Vec2(cameraMapAdd(mt),
       //            cameraMapAdd(mt)), cam->map(mp.data()) +
@@ -183,9 +182,7 @@ TEST_F(StereoPositioningTest, RandomPointsPrecise) {
       Vec3 mp = mot * p;
       double angleP = std::atan2(std::hypot(p[0], p[1]), p[2]);
       double angleMp = std::atan2(std::hypot(mp[0], mp[1]), mp[2]);
-      if (angleP < settingInitKeypointsObserveAngle &&
-          angleMp < settingInitKeypointsObserveAngle)
-        imgCorresps.push_back({cam->map(p.data()), cam->map(mp.data())});
+      imgCorresps.push_back({cam->map(p.data()), cam->map(mp.data())});
       //        imgCorresps[i] = {
       //            cam->map(p.data()) + Vec2(cameraMapAdd(mt),
       //            cameraMapAdd(mt)), cam->map(mp.data()) +
