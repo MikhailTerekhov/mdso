@@ -96,3 +96,7 @@ Built With
 * [ceres-solver](http://ceres-solver.org/) - Scalable library for solving optimization problems
 * [TBB](https://www.threadingbuildingblocks.org/) - Framework for parallelization 
 * [OpenCV](https://opencv.org/) - Open-source Computer Vision library
+
+License
+----------
+This project is licensed under the terms of the MIT license. For more information, please check the `LICENSE.txt` file.
