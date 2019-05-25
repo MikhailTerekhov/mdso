@@ -179,7 +179,8 @@ double ImmaturePoint::estVariance(const Vec2 &searchDirection) {
   }
 
   lastGeomVar = PS * settings.pointTracer.positionVariance / sum1;
-  return lastGeomVar;
+  lastFullVar = lastGeomVar;
+  return lastFullVar;
 }
 
 ImmaturePoint::TracingStatus
