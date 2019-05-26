@@ -210,6 +210,7 @@ struct Settings {
     BundleAdjuster()
         : maxIterations(default_maxIterations)
         , fixedMotionOnFirstAdjustent(default_fixedMotionOnFirstAdjustent)
+        , fixedRotationOnSecondKF(default_fixedRotationOnSecondKF)
         , runBA(default_runBA) {}
 
     int maxIterations;
@@ -217,6 +218,9 @@ struct Settings {
 
     bool fixedMotionOnFirstAdjustent;
     static constexpr bool default_fixedMotionOnFirstAdjustent = false;
+
+    bool fixedRotationOnSecondKF;
+    static constexpr bool default_fixedRotationOnSecondKF = false;
 
     bool runBA;
     static constexpr bool default_runBA = true;

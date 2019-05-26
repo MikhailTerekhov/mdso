@@ -61,6 +61,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/output/TrackingDebugImageDrawer.h
 
     ${PROJECT_SOURCE_DIR}/include/system/AffineLightTransform.h
+    ${PROJECT_SOURCE_DIR}/include/system/SphericalPlus.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoSystem.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoInitializer.h
     ${PROJECT_SOURCE_DIR}/include/system/DelaunayDsoInitializer.h
@@ -99,6 +100,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/output/InterpolationDrawer.cpp
     ${PROJECT_SOURCE_DIR}/source/output/TrackingDebugImageDrawer.cpp
 
+    ${PROJECT_SOURCE_DIR}/source/system/SphericalPlus.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoSystem.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DelaunayDsoInitializer.cpp
     ${PROJECT_SOURCE_DIR}/source/system/PreKeyFrame.cpp

@@ -74,7 +74,8 @@ It should contain "info" and "data" subdirectories.)abacaba";
   colors.reserve(FLAGS_gt_points + FLAGS_count * 2000);
 
   Settings settings = getFlaggedSettings();
-
+  // settings.bundleAdjuster.fixedRotationOnSecondKF = true;
+  
   DebugImageDrawer debugImageDrawer;
   TrackingDebugImageDrawer trackingDebugImageDrawer(
       reader.cam->camPyr(settings.pyramid.levelNum), settings.frameTracker,

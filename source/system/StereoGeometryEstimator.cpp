@@ -1,4 +1,5 @@
 #include "system/StereoGeometryEstimator.h"
+#include "system/SphericalPlus.h"
 #include "util/geometry.h"
 #include <RelativePoseEstimator.h>
 #include <ceres/ceres.h>
@@ -318,8 +319,10 @@ SE3 StereoGeometryEstimator::findPreciseMotion() {
                             new ceres::EigenQuaternionParameterization());
 
   // Scale of the dso is chosen here
-  problem.AddParameterBlock(motion.translation().data(), 3,
-                            new ceres::HomogeneousVectorParameterization(3));
+  problem.AddParameterBlock(
+      motion.translation().data(), 3,
+      new ceres::AutoDiffLocalParameterization<SphericalPlus, 3, 2>(
+          new SphericalPlus(Vec3::Zero(), 1, motion.translation())));
 
   for (int i : _inliersInds)
     problem.AddResidualBlock(

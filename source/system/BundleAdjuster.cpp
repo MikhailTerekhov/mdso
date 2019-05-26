@@ -1,5 +1,6 @@
 #include "system/BundleAdjuster.h"
 #include "system/AffineLightTransform.h"
+#include "system/SphericalPlus.h"
 #include "util/defs.h"
 #include "util/geometry.h"
 #include "util/util.h"
@@ -160,6 +161,16 @@ void BundleAdjuster::adjust(int maxNumIterations) {
   SE3 worldToSecond = secondKeyFrame->preKeyFrame->worldToThis;
   SE3 secondToFirst = worldToFirst * worldToSecond.inverse();
   Vec3 firstFramePos = worldToFirst.inverse().translation();
+  double radius = secondToFirst.translation().norm();
+  Vec3 center = -(worldToSecond.so3() * firstFramePos);
+  problem.SetParameterization(
+      secondKeyFrame->preKeyFrame->worldToThis.translation().data(),
+      new ceres::AutoDiffLocalParameterization<SphericalPlus, 3, 2>(
+          new SphericalPlus(center, radius, worldToSecond.translation())));
+
+  if (bundleAdjusterSettings.fixedRotationOnSecondKF)
+    problem.SetParameterBlockConstant(
+        secondKeyFrame->preKeyFrame->worldToThis.so3().data());
 
   if (bundleAdjusterSettings.fixedMotionOnFirstAdjustent &&
       keyFrames.size() == 2) {
@@ -180,7 +191,7 @@ void BundleAdjuster::adjust(int maxNumIterations) {
 
   StdVector<Vec2> oobPos;
   StdVector<Vec2> oobKf1;
-
+ 
   for (KeyFrame *baseFrame : keyFrames)
     for (const auto &op : baseFrame->optimizedPoints) {
       problem.AddParameterBlock(&op->logInvDepth, 1);
@@ -233,10 +244,6 @@ void BundleAdjuster::adjust(int maxNumIterations) {
         }
       }
     }
-
-  // TODO normal way of fixing the scale
-  for (const auto &op : firstKeyFrame->optimizedPoints)
-    problem.SetParameterBlockConstant(&op->logInvDepth);
 
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_SCHUR;
