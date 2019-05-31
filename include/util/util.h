@@ -43,6 +43,7 @@ void setDepthColBounds(const std::vector<double> &depths);
 cv::Mat drawLeveled(cv::Mat3b *images, int num, int w, int h, int resutW);
 
 void putMotion(std::ostream &out, const SE3 &motion);
+void putInMatrixForm(std::ostream &out, const SE3 &motion);
 
 void putDot(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col);
 void putCross(cv::Mat &img, const cv::Point &pos, int size,

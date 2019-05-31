@@ -2,11 +2,15 @@
 
 namespace fishdso {
 
-TrajectoryWriterGT::TrajectoryWriterGT(const StdVector<SE3> &worldToFrameGT,
-                                       const std::string &outputDirectory,
-                                       const std::string &fileName)
-    : worldToFrameGT(worldToFrameGT)
-    , outputFileName(fileInDir(outputDirectory, fileName)) {}
+TrajectoryWriterGT::TrajectoryWriterGT(
+    const StdVector<SE3> &worldToFrameUnalignedGT,
+    const std::string &outputDirectory, const std::string &fileName,
+    const std::string &matrixFormFileName)
+    : worldToFrameGT(worldToFrameUnalignedGT)
+    , worldToFrameUnalignedGT(worldToFrameUnalignedGT)
+    , outputFileName(fileInDir(outputDirectory, fileName))
+    , matrixFormOutputFileName(fileInDir(outputDirectory, matrixFormFileName)) {
+}
 
 void TrajectoryWriterGT::initialized(
     const std::vector<const KeyFrame *> &initializedKFs) {
@@ -29,12 +33,22 @@ void TrajectoryWriterGT::initialized(
 void TrajectoryWriterGT::keyFramesMarginalized(
     const std::vector<const KeyFrame *> &marginalized) {
   std::ofstream posesOfs(outputFileName, std::ios_base::app);
+  std::ofstream matrixFormOfs(matrixFormOutputFileName, std::ios_base::app);
 
   for (const KeyFrame *kf : marginalized) {
+    putInMatrixForm(matrixFormOfs,
+                    worldToFrameUnalignedGT[kf->preKeyFrame->globalFrameNum].inverse());
+    matrixFormOfs << '\n';
+
     posesOfs << kf->preKeyFrame->globalFrameNum << ' ';
     putMotion(posesOfs, worldToFrameGT[kf->preKeyFrame->globalFrameNum]);
     posesOfs << '\n';
     for (const auto &preKeyFrame : kf->trackedFrames) {
+      putInMatrixForm(
+          matrixFormOfs,
+          worldToFrameUnalignedGT[preKeyFrame->globalFrameNum].inverse());
+      matrixFormOfs << '\n';
+
       posesOfs << preKeyFrame->globalFrameNum << ' ';
       putMotion(posesOfs, worldToFrameGT[preKeyFrame->globalFrameNum]);
       posesOfs << '\n';

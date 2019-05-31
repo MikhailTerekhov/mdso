@@ -19,6 +19,8 @@ DEFINE_int32(gt_points, 1'000'000,
 
 DEFINE_bool(gen_gt, true, "Do we need to generate GT pointcloud?");
 
+DEFINE_bool(gen_gt_only, false, "Generate ground truth point cloud and exit.");
+
 DEFINE_string(debug_img_dir, "output/default/debug",
               "Directory for debug images to be put into.");
 DEFINE_string(
@@ -52,6 +54,33 @@ DEFINE_bool(write_files, true,
 DEFINE_string(output_directory, "output/default",
               "CO: \"it's dso's output directory!\"");
 
+void readPointsInFrameGT(const MultiFovReader &reader,
+                         std::vector<std::vector<Vec3>> &pointsInFrameGT,
+                         std::vector<std::vector<cv::Vec3b>> &colors,
+                         int maxPoints) {
+  std::cout << "filling GT points..." << std::endl;
+  int w = reader.cam->getWidth(), h = reader.cam->getHeight();
+  int step =
+      std::ceil(std::sqrt(double(FLAGS_count) * w * h / FLAGS_gt_points));
+  const double maxd = 1e10;
+  for (int it = FLAGS_start; it < FLAGS_start + FLAGS_count; ++it) {
+    pointsInFrameGT[it].reserve((h / step) * (w / step));
+    cv::Mat1d depths = reader.getDepths(it);
+    cv::Mat3b frame = reader.getFrame(it);
+    for (int y = 0; y < h; y += step)
+      for (int x = 0; x < w; x += step) {
+        Vec3 p = reader.cam->unmap(Vec2(x, y));
+        p.normalize();
+        double d = depths(y, x);
+        if (d > maxd)
+          continue;
+        p *= d;
+        pointsInFrameGT[it].push_back(p);
+        colors[it].push_back(frame(y, x));
+      }
+  }
+}
+
 int main(int argc, char **argv) {
   std::string usage = "Usage: " + std::string(argv[0]) + R"abacaba( data_dir
 Where data_dir names a directory with MultiFoV fishseye dataset.
@@ -68,15 +97,24 @@ It should contain "info" and "data" subdirectories.)abacaba";
 
   MultiFovReader reader(argv[1]);
 
-  int w = reader.cam->getWidth(), h = reader.cam->getHeight();
-  int step =
-      std::ceil(std::sqrt(double(FLAGS_count) * w * h / FLAGS_gt_points));
-  std::cout << "step = " << step << std::endl;
-
-  std::vector<Vec3> points;
-  std::vector<cv::Vec3b> colors;
-  points.reserve(FLAGS_gt_points + FLAGS_count * 2000);
-  colors.reserve(FLAGS_gt_points + FLAGS_count * 2000);
+  if (FLAGS_gen_gt_only) {
+    std::vector<std::vector<Vec3>> pointsInFrameGT(reader.getFrameCount());
+    std::vector<std::vector<cv::Vec3b>> colors(reader.getFrameCount());
+    readPointsInFrameGT(reader, pointsInFrameGT, colors, FLAGS_gt_points);
+    std::vector<Vec3> allPoints;
+    std::vector<cv::Vec3b> allColors;
+    allPoints.reserve(FLAGS_gt_points);
+    allColors.reserve(FLAGS_gt_points);
+    for (int i = 0; i < pointsInFrameGT.size(); ++i)
+      for (int j = 0; j < pointsInFrameGT[i].size(); ++j) {
+        const Vec3 &p = pointsInFrameGT[i][j];
+        allPoints.push_back(reader.getWorldToFrameGT(i).inverse() * p);
+        allColors.push_back(colors[i][j]);
+      }
+    std::ofstream pointsGTOfs("pointsGT.ply");
+    printInPly(pointsGTOfs, allPoints, allColors);
+    return 0;
+  }
 
   Settings settings = getFlaggedSettings();
   // settings.bundleAdjuster.fixedRotationOnSecondKF = true;
@@ -85,35 +123,19 @@ It should contain "info" and "data" subdirectories.)abacaba";
   TrackingDebugImageDrawer trackingDebugImageDrawer(
       reader.cam->camPyr(settings.pyramid.levelNum), settings.frameTracker,
       settings.pyramid);
-  TrajectoryWriter trajectoryWriter(FLAGS_output_directory, "tracked_pos.txt");
-  TrajectoryWriterGT trajectoryWriterGT(reader.getAllWorldToFrameGT(),
-                                        FLAGS_output_directory,
-                                        "ground_truth_pos.txt");
+  TrajectoryWriter trajectoryWriter(FLAGS_output_directory, "tracked_pos.txt",
+                                    "tracked_frame_to_world.txt");
+  TrajectoryWriterGT trajectoryWriterGT(
+      reader.getAllWorldToFrameGT(), FLAGS_output_directory,
+      "ground_truth_pos.txt", "matrix_form_GT_pose.txt");
   CloudWriter cloudWriter(reader.cam.get(), FLAGS_output_directory,
                           "points.ply");
 
   std::unique_ptr<CloudWriterGT> cloudWriterGTPtr;
   if (FLAGS_gen_gt) {
-    std::cout << "filling GT points..." << std::endl;
     std::vector<std::vector<Vec3>> pointsInFrameGT(reader.getFrameCount());
     std::vector<std::vector<cv::Vec3b>> colors(reader.getFrameCount());
-    const double maxd = 1e10;
-    for (int it = FLAGS_start; it < FLAGS_start + FLAGS_count; ++it) {
-      pointsInFrameGT[it].reserve((h / step) * (w / step));
-      cv::Mat1d depths = reader.getDepths(it);
-      cv::Mat3b frame = reader.getFrame(it);
-      for (int y = 0; y < h; y += step)
-        for (int x = 0; x < w; x += step) {
-          Vec3 p = reader.cam->unmap(Vec2(x, y));
-          p.normalize();
-          double d = depths(y, x);
-          if (d > maxd)
-            continue;
-          p *= d;
-          pointsInFrameGT[it].push_back(p);
-          colors[it].push_back(frame(y, x));
-        }
-    }
+    readPointsInFrameGT(reader, pointsInFrameGT, colors, FLAGS_gt_points);
     cloudWriterGTPtr.reset(
         new CloudWriterGT(reader.getAllWorldToFrameGT(), pointsInFrameGT,
                           colors, FLAGS_output_directory, "pointsGT.ply"));

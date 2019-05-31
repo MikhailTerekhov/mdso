@@ -129,6 +129,12 @@ void putMotion(std::ostream &out, const SE3 &motion) {
   out << motion.translation().transpose();
 }
 
+void putInMatrixForm(std::ostream &out, const SE3 &motion) {
+    Eigen::Matrix<double, 3, 4, Eigen::RowMajor> pose = motion.matrix3x4();
+    for (int i = 0; i < 12; ++i)
+      out << pose.data()[i] << ' ';
+}
+
 void putDot(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col) {
   cv::circle(img, pos, 4, col, cv::FILLED);
 }

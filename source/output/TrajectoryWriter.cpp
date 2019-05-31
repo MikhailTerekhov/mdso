@@ -3,22 +3,43 @@
 namespace fishdso {
 
 TrajectoryWriter::TrajectoryWriter(const std::string &outputDirectory,
-                                   const std::string &fileName)
-    : outputFileName(fileInDir(outputDirectory, fileName)) {}
+                                   const std::string &fileName,
+                                   const std::string &matrixFormFileName)
+    : outputFileName(fileInDir(outputDirectory, fileName))
+    , matrixFormOutputFileName(fileInDir(outputDirectory, matrixFormFileName)) {
+}
+
+void TrajectoryWriter::newKeyFrame(const KeyFrame *keyFrame) {
+  curKfNums.insert(keyFrame->preKeyFrame->globalFrameNum);
+}
 
 void TrajectoryWriter::keyFramesMarginalized(
     const std::vector<const KeyFrame *> &marginalized) {
-  std::ofstream posesOfs(outputFileName, std::ios_base::app);
+  for (const KeyFrame *kf : marginalized)
+    curKfNums.erase(kf->preKeyFrame->globalFrameNum);
+
   for (const KeyFrame *kf : marginalized) {
-    SE3 worldToBase = kf->preKeyFrame->worldToThis;
-    posesOfs << kf->preKeyFrame->globalFrameNum << ' ';
-    putMotion(posesOfs, worldToBase);
+    SE3 baseToWorld = kf->preKeyFrame->worldToThis.inverse();
+    frameToWorldPool.insert({kf->preKeyFrame->globalFrameNum, baseToWorld});
+    for (const auto &preKeyFrame : kf->trackedFrames)
+      frameToWorldPool.insert(
+          {preKeyFrame->globalFrameNum,
+           baseToWorld * preKeyFrame->baseToThis.inverse()});
+  }
+
+  std::ofstream posesOfs(outputFileName, std::ios_base::app);
+  std::ofstream matrixFormOfs(matrixFormOutputFileName, std::ios_base::app);
+  int minKfNum = curKfNums.empty() ? INF : (*curKfNums.begin());
+  auto it = frameToWorldPool.begin();
+  while (it != frameToWorldPool.end() && it->first < minKfNum) {
+    putInMatrixForm(matrixFormOfs, it->second);
+    matrixFormOfs << '\n';
+
+    posesOfs << it->first << ' ';
+    putMotion(posesOfs, it->second.inverse());
     posesOfs << '\n';
-    for (const auto &preKeyFrame : kf->trackedFrames) {
-      posesOfs << preKeyFrame->globalFrameNum << ' ';
-      putMotion(posesOfs, preKeyFrame->baseToThis * worldToBase);
-      posesOfs << '\n';
-    }
+
+    it = frameToWorldPool.erase(it);
   }
 }
 
