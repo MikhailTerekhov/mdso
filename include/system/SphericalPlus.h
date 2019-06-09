@@ -12,8 +12,9 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   SphericalPlus(const Vec3 &center, double radius, const Vec3 &initialValue)
-      : center(center), radius(radius),
-        k((initialValue - center).normalized()) {
+      : center(center)
+      , radius(radius)
+      , k((initialValue - center).normalized()) {
     CHECK(((initialValue - center).norm() - radius) / radius < 1e-4);
     int minI = std::min_element(k.data(), k.data() + 3,
                                 [](double a, double b) {

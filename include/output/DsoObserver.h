@@ -12,17 +12,17 @@ class DsoSystem;
 
 class DsoObserver {
 public:
+  virtual ~DsoObserver() = 0;
+
   virtual void created(DsoSystem *newDso, CameraModel *newCam,
                        const Settings &newSettings) {}
-  virtual void initialized(const std::vector<const KeyFrame *> &initializedKFs) {}
+  virtual void
+  initialized(const std::vector<const KeyFrame *> &initializedKFs) {}
   virtual void newFrame(const PreKeyFrame *frame) {}
   virtual void newKeyFrame(const KeyFrame *baseFrame) {}
   virtual void
   keyFramesMarginalized(const std::vector<const KeyFrame *> &marginalized) {}
   virtual void destructed(const std::vector<const KeyFrame *> &lastKeyFrames) {}
-
-protected:
-  DsoObserver() {}
 };
 
 } // namespace fishdso

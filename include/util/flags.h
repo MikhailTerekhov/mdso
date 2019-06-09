@@ -41,7 +41,6 @@ DECLARE_double(optimized_stddev);
 namespace fishdso {
 
 Settings getFlaggedSettings();
-
 }
 
 #endif

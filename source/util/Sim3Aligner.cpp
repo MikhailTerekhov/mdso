@@ -18,15 +18,13 @@ Sim3Aligner::Sim3Aligner(const SE3 &worldToFirst, const SE3 &worldToSecond,
   SE3 worldToFirstGTScaled = worldToFirstGT;
   worldToFirstGTScaled.translation() *= scaleGTToDso;
   gtToDso = worldToFirstGTScaled.inverse() * worldToFirst;
-
-
 }
 
-SE3 Sim3Aligner::alignWorldToFrameGT( const SE3 &worldToFrameGT ) const {
-    SE3 result = worldToFrameGT;
-    result.translation() *= scaleGTToDso;
-    result = result * gtToDso;
-    return result;
+SE3 Sim3Aligner::alignWorldToFrameGT(const SE3 &worldToFrameGT) const {
+  SE3 result = worldToFrameGT;
+  result.translation() *= scaleGTToDso;
+  result = result * gtToDso;
+  return result;
 }
 
 Vec3 Sim3Aligner::alignScale(const Vec3 &pointInFrameGT) const {

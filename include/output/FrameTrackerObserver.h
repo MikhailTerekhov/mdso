@@ -8,17 +8,15 @@ namespace fishdso {
 
 class FrameTrackerObserver {
 public:
-  virtual void startTracking(const ImagePyramid &frame) {}
-  virtual void
-  levelTracked(int pyrLevel, const SE3 &baseToLast,
-               const AffineLightTransform<double> &affLightBaseToLast,
-               const ceres::Problem &problem,
-               const ceres::Solver::Summary &summary,
-               const std::map<const ceres::CostFunction *, const PointTrackingResidual *>
-                   &costFuncToResidual) {}
+  virtual ~FrameTrackerObserver() = 0;
 
-protected:
-  FrameTrackerObserver() {}
+  virtual void startTracking(const ImagePyramid &frame) {}
+  virtual void levelTracked(
+      int pyrLevel, const SE3 &baseToLast,
+      const AffineLightTransform<double> &affLightBaseToLast,
+      const ceres::Problem &problem, const ceres::Solver::Summary &summary,
+      const std::map<const ceres::CostFunction *, const PointTrackingResidual *>
+          &costFuncToResidual) {}
 };
 
 } // namespace fishdso

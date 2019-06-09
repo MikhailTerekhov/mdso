@@ -75,13 +75,12 @@ It should contain "info" and "data" subdirectories.)abacaba";
 
   Settings settings = getFlaggedSettings();
   // settings.bundleAdjuster.fixedRotationOnSecondKF = true;
-  
+
   DebugImageDrawer debugImageDrawer;
   TrackingDebugImageDrawer trackingDebugImageDrawer(
       reader.cam->camPyr(settings.pyramid.levelNum), settings.frameTracker,
       settings.pyramid);
-  TrajectoryWriter trajectoryWriter(FLAGS_output_directory,
-                                    "tracked_pos.txt");
+  TrajectoryWriter trajectoryWriter(FLAGS_output_directory, "tracked_pos.txt");
   TrajectoryWriterGT trajectoryWriterGT(reader.getAllWorldToFrameGT(),
                                         FLAGS_output_directory,
                                         "ground_truth_pos.txt");

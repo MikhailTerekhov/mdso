@@ -2,9 +2,9 @@
 #define INCLUDE_CLOUDWRITERGT
 
 #include "output/DsoObserver.h"
-#include "util/types.h"
-#include "util/Sim3Aligner.h"
 #include "util/PlyHolder.h"
+#include "util/Sim3Aligner.h"
+#include "util/types.h"
 
 namespace fishdso {
 
@@ -28,6 +28,6 @@ private:
   std::unique_ptr<Sim3Aligner> sim3Aligner;
 };
 
-}
+} // namespace fishdso
 
 #endif

@@ -9,7 +9,7 @@ namespace fishdso {
 class CloudWriter : public DsoObserver {
 public:
   CloudWriter(CameraModel *cam, const std::string &outputDirectory,
-                 const std::string &fileName);
+              const std::string &fileName);
   void keyFramesMarginalized(const std::vector<const KeyFrame *> &marginalized);
   void destructed(const std::vector<const KeyFrame *> &lastKeyFrames);
 

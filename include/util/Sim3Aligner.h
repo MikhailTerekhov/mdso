@@ -9,7 +9,8 @@ class Sim3Aligner {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  Sim3Aligner(const SE3 &worldToFirst, const SE3 &worldToSecond, const SE3 &worldToFirstGT, const SE3 &worldToSecondGT);
+  Sim3Aligner(const SE3 &worldToFirst, const SE3 &worldToSecond,
+              const SE3 &worldToFirstGT, const SE3 &worldToSecondGT);
 
   SE3 alignWorldToFrameGT(const SE3 &worldToFrameGT) const;
   Vec3 alignScale(const Vec3 &pointInFrameGT) const;
@@ -19,6 +20,6 @@ private:
   SE3 gtToDso;
 };
 
-}
+} // namespace fishdso
 
 #endif

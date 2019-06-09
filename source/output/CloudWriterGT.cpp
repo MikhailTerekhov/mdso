@@ -2,17 +2,18 @@
 
 namespace fishdso {
 
-CloudWriterGT::CloudWriterGT(const StdVector<SE3> &worldToFrameGT,
-                const std::vector<std::vector<Vec3>> &pointsInFrameGT,
-                const std::vector<std::vector<cv::Vec3b>> &colors,
-                const std::string &outputDirectory,
-                const std::string &fileName) 
+CloudWriterGT::CloudWriterGT(
+    const StdVector<SE3> &worldToFrameGT,
+    const std::vector<std::vector<Vec3>> &pointsInFrameGT,
+    const std::vector<std::vector<cv::Vec3b>> &colors,
+    const std::string &outputDirectory, const std::string &fileName)
     : worldToFrameGT(worldToFrameGT)
     , pointsInFrameGT(pointsInFrameGT)
     , colors(colors)
     , cloudHolder(fileInDir(outputDirectory, fileName)) {}
 
-void CloudWriterGT::initialized(const std::vector<const KeyFrame *> &initializedKFs) {
+void CloudWriterGT::initialized(
+    const std::vector<const KeyFrame *> &initializedKFs) {
   CHECK(initializedKFs.size() > 1);
 
   SE3 worldToFirst = initializedKFs[0]->preKeyFrame->worldToThis;
@@ -29,7 +30,8 @@ void CloudWriterGT::initialized(const std::vector<const KeyFrame *> &initialized
     pose = sim3Aligner->alignWorldToFrameGT(pose);
 }
 
-void CloudWriterGT::keyFramesMarginalized(const std::vector<const KeyFrame *> &marginalized) {
+void CloudWriterGT::keyFramesMarginalized(
+    const std::vector<const KeyFrame *> &marginalized) {
   CHECK(sim3Aligner);
 
   for (const KeyFrame *kf : marginalized) {
@@ -52,8 +54,9 @@ void CloudWriterGT::keyFramesMarginalized(const std::vector<const KeyFrame *> &m
   cloudHolder.updatePointCount();
 }
 
-void CloudWriterGT::destructed( const std::vector<const KeyFrame *> &lastKeyFrames ) {
+void CloudWriterGT::destructed(
+    const std::vector<const KeyFrame *> &lastKeyFrames) {
   keyFramesMarginalized(lastKeyFrames);
 }
 
-}
+} // namespace fishdso

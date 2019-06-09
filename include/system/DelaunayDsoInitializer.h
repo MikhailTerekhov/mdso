@@ -3,9 +3,9 @@
 
 #include "DsoInitializer.h"
 #include "DsoSystem.h"
+#include "output/InitializerObserver.h"
 #include "system/KeyFrame.h"
 #include "system/StereoMatcher.h"
-#include "output/InitializerObserver.h"
 #include <memory>
 #include <opencv2/opencv.hpp>
 

@@ -246,7 +246,7 @@ struct Settings {
     static constexpr double default_minAffineLightA = -0.0953101798;
 
     double maxAffineLightA;
-    static constexpr double default_maxAffineLightA = 0.0953101798; //ln(1.1)
+    static constexpr double default_maxAffineLightA = 0.0953101798; // ln(1.1)
 
     double minAffineLightB;
     static constexpr double default_minAffineLightB = -0.1 * 256;
@@ -279,8 +279,7 @@ struct Settings {
   } gradWeighting;
 
   struct ResidualPattern {
-    ResidualPattern(const StdVector<Vec2> &newPattern =
-                        default_pattern)
+    ResidualPattern(const StdVector<Vec2> &newPattern = default_pattern)
         : _pattern(newPattern) {
       height =
           int(std::ceil(std::max_element(_pattern.begin(), _pattern.end(),

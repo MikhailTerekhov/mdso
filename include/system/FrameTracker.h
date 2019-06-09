@@ -25,9 +25,9 @@ public:
   std::pair<SE3, AffineLightTransform<double>>
   trackFrame(const ImagePyramid &frame, const SE3 &coarseMotion,
              const AffineLightTransform<double> &coarseAffLight);
-  
+
   void addObserver(FrameTrackerObserver *observer);
-  
+
   // output only
   std::vector<cv::Mat3b> residualsImg;
 
@@ -46,7 +46,7 @@ private:
   int displayWidth, displayHeight;
 
   std::vector<FrameTrackerObserver *> observers;
-  
+
   Settings::FrameTracker frameTrackerSettings;
   Settings::Pyramid pyrSettings;
   Settings::AffineLight affineLightSettings;

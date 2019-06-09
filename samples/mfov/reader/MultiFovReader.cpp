@@ -83,6 +83,4 @@ const StdVector<SE3> &MultiFovReader::getAllWorldToFrameGT() const {
   return worldToFrameGT;
 }
 
-int MultiFovReader::getFrameCount() const {
-  return worldToFrameGT.size();
-}
+int MultiFovReader::getFrameCount() const { return worldToFrameGT.size(); }

@@ -92,12 +92,15 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/util/Sim3Aligner.cpp
     ${PROJECT_SOURCE_DIR}/source/util/flags.cpp
 
+    ${PROJECT_SOURCE_DIR}/source/output/DsoObserver.cpp
     ${PROJECT_SOURCE_DIR}/source/output/DebugImageDrawer.cpp
     ${PROJECT_SOURCE_DIR}/source/output/TrajectoryWriter.cpp
     ${PROJECT_SOURCE_DIR}/source/output/TrajectoryWriterGT.cpp
     ${PROJECT_SOURCE_DIR}/source/output/CloudWriter.cpp
     ${PROJECT_SOURCE_DIR}/source/output/CloudWriterGT.cpp
+    ${PROJECT_SOURCE_DIR}/source/output/InitializerObserver.cpp
     ${PROJECT_SOURCE_DIR}/source/output/InterpolationDrawer.cpp
+    ${PROJECT_SOURCE_DIR}/source/output/FrameTrackerObserver.cpp
     ${PROJECT_SOURCE_DIR}/source/output/TrackingDebugImageDrawer.cpp
 
     ${PROJECT_SOURCE_DIR}/source/system/SphericalPlus.cpp

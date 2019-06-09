@@ -191,7 +191,7 @@ void BundleAdjuster::adjust(int maxNumIterations) {
 
   StdVector<Vec2> oobPos;
   StdVector<Vec2> oobKf1;
- 
+
   for (KeyFrame *baseFrame : keyFrames)
     for (const auto &op : baseFrame->optimizedPoints) {
       problem.AddParameterBlock(&op->logInvDepth, 1);
