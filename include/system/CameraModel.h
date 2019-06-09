@@ -50,12 +50,6 @@ public:
     }
 
     Vec3t res(pt[0], pt[1], z);
-    // double expectedR = std::hypot(pt[0], pt[1]);
-    // double angle = std::atan2(expectedR, z);
-    // double rRecalc = calcMapPoly(angle);
-    //    std::cout << "angle = " << angle << std::endl
-    //              << "expected r = " << expectedR << std::endl
-    //              << "r from zNorm = " << rRecalc << std::endl;
     return res;
   }
 

@@ -167,16 +167,7 @@ void CameraModel::setMapPolyCoeffs() {
     b(i) = funcGraph[i][0];
   }
 
-  //  std::ofstream fA("A" + std::to_string(deg) + ".bin");
-  //  fA.write((const char *)A.data(), A.rows() * A.cols() * sizeof(double));
-  //  std::ofstream fb("b" + std::to_string(deg) + ".bin");
-  //  fb.write((const char *)b.data(), b.rows() * b.cols() * sizeof(double));
-
   mapPolyCoeffs = A.fullPivHouseholderQr().solve(b);
-
-  //  std::ofstream fx("x" + std::to_string(deg) + ".bin");
-  //  fx.write((const char *)mapPolyCoeffs.data(),
-  //           mapPolyCoeffs.rows() * mapPolyCoeffs.cols() * sizeof(double));
 }
 
 StdVector<CameraModel> CameraModel::camPyr(int pyrLevels) {

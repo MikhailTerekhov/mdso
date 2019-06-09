@@ -8,21 +8,8 @@
 using namespace fishdso;
 
 int main() {
-  // const int segmentsCount = 10;
-  // const int onSegmCount = 5;
-  // StdVector<Vec2> pnt;
-
   std::random_device rd;
   std::uniform_real_distribution<double> d(0, 100);
-  std::uniform_real_distribution<double> d01(0, 1);
-
-  // for (int i = 0; i < segmentsCount; ++i) {
-  // Vec2 a(d(rd), d(rd)), b(d(rd), d(rd));
-  // for (int j = 0; j < onSegmCount; ++j) {
-  // double alpha = d01(rd);
-  // pnt.push_back(alpha * a + (1 - alpha) * b);
-  // }
-  // }
 
   const int pntCount = 100;
   StdVector<Vec2> pnt;

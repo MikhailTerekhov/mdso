@@ -625,43 +625,6 @@ void Triangulation::drawScaled(cv::Mat &img, double scaleX, double scaleY,
                                  upperLeftPoint)};
       cv::line(img, v[0], v[1], edgeCol, 2);
     }
-
-  //  for (auto p : _points) {
-  //    cv::Point cvp(int(p->pos[0] * scaleX), int(p->pos[1] * scaleY));
-  //    cv::circle(result, cvp, 2, CV_RED, CV_FILLED);
-  //  }
-
-  //  for (auto p : _points)
-  //    for (auto t : p->triangles) {
-  //      if (!t)
-  //        continue;
-  //      if (trianglesDrawn.find(t) != trianglesDrawn.end())
-  //        continue;
-  //      trianglesDrawn.insert(t);
-  //      Vec2 center = (t->vert[0]->pos + t->vert[1]->pos + t->vert[2]->pos) /
-  //      3;
-
-  //      cv::Point cvcenter = toCvPoint(center, scaleX, scaleY);
-  //      cv::Point vert[] = {toCvPoint(t->vert[0]->pos, scaleX, scaleY),
-  //                          toCvPoint(t->vert[1]->pos, scaleX, scaleY),
-  //                          toCvPoint(t->vert[2]->pos, scaleX, scaleY)};
-  //      cv::Point edgeCenters[] = {
-  //          toCvPoint((t->edges[0]->vert[0]->pos + t->edges[0]->vert[1]->pos)
-  //          / 2,
-  //                    scaleX, scaleY),
-  //          toCvPoint((t->edges[1]->vert[0]->pos + t->edges[1]->vert[1]->pos)
-  //          / 2,
-  //                    scaleX, scaleY),
-  //          toCvPoint((t->edges[2]->vert[0]->pos + t->edges[2]->vert[1]->pos)
-  //          / 2,
-  //                    scaleX, scaleY)};
-
-  //      for (auto v : vert)
-  //        cv::arrowedLine(result, cvcenter, (v + cvcenter) / 2, CV_MAGNETA /
-  //        2);
-  //      for (auto e : edgeCenters)
-  //        cv::arrowedLine(result, cvcenter, (e + cvcenter) / 2, CV_BLUE / 2);
-  //    }
 }
 
 void drawCurvedInternal(CameraModel *cam, Vec2 ptFrom, Vec2 ptTo, cv::Mat &img,
