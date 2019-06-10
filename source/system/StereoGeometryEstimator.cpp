@@ -9,11 +9,11 @@
 namespace fishdso {
 
 const int inlierVectorsUsed = 5;
-const int motionInliers = 1;
-const int extractBestInliers = 2;
-const int extractCurInliers = 3;
-const int ransacBestInliers = 4;
-const int ransacCurInliers = 5;
+const int motionInliers = 0;
+const int extractBestInliers = 1;
+const int extractCurInliers = 2;
+const int ransacBestInliers = 3;
+const int ransacCurInliers = 4;
 
 StereoGeometryEstimator::StereoGeometryEstimator(
     CameraModel *cam, const StdVector<std::pair<Vec2, Vec2>> &imgCorresps,
@@ -23,8 +23,8 @@ StereoGeometryEstimator::StereoGeometryEstimator(
     , imgCorresps(imgCorresps)
     , rays(imgCorresps.size())
     , _depths(imgCorresps.size())
-    , inlierVectorsPool(reservedVector<int>(_settings.initialInliersCapacity),
-                        inlierVectorsUsed)
+    , inlierVectorsPool(inlierVectorsUsed,
+                        reservedVector<int>(_settings.initialInliersCapacity))
     , coarseFound(false)
     , preciseFound(false)
     , depthsEvaluated(false)
@@ -92,7 +92,7 @@ int StereoGeometryEstimator::findInliersEssential(
 
 int StereoGeometryEstimator::findInliersMotion(const SE3 &motion,
                                                std::vector<int> &inliersInds) {
-  std::vector<int> &newInlierInds = inlierVectorsPool.get(motionInliers);
+  std::vector<int> &newInlierInds = inlierVectorsPool[motionInliers];
 
   newInlierInds.resize(0);
   for (int i : inliersInds) {
@@ -135,8 +135,8 @@ SE3 StereoGeometryEstimator::extractMotion(const Mat33 &E,
   int bestFrontPointsNum = 0;
   SE3 bestSol;
 
-  std::vector<int> bestInliersInds = inlierVectorsPool.get(extractBestInliers),
-                   curInliersInds = inlierVectorsPool.get(extractCurInliers);
+  std::vector<int> bestInliersInds = inlierVectorsPool[extractBestInliers],
+                   curInliersInds = inlierVectorsPool[extractCurInliers];
   bestInliersInds.resize(0);
   curInliersInds.resize(0);
 
@@ -184,8 +184,8 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
   Mat33 results[10];
 
   int bestInliers = -1;
-  std::vector<int> curInliersInds = inlierVectorsPool.get(ransacCurInliers),
-                   bestInliersInds = inlierVectorsPool.get(ransacBestInliers);
+  std::vector<int> curInliersInds = inlierVectorsPool[ransacCurInliers],
+                   bestInliersInds = inlierVectorsPool[ransacBestInliers];
 
   long long iterNum = settings.maxRansacIter;
   double q = std::pow(1.0 - std::pow(1 - p, 1.0 / iterNum), 1.0 / N);

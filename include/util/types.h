@@ -49,10 +49,6 @@ using StdVector = std::vector<T, Eigen::aligned_allocator<T>>;
 template <typename T>
 using StdQueue = std::queue<T, std::deque<T, Eigen::aligned_allocator<T>>>;
 
-template <typename T>
-using StdUnorderedSet = std::unordered_set<T, std::hash<T>, std::equal_to<T>,
-                                           Eigen::aligned_allocator<T>>;
-
 template <typename K, typename T>
 using StdMap =
     std::map<K, T, std::less<K>, Eigen::aligned_allocator<std::pair<K, T>>>;

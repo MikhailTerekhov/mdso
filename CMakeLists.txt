@@ -41,7 +41,6 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/util/SphericalTerrain.h
     ${PROJECT_SOURCE_DIR}/include/util/ImagePyramid.h
     ${PROJECT_SOURCE_DIR}/include/util/DepthedImagePyramid.h
-    ${PROJECT_SOURCE_DIR}/include/util/ObjectPool.h
     ${PROJECT_SOURCE_DIR}/include/util/PixelSelector.h
     ${PROJECT_SOURCE_DIR}/include/util/DistanceMap.h
     ${PROJECT_SOURCE_DIR}/include/util/PlyHolder.h
