@@ -7,21 +7,18 @@
 
 namespace fishdso {
 
-#define PL (pyrSettings.levelNum)
-#define PS (rpSettings.pattern().size())
-#define PH (rpSettings.height)
-#define TH (intencitySettings.outlierDiff)
+#define PL (settings.pyramid.levelNum)
+#define PS (settings.residualPattern.pattern().size())
+#define PH (settings.residualPattern.height)
+#define TH (settings.intencity.outlierDiff)
 
 ImmaturePoint::ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p,
-                             const Settings::PointTracer &tracingSettings,
-                             const Settings::Intencity &intencitySettings,
-                             const Settings::ResidualPattern &rpSettings,
-                             const Settings::Pyramid &pyrSettings)
+                             const PointTracerSettings &_settings)
     : p(p)
-    , baseDirections(rpSettings.pattern().size())
-    , baseIntencities(rpSettings.pattern().size())
-    , baseGrad(rpSettings.pattern().size())
-    , baseGradNorm(rpSettings.pattern().size())
+    , baseDirections(_settings.residualPattern.pattern().size())
+    , baseIntencities(_settings.residualPattern.pattern().size())
+    , baseGrad(_settings.residualPattern.pattern().size())
+    , baseGradNorm(_settings.residualPattern.pattern().size())
     , minDepth(0)
     , maxDepth(INF)
     , bestQuality(-1)
@@ -30,10 +27,7 @@ ImmaturePoint::ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p,
     , baseFrame(baseFrame)
     , cam(baseFrame->cam)
     , state(ACTIVE)
-    , tracingSettings(tracingSettings)
-    , intencitySettings(intencitySettings)
-    , rpSettings(rpSettings)
-    , pyrSettings(pyrSettings)
+    , settings(_settings)
     , lastTraced(false)
     , numTraced(0)
     , tracedPyrLevel(0) {
@@ -43,7 +37,7 @@ ImmaturePoint::ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p,
   }
 
   for (int i = 0; i < PS; ++i) {
-    Vec2 curP = p + rpSettings.pattern()[i];
+    Vec2 curP = p + settings.residualPattern.pattern()[i];
     cv::Point curPCV = toCvPoint(curP);
     baseDirections[i] = cam->unmap(curP).normalized();
     baseIntencities[i] = baseFrame->frame()(curPCV);
@@ -54,7 +48,7 @@ ImmaturePoint::ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p,
 }
 
 bool ImmaturePoint::isReady() {
-  return state == ACTIVE && stddev < tracingSettings.optimizedStddev;
+  return state == ACTIVE && stddev < settings.pointTracer.optimizedStddev;
 }
 
 bool ImmaturePoint::pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth,
@@ -68,7 +62,7 @@ bool ImmaturePoint::pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth,
     return false;
   }
 
-  if (tracingSettings.performFullTracing) {
+  if (settings.pointTracer.performFullTracing) {
     // While searching along epipolar curve, we will continously map rays on a
     // diametrical segment of a sphere. Since our camera model remains valid
     // only when angle between the mapped ray and Oz is smaller then certain
@@ -81,14 +75,14 @@ bool ImmaturePoint::pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth,
   }
 
   int maxSearchCount =
-      tracingSettings.maxSearchRel * (cam->getWidth() + cam->getHeight());
+      settings.pointTracer.maxSearchRel * (cam->getWidth() + cam->getHeight());
   double alpha0 = 0;
-  double step = 1.0 / (tracingSettings.onImageTestCount - 1);
+  double step = 1.0 / (settings.pointTracer.onImageTestCount - 1);
   while (alpha0 <= 1) {
     Vec3 curDir = (1 - alpha0) * dirMaxDepth + alpha0 * dirMinDepth;
     Vec2 curP = cam->map(curDir);
     if (!cam->isOnImage(curP, PH)) {
-      if (!tracingSettings.performFullTracing)
+      if (!settings.pointTracer.performFullTracing)
         break;
       alpha0 += step;
       continue;
@@ -112,12 +106,13 @@ bool ImmaturePoint::pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth,
         alpha += deltaAlpha;
 
         pointCnt++;
-        if (!tracingSettings.performFullTracing && pointCnt >= maxSearchCount)
+        if (!settings.pointTracer.performFullTracing &&
+            pointCnt >= maxSearchCount)
           break;
       } while (alpha >= 0 && alpha <= 1 && cam->isOnImage(point, PH));
     }
 
-    if (!tracingSettings.performFullTracing)
+    if (!settings.pointTracer.performFullTracing)
       break;
 
     alpha0 = alpha + step;
@@ -136,7 +131,7 @@ Vec2 ImmaturePoint::tracePrecise(
   bestEnergy = INF;
   bestDispl = 0;
   double step = 0;
-  for (int it = 0; it < tracingSettings.gnIter + 1; ++it) {
+  for (int it = 0; it < settings.pointTracer.gnIter + 1; ++it) {
     double newEnergy = 0;
     double H = 0, b = 0;
     Vec2 curPoint = bestPoint + step * dir;
@@ -151,7 +146,7 @@ Vec2 ImmaturePoint::tracePrecise(
       newEnergy += wb * (2 - wb) * ar * ar;
       double dr = grad.dot(dir);
       b += wb * r * dr;
-      if (tracingSettings.useAltHWeighting) {
+      if (settings.pointTracer.useAltHWeighting) {
         double wh = wb / (2 - wb);
         H += wh * dr * dr;
       } else
@@ -181,7 +176,7 @@ double ImmaturePoint::estVariance(const Vec2 &searchDirection) {
     sum1 += s * s;
   }
 
-  lastGeomVar = PS * tracingSettings.positionVariance / sum1;
+  lastGeomVar = PS * settings.pointTracer.positionVariance / sum1;
   return lastGeomVar;
 }
 
@@ -207,8 +202,8 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
   double variance = estVariance(searchDirection);
   double curDev = std::sqrt(variance);
 
-  if (!tracingSettings.performFullTracing && numTraced > 0)
-    if (curDev * tracingSettings.imprFactor > stddev)
+  if (!settings.pointTracer.performFullTracing && numTraced > 0)
+    if (curDev * settings.pointTracer.imprFactor > stddev)
       return;
 
   StdVector<Vec2> points;
@@ -303,7 +298,8 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
 
   double secondBestEnergy = INF;
   for (const auto &p : energiesFound) {
-    if ((p.first - bestPoint).norm() < tracingSettings.minSecondBestDistance)
+    if ((p.first - bestPoint).norm() <
+        settings.pointTracer.minSecondBestDistance)
       continue;
     if (p.second < secondBestEnergy)
       secondBestEnergy = p.second;
@@ -320,9 +316,10 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
     bestQuality = newQuality;
   lastEnergy = bestEnergy;
 
-  double outlierEnergy = tracingSettings.outlierEnergyFactor * PS * TH * TH;
+  double outlierEnergy =
+      settings.pointTracer.outlierEnergyFactor * PS * TH * TH;
   if (lastEnergy > outlierEnergy ||
-      newQuality < tracingSettings.outlierQuality) {
+      newQuality < settings.pointTracer.outlierQuality) {
     depth = oldDepth;
     LOG(INFO) << "trace quit : e or q\n";
     return;
@@ -336,7 +333,7 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
 
   // subpixel refinement
   double bestDispl = 0;
-  if (tracingSettings.gnIter > 0) {
+  if (settings.pointTracer.gnIter > 0) {
     int fromInd = std::max(0, bestInd - 1);
     int toInd = std::min(int(points.size()) - 1, bestInd + 1);
     Vec2 from = points[fromInd];

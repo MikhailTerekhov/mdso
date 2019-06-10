@@ -21,10 +21,7 @@ DsoSystem::DsoSystem(CameraModel *cam, const Observers &observers,
     , dsoInitializer(std::unique_ptr<DsoInitializer>(new DelaunayDsoInitializer(
           this, cam, &pixelSelector, _settings.maxOptimizedPoints,
           DelaunayDsoInitializer::SPARSE_DEPTHS, observers.initializer,
-          _settings.delaunayDsoInitializer, _settings.stereoMatcher,
-          _settings.threading, _settings.triangulation, _settings.keyFrame,
-          _settings.pointTracer, _settings.intencity, _settings.residualPattern,
-          _settings.pyramid)))
+          _settings.getInitializerSettings())))
     , isInitialized(false)
     , lastTrackRmse(INF)
     , firstFrameNum(-1)
@@ -433,8 +430,7 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
     int kfNum = preKeyFrame->globalFrameNum;
     keyFrames.insert(std::pair<int, KeyFrame>(
         kfNum, KeyFrame(preKeyFrame, pixelSelector, settings.keyFrame,
-                        settings.pointTracer, settings.intencity,
-                        settings.residualPattern, settings.pyramid)));
+                        settings.getPointTracerSettings())));
 
     marginalizeFrames();
     activateNewOptimizedPoints();
@@ -443,10 +439,7 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
       obs->newKeyFrame(&baseKeyFrame());
 
     if (settings.bundleAdjuster.runBA) {
-      BundleAdjuster bundleAdjuster(
-          cam, settings.bundleAdjuster, settings.residualPattern,
-          settings.gradWeighting, settings.intencity, settings.affineLight,
-          settings.threading, settings.depth);
+      BundleAdjuster bundleAdjuster(cam, settings.getBundleAdjusterSettings());
 
       for (auto &kfp : keyFrames)
         bundleAdjuster.addKeyFrame(&kfp.second);

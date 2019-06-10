@@ -9,17 +9,11 @@ namespace fishdso {
 KeyFrame::KeyFrame(CameraModel *cam, const cv::Mat &frameColored,
                    int globalFrameNum, PixelSelector &pixelSelector,
                    const Settings::KeyFrame &kfSettings,
-                   const Settings::PointTracer &tracingSettings,
-                   const Settings::Intencity &intencitySettings,
-                   const Settings::ResidualPattern &rpSettings,
-                   const Settings::Pyramid &pyrSettings)
+                   const PointTracerSettings tracingSettings)
     : preKeyFrame(std::shared_ptr<PreKeyFrame>(
           new PreKeyFrame(cam, frameColored, globalFrameNum)))
     , kfSettings(kfSettings)
-    , tracingSettings(tracingSettings)
-    , intencitySettings(intencitySettings)
-    , rpSettings(rpSettings)
-    , pyrSettings(pyrSettings) {
+    , tracingSettings(tracingSettings) {
   std::vector<cv::Point> points = pixelSelector.select(
       frameColored, preKeyFrame->gradNorm, kfSettings.pointsNum, nullptr);
   addImmatures(points);
@@ -28,16 +22,10 @@ KeyFrame::KeyFrame(CameraModel *cam, const cv::Mat &frameColored,
 KeyFrame::KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame,
                    PixelSelector &pixelSelector,
                    const Settings::KeyFrame &kfSettings,
-                   const Settings::PointTracer &tracingSettings,
-                   const Settings::Intencity &intencitySettings,
-                   const Settings::ResidualPattern &rpSettings,
-                   const Settings::Pyramid &pyrSettings)
+                   const PointTracerSettings &tracingSettings)
     : preKeyFrame(newPreKeyFrame)
     , kfSettings(kfSettings)
-    , tracingSettings(tracingSettings)
-    , intencitySettings(intencitySettings)
-    , rpSettings(rpSettings)
-    , pyrSettings(pyrSettings) {
+    , tracingSettings(tracingSettings) {
   std::vector<cv::Point> points =
       pixelSelector.select(newPreKeyFrame->frameColored, preKeyFrame->gradNorm,
                            kfSettings.pointsNum, nullptr);
@@ -48,8 +36,7 @@ void KeyFrame::addImmatures(const std::vector<cv::Point> &points) {
   immaturePoints.reserve(immaturePoints.size() + points.size());
   for (const cv::Point &p : points) {
     SetUniquePtr<ImmaturePoint> ip(
-        new ImmaturePoint(preKeyFrame.get(), toVec2(p), tracingSettings,
-                          intencitySettings, rpSettings, pyrSettings));
+        new ImmaturePoint(preKeyFrame.get(), toVec2(p), tracingSettings));
     immaturePoints.insert(std::move(ip));
   }
 }
@@ -73,8 +60,7 @@ void KeyFrame::activateAllImmature() {
 void KeyFrame::deactivateAllOptimized() {
   for (const auto &op : optimizedPoints) {
     SetUniquePtr<ImmaturePoint> ip(
-        new ImmaturePoint(preKeyFrame.get(), op->p, tracingSettings,
-                          intencitySettings, rpSettings, pyrSettings));
+        new ImmaturePoint(preKeyFrame.get(), op->p, tracingSettings));
     ip->depth = op->depth();
     immaturePoints.insert(std::move(ip));
   }
@@ -97,8 +83,9 @@ std::unique_ptr<DepthedImagePyramid> KeyFrame::makePyramid() {
     weights.push_back(1 / op->stddev);
   }
 
-  return std::make_unique<DepthedImagePyramid>(
-      preKeyFrame->frame(), pyrSettings.levelNum, points, depths, weights);
+  return std::make_unique<DepthedImagePyramid>(preKeyFrame->frame(),
+                                               tracingSettings.pyramid.levelNum,
+                                               points, depths, weights);
 }
 
 cv::Mat3b KeyFrame::drawDepthedFrame(double minDepth, double maxDepth) const {

@@ -8,6 +8,12 @@
 
 namespace fishdso {
 
+struct InitializerSettings;
+
+struct PointTracerSettings;
+
+struct BundleAdjusterSettings;
+
 struct Settings {
   struct CameraModel {
     CameraModel()
@@ -343,6 +349,36 @@ struct Settings {
 
   bool continueChoosingKeyFrames;
   static constexpr bool default_continueChoosingKeyFrames = true;
+
+  InitializerSettings getInitializerSettings() const;
+  PointTracerSettings getPointTracerSettings() const;
+  BundleAdjusterSettings getBundleAdjusterSettings() const;
+};
+
+struct PointTracerSettings {
+  Settings::PointTracer pointTracer = {};
+  Settings::Intencity intencity = {};
+  Settings::ResidualPattern residualPattern = {};
+  Settings::Pyramid pyramid = {};
+};
+
+struct InitializerSettings {
+  Settings::DelaunayDsoInitializer initializer = {};
+  Settings::StereoMatcher stereoMatcher = {};
+  Settings::Threading threading = {};
+  Settings::Triangulation triangulation = {};
+  Settings::KeyFrame keyFrame = {};
+  PointTracerSettings tracingSettings = {};
+};
+
+struct BundleAdjusterSettings {
+  Settings::BundleAdjuster bundleAdjuster = {};
+  Settings::ResidualPattern residualPattern = {};
+  Settings::GradWeighting gradWeighting = {};
+  Settings::Intencity intencity = {};
+  Settings::AffineLight affineLight = {};
+  Settings::Threading threading = {};
+  Settings::Depth depth = {};
 };
 
 } // namespace fishdso

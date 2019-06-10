@@ -20,18 +20,12 @@ struct KeyFrame {
   KeyFrame(CameraModel *cam, const cv::Mat &frameColored, int globalFrameNum,
            PixelSelector &pixelSelector,
            const Settings::KeyFrame &kfSettings = {},
-           const Settings::PointTracer &tracingSettings = {},
-           const Settings::Intencity &intencitySettings = {},
-           const Settings::ResidualPattern &rpSettings = {},
-           const Settings::Pyramid &pyrSettings = {});
+           const PointTracerSettings tracingSettings = {});
 
   KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame,
            PixelSelector &pixelSelector,
            const Settings::KeyFrame &kfSettings = {},
-           const Settings::PointTracer &tracingSettings = {},
-           const Settings::Intencity &intencitySettings = {},
-           const Settings::ResidualPattern &rpSettings = {},
-           const Settings::Pyramid &pyrSettings = {});
+           const PointTracerSettings &tracingSettings = {});
 
   void activateAllImmature();
   void deactivateAllOptimized();
@@ -51,10 +45,7 @@ struct KeyFrame {
   std::vector<std::shared_ptr<PreKeyFrame>> trackedFrames;
 
   Settings::KeyFrame kfSettings;
-  Settings::PointTracer tracingSettings;
-  Settings::Intencity intencitySettings;
-  Settings::ResidualPattern rpSettings;
-  Settings::Pyramid pyrSettings;
+  PointTracerSettings tracingSettings;
 };
 
 } // namespace fishdso

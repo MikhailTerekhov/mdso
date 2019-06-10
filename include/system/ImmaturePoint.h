@@ -15,11 +15,9 @@ struct ImmaturePoint {
   enum State { ACTIVE, OOB, OUTLIER };
   enum TracingDebugType { NO_DEBUG, DRAW_EPIPOLE };
 
+  // TODO create PointTracer!!!
   ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p,
-                const Settings::PointTracer &tracingSettings = {},
-                const Settings::Intencity &intencitySettings = {},
-                const Settings::ResidualPattern &rpSettings = {},
-                const Settings::Pyramid &pyrSettings = {});
+                const PointTracerSettings &_settings = {});
 
   void traceOn(const PreKeyFrame &refFrame, TracingDebugType debugType);
 
@@ -44,10 +42,7 @@ struct ImmaturePoint {
   CameraModel *cam;
   State state;
 
-  Settings::PointTracer tracingSettings;
-  Settings::Intencity intencitySettings;
-  Settings::ResidualPattern rpSettings;
-  Settings::Pyramid pyrSettings;
+  PointTracerSettings settings;
 
   // output only
   bool lastTraced;

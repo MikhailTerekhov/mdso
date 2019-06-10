@@ -13,4 +13,22 @@ const StdVector<Vec2> Settings::ResidualPattern::default_pattern{
     Vec2(0, 0), Vec2(0, -2), Vec2(-1, -1), Vec2(1, -1), Vec2(-2, 0),
     Vec2(2, 0), Vec2(-1, 1), Vec2(1, 1),   Vec2(0, 2)};
 
+InitializerSettings Settings::getInitializerSettings() const {
+  return {delaunayDsoInitializer,
+          stereoMatcher,
+          threading,
+          triangulation,
+          keyFrame,
+          {pointTracer, intencity, residualPattern, pyramid}};
+}
+
+PointTracerSettings Settings::getPointTracerSettings() const {
+  return {pointTracer, intencity, residualPattern, pyramid};
+}
+
+BundleAdjusterSettings Settings::getBundleAdjusterSettings() const {
+  return {bundleAdjuster, residualPattern, gradWeighting, intencity,
+          affineLight,    threading,       depth};
+}
+
 } // namespace fishdso

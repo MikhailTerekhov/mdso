@@ -12,31 +12,16 @@ DelaunayDsoInitializer::DelaunayDsoInitializer(
     DsoSystem *dsoSystem, CameraModel *cam, PixelSelector *pixelSelector,
     int pointsNeeded, DelaunayDsoInitializer::DebugOutputType debugOutputType,
     const std::vector<InitializerObserver *> &observers,
-    const Settings::DelaunayDsoInitializer &initSettings,
-    const Settings::StereoMatcher &smSettings,
-    const Settings::Threading &threadingSettings,
-    const Settings::Triangulation &triangulationSettings,
-    const Settings::KeyFrame &kfSettings,
-    const Settings::PointTracer &tracingSettings,
-    const Settings::Intencity &intencitySettings,
-    const Settings::ResidualPattern &rpSettings,
-    const Settings::Pyramid &pyrSettings)
+    const InitializerSettings &_settings)
     : cam(cam)
     , dsoSystem(dsoSystem)
     , pixelSelector(pixelSelector)
-    , stereoMatcher(cam, smSettings, threadingSettings)
+    , stereoMatcher(cam, _settings.stereoMatcher, _settings.threading)
     , hasFirstFrame(false)
     , framesSkipped(0)
     , pointsNeeded(pointsNeeded)
     , debugOutputType(debugOutputType)
-    , initSettings(initSettings)
-    , threadingSettings(threadingSettings)
-    , triangulationSettings(triangulationSettings)
-    , kfSettings(kfSettings)
-    , tracingSettings(tracingSettings)
-    , intencitySettings(intencitySettings)
-    , rpSettings(rpSettings)
-    , pyrSettings(pyrSettings)
+    , settings(_settings)
     , observers(observers) {}
 
 bool DelaunayDsoInitializer::addFrame(const cv::Mat &frame,
@@ -47,7 +32,7 @@ bool DelaunayDsoInitializer::addFrame(const cv::Mat &frame,
     hasFirstFrame = true;
     return false;
   } else {
-    if (framesSkipped < initSettings.firstFramesSkip) {
+    if (framesSkipped < settings.initializer.firstFramesSkip) {
       ++framesSkipped;
       return false;
     }
@@ -74,8 +59,8 @@ std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFrames() {
   std::vector<KeyFrame> keyFrames;
   for (int i = 0; i < 2; ++i) {
     keyFrames.push_back(KeyFrame(cam, frames[i], globalFrameNums[i],
-                                 *pixelSelector, kfSettings, tracingSettings,
-                                 intencitySettings, rpSettings, pyrSettings));
+                                 *pixelSelector, settings.keyFrame,
+                                 settings.tracingSettings));
     for (const auto &ip : keyFrames.back().immaturePoints)
       ip->stddev = 1;
   }
@@ -83,10 +68,10 @@ std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFrames() {
   keyFrames[0].preKeyFrame->worldToThis = SE3();
   keyFrames[1].preKeyFrame->worldToThis = firstToSecond;
 
-  if (initSettings.usePlainTriangulation) {
+  if (settings.initializer.usePlainTriangulation) {
     Terrain kpTerrains[2] = {
-        Terrain(cam, keyPoints[0], depths[0], triangulationSettings),
-        Terrain(cam, keyPoints[1], depths[1], triangulationSettings)};
+        Terrain(cam, keyPoints[0], depths[0], settings.triangulation),
+        Terrain(cam, keyPoints[1], depths[1], settings.triangulation)};
     for (int i = 0; i < 2; ++i) {
       for (const auto &ip : keyFrames[i].immaturePoints) {
         double depth;
@@ -108,8 +93,8 @@ std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFrames() {
     }
 
     SphericalTerrain kpTerrains[2] = {
-        SphericalTerrain(depthedRays[0], triangulationSettings),
-        SphericalTerrain(depthedRays[1], triangulationSettings)};
+        SphericalTerrain(depthedRays[0], settings.triangulation),
+        SphericalTerrain(depthedRays[1], settings.triangulation)};
 
     for (int kfInd = 0; kfInd < 2; ++kfInd) {
       const int reselectCount = 1;

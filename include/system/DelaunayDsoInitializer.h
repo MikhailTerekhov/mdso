@@ -19,15 +19,7 @@ public:
       DsoSystem *dsoSystem, CameraModel *cam, PixelSelector *pixelSelector,
       int pointsNeeded, DebugOutputType debugOutputType,
       const std::vector<InitializerObserver *> &observers = {},
-      const Settings::DelaunayDsoInitializer &initSettings = {},
-      const Settings::StereoMatcher &smSettings = {},
-      const Settings::Threading &threadingSettings = {},
-      const Settings::Triangulation &triangulationSettings = {},
-      const Settings::KeyFrame &kfSettings = {},
-      const Settings::PointTracer &tracingSettings = {},
-      const Settings::Intencity &intencitySettings = {},
-      const Settings::ResidualPattern &rpSettings = {},
-      const Settings::Pyramid &pyrSettings = {});
+      const InitializerSettings &settings = {});
 
   // returns true if initialization is completed
   bool addFrame(const cv::Mat &frame, int globalFrameNum);
@@ -45,19 +37,7 @@ private:
   int globalFrameNums[2];
   int pointsNeeded;
   DebugOutputType debugOutputType;
-
-  Settings::DelaunayDsoInitializer initSettings;
-  Settings::StereoMatcher smSettigns;
-  Settings::Threading threadingSettings;
-  Settings::Triangulation triangulationSettings;
-  Settings::KeyFrame kfSettings;
-
-  // TODO create PointTracer!!!
-  Settings::PointTracer tracingSettings;
-  Settings::Intencity intencitySettings;
-  Settings::ResidualPattern rpSettings;
-  Settings::Pyramid pyrSettings;
-
+  InitializerSettings settings;
   std::vector<InitializerObserver *> observers;
 };
 
