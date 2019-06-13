@@ -95,8 +95,9 @@ std::pair<Vec2, Mat23> CameraModel::diffMap(const Vec3 &ray) const {
 }
 
 bool CameraModel::isOnImage(const Vec2 &p, int border) const {
-  return p[0] >= border && p[0] < (width - border) && p[1] >= border &&
-         p[1] <= (height - border);
+  return Eigen::AlignedBox2d(Vec2(border, border),
+                             Vec2(width - border, height - border))
+      .contains(p);
 }
 
 double CameraModel::getImgRadiusByAngle(double observeAngle) const {

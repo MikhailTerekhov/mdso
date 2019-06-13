@@ -22,21 +22,17 @@ EIGEN_STRONG_INLINE std::vector<T> reservedVector(int toReserve) {
 }
 
 template <typename T>
-void outputArray(const std::string &fname, const std::vector<T> &array) {
-  std::ofstream ofs(fname);
-  for (const T &a : array)
-    ofs << a << ' ';
-  ofs << std::endl;
-  ofs.close();
-}
-
-template <typename T>
 void outputArray(const std::string &fname, const T array[], int size) {
   std::ofstream ofs(fname);
   for (int i = 0; i < size; ++i)
     ofs << array[i] << ' ';
   ofs << std::endl;
   ofs.close();
+}
+
+template <typename T>
+void outputArray(const std::string &fname, const std::vector<T> &array) {
+  outputArray(fname, array.data(), array.size());
 }
 
 void printInPly(std::ostream &out, const std::vector<Vec3> &points,

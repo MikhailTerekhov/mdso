@@ -66,23 +66,22 @@ SE3 StereoMatcher::match(cv::Mat frames[2], StdVector<Vec2> resPoints[2],
     corresps.push_back({toVec2(keyPoints[0][matches[i].trainIdx].pt),
                         toVec2(keyPoints[1][matches[i].queryIdx].pt)});
 
-  std::unique_ptr<StereoGeometryEstimator> geometryEstimator =
-      std::unique_ptr<StereoGeometryEstimator>(new StereoGeometryEstimator(
-          cam, corresps, settings.stereoGeometryEstimator, threadingSettings));
+  StereoGeometryEstimator geometryEstimator(
+      cam, corresps, settings.stereoGeometryEstimator, threadingSettings);
 
   SE3 motion;
   if (settings.stereoGeometryEstimator.runAveraging)
-    motion = geometryEstimator->findPreciseMotion();
+    motion = geometryEstimator.findPreciseMotion();
   else
-    motion = geometryEstimator->findCoarseMotion();
+    motion = geometryEstimator.findCoarseMotion();
 
-  LOG(INFO) << "inlier matches = " << geometryEstimator->inliersNum()
+  LOG(INFO) << "inlier matches = " << geometryEstimator.inliersNum()
             << std::endl;
 
   if (FLAGS_draw_inlier_matches) {
     std::vector<cv::DMatch> inlierMatches;
     inlierMatches.reserve(matches.size());
-    for (int i : geometryEstimator->inliersInds())
+    for (int i : geometryEstimator.inliersInds())
       inlierMatches.push_back(matches[i]);
     cv::Mat imi, imi2;
     cv::drawMatches(frames[1], keyPoints[1], frames[0], keyPoints[0],
@@ -95,16 +94,16 @@ SE3 StereoMatcher::match(cv::Mat frames[2], StdVector<Vec2> resPoints[2],
 
   for (int frameNum = 0; frameNum < 2; ++frameNum) {
     resPoints[frameNum].resize(0);
-    resPoints[frameNum].reserve(geometryEstimator->inliersNum());
+    resPoints[frameNum].reserve(geometryEstimator.inliersNum());
     resDepths[frameNum].resize(0);
-    resDepths[frameNum].reserve(geometryEstimator->inliersNum());
+    resDepths[frameNum].reserve(geometryEstimator.inliersNum());
   }
 
-  for (int i : geometryEstimator->inliersInds()) {
+  for (int i : geometryEstimator.inliersInds()) {
     resPoints[0].push_back(corresps[i].first);
     resPoints[1].push_back(corresps[i].second);
-    resDepths[0].push_back(geometryEstimator->depths()[i].first);
-    resDepths[1].push_back(geometryEstimator->depths()[i].second);
+    resDepths[0].push_back(geometryEstimator.depths()[i].first);
+    resDepths[1].push_back(geometryEstimator.depths()[i].second);
   }
 
   return motion;

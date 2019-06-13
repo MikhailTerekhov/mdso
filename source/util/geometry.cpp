@@ -47,7 +47,7 @@ bool isABCDConvex(const Vec2 &a, const Vec2 &b, const Vec2 &c, const Vec2 &d) {
 }
 
 bool areEqual(const Vec2 &a, const Vec2 &b, double eps) {
-  return (a - b).norm() < eps;
+  return (a - b).squaredNorm() < eps * eps;
 }
 
 bool doesABcontain(const Vec2 &a, const Vec2 &b, const Vec2 &p, double eps) {

@@ -47,8 +47,7 @@ DEFINE_string(output_directory, "output/default",
               "CO: \"it's dso's output directory!\"");
 
 int main(int argc, char **argv) {
-  std::string usage =
-      R"abacaba(Usage: genply data_dir
+  std::string usage = "Usage: " + std::string(argv[0]) + R"abacaba( data_dir
 Where data_dir names a directory with MultiFoV fishseye dataset.
 It should contain "info" and "data" subdirectories.)abacaba";
 

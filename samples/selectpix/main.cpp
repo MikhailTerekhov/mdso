@@ -19,9 +19,9 @@ bool isImage(const std::string &fname) {
 }
 
 int main(int argc, const char **argv) {
-  std::string usage = R"abacaba(Usage: "selectpix dir"
+  std::string usage = "Usage: " + std::string(argv[0]) + R"aba( dir"
 Where dir names a directory with images with .jpg extension
-)abacaba";
+)aba";
   google::InitGoogleLogging(argv[0]);
 
   if (argc != 2) {
