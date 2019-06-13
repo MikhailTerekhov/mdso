@@ -20,15 +20,6 @@ find_package(OpenCV REQUIRED)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/thirdparty/googletest)
 
-include_directories(
-    ${CERES_INCLUDE_DIRS}
-    ${GFLAGS_INCLUDE_DIRS}
-    ${GLOG_INCLUDE_DIRS}
-    ${PROJECT_SOURCE_DIR}/include
-    ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
-    ${PROJECT_SOURCE_DIR}/thirdparty/relative_pose_solver
-)
-
 set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/util/util.h
     ${PROJECT_SOURCE_DIR}/include/util/types.h
@@ -129,6 +120,18 @@ set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -march=nat
 add_library(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES}
     ${essietial_5pt_estimator_SOURCE_FILES}
 )
+
+target_include_directories(dso
+  PUBLIC
+    ${CERES_INCLUDE_DIRS}
+    ${GFLAGS_INCLUDE_DIRS}
+    ${GLOG_INCLUDE_DIRS}
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
+  PRIVATE
+    ${PROJECT_SOURCE_DIR}/thirdparty/relative_pose_solver
+)
+
 
 target_link_libraries(dso ${OpenCV_LIBS} ${CERES_LIBRARIES} ${GLOG_LIBRARIES} ${TBB_LIBRARIES})
 
