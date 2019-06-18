@@ -67,27 +67,6 @@ void KeyFrame::deactivateAllOptimized() {
   optimizedPoints.clear();
 }
 
-std::unique_ptr<DepthedImagePyramid> KeyFrame::makePyramid() {
-  StdVector<Vec2> points;
-  points.reserve(optimizedPoints.size());
-  std::vector<double> depths;
-  depths.reserve(optimizedPoints.size());
-  std::vector<double> weights;
-  weights.reserve(optimizedPoints.size());
-
-  for (const auto &op : optimizedPoints) {
-    if (op->state != OptimizedPoint::ACTIVE)
-      continue;
-    points.push_back(op->p);
-    depths.push_back(op->depth());
-    weights.push_back(1 / op->stddev);
-  }
-
-  return std::make_unique<DepthedImagePyramid>(preKeyFrame->frame(),
-                                               tracingSettings.pyramid.levelNum,
-                                               points, depths, weights);
-}
-
 cv::Mat3b KeyFrame::drawDepthedFrame(double minDepth, double maxDepth) const {
   cv::Mat res = preKeyFrame->frameColored.clone();
 

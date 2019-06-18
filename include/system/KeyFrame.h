@@ -32,7 +32,6 @@ struct KeyFrame {
 
   void addImmatures(const std::vector<cv::Point> &points);
 
-  std::unique_ptr<DepthedImagePyramid> makePyramid();
   void selectPointsDenser(PixelSelector &pixelSelector, int pointsNeeded);
 
   cv::Mat3b drawDepthedFrame(double minDepth, double maxDepth) const;
