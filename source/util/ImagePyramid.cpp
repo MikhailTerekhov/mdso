@@ -4,9 +4,7 @@
 namespace fishdso {
 
 ImagePyramid::ImagePyramid(const cv::Mat1b &baseImage, int levelNum)
-    : images(levelNum)
-    , grids(levelNum)
-    , interpolators(levelNum) {
+    : levelNum(levelNum) {
   images[0] = baseImage;
   for (int lvl = 1; lvl < levelNum; ++lvl)
     images[lvl] = boxFilterPyrUp<unsigned char>(images[lvl - 1]);

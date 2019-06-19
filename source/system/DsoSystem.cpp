@@ -307,11 +307,13 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
       std::vector<double> depths;
       projectOntoBaseKf<ImmaturePoint>(&points, &depths, nullptr, nullptr);
 
-      std::vector<double> weights(points.size(), 1.0);
+      StdVector<DepthedImagePyramid::Point> pointsForPyr(points.size());
+      for (int i = 0; i < points.size(); ++i)
+        pointsForPyr[i] = {points[i], depths[i], 1.0};
 
-      std::unique_ptr<DepthedImagePyramid> initialTrack(new DepthedImagePyramid(
-          baseKeyFrame().preKeyFrame->frame(), settings.pyramid.levelNum,
-          points, depths, weights));
+      std::unique_ptr<DepthedImagePyramid> initialTrack(
+          new DepthedImagePyramid(baseKeyFrame().preKeyFrame->frame(),
+                                  settings.pyramid.levelNum, pointsForPyr));
 
       frameTracker = std::unique_ptr<FrameTracker>(new FrameTracker(
           camPyr, std::move(initialTrack), observers.frameTracker,
@@ -450,23 +452,14 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
     std::vector<double> depths;
     std::vector<OptimizedPoint *> refs;
     projectOntoBaseKf<OptimizedPoint>(&points, &depths, &refs, nullptr);
-    std::vector<double> weights(points.size());
-    for (int i = 0; i < points.size(); ++i)
-      weights[i] = 1.0 / refs[i]->stddev;
-    std::unique_ptr<DepthedImagePyramid> baseForTrack(new DepthedImagePyramid(
-        baseKeyFrame().preKeyFrame->frame(), settings.pyramid.levelNum, points,
-        depths, weights));
 
-    for (int i = 0; i < points.size(); ++i) {
-      for (int pl = 0; pl < settings.pyramid.levelNum; ++pl) {
-        cv::Point p = toCvPoint(points[i]);
-        if (baseForTrack->depths[pl](p / (1 << pl)) <= 0) {
-          std::cout << "pl=" << pl << " p=" << p << " psh=" << p / (1 << pl)
-                    << " i=" << i << " d=" << depths[i] << " w=" << weights[i]
-                    << " porig=" << points[i] << std::endl;
-        }
-      }
-    }
+    StdVector<DepthedImagePyramid::Point> pointsForPyr(points.size());
+    for (int i = 0; i < points.size(); ++i)
+      pointsForPyr[i] = {points[i], depths[i], 1.0 / refs[i]->stddev};
+
+    std::unique_ptr<DepthedImagePyramid> baseForTrack(
+        new DepthedImagePyramid(baseKeyFrame().preKeyFrame->frame(),
+                                settings.pyramid.levelNum, pointsForPyr));
 
     frameTracker = std::unique_ptr<FrameTracker>(new FrameTracker(
         camPyr, std::move(baseForTrack), observers.frameTracker,

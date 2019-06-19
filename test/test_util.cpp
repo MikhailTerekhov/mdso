@@ -45,6 +45,10 @@ TEST(UtilTest, PyrNUpDepthTrivial) {
   }
 }
 
+bool cmp(const cv::Point &a, const cv::Point &b) {
+  return a.x == b.x ? a.y < b.y : a.x < b.x;
+}
+
 TEST(UtilTest, DepthedImagePyramid) {
   const int w = 1024, h = 512, cnt = 2000;
 
@@ -52,28 +56,34 @@ TEST(UtilTest, DepthedImagePyramid) {
   std::uniform_int_distribution<int> x(0, w - 1), y(0, h - 1);
   std::uniform_real_distribution<double> ddis(10.0, 20.0);
   std::uniform_real_distribution<double> wdis(1.0, 2.0);
-  StdVector<Vec2> pnts;
-  std::vector<double> dps;
-  std::vector<double> ws;
+  StdVector<DepthedImagePyramid::Point> points;
+  points.reserve(cnt);
   for (int i = 0; i < cnt; ++i) {
     cv::Point p(x(mt), y(mt));
-    pnts.push_back(toVec2(p));
-    dps.push_back(ddis(mt));
-    ws.push_back(wdis(mt));
+    points.push_back({toVec2(p), ddis(mt), wdis(mt)});
   }
 
   cv::Mat1b base(h, w, CV_BLACK_BYTE);
-  DepthedImagePyramid tst(base, Settings::Pyramid::default_levelNum, pnts, dps,
-                          ws);
+  DepthedImagePyramid tst(base, Settings::Pyramid::default_levelNum, points);
 
-  for (int i = 0; i < pnts.size(); ++i) {
-    for (int pl = 0; pl < Settings::Pyramid::default_levelNum; ++pl) {
-      cv::Point p = toCvPoint(pnts[i]);
-      ASSERT_GT(tst.depths[pl](p / (1 << pl)), 0)
-          << "pl=" << pl << " p=" << p << " psh=" << p / (1 << pl) << " i=" << i
-          << " d=" << dps[i] << " w=" << ws[i] << " porig=" << pnts[i]
-          << std::endl;
+  for (int pl = 0; pl < Settings::Pyramid::default_levelNum; ++pl) {
+    std::vector<cv::Point> appear, needed;
+    for (const auto &p : tst.depthPyr[pl])
+      appear.push_back(toCvPoint(p.p));
+    for (int i = 0; i < points.size(); ++i) {
+      cv::Point p = toCvPoint(points[i].p);
+      needed.push_back(p / (1 << pl));
     }
+
+    std::sort(appear.begin(), appear.end(), cmp);
+    appear.erase(std::unique(appear.begin(), appear.end()), appear.end());
+    std::sort(needed.begin(), needed.end(), cmp);
+    needed.erase(std::unique(needed.begin(), needed.end()), needed.end());
+
+    ASSERT_EQ(appear.size(), needed.size());
+
+    for (int i = 0; i < appear.size(); ++i)
+      ASSERT_EQ(appear[i], needed[i]);
   }
 }
 

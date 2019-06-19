@@ -238,6 +238,7 @@ struct Settings {
 
     int levelNum;
     static constexpr int default_levelNum = 6;
+    static constexpr int max_levelNum = 8;
   } pyramid;
 
   struct AffineLight {
