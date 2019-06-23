@@ -26,6 +26,11 @@ PointTracerSettings Settings::getPointTracerSettings() const {
   return {pointTracer, intencity, residualPattern, pyramid};
 }
 
+FrameTrackerSettings Settings::getFrameTrackerSettings() const {
+  return {frameTracker, pyramid,       affineLight,
+          intencity,    gradWeighting, threading};
+}
+
 BundleAdjusterSettings Settings::getBundleAdjusterSettings() const {
   return {bundleAdjuster, residualPattern, gradWeighting, intencity,
           affineLight,    threading,       depth};

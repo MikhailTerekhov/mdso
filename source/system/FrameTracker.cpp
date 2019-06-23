@@ -12,25 +12,15 @@ namespace fishdso {
 FrameTracker::FrameTracker(const StdVector<CameraModel> &camPyr,
                            std::unique_ptr<DepthedImagePyramid> baseFrame,
                            const std::vector<FrameTrackerObserver *> &observers,
-                           const Settings::FrameTracker &frameTrackerSettings,
-                           const Settings::Pyramid &pyrSettings,
-                           const Settings::AffineLight &affineLightSettings,
-                           const Settings::Intencity &intencitySettings,
-                           const Settings::GradWeighting &gradWeightingSettings,
-                           const Settings::Threading &threadingSettings)
-    : residualsImg(pyrSettings.levelNum)
+                           const FrameTrackerSettings &_settings)
+    : residualsImg(_settings.pyramid.levelNum)
     , lastRmse(INF)
     , camPyr(camPyr)
     , baseFrame(std::move(baseFrame))
     , displayWidth(camPyr[1].getWidth())
     , displayHeight(camPyr[1].getHeight())
     , observers(observers)
-    , frameTrackerSettings(frameTrackerSettings)
-    , pyrSettings(pyrSettings)
-    , affineLightSettings(affineLightSettings)
-    , intencitySettings(intencitySettings)
-    , gradWeightingSettings(gradWeightingSettings)
-    , threadingSettings(threadingSettings) {}
+    , settings(_settings) {}
 
 void FrameTracker::addObserver(FrameTrackerObserver *observer) {
   observers.push_back(observer);
@@ -45,7 +35,7 @@ FrameTracker::trackFrame(const ImagePyramid &frame, const SE3 &coarseMotion,
   SE3 motion = coarseMotion;
   AffineLightTransform<double> affLight;
 
-  for (int i = pyrSettings.levelNum - 1; i >= 0; --i) {
+  for (int i = settings.pyramid.levelNum - 1; i >= 0; --i) {
     LOG(INFO) << "track level #" << i << std::endl;
     std::tie(motion, affLight) =
         trackPyrLevel(camPyr[i], baseFrame->images[i], baseFrame->depthPyr[i],
@@ -88,15 +78,15 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
 
   problem.AddParameterBlock(affLight.data, 2);
   problem.SetParameterLowerBound(affLight.data, 0,
-                                 affineLightSettings.minAffineLightA);
+                                 settings.affineLight.minAffineLightA);
   problem.SetParameterUpperBound(affLight.data, 0,
-                                 affineLightSettings.maxAffineLightA);
+                                 settings.affineLight.maxAffineLightA);
   problem.SetParameterLowerBound(affLight.data, 1,
-                                 affineLightSettings.minAffineLightB);
+                                 settings.affineLight.minAffineLightB);
   problem.SetParameterUpperBound(affLight.data, 1,
-                                 affineLightSettings.maxAffineLightB);
+                                 settings.affineLight.maxAffineLightB);
 
-  if (!affineLightSettings.optimizeAffineLight)
+  if (!settings.affineLight.optimizeAffineLight)
     problem.SetParameterBlockConstant(affLight.data);
 
   std::map<const ceres::CostFunction *, const PointTrackingResidual *>
@@ -115,15 +105,15 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
     }
 
     ceres::LossFunction *lossFunc = nullptr;
-    if (frameTrackerSettings.useGradWeighting) {
+    if (settings.frameTracker.useGradWeighting) {
       double gradNorm = gradNormAt(baseImg, cvp);
-      double c = gradWeightingSettings.c;
+      double c = settings.gradWeighting.c;
       double weight = c / std::hypot(c, gradNorm);
       lossFunc = new ceres::ScaledLoss(
-          new ceres::HuberLoss(intencitySettings.outlierDiff), weight,
+          new ceres::HuberLoss(settings.intencity.outlierDiff), weight,
           ceres::Ownership::TAKE_OWNERSHIP);
     } else
-      lossFunc = new ceres::HuberLoss(intencitySettings.outlierDiff);
+      lossFunc = new ceres::HuberLoss(settings.intencity.outlierDiff);
 
     auto newResidual = new PointTrackingResidual(
         pos, static_cast<double>(baseImg(cvp)), &cam, &trackedFrame);
@@ -137,7 +127,7 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
 
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_QR;
-  options.num_threads = threadingSettings.numThreads;
+  options.num_threads = settings.threading.numThreads;
   // options.minimizer_progress_to_stdout = true;
   // options.max_num_iterations = 10;
   ceres::Solver::Summary summary;

@@ -12,6 +12,8 @@ struct InitializerSettings;
 
 struct PointTracerSettings;
 
+struct FrameTrackerSettings;
+
 struct BundleAdjusterSettings;
 
 struct Settings {
@@ -353,6 +355,7 @@ struct Settings {
 
   InitializerSettings getInitializerSettings() const;
   PointTracerSettings getPointTracerSettings() const;
+  FrameTrackerSettings getFrameTrackerSettings() const;
   BundleAdjusterSettings getBundleAdjusterSettings() const;
 };
 
@@ -370,6 +373,15 @@ struct InitializerSettings {
   Settings::Triangulation triangulation = {};
   Settings::KeyFrame keyFrame = {};
   PointTracerSettings tracingSettings = {};
+};
+
+struct FrameTrackerSettings {
+  Settings::FrameTracker frameTracker;
+  Settings::Pyramid pyramid;
+  Settings::AffineLight affineLight;
+  Settings::Intencity intencity;
+  Settings::GradWeighting gradWeighting;
+  Settings::Threading threading;
 };
 
 struct BundleAdjusterSettings {

@@ -15,12 +15,7 @@ public:
   FrameTracker(const StdVector<CameraModel> &camPyr,
                std::unique_ptr<DepthedImagePyramid> baseFrame,
                const std::vector<FrameTrackerObserver *> &observers = {},
-               const Settings::FrameTracker &frameTrackerSettings = {},
-               const Settings::Pyramid &pyrSettings = {},
-               const Settings::AffineLight &affineLightSettings = {},
-               const Settings::Intencity &intencitySettings = {},
-               const Settings::GradWeighting &gradWeightingSettings = {},
-               const Settings::Threading &threadingSettings = {});
+               const FrameTrackerSettings &_settings = {});
 
   std::pair<SE3, AffineLightTransform<double>>
   trackFrame(const ImagePyramid &frame, const SE3 &coarseMotion,
@@ -46,13 +41,7 @@ private:
   int displayWidth, displayHeight;
 
   std::vector<FrameTrackerObserver *> observers;
-
-  Settings::FrameTracker frameTrackerSettings;
-  Settings::Pyramid pyrSettings;
-  Settings::AffineLight affineLightSettings;
-  Settings::Intencity intencitySettings;
-  Settings::GradWeighting gradWeightingSettings;
-  Settings::Threading threadingSettings;
+  FrameTrackerSettings settings;
 };
 
 struct PointTrackingResidual {

@@ -317,8 +317,7 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
 
       frameTracker = std::unique_ptr<FrameTracker>(new FrameTracker(
           camPyr, std::move(initialTrack), observers.frameTracker,
-          settings.frameTracker, settings.pyramid, settings.affineLight,
-          settings.intencity, settings.gradWeighting, settings.threading));
+          settings.getFrameTrackerSettings()));
 
       lastInitialized = &keyFrames.rbegin()->second;
 
@@ -463,8 +462,7 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
 
     frameTracker = std::unique_ptr<FrameTracker>(new FrameTracker(
         camPyr, std::move(baseForTrack), observers.frameTracker,
-        settings.frameTracker, settings.pyramid, settings.affineLight,
-        settings.intencity, settings.gradWeighting, settings.threading));
+        settings.getFrameTrackerSettings()));
   }
 
   return preKeyFrame;
