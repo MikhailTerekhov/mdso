@@ -33,9 +33,11 @@ DistanceMap::DistanceMap(int givenW, int givenH, const StdVector<Vec2> &points,
   StdQueue<Vec2i> q;
 
   for (const Vec2 &p : points) {
-    LOG_IF(WARNING, !(p[0] >= 0 && p[0] < givenW && p[1] >= 0 && p[1] < givenH))
-        << "point in DistanceMap::DistanceMap OOB! w, h = " << givenW << ' '
-        << givenH << " p = " << p.transpose() << std::endl;
+    if (!(p[0] >= 0 && p[0] < givenW && p[1] >= 0 && p[1] < givenH)) {
+      LOG(WARNING) << "point in DistanceMap::DistanceMap OOB! w, h = " << givenW
+                   << ' ' << givenH << " p = " << p.transpose() << std::endl;
+      continue;
+    }
     Vec2i pi = p.cast<int>() / pyrDown;
     dist(pi[1], pi[0]) = 0;
     q.push(pi);

@@ -8,11 +8,15 @@ namespace fishdso {
 
 KeyFrame::KeyFrame(CameraModel *cam, const cv::Mat &frameColored,
                    int globalFrameNum, PixelSelector &pixelSelector,
-                   const Settings::KeyFrame &kfSettings,
+                   const Settings::KeyFrame &_kfSettings,
                    const PointTracerSettings tracingSettings)
     : preKeyFrame(std::shared_ptr<PreKeyFrame>(
           new PreKeyFrame(cam, frameColored, globalFrameNum)))
-    , kfSettings(kfSettings)
+    , immaturePoints(
+          reservedVector<std::unique_ptr<ImmaturePoint>>(_kfSettings.pointsNum))
+    , optimizedPoints(reservedVector<std::unique_ptr<OptimizedPoint>>(
+          _kfSettings.pointsNum))
+    , kfSettings(_kfSettings)
     , tracingSettings(tracingSettings) {
   std::vector<cv::Point> points = pixelSelector.select(
       frameColored, preKeyFrame->gradNorm, kfSettings.pointsNum, nullptr);
@@ -21,10 +25,14 @@ KeyFrame::KeyFrame(CameraModel *cam, const cv::Mat &frameColored,
 
 KeyFrame::KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame,
                    PixelSelector &pixelSelector,
-                   const Settings::KeyFrame &kfSettings,
+                   const Settings::KeyFrame &_kfSettings,
                    const PointTracerSettings &tracingSettings)
     : preKeyFrame(newPreKeyFrame)
-    , kfSettings(kfSettings)
+    , immaturePoints(
+          reservedVector<std::unique_ptr<ImmaturePoint>>(_kfSettings.pointsNum))
+    , optimizedPoints(reservedVector<std::unique_ptr<OptimizedPoint>>(
+          _kfSettings.pointsNum))
+    , kfSettings(_kfSettings)
     , tracingSettings(tracingSettings) {
   std::vector<cv::Point> points =
       pixelSelector.select(newPreKeyFrame->frameColored, preKeyFrame->gradNorm,
@@ -34,11 +42,9 @@ KeyFrame::KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame,
 
 void KeyFrame::addImmatures(const std::vector<cv::Point> &points) {
   immaturePoints.reserve(immaturePoints.size() + points.size());
-  for (const cv::Point &p : points) {
-    SetUniquePtr<ImmaturePoint> ip(
-        new ImmaturePoint(preKeyFrame.get(), toVec2(p), tracingSettings));
-    immaturePoints.insert(std::move(ip));
-  }
+  for (const cv::Point &p : points)
+    immaturePoints.push_back(std::unique_ptr<ImmaturePoint>(
+        new ImmaturePoint(preKeyFrame.get(), toVec2(p), tracingSettings)));
 }
 
 void KeyFrame::selectPointsDenser(PixelSelector &pixelSelector,
@@ -52,17 +58,17 @@ void KeyFrame::selectPointsDenser(PixelSelector &pixelSelector,
 
 void KeyFrame::activateAllImmature() {
   for (const auto &ip : immaturePoints)
-    optimizedPoints.insert(
-        SetUniquePtr<OptimizedPoint>(new OptimizedPoint(*ip)));
+    optimizedPoints.push_back(
+        std::unique_ptr<OptimizedPoint>(new OptimizedPoint(*ip)));
   immaturePoints.clear();
 }
 
 void KeyFrame::deactivateAllOptimized() {
   for (const auto &op : optimizedPoints) {
-    SetUniquePtr<ImmaturePoint> ip(
+    std::unique_ptr<ImmaturePoint> ip(
         new ImmaturePoint(preKeyFrame.get(), op->p, tracingSettings));
     ip->depth = op->depth();
-    immaturePoints.insert(std::move(ip));
+    immaturePoints.push_back(std::move(ip));
   }
   optimizedPoints.clear();
 }

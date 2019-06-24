@@ -19,12 +19,12 @@ struct KeyFrame {
   KeyFrame(KeyFrame &&other) = default;
   KeyFrame(CameraModel *cam, const cv::Mat &frameColored, int globalFrameNum,
            PixelSelector &pixelSelector,
-           const Settings::KeyFrame &kfSettings = {},
+           const Settings::KeyFrame &_kfSettings = {},
            const PointTracerSettings tracingSettings = {});
 
   KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame,
            PixelSelector &pixelSelector,
-           const Settings::KeyFrame &kfSettings = {},
+           const Settings::KeyFrame &_kfSettings = {},
            const PointTracerSettings &tracingSettings = {});
 
   void activateAllImmature();
@@ -38,8 +38,8 @@ struct KeyFrame {
 
   std::shared_ptr<PreKeyFrame> preKeyFrame;
 
-  StdUnorderedSetOfPtrs<ImmaturePoint> immaturePoints;
-  StdUnorderedSetOfPtrs<OptimizedPoint> optimizedPoints;
+  std::vector<std::unique_ptr<ImmaturePoint>> immaturePoints;
+  std::vector<std::unique_ptr<OptimizedPoint>> optimizedPoints;
 
   std::vector<std::shared_ptr<PreKeyFrame>> trackedFrames;
 

@@ -8,13 +8,18 @@ DepthedImagePyramid::DepthedImagePyramid(const cv::Mat1b &baseImage,
                                          int levelNum,
                                          const StdVector<Point> &points)
     : ImagePyramid(baseImage, levelNum) {
-  depthPyr[0] = points;
+  depthPyr[0].reserve(points.size());
   cv::Mat1d depths = cv::Mat1d(baseImage.rows, baseImage.cols, -1.0);
   cv::Mat1d weights = cv::Mat1d(baseImage.rows, baseImage.cols, 0.0);
   for (const Point &p : points) {
     cv::Point cvp = toCvPoint(p.p);
-    depths(cvp) = p.depth;
-    weights(cvp) = p.weight;
+    if (Eigen::AlignedBox2i(Vec2i::Zero(),
+                            Vec2i(baseImage.cols - 1, baseImage.rows - 1))
+            .contains(Vec2i(cvp.x, cvp.y))) {
+      depths(cvp) = p.depth;
+      weights(cvp) = p.weight;
+      depthPyr[0].push_back(p);
+    }
   }
 
   cv::Mat1d weightedDepths = depths.mul(weights, 1);
@@ -30,8 +35,12 @@ DepthedImagePyramid::DepthedImagePyramid(const cv::Mat1b &baseImage,
       cv::Point cvp = toCvPoint(p.p);
       int newX = cvp.x >> il, newY = cvp.y >> il;
       int origX = newX << il, origY = newY << il;
-      int ind = newX * images[il].cols + newY;
+      if (!Eigen::AlignedBox2i(Vec2i::Zero(),
+                               Vec2i(baseImage.cols - d, baseImage.rows - d))
+               .contains(Vec2i(origX, origY)))
+        continue;
 
+      int ind = newX * images[il].cols + newY;
       if (alreadyPutInd.count(ind) > 0)
         continue;
       alreadyPutInd.insert(ind);

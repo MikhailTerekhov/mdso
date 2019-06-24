@@ -60,14 +60,23 @@ EIGEN_STRONG_INLINE double depth(const PtrPointT &p);
 
 template <>
 EIGEN_STRONG_INLINE double
-depth<SetUniquePtr<ImmaturePoint>>(const SetUniquePtr<ImmaturePoint> &p) {
+depth<std::unique_ptr<ImmaturePoint>>(const std::unique_ptr<ImmaturePoint> &p) {
   return p->depth;
 }
 
 template <>
-EIGEN_STRONG_INLINE double
-depth<SetUniquePtr<OptimizedPoint>>(const SetUniquePtr<OptimizedPoint> &p) {
+EIGEN_STRONG_INLINE double depth<std::unique_ptr<OptimizedPoint>>(
+    const std::unique_ptr<OptimizedPoint> &p) {
   return p->depth();
+}
+
+// returns reprojection + depth
+std::pair<Vec2, double> reproject(CameraModel *cam, const SE3 origToReprojected,
+                                  const Vec2 &p, double depth) {
+  Vec3 reprojectedDir =
+      origToReprojected * (depth * cam->unmap(p).normalized());
+  Vec2 reprojectedPos = cam->map(reprojectedDir);
+  return {reprojectedPos, reprojectedDir.norm()};
 }
 
 template <typename PointT>
@@ -119,6 +128,13 @@ void DsoSystem::projectOntoBaseKf(StdVector<Vec2> *points,
     }
   }
 }
+
+template void DsoSystem::projectOntoBaseKf<ImmaturePoint>(
+    StdVector<Vec2> *points, std::vector<double> *depths,
+    std::vector<ImmaturePoint *> *ptrs, std::vector<KeyFrame *> *kfs);
+template void DsoSystem::projectOntoBaseKf<OptimizedPoint>(
+    StdVector<Vec2> *points, std::vector<double> *depths,
+    std::vector<OptimizedPoint *> *ptrs, std::vector<KeyFrame *> *kfs);
 
 SE3 predictScrewInternal(int prevFramesSkipped, const SE3 &worldToBaseKf,
                          const SE3 &worldToLbo, const SE3 &worldToLast) {
@@ -204,32 +220,46 @@ void DsoSystem::marginalizeFrames() {
 
 void DsoSystem::activateNewOptimizedPoints() {
   StdVector<Vec2> optPoints;
-  projectOntoBaseKf<OptimizedPoint>(&optPoints, nullptr, nullptr, nullptr);
+  for (const auto &[num, kf] : keyFrames) {
+    SE3 refToBase = baseKeyFrame().preKeyFrame->worldToThis *
+                    kf.preKeyFrame->worldToThis.inverse();
+    for (const auto &op : kf.optimizedPoints)
+      if (op->state == OptimizedPoint::ACTIVE) {
+        auto [p, depth] = (&kf == &baseKeyFrame()
+                               ? std::pair(op->p, op->depth())
+                               : reproject(cam, refToBase, op->p, op->depth()));
+        optPoints.push_back(p);
+      }
+  }
+
   DistanceMap distMap(cam->getWidth(), cam->getHeight(), optPoints);
 
-  StdVector<Vec2> immPoints;
-  std::vector<ImmaturePoint *> immRefs;
-  std::vector<KeyFrame *> kfs;
-  projectOntoBaseKf<ImmaturePoint>(&immPoints, nullptr, &immRefs, &kfs);
-  int oldIt = 0, newIt = 0;
   int totalActive = 0;
-  for (; oldIt < immPoints.size(); ++oldIt) {
-    if (immRefs[oldIt]->state == ImmaturePoint::ACTIVE)
-      totalActive++;
 
-    if (immRefs[oldIt]->isReady()) {
-      immPoints[newIt] = immPoints[oldIt];
-      kfs[newIt] = kfs[oldIt];
-      immRefs[newIt++] = immRefs[oldIt];
+  StdVector<Vec2> projectedImmatures;
+  std::vector<std::pair<KeyFrame *, int>> immaturePositions;
+
+  for (auto &[num, kf] : keyFrames) {
+    SE3 refToBase = baseKeyFrame().preKeyFrame->worldToThis *
+                    kf.preKeyFrame->worldToThis.inverse();
+    for (int ind = 0; ind < kf.immaturePoints.size(); ++ind) {
+      const auto &ip = kf.immaturePoints[ind];
+      if (ip->state == ImmaturePoint::ACTIVE)
+        totalActive++;
+      if (ip->isReady()) {
+        auto [p, depth] = (&kf == &baseKeyFrame()
+                               ? std::pair(ip->p, ip->depth)
+                               : reproject(cam, refToBase, ip->p, ip->depth));
+        projectedImmatures.push_back(p);
+        immaturePositions.push_back({&kf, ind});
+      }
     }
   }
+
   std::cout << "before selection:" << std::endl;
   std::cout << "total active = " << totalActive << std::endl;
-  std::cout << "total good = " << newIt << std::endl;
+  std::cout << "total good = " << projectedImmatures.size() << std::endl;
 
-  immPoints.resize(newIt);
-  immRefs.resize(newIt);
-  kfs.resize(newIt);
   int curOptPoints = std::accumulate(
       keyFrames.begin(), keyFrames.end(), 0, [](int acc, const auto &kfp) {
         return acc + kfp.second.optimizedPoints.size();
@@ -237,13 +267,24 @@ void DsoSystem::activateNewOptimizedPoints() {
   int pointsNeeded = settings.maxOptimizedPoints - curOptPoints;
   std::cout << "cur opt = " << curOptPoints << ", needed = " << pointsNeeded
             << std::endl;
-  std::vector<int> activatedInd = distMap.choose(immPoints, pointsNeeded);
-  std::cout << "chosen = " << activatedInd.size() << std::endl;
-  for (int i : activatedInd) {
-    kfs[i]->optimizedPoints.insert(
-        SetUniquePtr<OptimizedPoint>(new OptimizedPoint(*immRefs[i])));
-    int erasedCount = kfs[i]->immaturePoints.erase(makeFindPtr(immRefs[i]));
-    CHECK(erasedCount > 0);
+
+  std::vector<int> activatedIndices =
+      distMap.choose(projectedImmatures, pointsNeeded);
+  std::cout << "chosen = " << activatedIndices.size() << std::endl;
+  std::sort(activatedIndices.begin(), activatedIndices.end(),
+            [&immaturePositions](int i1, int i2) {
+              return immaturePositions[i1].second >
+                     immaturePositions[i2].second;
+            });
+
+  for (int i : activatedIndices) {
+    KeyFrame *kf = immaturePositions[i].first;
+    auto &ip = kf->immaturePoints[immaturePositions[i].second];
+    kf->optimizedPoints.push_back(
+        std::unique_ptr<OptimizedPoint>(new OptimizedPoint(*ip)));
+
+    std::swap(ip, kf->immaturePoints.back());
+    kf->immaturePoints.pop_back();
   }
 }
 
@@ -302,14 +343,19 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
             worldToSecondKfGT;
       }
 
-      StdVector<Vec2> points;
-
-      std::vector<double> depths;
-      projectOntoBaseKf<ImmaturePoint>(&points, &depths, nullptr, nullptr);
-
-      StdVector<DepthedImagePyramid::Point> pointsForPyr(points.size());
-      for (int i = 0; i < points.size(); ++i)
-        pointsForPyr[i] = {points[i], depths[i], 1.0};
+      StdVector<DepthedImagePyramid::Point> pointsForPyr;
+      for (const auto &[num, kf] : keyFrames) {
+        SE3 refToBase = baseKeyFrame().preKeyFrame->worldToThis *
+                        kf.preKeyFrame->worldToThis.inverse();
+        for (const auto &ip : kf.immaturePoints)
+          if (ip->state == ImmaturePoint::ACTIVE) {
+            auto [p, depth] =
+                (&kf == &baseKeyFrame()
+                     ? std::pair(ip->p, ip->depth)
+                     : reproject(cam, refToBase, ip->p, ip->depth));
+            pointsForPyr.push_back({p, depth, 1.0});
+          }
+      }
 
       std::unique_ptr<DepthedImagePyramid> initialTrack(
           new DepthedImagePyramid(baseKeyFrame().preKeyFrame->frame(),
@@ -447,14 +493,19 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
       bundleAdjuster.adjust(settings.bundleAdjuster.maxIterations);
     }
 
-    StdVector<Vec2> points;
-    std::vector<double> depths;
-    std::vector<OptimizedPoint *> refs;
-    projectOntoBaseKf<OptimizedPoint>(&points, &depths, &refs, nullptr);
-
-    StdVector<DepthedImagePyramid::Point> pointsForPyr(points.size());
-    for (int i = 0; i < points.size(); ++i)
-      pointsForPyr[i] = {points[i], depths[i], 1.0 / refs[i]->stddev};
+    StdVector<DepthedImagePyramid::Point> pointsForPyr;
+    for (const auto &[num, kf] : keyFrames) {
+      SE3 refToBase = baseKeyFrame().preKeyFrame->worldToThis *
+                      kf.preKeyFrame->worldToThis.inverse();
+      for (const auto &op : kf.optimizedPoints)
+        if (op->state == OptimizedPoint::ACTIVE) {
+          auto [p, depth] =
+              (&kf == &baseKeyFrame()
+                   ? std::pair(op->p, op->depth())
+                   : reproject(cam, refToBase, op->p, op->depth()));
+          pointsForPyr.push_back({p, depth, 1.0 / op->stddev});
+        }
+    }
 
     std::unique_ptr<DepthedImagePyramid> baseForTrack(
         new DepthedImagePyramid(baseKeyFrame().preKeyFrame->frame(),
