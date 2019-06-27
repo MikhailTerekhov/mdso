@@ -197,21 +197,13 @@ struct Settings {
   struct FrameTracker {
     FrameTracker()
         : trackFailFactor(default_trackFailFactor)
-        , useGradWeighting(default_useGradWeighting)
-        , performTrackingCheckGT(default_performTrackingCheckGT)
-        , performTrackingCheckStereo(default_performTrackingCheckStereo) {}
+        , useGradWeighting(default_useGradWeighting) {}
 
     double trackFailFactor;
     static constexpr double default_trackFailFactor = 1.5;
 
     bool useGradWeighting;
     static constexpr bool default_useGradWeighting = false;
-
-    bool performTrackingCheckGT;
-    static constexpr bool default_performTrackingCheckGT = false;
-
-    bool performTrackingCheckStereo;
-    static constexpr bool default_performTrackingCheckStereo = false;
   } frameTracker;
 
   struct BundleAdjuster {
@@ -328,9 +320,7 @@ struct Settings {
       , maxKeyFrames(default_maxKeyFrames)
       , trackFromLastKf(default_trackFromLastKf)
       , predictUsingScrew(default_predictUsingScrew)
-      , switchFirstMotionToGT(default_switchFirstMotionToGT)
-      , allPosesGT(default_allPosesGT)
-      , continueChoosingKeyFrames(default_continueChoosingKeyFrames) 
+      , continueChoosingKeyFrames(default_continueChoosingKeyFrames)
       , initialMaxFrame(default_initialMaxFrame) {}
 
   int maxOptimizedPoints;
@@ -344,12 +334,6 @@ struct Settings {
 
   bool predictUsingScrew;
   static constexpr bool default_predictUsingScrew = false;
-
-  bool switchFirstMotionToGT;
-  static constexpr bool default_switchFirstMotionToGT = false;
-
-  bool allPosesGT;
-  static constexpr bool default_allPosesGT = false;
 
   bool continueChoosingKeyFrames;
   static constexpr bool default_continueChoosingKeyFrames = true;

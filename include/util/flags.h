@@ -25,8 +25,6 @@ DECLARE_double(tracing_impr_factor);
 DECLARE_double(epi_outlier_e);
 DECLARE_double(epi_outlier_q);
 
-DECLARE_bool(perform_tracking_check_stereo);
-DECLARE_bool(perform_tracking_check_GT);
 DECLARE_bool(track_from_lask_kf);
 DECLARE_bool(predict_using_screw);
 DECLARE_bool(use_grad_weights_on_tracking);

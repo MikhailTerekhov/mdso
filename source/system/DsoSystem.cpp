@@ -25,8 +25,6 @@ DsoSystem::DsoSystem(CameraModel *cam, const Observers &observers,
     , isInitialized(false)
     , worldToFrame(_settings.initialMaxFrame)
     , worldToFramePredict(_settings.initialMaxFrame)
-    , worldToFrameMatched(_settings.initialMaxFrame)
-    , worldToFrameGT(_settings.initialMaxFrame)
     , lastTrackRmse(INF)
     , firstFrameNum(-1)
     , settings(_settings)
@@ -174,10 +172,10 @@ double DsoSystem::getTimeLastByLbo() {
 SE3 DsoSystem::predictInternal(double timeLastByLbo, const SE3 &worldToBaseKf,
                                const SE3 &worldToLbo, const SE3 &worldToLast) {
   return settings.predictUsingScrew
-             ? predictScrewInternal(timeLastByLbo, worldToBaseKf,
-                                    worldToLbo, worldToLast)
-             : predictSimpleInternal(timeLastByLbo, worldToBaseKf,
-                                     worldToLbo, worldToLast);
+             ? predictScrewInternal(timeLastByLbo, worldToBaseKf, worldToLbo,
+                                    worldToLast)
+             : predictSimpleInternal(timeLastByLbo, worldToBaseKf, worldToLbo,
+                                     worldToLast);
 }
 
 SE3 DsoSystem::predictBaseKfToCur() {
@@ -313,9 +311,7 @@ void DsoSystem::adjustWorldToFrameSizes(int newFrameNum) {
   CHECK(newFrameNum > 0);
   if (newFrameNum >= worldToFrame.size()) {
     worldToFrame.resize(newFrameNum + 1);
-    worldToFrameMatched.resize(newFrameNum + 1);
     worldToFramePredict.resize(newFrameNum + 1);
-    worldToFrameGT.resize(newFrameNum + 1);
   }
 }
 
@@ -356,15 +352,6 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
       // for (auto &p : keyFrames)
       // bundleAdjuster.addKeyFrame(&p.second);
       // bundleAdjuster.adjust(settingMaxFirstBAIterations);
-
-      if (settings.switchFirstMotionToGT || settings.allPosesGT) {
-        SE3 worldToSecondKfGT =
-            worldToFrameGT[keyFrames.rbegin()
-                               ->second.preKeyFrame->globalFrameNum];
-        keyFrames.rbegin()->second.preKeyFrame->worldToThis = worldToSecondKfGT;
-        worldToFrame[keyFrames.rbegin()->second.preKeyFrame->globalFrameNum] =
-            worldToSecondKfGT;
-      }
 
       StdVector<DepthedImagePyramid::Point> pointsForPyr;
       for (const auto &[num, kf] : keyFrames) {
@@ -435,11 +422,6 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
   preKeyFrame->baseToThis = baseKfToCur;
   preKeyFrame->worldToThis = worldToFrame[globalFrameNum];
 
-  if (settings.allPosesGT) {
-    worldToFrame[globalFrameNum] = worldToFrameGT[globalFrameNum];
-    preKeyFrame->worldToThis = worldToFrameGT[globalFrameNum];
-  }
-
   lightKfToLast = lightBaseKfToCur;
 
   LOG(INFO) << "estimated motion\n"
@@ -451,14 +433,6 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
             << diff.translation().norm() << "\n"
             << diff.so3().log().norm() << std::endl;
   LOG(INFO) << "estimated aff = \n" << lightBaseKfToCur << std::endl;
-
-  if (settings.frameTracker.performTrackingCheckGT) {
-    LOG(INFO) << "perform comparison to ground truth" << std::endl;
-    checkLastTrackedGT(preKeyFrame.get());
-  } else if (settings.frameTracker.performTrackingCheckStereo) {
-    LOG(INFO) << "perform stereo check" << std::endl;
-    checkLastTrackedStereo(preKeyFrame.get());
-  }
 
   int totalActive = 0, totalGood = 0;
   constexpr int maxTraced = 5;
@@ -540,53 +514,6 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
   }
 
   return preKeyFrame;
-}
-
-void DsoSystem::checkLastTrackedGT(PreKeyFrame *lastFrame) {
-  SE3 worldToBase = baseKeyFrame().preKeyFrame->worldToThis;
-  SE3 worldToLast = lastFrame->worldToThis;
-  SE3 baseToLast = worldToLast * worldToBase.inverse();
-
-  SE3 worldToBaseGT =
-      worldToFrameGT[baseKeyFrame().preKeyFrame->globalFrameNum];
-  SE3 worldToLastGT = worldToFrameGT[lastFrame->globalFrameNum];
-  SE3 baseToLastGT = worldToLastGT * worldToBaseGT.inverse();
-
-  double transErr =
-      (baseToLastGT.translation() - baseToLast.translation()).norm();
-  double rotErr =
-      180. / M_PI *
-      (baseToLast.so3() * baseToLastGT.so3().inverse()).log().norm();
-
-  LOG(INFO) << "translation error distance = " << transErr
-            << "\nrotation error angle = " << rotErr << std::endl;
-}
-
-void DsoSystem::checkLastTrackedStereo(PreKeyFrame *lastFrame) {
-  cv::Mat1b frames[2];
-  frames[0] = keyFrames.begin()->second.preKeyFrame->frame();
-  frames[1] = lastFrame->frame();
-
-  SE3 worldToFirst = keyFrames.rbegin()->second.preKeyFrame->worldToThis;
-  SE3 worldToBase = baseKeyFrame().preKeyFrame->worldToThis;
-
-  StdVector<Vec2> points[2];
-  std::vector<double> depths[2];
-  StereoMatcher matcher(cam);
-  SE3 matchedFirstToLast = matcher.match(frames, points, depths);
-  SE3 refMotion = matchedFirstToLast * worldToFirst * worldToBase.inverse();
-  SE3 trackedMotion = worldToFrame[frameNumbers.back()] * worldToBase.inverse();
-
-  double transErr = angle(refMotion.translation(), trackedMotion.translation());
-  double rotErr =
-      (trackedMotion.so3() * refMotion.so3().inverse()).log().norm();
-  std::cout << "trans error angle = " << 180. / M_PI * transErr
-            << "\nrot error angle = " << 180. / M_PI * rotErr << std::endl;
-  std::cout << "rel rot error = " << rotErr / refMotion.so3().log().norm()
-            << std::endl;
-
-  refMotion.translation() *= trackedMotion.translation().norm();
-  worldToFrameMatched[frameNumbers.back()] = refMotion * worldToBase;
 }
 
 } // namespace fishdso

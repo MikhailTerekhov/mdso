@@ -59,9 +59,6 @@ private:
 
   void adjustWorldToFrameSizes(int newFrameNum);
 
-  void checkLastTrackedStereo(PreKeyFrame *lastFrame);
-  void checkLastTrackedGT(PreKeyFrame *lastFrame);
-
   bool didTrackFail();
   std::pair<SE3, AffineLightTransform<double>>
   recoverTrack(PreKeyFrame *lastFrame);
@@ -85,8 +82,6 @@ private:
   std::vector<int> frameNumbers;
   StdVector<SE3> worldToFrame;
   StdVector<SE3> worldToFramePredict;
-  StdVector<SE3> worldToFrameMatched;
-  StdVector<SE3> worldToFrameGT;
 
   AffineLightTransform<double> lightKfToLast;
 
