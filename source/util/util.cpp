@@ -210,8 +210,8 @@ cv::Point toCvPoint(const Vec2 &vec, double scaleX, double scaleY,
                    int(vec[1] * scaleY) + shift.y);
 }
 
-template cv::Mat boxFilterPyrUp<unsigned char>(const cv::Mat &img);
-template cv::Mat boxFilterPyrUp<cv::Vec3b>(const cv::Mat &img);
+template cv::Mat boxFilterPyrDown<unsigned char>(const cv::Mat &img);
+template cv::Mat boxFilterPyrDown<cv::Vec3b>(const cv::Mat &img);
 
 cv::Mat1b cvtBgrToGray(const cv::Mat &coloredImg) {
   cv::Mat result;
@@ -225,31 +225,6 @@ cv::Mat3b cvtBgrToGray3(const cv::Mat3b coloredImg) {
   cv::Mat3b result3C;
   cv::cvtColor(result1C, result3C, cv::COLOR_GRAY2BGR);
   return result3C;
-}
-
-cv::Mat1d pyrNUpDepth(const cv::Mat1d &integralWeightedDepths,
-                      const cv::Mat1d &integralWeights, int levelNum) {
-  cv::Mat1d res = cv::Mat1d((integralWeightedDepths.rows - 1) >> levelNum,
-                            (integralWeightedDepths.cols - 1) >> levelNum);
-  int d = (1 << levelNum);
-
-  for (int y = 0; y < res.rows; ++y)
-    for (int x = 0; x < res.cols; ++x) {
-      int origX = x << levelNum, origY = y << levelNum;
-      float depthsSum = integralWeightedDepths(origY + d, origX + d) -
-                        integralWeightedDepths(origY, origX + d) -
-                        integralWeightedDepths(origY + d, origX) +
-                        integralWeightedDepths(origY, origX);
-      float weightsSum = integralWeights(origY + d, origX + d) -
-                         integralWeights(origY, origX + d) -
-                         integralWeights(origY + d, origX) +
-                         integralWeights(origY, origX);
-      if (std::abs(weightsSum) > 1e-8)
-        res(y, x) = depthsSum / weightsSum;
-      else
-        res(y, x) = -1;
-    }
-  return res;
 }
 
 cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,

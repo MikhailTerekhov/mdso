@@ -9,42 +9,6 @@
 
 using namespace fishdso;
 
-TEST(UtilTest, PyrNUpDepthTrivial) {
-  for (int i = 0; i < 4; ++i) {
-    cv::Mat1d w, d;
-    w = cv::Mat1d(2, 2, 0.0);
-    d = cv::Mat1d(2, 2, -1.0);
-    w(i / 2, i % 2) = 1;
-    d(i / 2, i % 2) = i + 1;
-    cv::Mat1d intW;
-    cv::integral(w, intW, CV_64F);
-    cv::Mat1d wd = d.mul(w);
-    cv::Mat1d intWD;
-    cv::integral(wd, intWD, CV_64F);
-    cv::Mat1d res = pyrNUpDepth(intWD, intW, 1);
-    EXPECT_EQ(res.rows, 1);
-    EXPECT_EQ(res.cols, 1);
-    EXPECT_EQ(res(0, 0), i + 1);
-  }
-
-  for (int i = 0; i < 4; ++i) {
-    cv::Mat1d w, d;
-    w = cv::Mat1d(2, 2, 0.0);
-    d = cv::Mat1d(2, 2, -1.0);
-    w(i / 2, i % 2) = 1;
-    d(i / 2, i % 2) = i + 1;
-    cv::Mat1d intW;
-    cv::integral(w, intW, CV_64F);
-    cv::Mat1d wd = d.mul(w);
-    cv::Mat1d intWD;
-    cv::integral(wd, intWD, CV_64F);
-    cv::Mat1d res = pyrNUpDepth(intWD, intW, 1);
-    EXPECT_EQ(res.rows, 1);
-    EXPECT_EQ(res.cols, 1);
-    EXPECT_EQ(res(0, 0), i + 1);
-  }
-}
-
 bool cmp(const cv::Point &a, const cv::Point &b) {
   return a.x == b.x ? a.y < b.y : a.x < b.x;
 }

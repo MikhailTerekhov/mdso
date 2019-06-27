@@ -73,7 +73,7 @@ template <> struct accum_type<signed char> { typedef int type; };
 template <> struct accum_type<char> { typedef int type; };
 template <> struct accum_type<cv::Vec3b> { typedef cv::Vec3i type; };
 
-template <typename T> cv::Mat boxFilterPyrUp(const cv::Mat &img) {
+template <typename T> cv::Mat boxFilterPyrDown(const cv::Mat &img) {
   constexpr int d = 2;
   cv::Mat result(img.rows / d, img.cols / d, img.type());
   for (int y = 0; y < img.rows / d * d; y += d)
@@ -88,14 +88,11 @@ template <typename T> cv::Mat boxFilterPyrUp(const cv::Mat &img) {
   return result;
 }
 
-extern template cv::Mat boxFilterPyrUp<unsigned char>(const cv::Mat &img);
-extern template cv::Mat boxFilterPyrUp<cv::Vec3b>(const cv::Mat &img);
+extern template cv::Mat boxFilterPyrDown<unsigned char>(const cv::Mat &img);
+extern template cv::Mat boxFilterPyrDown<cv::Vec3b>(const cv::Mat &img);
 
 cv::Mat1b cvtBgrToGray(const cv::Mat &coloredImg);
 cv::Mat3b cvtBgrToGray3(const cv::Mat3b coloredImg);
-
-cv::Mat1d pyrNUpDepth(const cv::Mat1d &integralWeightedDepths,
-                      const cv::Mat1d &integralWeights, int levelNum);
 
 cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
                            double minDepth, double maxDepth);
