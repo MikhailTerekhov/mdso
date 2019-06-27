@@ -51,10 +51,13 @@ private:
     return settings.trackFromLastKf ? lastKeyFrame() : lboKeyFrame();
   }
 
-  SE3 predictInternal(int prevFramesSkipped, const SE3 &worldToBaseKf,
+  double getTimeLastByLbo();
+  SE3 predictInternal(double timeLastByLbo, const SE3 &worldToBaseKf,
                       const SE3 &worldToLbo, const SE3 &worldToLast);
   SE3 predictBaseKfToCur();
   SE3 purePredictBaseKfToCur();
+
+  void adjustWorldToFrameSizes(int newFrameNum);
 
   void checkLastTrackedStereo(PreKeyFrame *lastFrame);
   void checkLastTrackedGT(PreKeyFrame *lastFrame);
@@ -78,10 +81,12 @@ private:
   std::unique_ptr<FrameTracker> frameTracker;
 
   std::map<int, KeyFrame> keyFrames;
-  StdMap<int, SE3> worldToFrame;
-  StdMap<int, SE3> worldToFramePredict;
-  StdMap<int, SE3> worldToFrameMatched;
-  StdMap<int, SE3> worldToFrameGT;
+
+  std::vector<int> frameNumbers;
+  StdVector<SE3> worldToFrame;
+  StdVector<SE3> worldToFramePredict;
+  StdVector<SE3> worldToFrameMatched;
+  StdVector<SE3> worldToFrameGT;
 
   AffineLightTransform<double> lightKfToLast;
 

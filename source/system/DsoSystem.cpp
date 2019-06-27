@@ -23,11 +23,17 @@ DsoSystem::DsoSystem(CameraModel *cam, const Observers &observers,
           DelaunayDsoInitializer::SPARSE_DEPTHS, observers.initializer,
           _settings.getInitializerSettings())))
     , isInitialized(false)
+    , worldToFrame(_settings.initialMaxFrame)
+    , worldToFramePredict(_settings.initialMaxFrame)
+    , worldToFrameMatched(_settings.initialMaxFrame)
+    , worldToFrameGT(_settings.initialMaxFrame)
     , lastTrackRmse(INF)
     , firstFrameNum(-1)
     , settings(_settings)
     , observers(observers) {
   LOG(INFO) << "create DsoSystem" << std::endl;
+
+  frameNumbers.reserve(settings.initialMaxFrame);
 
   for (DsoObserver *obs : observers.dso)
     obs->created(this, cam, settings);
@@ -136,58 +142,61 @@ template void DsoSystem::projectOntoBaseKf<OptimizedPoint>(
     StdVector<Vec2> *points, std::vector<double> *depths,
     std::vector<OptimizedPoint *> *ptrs, std::vector<KeyFrame *> *kfs);
 
-SE3 predictScrewInternal(int prevFramesSkipped, const SE3 &worldToBaseKf,
+SE3 predictScrewInternal(double timeLastByLbo, const SE3 &worldToBaseKf,
                          const SE3 &worldToLbo, const SE3 &worldToLast) {
   SE3 lboToLast = worldToLast * worldToLbo.inverse();
-  double alpha = 1.0 / prevFramesSkipped;
-  return SE3::exp(alpha * lboToLast.log()) * worldToLast *
+  return SE3::exp(timeLastByLbo * lboToLast.log()) * worldToLast *
          worldToBaseKf.inverse();
 }
 
-SE3 predictSimpleInternal(int prevFramesSkipped, const SE3 &worldToBaseKf,
+SE3 predictSimpleInternal(double timeLastByLbo, const SE3 &worldToBaseKf,
                           const SE3 &worldToLbo, const SE3 &worldToLast) {
   SE3 lboToLast = worldToLast * worldToLbo.inverse();
-  double alpha = 1.0 / prevFramesSkipped;
-  SO3 lastToCurRot = SO3::exp(alpha * lboToLast.so3().log());
-  Vec3 lastToCurTrans = alpha * (lastToCurRot * lboToLast.so3().inverse() *
-                                 lboToLast.translation());
+  SO3 lastToCurRot = SO3::exp(timeLastByLbo * lboToLast.so3().log());
+  Vec3 lastToCurTrans =
+      timeLastByLbo *
+      (lastToCurRot * lboToLast.so3().inverse() * lboToLast.translation());
 
   return SE3(lastToCurRot, lastToCurTrans) * worldToLast *
          worldToBaseKf.inverse();
 }
 
-SE3 DsoSystem::predictInternal(int prevFramesSkipped, const SE3 &worldToBaseKf,
+double DsoSystem::getTimeLastByLbo() {
+  CHECK(frameNumbers.size() >= 3);
+
+  int prevFramesSkipped = frameNumbers[frameNumbers.size() - 3] -
+                          frameNumbers[frameNumbers.size() - 2];
+  int lastFramesSkipped = frameNumbers[frameNumbers.size() - 2] -
+                          frameNumbers[frameNumbers.size() - 1];
+  return double(lastFramesSkipped) / prevFramesSkipped;
+}
+
+SE3 DsoSystem::predictInternal(double timeLastByLbo, const SE3 &worldToBaseKf,
                                const SE3 &worldToLbo, const SE3 &worldToLast) {
   return settings.predictUsingScrew
-             ? predictScrewInternal(prevFramesSkipped, worldToBaseKf,
+             ? predictScrewInternal(timeLastByLbo, worldToBaseKf,
                                     worldToLbo, worldToLast)
-             : predictSimpleInternal(prevFramesSkipped, worldToBaseKf,
+             : predictSimpleInternal(timeLastByLbo, worldToBaseKf,
                                      worldToLbo, worldToLast);
 }
 
 SE3 DsoSystem::predictBaseKfToCur() {
   PreKeyFrame *baseKf = baseKeyFrame().preKeyFrame.get();
 
-  int prevFramesSkipped =
-      worldToFrame.rbegin()->first - (++worldToFrame.rbegin())->first;
+  SE3 worldToLbo = worldToFrame[frameNumbers[frameNumbers.size() - 3]];
+  SE3 worldToLast = worldToFrame[frameNumbers[frameNumbers.size() - 2]];
 
-  SE3 worldToLbo = (++worldToFrame.rbegin())->second;
-  SE3 worldToLast = worldToFrame.rbegin()->second;
-
-  return predictInternal(prevFramesSkipped, baseKf->worldToThis, worldToLbo,
+  return predictInternal(getTimeLastByLbo(), baseKf->worldToThis, worldToLbo,
                          worldToLast);
 }
 
 SE3 DsoSystem::purePredictBaseKfToCur() {
   PreKeyFrame *baseKf = baseKeyFrame().preKeyFrame.get();
 
-  int prevFramesSkipped = worldToFramePredict.rbegin()->first -
-                          (++worldToFramePredict.rbegin())->first;
+  SE3 worldToLbo = worldToFramePredict[frameNumbers[frameNumbers.size() - 3]];
+  SE3 worldToLast = worldToFramePredict[frameNumbers[frameNumbers.size() - 2]];
 
-  SE3 worldToLbo = (++worldToFramePredict.rbegin())->second;
-  SE3 worldToLast = worldToFramePredict.rbegin()->second;
-
-  return predictInternal(prevFramesSkipped, baseKf->worldToThis, worldToLbo,
+  return predictInternal(getTimeLastByLbo(), baseKf->worldToThis, worldToLbo,
                          worldToLast);
 }
 
@@ -300,9 +309,23 @@ DsoSystem::recoverTrack(PreKeyFrame *lastFrame) {
   return retT();
 }
 
+void DsoSystem::adjustWorldToFrameSizes(int newFrameNum) {
+  CHECK(newFrameNum > 0);
+  if (newFrameNum >= worldToFrame.size()) {
+    worldToFrame.resize(newFrameNum + 1);
+    worldToFrameMatched.resize(newFrameNum + 1);
+    worldToFramePredict.resize(newFrameNum + 1);
+    worldToFrameGT.resize(newFrameNum + 1);
+  }
+}
+
 std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
                                                  int globalFrameNum) {
   LOG(INFO) << "add frame #" << globalFrameNum << std::endl;
+
+  adjustWorldToFrameSizes(globalFrameNum);
+  CHECK(frameNumbers.empty() || globalFrameNum > frameNumbers.back());
+  frameNumbers.push_back(globalFrameNum);
 
   if (!isInitialized) {
     LOG(INFO) << "put into initializer" << std::endl;
@@ -552,7 +575,7 @@ void DsoSystem::checkLastTrackedStereo(PreKeyFrame *lastFrame) {
   StereoMatcher matcher(cam);
   SE3 matchedFirstToLast = matcher.match(frames, points, depths);
   SE3 refMotion = matchedFirstToLast * worldToFirst * worldToBase.inverse();
-  SE3 trackedMotion = worldToFrame.rbegin()->second * worldToBase.inverse();
+  SE3 trackedMotion = worldToFrame[frameNumbers.back()] * worldToBase.inverse();
 
   double transErr = angle(refMotion.translation(), trackedMotion.translation());
   double rotErr =
@@ -563,7 +586,7 @@ void DsoSystem::checkLastTrackedStereo(PreKeyFrame *lastFrame) {
             << std::endl;
 
   refMotion.translation() *= trackedMotion.translation().norm();
-  worldToFrameMatched[worldToFrame.rbegin()->first] = refMotion * worldToBase;
+  worldToFrameMatched[frameNumbers.back()] = refMotion * worldToBase;
 }
 
 } // namespace fishdso

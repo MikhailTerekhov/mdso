@@ -330,7 +330,8 @@ struct Settings {
       , predictUsingScrew(default_predictUsingScrew)
       , switchFirstMotionToGT(default_switchFirstMotionToGT)
       , allPosesGT(default_allPosesGT)
-      , continueChoosingKeyFrames(default_continueChoosingKeyFrames) {}
+      , continueChoosingKeyFrames(default_continueChoosingKeyFrames) 
+      , initialMaxFrame(default_initialMaxFrame) {}
 
   int maxOptimizedPoints;
   static constexpr int default_maxOptimizedPoints = 2000;
@@ -352,6 +353,9 @@ struct Settings {
 
   bool continueChoosingKeyFrames;
   static constexpr bool default_continueChoosingKeyFrames = true;
+
+  int initialMaxFrame;
+  static constexpr int default_initialMaxFrame = 2500;
 
   InitializerSettings getInitializerSettings() const;
   PointTracerSettings getPointTracerSettings() const;
