@@ -84,9 +84,10 @@ std::vector<int> DistanceMap::choose(const StdVector<Vec2> &otherPoints,
       otherDist[i].second = dist(pi[1], pi[0]);
     }
   }
-  std::sort(otherDist.begin(), otherDist.end(),
-            [](const auto &a, const auto &b) { return a.second > b.second; });
+
   int total = std::min(pointsNeeded, int(otherPoints.size()));
+  std::nth_element(otherDist.begin(), otherDist.begin() + total, otherDist.end(),
+            [](const auto &a, const auto &b) { return a.second > b.second; });
   for (int i = 0; i < total; ++i)
     if (otherDist[i].second != -1)
       chosen.push_back(otherDist[i].first);
