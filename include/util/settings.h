@@ -18,265 +18,186 @@ struct BundleAdjusterSettings;
 
 struct Settings {
   struct CameraModel {
-    CameraModel()
-        : mapPolyDegree(default_mapPolyDegree)
-        , mapPolyPoints(default_mapPolyPoints) {}
-
-    int mapPolyDegree;
     static constexpr int default_mapPolyDegree = 10;
+    int mapPolyDegree = default_mapPolyDegree;
 
-    int mapPolyPoints;
     static constexpr int default_mapPolyPoints = 2000;
+    int mapPolyPoints = default_mapPolyPoints;
   } cameraModel;
 
   struct PixelSelector {
-    PixelSelector()
-        : initialAdaptiveBlockSize(default_initialAdaptiveBlockSize)
-        , initialPointsFound(default_initialPointsFound)
-        , adaptToFactor(default_adaptToFactor)
-        , gradThresholds(default_gradThresholds)
-        , pointColors(default_pointColors) {}
-
-    int initialAdaptiveBlockSize;
     static constexpr int default_initialAdaptiveBlockSize = 25;
+    int initialAdaptiveBlockSize = default_initialAdaptiveBlockSize;
 
-    int initialPointsFound;
     static constexpr int default_initialPointsFound = 1000;
+    int initialPointsFound = default_initialPointsFound;
 
-    double adaptToFactor;
     static constexpr double default_adaptToFactor = 1.1;
+    double adaptToFactor = default_adaptToFactor;
 
-    std::vector<double> gradThresholds;
     static const std::vector<double> default_gradThresholds;
+    std::vector<double> gradThresholds = default_gradThresholds;
 
-    std::vector<cv::Scalar> pointColors;
     static const std::vector<cv::Scalar> default_pointColors;
+    std::vector<cv::Scalar> pointColors = default_pointColors;
   } pixelSelector;
 
   struct DistanceMap {
-    DistanceMap()
-        : maxWidth(default_maxWidth)
-        , maxHeight(default_maxHeight) {}
-
-    double maxWidth;
     static constexpr double default_maxWidth = 480;
+    double maxWidth = default_maxWidth;
 
-    double maxHeight;
     static constexpr double default_maxHeight = 302;
+    double maxHeight = default_maxHeight;
   } distanceMap;
 
   struct StereoMatcher {
-    StereoMatcher()
-        : matchNonMoveDist(default_matchNonMoveDist)
-        , keyPointNum(default_keyPointNum) {}
-
     struct StereoGeometryEstimator {
-      StereoGeometryEstimator()
-          : outlierReprojError(default_outlierReprojError)
-          , successProb(default_successProb)
-          , maxRansacIter(default_maxRansacIter)
-          , initialInliersCapacity(default_initialInliersCapacity)
-          , runAveraging(default_runAveraging)
-          , runMaxRansacIter(default_runMaxRansacIter) {}
-
-      double outlierReprojError;
       static constexpr double default_outlierReprojError = 1.25;
+      double outlierReprojError = default_outlierReprojError;
 
-      double successProb;
       static constexpr double default_successProb = 0.999;
+      double successProb = default_successProb;
 
-      int maxRansacIter;
       static constexpr int default_maxRansacIter = 100000;
+      int maxRansacIter = default_maxRansacIter;
 
-      int initialInliersCapacity;
       static constexpr int default_initialInliersCapacity = 2000;
+      int initialInliersCapacity = default_initialInliersCapacity;
 
-      bool runAveraging;
       static constexpr bool default_runAveraging = true;
+      bool runAveraging = default_runAveraging;
 
-      bool runMaxRansacIter;
       static constexpr bool default_runMaxRansacIter = false;
+      bool runMaxRansacIter = default_runMaxRansacIter;
 
       static constexpr int minimalSolveN = 5;
     } stereoGeometryEstimator;
 
-    double matchNonMoveDist;
     static constexpr double default_matchNonMoveDist = 8.0;
+    double matchNonMoveDist = default_matchNonMoveDist;
 
-    int keyPointNum;
     static constexpr int default_keyPointNum = 2000;
+    int keyPointNum = default_keyPointNum;
 
-    int maxRansacIter;
     static constexpr int default_maxRansacIter = 100000;
+    int maxRansacIter = default_maxRansacIter;
   } stereoMatcher;
 
   struct Triangulation {
-    Triangulation()
-        : epsPointIsOnSegment(default_epsPointIsOnSegment)
-        , epsSamePoints(default_epsSamePoints)
-        , drawPadding(default_drawPadding) {}
-
-    double epsPointIsOnSegment;
     static constexpr double default_epsPointIsOnSegment = 1e-9;
+    double epsPointIsOnSegment = default_epsPointIsOnSegment;
 
-    double epsSamePoints;
     static constexpr double default_epsSamePoints = 1e-9;
+    double epsSamePoints = default_epsSamePoints;
 
-    double drawPadding;
     static constexpr double default_drawPadding = 0.1;
+    double drawPadding = default_drawPadding;
   } triangulation;
 
   struct DelaunayDsoInitializer {
-    DelaunayDsoInitializer()
-        : firstFramesSkip(default_firstFramesSkip)
-        , usePlainTriangulation(default_usePlainTriangulation) {}
-
-    int firstFramesSkip;
     static constexpr int default_firstFramesSkip = 15;
+    int firstFramesSkip = default_firstFramesSkip;
 
-    bool usePlainTriangulation;
     static constexpr bool default_usePlainTriangulation = false;
+    bool usePlainTriangulation = default_usePlainTriangulation;
   } delaunayDsoInitializer;
 
   struct KeyFrame {
-    KeyFrame()
-        : pointsNum(default_pointsNum) {}
-
-    int pointsNum;
     static constexpr int default_pointsNum = 2000;
+    int pointsNum = default_pointsNum;
   } keyFrame;
 
   struct PointTracer {
-    PointTracer()
-        : onImageTestCount(default_onImageTestCount)
-        , maxSearchRel(default_maxSearchRel)
-        , positionVariance(default_positionVariance)
-        , minSecondBestDistance(default_minSecondBestDistance)
-        , imprFactor(default_imprFactor)
-        , outlierEnergyFactor(default_outlierEnergyFactor)
-        , outlierQuality(default_outlierQuality)
-        , optimizedStddev(default_optimizedStddev)
-        , gnIter(default_gnIter)
-        , performFullTracing(default_performFullTracing)
-        , useAltHWeighting(default_useAltHWeighting) {}
-
-    int onImageTestCount;
     static constexpr int default_onImageTestCount = 100;
+    int onImageTestCount = default_onImageTestCount;
 
-    double maxSearchRel;
     static constexpr double default_maxSearchRel = 0.027;
+    double maxSearchRel = default_maxSearchRel;
 
-    double positionVariance;
     static constexpr double default_positionVariance = 3.2;
+    double positionVariance = default_positionVariance;
 
-    double minSecondBestDistance;
     static constexpr double default_minSecondBestDistance = 3.0;
+    double minSecondBestDistance = default_minSecondBestDistance;
 
-    double imprFactor;
     static constexpr double default_imprFactor = 1.0;
+    double imprFactor = default_imprFactor;
 
-    double outlierEnergyFactor;
     static constexpr double default_outlierEnergyFactor = 0.444;
+    double outlierEnergyFactor = default_outlierEnergyFactor;
 
-    double outlierQuality;
     static constexpr double default_outlierQuality = 3.0;
+    double outlierQuality = default_outlierQuality;
 
-    double optimizedStddev;
     static constexpr double default_optimizedStddev = 2.4;
+    double optimizedStddev = default_optimizedStddev;
 
-    int gnIter;
     static constexpr int default_gnIter = 3;
+    int gnIter = default_gnIter;
 
-    bool performFullTracing;
     static constexpr bool default_performFullTracing = false;
+    bool performFullTracing = default_performFullTracing;
 
-    bool useAltHWeighting;
     static constexpr bool default_useAltHWeighting = true;
+    bool useAltHWeighting = default_useAltHWeighting;
   } pointTracer;
 
   struct FrameTracker {
-    FrameTracker()
-        : trackFailFactor(default_trackFailFactor)
-        , useGradWeighting(default_useGradWeighting) {}
-
-    double trackFailFactor;
     static constexpr double default_trackFailFactor = 1.5;
+    double trackFailFactor = default_trackFailFactor;
 
-    bool useGradWeighting;
     static constexpr bool default_useGradWeighting = false;
+    bool useGradWeighting = default_useGradWeighting;
   } frameTracker;
 
   struct BundleAdjuster {
-    BundleAdjuster()
-        : maxIterations(default_maxIterations)
-        , fixedMotionOnFirstAdjustent(default_fixedMotionOnFirstAdjustent)
-        , fixedRotationOnSecondKF(default_fixedRotationOnSecondKF)
-        , runBA(default_runBA) {}
-
-    int maxIterations;
     static constexpr int default_maxIterations = 10;
+    int maxIterations = default_maxIterations;
 
-    bool fixedMotionOnFirstAdjustent;
     static constexpr bool default_fixedMotionOnFirstAdjustent = false;
+    bool fixedMotionOnFirstAdjustent = default_fixedMotionOnFirstAdjustent;
 
-    bool fixedRotationOnSecondKF;
     static constexpr bool default_fixedRotationOnSecondKF = false;
+    bool fixedRotationOnSecondKF = default_fixedRotationOnSecondKF;
 
-    bool runBA;
     static constexpr bool default_runBA = true;
+    bool runBA = default_runBA;
   } bundleAdjuster;
 
   struct Pyramid {
-    Pyramid()
-        : levelNum(default_levelNum) {}
-
-    int levelNum;
-    static constexpr int default_levelNum = 6;
     static constexpr int max_levelNum = 8;
+    static constexpr int default_levelNum = 6;
+    int levelNum = default_levelNum;
   } pyramid;
 
   struct AffineLight {
-    AffineLight()
-        : minAffineLightA(default_minAffineLightA)
-        , maxAffineLightA(default_maxAffineLightA)
-        , minAffineLightB(default_minAffineLightB)
-        , maxAffineLightB(default_maxAffineLightB)
-        , optimizeAffineLight(default_optimizeAffineLight) {}
-
-    double minAffineLightA;
     static constexpr double default_minAffineLightA = -0.0953101798;
+    double minAffineLightA = default_minAffineLightA;
 
-    double maxAffineLightA;
     static constexpr double default_maxAffineLightA = 0.0953101798; // ln(1.1)
+    double maxAffineLightA = default_maxAffineLightA;
 
-    double minAffineLightB;
     static constexpr double default_minAffineLightB = -0.1 * 256;
+    double minAffineLightB = default_minAffineLightB;
 
-    double maxAffineLightB;
     static constexpr double default_maxAffineLightB = 0.1 * 256;
+    double maxAffineLightB = default_maxAffineLightB;
 
-    bool optimizeAffineLight;
     static constexpr bool default_optimizeAffineLight = false;
+    bool optimizeAffineLight = default_optimizeAffineLight;
   } affineLight;
 
   struct Depth {
-    Depth()
-        : min(default_min)
-        , max(default_max) {}
-
-    double min;
     static constexpr double default_min = 1e-3;
+    double min = default_min;
 
-    double max;
     static constexpr double default_max = 1e4;
+    double max = default_max;
   } depth;
 
   struct GradWeighting {
-    GradWeighting()
-        : c(default_c) {}
-
-    double c;
     static constexpr double default_c = 50.0;
+    double c = default_c;
   } gradWeighting;
 
   struct ResidualPattern {
@@ -300,46 +221,32 @@ struct Settings {
   } residualPattern;
 
   struct Intencity {
-    Intencity()
-        : outlierDiff(default_outlierDiff) {}
-
-    double outlierDiff;
     static constexpr double default_outlierDiff = 12.0;
+    double outlierDiff = default_outlierDiff;
   } intencity;
 
   struct Threading {
-    Threading()
-        : numThreads(4) {}
-
-    int numThreads;
     static constexpr int default_numThreads = 4;
+    int numThreads = default_numThreads;
   } threading;
 
-  Settings()
-      : maxOptimizedPoints(default_maxOptimizedPoints)
-      , maxKeyFrames(default_maxKeyFrames)
-      , trackFromLastKf(default_trackFromLastKf)
-      , predictUsingScrew(default_predictUsingScrew)
-      , continueChoosingKeyFrames(default_continueChoosingKeyFrames)
-      , initialMaxFrame(default_initialMaxFrame) {}
-
-  int maxOptimizedPoints;
   static constexpr int default_maxOptimizedPoints = 2000;
+  int maxOptimizedPoints = default_maxOptimizedPoints;
 
-  int maxKeyFrames;
   static constexpr int default_maxKeyFrames = 6;
+  int maxKeyFrames = default_maxKeyFrames;
 
-  bool trackFromLastKf;
   static constexpr bool default_trackFromLastKf = true;
+  bool trackFromLastKf = default_trackFromLastKf;
 
-  bool predictUsingScrew;
   static constexpr bool default_predictUsingScrew = false;
+  bool predictUsingScrew = default_predictUsingScrew;
 
-  bool continueChoosingKeyFrames;
   static constexpr bool default_continueChoosingKeyFrames = true;
+  bool continueChoosingKeyFrames = default_continueChoosingKeyFrames;
 
-  int initialMaxFrame;
   static constexpr int default_initialMaxFrame = 2500;
+  int initialMaxFrame = default_initialMaxFrame;
 
   InitializerSettings getInitializerSettings() const;
   PointTracerSettings getPointTracerSettings() const;
@@ -364,12 +271,12 @@ struct InitializerSettings {
 };
 
 struct FrameTrackerSettings {
-  Settings::FrameTracker frameTracker;
-  Settings::Pyramid pyramid;
-  Settings::AffineLight affineLight;
-  Settings::Intencity intencity;
-  Settings::GradWeighting gradWeighting;
-  Settings::Threading threading;
+  Settings::FrameTracker frameTracker = {};
+  Settings::Pyramid pyramid = {};
+  Settings::AffineLight affineLight = {};
+  Settings::Intencity intencity = {};
+  Settings::GradWeighting gradWeighting = {};
+  Settings::Threading threading = {};
 };
 
 struct BundleAdjusterSettings {
