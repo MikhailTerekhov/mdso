@@ -10,17 +10,20 @@
 namespace fishdso {
 
 FrameTracker::FrameTracker(const StdVector<CameraModel> &camPyr,
-                           std::unique_ptr<DepthedImagePyramid> baseFrame,
+                           std::unique_ptr<DepthedImagePyramid> _baseFrame,
                            const std::vector<FrameTrackerObserver *> &observers,
                            const FrameTrackerSettings &_settings)
     : residualsImg(_settings.pyramid.levelNum)
     , lastRmse(INF)
     , camPyr(camPyr)
-    , baseFrame(std::move(baseFrame))
+    , baseFrame(std::move(_baseFrame))
     , displayWidth(camPyr[1].getWidth())
     , displayHeight(camPyr[1].getHeight())
     , observers(observers)
-    , settings(_settings) {}
+    , settings(_settings) {
+  for (FrameTrackerObserver *obs : observers)
+    obs->newBaseFrame(*baseFrame);
+}
 
 void FrameTracker::addObserver(FrameTrackerObserver *observer) {
   observers.push_back(observer);

@@ -49,6 +49,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/output/InterpolationDrawer.h
     ${PROJECT_SOURCE_DIR}/include/output/FrameTrackerObserver.h
     ${PROJECT_SOURCE_DIR}/include/output/TrackingDebugImageDrawer.h
+    ${PROJECT_SOURCE_DIR}/include/output/DepthPyramidDrawer.h
 
     ${PROJECT_SOURCE_DIR}/include/system/AffineLightTransform.h
     ${PROJECT_SOURCE_DIR}/include/system/SphericalPlus.h
@@ -92,6 +93,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/output/InterpolationDrawer.cpp
     ${PROJECT_SOURCE_DIR}/source/output/FrameTrackerObserver.cpp
     ${PROJECT_SOURCE_DIR}/source/output/TrackingDebugImageDrawer.cpp
+    ${PROJECT_SOURCE_DIR}/source/output/DepthPyramidDrawer.cpp
 
     ${PROJECT_SOURCE_DIR}/source/system/SphericalPlus.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoSystem.cpp

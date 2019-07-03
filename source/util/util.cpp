@@ -227,6 +227,12 @@ cv::Mat3b cvtBgrToGray3(const cv::Mat3b coloredImg) {
   return result3C;
 }
 
+cv::Mat3b cvtGrayToBgr(const cv::Mat1b &grayImg) {
+  cv::Mat3b result;
+  cv::cvtColor(grayImg, result, cv::COLOR_GRAY2BGR);
+  return result;
+}
+
 cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
                            double minDepth, double maxDepth) {
   int w = frame.cols, h = frame.rows;

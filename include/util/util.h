@@ -93,6 +93,7 @@ extern template cv::Mat boxFilterPyrDown<cv::Vec3b>(const cv::Mat &img);
 
 cv::Mat1b cvtBgrToGray(const cv::Mat &coloredImg);
 cv::Mat3b cvtBgrToGray3(const cv::Mat3b coloredImg);
+cv::Mat3b cvtGrayToBgr(const cv::Mat1b &grayImg);
 
 cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
                            double minDepth, double maxDepth);

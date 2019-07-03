@@ -2,6 +2,7 @@
 #include "output/CloudWriter.h"
 #include "output/CloudWriterGT.h"
 #include "output/DebugImageDrawer.h"
+#include "output/DepthPyramidDrawer.h"
 #include "output/InterpolationDrawer.h"
 #include "output/TrackingDebugImageDrawer.h"
 #include "output/TrajectoryWriter.h"
@@ -37,6 +38,11 @@ A displays color-coded depths projected onto the base frame;
 B -- visible vs invizible OptimizedPoint-s projected onto the base frame;
 C -- color-coded predicted disparities;
 D -- color-coded tracking residuals on the finest pyramid level.)__");
+DEFINE_string(depth_pyramid_dir, "output/default/pyr",
+              "Directory for depth pyramid images to be put into.");
+DEFINE_bool(draw_depth_pyramid, false,
+            "Draw the depth pyramid, that is used for tracking? Will be "
+            "overridden to false if write_files is set to false.");
 
 DEFINE_bool(show_interpolation, false,
             "Show interpolated depths after initialization?");
@@ -115,12 +121,16 @@ It should contain "info" and "data" subdirectories.)abacaba";
 
   InterpolationDrawer interpolationDrawer(reader.cam.get());
 
+  DepthPyramidDrawer depthPyramidDrawer;
+
   Observers observers;
   if (FLAGS_write_files || FLAGS_show_debug_image)
     observers.dso.push_back(&debugImageDrawer);
   observers.dso.push_back(&trajectoryWriter);
   observers.dso.push_back(&trajectoryWriterGT);
   observers.dso.push_back(&cloudWriter);
+  if (FLAGS_write_files && FLAGS_draw_depth_pyramid)
+    observers.frameTracker.push_back(&depthPyramidDrawer);
   if (cloudWriterGTPtr)
     observers.dso.push_back(cloudWriterGTPtr.get());
   if (FLAGS_write_files || FLAGS_show_track_res)
@@ -153,6 +163,12 @@ It should contain "info" and "data" subdirectories.)abacaba";
       cv::imwrite(fileInDir(FLAGS_track_img_dir,
                             "frame#" + std::to_string(it) + ".jpg"),
                   trackImage);
+      if (FLAGS_draw_depth_pyramid && depthPyramidDrawer.pyrChanged()) {
+        cv::Mat pyrImage = depthPyramidDrawer.getLastPyr();
+        cv::imwrite(fileInDir(FLAGS_depth_pyramid_dir,
+                              "frame#" + std::to_string(it) + ".jpg"),
+                    pyrImage);
+      }
     }
     if (FLAGS_show_debug_image)
       cv::imshow("debug", debugImageDrawer.draw());

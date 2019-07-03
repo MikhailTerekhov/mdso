@@ -1,13 +1,13 @@
 #include "output/DebugImageDrawer.h"
 
-namespace fishdso {
-
 DEFINE_double(debug_rel_point_size, 0.004,
               "Relative to w+h point size on debug video.");
 DEFINE_int32(debug_image_width, 1200,
              "Width of the image with tracking residuals.");
 DEFINE_double(debug_max_stddev, 6.0,
               "Max predicted stddev when displaying debug image with stddevs.");
+
+namespace fishdso {
 
 DebugImageDrawer::DebugImageDrawer()
     : baseFrame(nullptr)

@@ -13,7 +13,7 @@ class FrameTrackerObserver;
 class FrameTracker {
 public:
   FrameTracker(const StdVector<CameraModel> &camPyr,
-               std::unique_ptr<DepthedImagePyramid> baseFrame,
+               std::unique_ptr<DepthedImagePyramid> _baseFrame,
                const std::vector<FrameTrackerObserver *> &observers = {},
                const FrameTrackerSettings &_settings = {});
 

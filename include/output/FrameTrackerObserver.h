@@ -10,6 +10,7 @@ class FrameTrackerObserver {
 public:
   virtual ~FrameTrackerObserver() = 0;
 
+  virtual void newBaseFrame(const DepthedImagePyramid &pyr) {}
   virtual void startTracking(const ImagePyramid &frame) {}
   virtual void levelTracked(
       int pyrLevel, const SE3 &baseToLast,
