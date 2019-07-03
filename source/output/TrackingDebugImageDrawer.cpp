@@ -21,8 +21,7 @@ TrackingDebugImageDrawer::TrackingDebugImageDrawer(
           cv::Mat3b::zeros(camPyr[0].getHeight(), camPyr[0].getWidth())) {}
 
 void TrackingDebugImageDrawer::startTracking(const ImagePyramid &frame) {
-  curFramePyr.resize(frame.levelNum);
-  std::copy(frame.images, frame.images + frame.levelNum, curFramePyr.begin());
+  curFramePyr = frame.images;
   residualsImg.resize(0);
   residualsImg.resize(pyrSettings.levelNum);
 }

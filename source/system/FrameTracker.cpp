@@ -41,7 +41,7 @@ FrameTracker::trackFrame(const ImagePyramid &frame, const SE3 &coarseMotion,
   for (int i = settings.pyramid.levelNum - 1; i >= 0; --i) {
     LOG(INFO) << "track level #" << i << std::endl;
     std::tie(motion, affLight) =
-        trackPyrLevel(camPyr[i], baseFrame->images[i], baseFrame->depthPyr[i],
+        trackPyrLevel(camPyr[i], baseFrame->images[i], baseFrame->depths[i],
                       frame.images[i], motion, affLight, i);
   }
 
@@ -59,9 +59,9 @@ bool isPointTrackable(const CameraModel &cam, const Vec3 &basePos,
 
 std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
     const CameraModel &cam, const cv::Mat1b &baseImg,
-    const StdVector<DepthedImagePyramid::Point> &depthLayer,
-    const cv::Mat1b &trackedImg, const SE3 &coarseMotion,
-    const AffineLightTransform<double> &coarseAffLight, int pyrLevel) {
+    const cv::Mat1d &baseDepths, const cv::Mat1b &trackedImg,
+    const SE3 &coarseMotion, const AffineLightTransform<double> &coarseAffLight,
+    int pyrLevel) {
   SE3 motion = coarseMotion;
   AffineLightTransform<double> affLight = coarseAffLight;
 
@@ -92,41 +92,53 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
   if (!settings.affineLight.optimizeAffineLight)
     problem.SetParameterBlockConstant(affLight.data);
 
+  std::vector<double> pixUsed;
+
+  double pnt[2] = {0.0, 0.0};
+
   std::map<const ceres::CostFunction *, const PointTrackingResidual *>
       costFuncToResidual;
   StdVector<Vec2> gotOutside;
 
   int pntTotal = 0;
 
-  for (const auto &point : depthLayer) {
-    ++pntTotal;
-    cv::Point cvp = toCvPoint(point.p);
-    Vec3 pos = cam.unmap(point.p).normalized() * point.depth;
-    if (!isPointTrackable(cam, pos, coarseMotion)) {
-      gotOutside.push_back(point.p);
-      continue;
-    }
+  for (int y = 0; y < baseImg.rows; ++y)
+    for (int x = 0; x < baseImg.cols; ++x)
+      if (baseDepths(y, x) > 0) {
+        if (!resMask(y, x))
+          continue;
+        ++pntTotal;
+        pnt[0] = x;
+        pnt[1] = y;
 
-    ceres::LossFunction *lossFunc = nullptr;
-    if (settings.frameTracker.useGradWeighting) {
-      double gradNorm = gradNormAt(baseImg, cvp);
-      double c = settings.gradWeighting.c;
-      double weight = c / std::hypot(c, gradNorm);
-      lossFunc = new ceres::ScaledLoss(
-          new ceres::HuberLoss(settings.intencity.outlierDiff), weight,
-          ceres::Ownership::TAKE_OWNERSHIP);
-    } else
-      lossFunc = new ceres::HuberLoss(settings.intencity.outlierDiff);
+        Vec3 pos = cam.unmap(pnt).normalized() * baseDepths(y, x);
+        if (!isPointTrackable(cam, pos, coarseMotion)) {
+          gotOutside.push_back(Vec2(x, y));
+          continue;
+        }
 
-    auto newResidual = new PointTrackingResidual(
-        pos, static_cast<double>(baseImg(cvp)), &cam, &trackedFrame);
-    ceres::CostFunction *newCostFunc =
-        new ceres::AutoDiffCostFunction<PointTrackingResidual, 1, 4, 3, 2>(
-            newResidual);
-    costFuncToResidual[newCostFunc] = newResidual;
-    problem.AddResidualBlock(newCostFunc, lossFunc, motion.so3().data(),
-                             motion.translation().data(), affLight.data);
-  }
+        pixUsed.push_back(baseImg(y, x));
+
+        ceres::LossFunction *lossFunc = nullptr;
+        if (settings.frameTracker.useGradWeighting) {
+          double gradNorm = gradNormAt(baseImg, cv::Point(x, y));
+          double c = settings.gradWeighting.c;
+          double weight = c / std::hypot(c, gradNorm);
+          lossFunc = new ceres::ScaledLoss(
+              new ceres::HuberLoss(settings.intencity.outlierDiff), weight,
+              ceres::Ownership::TAKE_OWNERSHIP);
+        } else
+          lossFunc = new ceres::HuberLoss(settings.intencity.outlierDiff);
+
+        auto newResidual = new PointTrackingResidual(
+            pos, static_cast<double>(baseImg(y, x)), &cam, &trackedFrame);
+        ceres::CostFunction *newCostFunc =
+            new ceres::AutoDiffCostFunction<PointTrackingResidual, 1, 4, 3, 2>(
+                newResidual);
+        costFuncToResidual[newCostFunc] = newResidual;
+        problem.AddResidualBlock(newCostFunc, lossFunc, motion.so3().data(),
+                                 motion.translation().data(), affLight.data);
+      }
 
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_QR;

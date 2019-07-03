@@ -233,6 +233,31 @@ cv::Mat3b cvtGrayToBgr(const cv::Mat1b &grayImg) {
   return result;
 }
 
+cv::Mat1d pyrNUpDepth(const cv::Mat1d &integralWeightedDepths,
+                      const cv::Mat1d &integralWeights, int levelNum) {
+  cv::Mat1d res = cv::Mat1d((integralWeightedDepths.rows - 1) >> levelNum,
+                            (integralWeightedDepths.cols - 1) >> levelNum);
+  int d = (1 << levelNum);
+
+  for (int y = 0; y < res.rows; ++y)
+    for (int x = 0; x < res.cols; ++x) {
+      int origX = x << levelNum, origY = y << levelNum;
+      float depthsSum = integralWeightedDepths(origY + d, origX + d) -
+                        integralWeightedDepths(origY, origX + d) -
+                        integralWeightedDepths(origY + d, origX) +
+                        integralWeightedDepths(origY, origX);
+      float weightsSum = integralWeights(origY + d, origX + d) -
+                         integralWeights(origY, origX + d) -
+                         integralWeights(origY + d, origX) +
+                         integralWeights(origY, origX);
+      if (std::abs(weightsSum) > 1e-8)
+        res(y, x) = depthsSum / weightsSum;
+      else
+        res(y, x) = -1;
+    }
+  return res;
+}
+
 cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
                            double minDepth, double maxDepth) {
   int w = frame.cols, h = frame.rows;

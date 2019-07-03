@@ -8,15 +8,17 @@ DEFINE_int32(pyr_image_width, 1200, "Width of the debug image pyramid.");
 namespace fishdso {
 
 cv::Mat draw(const DepthedImagePyramid &pyr) {
-  std::vector<cv::Mat3b> images(pyr.levelNum);
-  for (int i = 0; i < pyr.levelNum; ++i) {
+  std::vector<cv::Mat3b> images(pyr.images.size());
+  for (int i = 0; i < pyr.images.size(); ++i) {
     int s = FLAGS_pyr_rel_point_size * (pyr[i].cols + pyr[i].rows) / 2;
     images[i] = cvtGrayToBgr(pyr[i]);
-    for (const auto &p : pyr.depthPyr[i])
-      putSquare(images[i], toCvPoint(p.p), s,
-                depthCol(p.depth, minDepthCol, maxDepthCol), cv::FILLED);
+  for (int y = 0; y < pyr.depths[i].rows; ++y)
+    for (int x = 0; x < pyr.depths[i].cols; ++x)
+      if (pyr.depths[i](y, x) > 0)
+        putSquare(images[i], cv::Point(x, y), s,
+                  depthCol(pyr.depths[i](y, x), minDepthCol, maxDepthCol), cv::FILLED);
   }
-  return drawLeveled(images.data(), pyr.levelNum, pyr[0].cols, pyr[0].rows,
+  return drawLeveled(images.data(), pyr.depths.size(), pyr[0].cols, pyr[0].rows,
                      FLAGS_pyr_image_width);
 }
 

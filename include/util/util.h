@@ -95,6 +95,9 @@ cv::Mat1b cvtBgrToGray(const cv::Mat &coloredImg);
 cv::Mat3b cvtBgrToGray3(const cv::Mat3b coloredImg);
 cv::Mat3b cvtGrayToBgr(const cv::Mat1b &grayImg);
 
+cv::Mat1d pyrNUpDepth(const cv::Mat1d &integralWeightedDepths,
+                      const cv::Mat1d &integralWeights, int levelNum);
+
 cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
                            double minDepth, double maxDepth);
 

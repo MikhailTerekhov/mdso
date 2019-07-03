@@ -353,23 +353,16 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
       // bundleAdjuster.addKeyFrame(&p.second);
       // bundleAdjuster.adjust(settingMaxFirstBAIterations);
 
-      StdVector<DepthedImagePyramid::Point> pointsForPyr;
-      for (const auto &[num, kf] : keyFrames) {
-        SE3 refToBase = baseKeyFrame().preKeyFrame->worldToThis *
-                        kf.preKeyFrame->worldToThis.inverse();
-        for (const auto &ip : kf.immaturePoints)
-          if (ip->state == ImmaturePoint::ACTIVE) {
-            auto [p, depth] =
-                (&kf == &baseKeyFrame()
-                     ? std::pair(ip->p, ip->depth)
-                     : reproject(cam, refToBase, ip->p, ip->depth));
-            pointsForPyr.push_back({p, depth, 1.0});
-          }
-      }
+      StdVector<Vec2> points;
 
-      std::unique_ptr<DepthedImagePyramid> initialTrack(
-          new DepthedImagePyramid(baseKeyFrame().preKeyFrame->frame(),
-                                  settings.pyramid.levelNum, pointsForPyr));
+      std::vector<double> depths;
+      projectOntoBaseKf<ImmaturePoint>(&points, &depths, nullptr, nullptr);
+
+      std::vector<double> weights(points.size(), 1.0);
+
+      std::unique_ptr<DepthedImagePyramid> initialTrack(new DepthedImagePyramid(
+          baseKeyFrame().preKeyFrame->frame(), settings.pyramid.levelNum,
+          points, depths, weights));
 
       frameTracker = std::unique_ptr<FrameTracker>(new FrameTracker(
           camPyr, std::move(initialTrack), observers.frameTracker,
@@ -490,23 +483,27 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
       bundleAdjuster.adjust(settings.bundleAdjuster.maxIterations);
     }
 
-    StdVector<DepthedImagePyramid::Point> pointsForPyr;
-    for (const auto &[num, kf] : keyFrames) {
-      SE3 refToBase = baseKeyFrame().preKeyFrame->worldToThis *
-                      kf.preKeyFrame->worldToThis.inverse();
-      for (const auto &op : kf.optimizedPoints)
-        if (op->state == OptimizedPoint::ACTIVE) {
-          auto [p, depth] =
-              (&kf == &baseKeyFrame()
-                   ? std::pair(op->p, op->depth())
-                   : reproject(cam, refToBase, op->p, op->depth()));
-          pointsForPyr.push_back({p, depth, 1.0 / op->stddev});
-        }
-    }
+    StdVector<Vec2> points;
+    std::vector<double> depths;
+    std::vector<OptimizedPoint *> refs;
+    projectOntoBaseKf<OptimizedPoint>(&points, &depths, &refs, nullptr);
+    std::vector<double> weights(points.size());
+    for (int i = 0; i < points.size(); ++i)
+      weights[i] = 1.0 / refs[i]->stddev;
+    std::unique_ptr<DepthedImagePyramid> baseForTrack(new DepthedImagePyramid(
+        baseKeyFrame().preKeyFrame->frame(), settings.pyramid.levelNum, points,
+        depths, weights));
 
-    std::unique_ptr<DepthedImagePyramid> baseForTrack(
-        new DepthedImagePyramid(baseKeyFrame().preKeyFrame->frame(),
-                                settings.pyramid.levelNum, pointsForPyr));
+    // for (int i = 0; i < points.size(); ++i) {
+      // for (int pl = 0; pl < settings.pyramid.levelNum; ++pl) {
+        // cv::Point p = toCvPoint(points[i]);
+        // if (baseForTrack->depths[pl](p / (1 << pl)) <= 0) {
+          // std::cout << "pl=" << pl << " p=" << p << " psh=" << p / (1 << pl)
+                    // << " i=" << i << " d=" << depths[i] << " w=" << weights[i]
+                    // << " porig=" << points[i] << std::endl;
+        // }
+      // }
+    // }
 
     frameTracker = std::unique_ptr<FrameTracker>(new FrameTracker(
         camPyr, std::move(baseForTrack), observers.frameTracker,
