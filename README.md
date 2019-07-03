@@ -22,9 +22,10 @@ sudo apt install libgflags-dev libgoogle-glog-dev libceres-dev
 sudo apt install libtbb-dev
 sudo apt install libopencv-dev
 ```
-Addititionally, if you want to see nice graphs of errors, trajectories and more, you will need [Python 3](https://www.python.org/download/releases/3.0/) and [Matplotlib](https://matplotlib.org/):
+Addititionally, if you want to see nice graphs of errors, trajectories and more, you will need [Python 3](https://www.python.org/download/releases/3.0/) and [Matplotlib](https://matplotlib.org/). You will also need to install some Python 3 packages for provided scripts to work: 
 ```bash
-sudo apt install python3 python3-matplotlib
+sudo apt install python3 python3-matplotlib python3-pandas python3-pip
+sudo pip3 install numpy-quaternion 
 ```
 
 #### Building
