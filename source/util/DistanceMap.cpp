@@ -26,7 +26,7 @@ DistanceMap::DistanceMap(int givenW, int givenH, const StdVector<Vec2> &points,
   const int w = givenW / pyrDown, h = givenH / pyrDown;
 
   LOG(INFO) << "DistanceMap: w, h = " << w << ' ' << h
-            << "\npyrDown = " << pyrDown << std::endl;
+            << " pyrDown = " << pyrDown << std::endl;
 
   dist = MatXXi::Constant(h, w, std::numeric_limits<int>::max());
 
@@ -34,8 +34,6 @@ DistanceMap::DistanceMap(int givenW, int givenH, const StdVector<Vec2> &points,
 
   for (const Vec2 &p : points) {
     if (!(p[0] >= 0 && p[0] < givenW && p[1] >= 0 && p[1] < givenH)) {
-      LOG(WARNING) << "point in DistanceMap::DistanceMap OOB! w, h = " << givenW
-                   << ' ' << givenH << " p = " << p.transpose() << std::endl;
       continue;
     }
     Vec2i pi = p.cast<int>() / pyrDown;
@@ -72,22 +70,19 @@ std::vector<int> DistanceMap::choose(const StdVector<Vec2> &otherPoints,
   for (int i = 0; i < otherPoints.size(); ++i) {
     const Vec2 &p = otherPoints[i];
     Vec2i pi = p.cast<int>() / pyrDown;
-    if (!(pi[0] >= 0 && pi[0] < dist.cols() && pi[1] >= 0 &&
-          pi[1] < dist.rows())) {
-      LOG(WARNING) << "point in DistanceMap::choose OOB! w, h = " << dist.cols()
-                   << ' ' << dist.rows() << " p = " << pi.transpose()
-                   << std::endl;
-      otherDist[i].first = i;
+
+    otherDist[i].first = i;
+    if (!Eigen::AlignedBox2i(Vec2i::Zero(), Vec2i(dist.cols(), dist.rows()))
+             .contains(pi))
       otherDist[i].second = -1;
-    } else {
-      otherDist[i].first = i;
+    else
       otherDist[i].second = dist(pi[1], pi[0]);
-    }
   }
 
   int total = std::min(pointsNeeded, int(otherPoints.size()));
-  std::nth_element(otherDist.begin(), otherDist.begin() + total, otherDist.end(),
-            [](const auto &a, const auto &b) { return a.second > b.second; });
+  std::nth_element(
+      otherDist.begin(), otherDist.begin() + total, otherDist.end(),
+      [](const auto &a, const auto &b) { return a.second > b.second; });
   for (int i = 0; i < total; ++i)
     if (otherDist[i].second != -1)
       chosen.push_back(otherDist[i].first);

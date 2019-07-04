@@ -242,31 +242,6 @@ void BundleAdjuster::adjust(int maxNumIterations) {
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
 
-  SE3 newMotion = secondKeyFrame->preKeyFrame->worldToThis;
-
-  LOG(INFO) << "old motion: "
-            << "\ntrans = " << oldMotion.translation().transpose()
-            << "\nrot =   " << oldMotion.unit_quaternion().coeffs().transpose()
-            << std::endl;
-  LOG(INFO) << "new motion: "
-            << "\ntrans = " << newMotion.translation().transpose()
-            << "\nrot =   " << newMotion.unit_quaternion().coeffs().transpose()
-            << std::endl;
-
-  double transCos = oldMotion.translation().normalized().dot(
-      newMotion.translation().normalized());
-  if (transCos < -1)
-    transCos = -1;
-  if (transCos > 1)
-    transCos = 1;
-  LOG(INFO) << "diff angles: "
-            << "\ntrans = " << 180.0 / M_PI * std::acos(transCos) << "\nrot = "
-            << 180.0 / M_PI *
-                   (newMotion.so3().inverse() * oldMotion.so3()).log().norm()
-            << std::endl;
-
-  LOG(INFO) << "aff light:\n" << secondKeyFrame->preKeyFrame->lightWorldToThis;
-
   if (secondKeyFrame->optimizedPoints.size() > 0) {
     auto p = std::minmax_element(secondKeyFrame->optimizedPoints.begin(),
                                  secondKeyFrame->optimizedPoints.end(),
@@ -322,25 +297,10 @@ void BundleAdjuster::adjust(int maxNumIterations) {
   }
   pointsOutliers = outliers.size();
 
-  LOG(INFO) << "BA results:" << std::endl;
-  LOG(INFO) << "total points = " << pointsTotal << std::endl;
-  LOG(INFO) << "OOB points = " << pointsOOB << std::endl;
-  LOG(INFO) << "outlier points = " << pointsOutliers << std::endl;
-
-  SE3 oldFirstToSecond = secondToFirst.inverse();
-  SE3 newFirstToSecond = secondKeyFrame->preKeyFrame->worldToThis *
-                         firstKeyFrame->preKeyFrame->worldToThis.inverse();
-  LOG(INFO) << "BA first to second kf motion change:\n"
-            << "translation diff angle = "
-            << 180. / M_PI *
-                   angle(oldFirstToSecond.translation(),
-                         newFirstToSecond.translation())
-            << "\nrotation diff = "
-            << 180. / M_PI *
-                   (oldFirstToSecond.so3() * newFirstToSecond.so3().inverse())
-                       .log()
-                       .norm()
-            << std::endl;
+  LOG(INFO) << "BA results:";
+  LOG(INFO) << "total points = " << pointsTotal;
+  LOG(INFO) << "OOB points = " << pointsOOB;
+  LOG(INFO) << "outlier points = " << pointsOutliers;
 
   LOG(INFO) << summary.FullReport() << std::endl;
 }

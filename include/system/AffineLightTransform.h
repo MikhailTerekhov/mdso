@@ -43,7 +43,7 @@ template <typename T> struct AffineLightTransform {
 
   friend std::ostream &operator<<(std::ostream &os,
                                   AffineLightTransform<T> affLight) {
-    os << "raw =     " << affLight.data[0] << ' ' << affLight.data[1]
+    os << "raw     = " << affLight.data[0] << ' ' << affLight.data[1]
        << "\nas ax+b = " << ceres::exp(affLight.data[0]) << ' '
        << ceres::exp(affLight.data[0]) * affLight.data[1] << '\n';
     return os;

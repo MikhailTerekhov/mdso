@@ -180,12 +180,11 @@ double ImmaturePoint::estVariance(const Vec2 &searchDirection) {
   return lastGeomVar;
 }
 
-void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
-                            TracingDebugType debugType) {
+ImmaturePoint::TracingStatus
+ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
+                       TracingDebugType debugType) {
   if (state == OOB)
-    return;
-
-  double oldDepth = depth;
+    return WAS_OOB;
 
   AffineLightTransform<double> lightBaseToRef =
       refFrame.lightWorldToThis * baseFrame->lightWorldToThis.inverse();
@@ -204,12 +203,12 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
 
   if (!settings.pointTracer.performFullTracing && numTraced > 0)
     if (curDev * settings.pointTracer.imprFactor > stddev)
-      return;
+      return BIG_PREDICTED_ERROR;
 
   StdVector<Vec2> points;
   std::vector<Vec3> directions;
   if (!pointsToTrace(baseToRef, dirMin, dirMax, points, directions)) {
-    return;
+    return EPIPOLAR_OOB;
   }
 
   std::vector<double> intencities(PS);
@@ -231,15 +230,15 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
     curDir.normalize();
     StdVector<Vec2> reproj(PS);
     reproj[0] = point;
-    double depth = INF;
+    double curDepth = INF;
     if (maxDepth == INF && dirInd == 0) {
       for (int i = 1; i < PS; ++i)
         reproj[i] = cam->map(baseToRef.so3() * baseDirections[i]);
     } else {
-      Vec2 depths = triangulate(baseToRef, baseDirections[0], curDir);
-      depth = depths[0];
+      Vec2 curDepths = triangulate(baseToRef, baseDirections[0], curDir);
+      curDepth = curDepths[0];
       for (int i = 1; i < PS; ++i)
-        reproj[i] = cam->map(baseToRef * (depths[0] * baseDirections[i]));
+        reproj[i] = cam->map(baseToRef * (curDepths[0] * baseDirections[i]));
     }
 
     double maxReprojDist = -1;
@@ -276,25 +275,22 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
     if (energy < bestEnergy) {
       bestEnergy = energy;
       bestPoint = point;
-      bestDepth = depth;
+      bestDepth = curDepth;
       bestInd = dirInd;
       bestPyrLevel = pyrLevel;
     }
   }
 
+  lastEnergy = bestEnergy;
+
   lastTraced = false;
 
   // tracing reliability checks
-  if (bestPyrLevel == PL - 1) {
-    depth = oldDepth;
-    return;
-  }
+  if (bestPyrLevel == PL - 1)
+    return TOO_COARSE_PYR_LEVEL;
 
-  if (bestDepth == INF) {
-    depth = oldDepth;
-    LOG(INFO) << "trace quit : inf point\n";
-    return;
-  }
+  if (bestDepth == INF)
+    return INF_DEPTH;
 
   double secondBestEnergy = INF;
   for (const auto &p : energiesFound) {
@@ -305,25 +301,27 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
       secondBestEnergy = p.second;
   }
 
-  if (bestEnergy == INF || secondBestEnergy == INF || secondBestEnergy <= 5.0) {
-    LOG(INFO) << "trace quit : energies\n";
-    depth = oldDepth;
-    return;
-  }
+  if (bestEnergy == INF || secondBestEnergy == INF)
+    return INF_ENERGY;
 
-  double newQuality = secondBestEnergy / bestEnergy;
-  if (newQuality > bestQuality)
-    bestQuality = newQuality;
-  lastEnergy = bestEnergy;
+  double secondBestEnergyThres =
+      settings.pointTracer.secondBestEnergyThresFactor * PS * TH * TH;
+  if (secondBestEnergy <= secondBestEnergyThres)
+    return SMALL_ABS_SECOND_BEST;
 
   double outlierEnergy =
       settings.pointTracer.outlierEnergyFactor * PS * TH * TH;
-  if (lastEnergy > outlierEnergy ||
-      newQuality < settings.pointTracer.outlierQuality) {
-    depth = oldDepth;
-    LOG(INFO) << "trace quit : e or q\n";
-    return;
-  }
+
+  if (lastEnergy > outlierEnergy)
+    return BIG_ENERGY;
+
+  double newQuality = secondBestEnergy / bestEnergy;
+
+  if (newQuality < settings.pointTracer.outlierQuality)
+    return LOW_QUALITY;
+
+  if (newQuality > bestQuality)
+    bestQuality = newQuality;
 
   numTraced++;
 
@@ -396,6 +394,8 @@ void ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
 
     cv::waitKey();
   }
+
+  return OK;
 }
 
 void ImmaturePoint::drawTracing(

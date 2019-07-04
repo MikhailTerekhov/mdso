@@ -14,12 +14,25 @@ struct ImmaturePoint {
 
   enum State { ACTIVE, OOB, OUTLIER };
   enum TracingDebugType { NO_DEBUG, DRAW_EPIPOLE };
+  enum TracingStatus {
+    OK,
+    WAS_OOB,
+    BIG_PREDICTED_ERROR,
+    EPIPOLAR_OOB,
+    TOO_COARSE_PYR_LEVEL,
+    INF_DEPTH,
+    INF_ENERGY,
+    BIG_ENERGY,
+    SMALL_ABS_SECOND_BEST,
+    LOW_QUALITY
+  };
 
   // TODO create PointTracer!!!
   ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p,
                 const PointTracerSettings &_settings = {});
 
-  void traceOn(const PreKeyFrame &refFrame, TracingDebugType debugType);
+  TracingStatus traceOn(const PreKeyFrame &refFrame,
+                        TracingDebugType debugType);
 
   static void
   drawTracing(cv::Mat &frame,

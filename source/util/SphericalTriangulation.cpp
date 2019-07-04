@@ -102,18 +102,18 @@ void SphericalTriangulation::checkAllSectors(Vec3 ray, CameraModel *cam,
     if (isInSector(ray, triSec.second.rays))
       sec.push_back(&triSec.second);
   if (sec.size() > 1) {
-    std::cout << sec.size() << " sectors pnt!" << std::endl;
-    std::cout << "p = " << cam->map(ray.data()).transpose() << std::endl;
+    LOG(INFO) << sec.size() << " sectors pnt!" << std::endl;
+    LOG(INFO) << "p = " << cam->map(ray.data()).transpose() << std::endl;
     putDot(img, toCvPoint(cam->map(ray.data())), CV_BLACK);
 
     int i = 0;
     for (auto s : sec) {
-      std::cout << "sec " << i++ << " mapped" << std::endl;
+      LOG(INFO) << "sec " << i++ << " mapped" << std::endl;
       for (auto r : s->rays)
-        std::cout << cam->map(r->data()).transpose() << std::endl;
-      std::cout << "unmapped:" << std::endl;
+        LOG(INFO) << cam->map(r->data()).transpose() << std::endl;
+      LOG(INFO) << "unmapped:" << std::endl;
       for (auto r : s->rays)
-        std::cout << r->transpose() << std::endl;
+        LOG(INFO) << r->transpose() << std::endl;
 
       if (!secDrawn) {
         for (int i = 0; i < 3; ++i) {
@@ -132,10 +132,10 @@ void SphericalTriangulation::fillUncovered(cv::Mat &img, CameraModel *cam,
   const int step = 10;
   double pnt[2];
   int it = 0;
-  std::cout << "start finding uncovered pixels" << std::endl;
+  LOG(INFO) << "start finding uncovered pixels" << std::endl;
   for (int y = 0; y < img.rows; y += step)
     for (int x = 0; x < img.cols; x += step) {
-      std::cout << x << ' ' << y << ' '
+      LOG(INFO) << x << ' ' << y << ' '
                 << 100 * (double((it++) * step * step) / (img.rows * img.cols))
                 << "%" << std::endl;
       pnt[0] = x;

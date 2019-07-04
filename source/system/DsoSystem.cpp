@@ -241,8 +241,6 @@ void DsoSystem::activateNewOptimizedPoints() {
 
   DistanceMap distMap(cam->getWidth(), cam->getHeight(), optPoints);
 
-  int totalActive = 0;
-
   StdVector<Vec2> projectedImmatures;
   std::vector<std::pair<KeyFrame *, int>> immaturePositions;
 
@@ -251,8 +249,6 @@ void DsoSystem::activateNewOptimizedPoints() {
                     kf.preKeyFrame->worldToThis.inverse();
     for (int ind = 0; ind < kf.immaturePoints.size(); ++ind) {
       const auto &ip = kf.immaturePoints[ind];
-      if (ip->state == ImmaturePoint::ACTIVE)
-        totalActive++;
       if (ip->isReady()) {
         auto [p, depth] = (&kf == &baseKeyFrame()
                                ? std::pair(ip->p, ip->depth)
@@ -263,21 +259,22 @@ void DsoSystem::activateNewOptimizedPoints() {
     }
   }
 
-  std::cout << "before selection:" << std::endl;
-  std::cout << "total active = " << totalActive << std::endl;
-  std::cout << "total good = " << projectedImmatures.size() << std::endl;
+  LOG(INFO) << "\n\nPOINT SELECTION\n"
+            << "Ready to be optimized = " << projectedImmatures.size()
+            << std::endl;
 
   int curOptPoints = std::accumulate(
       keyFrames.begin(), keyFrames.end(), 0, [](int acc, const auto &kfp) {
         return acc + kfp.second.optimizedPoints.size();
       });
   int pointsNeeded = settings.maxOptimizedPoints - curOptPoints;
-  std::cout << "cur opt = " << curOptPoints << ", needed = " << pointsNeeded
-            << std::endl;
+  LOG(INFO) << "Current # of OptimizedPoint-s = " << curOptPoints
+            << ", needed = " << pointsNeeded << '\n';
 
   std::vector<int> activatedIndices =
       distMap.choose(projectedImmatures, pointsNeeded);
-  std::cout << "chosen = " << activatedIndices.size() << std::endl;
+  LOG(INFO) << "New OptimizedPoint-s = " << activatedIndices.size()
+            << std::endl;
   std::sort(activatedIndices.begin(), activatedIndices.end(),
             [&immaturePositions](int i1, int i2) {
               return immaturePositions[i1].second >
@@ -393,13 +390,9 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
   SE3 purePredicted = purePredictBaseKfToCur();
   SE3 predicted = predictBaseKfToCur();
 
-  LOG(INFO) << "start tracking this frame" << std::endl;
-
   std::tie(baseKfToCur, lightBaseKfToCur) = frameTracker->trackFrame(
       ImagePyramid(preKeyFrame->frame(), settings.pyramid.levelNum), predicted,
       lightKfToLast);
-
-  LOG(INFO) << "tracking ended" << std::endl;
 
   PreKeyFrame *baseKf = baseKeyFrame().preKeyFrame.get();
 
@@ -417,44 +410,37 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
 
   lightKfToLast = lightBaseKfToCur;
 
-  LOG(INFO) << "estimated motion\n"
-            << baseKfToCur.translation() << "\n"
-            << baseKfToCur.unit_quaternion().coeffs().transpose() << std::endl;
-
   SE3 diff = baseKfToCur * predicted.inverse();
-  LOG(INFO) << "diff to predicted:\n"
-            << diff.translation().norm() << "\n"
-            << diff.so3().log().norm() << std::endl;
-  LOG(INFO) << "estimated aff = \n" << lightBaseKfToCur << std::endl;
+  LOG(INFO) << "diff to predicted (trans and rot): "
+            << diff.translation().norm() << " " << diff.so3().log().norm()
+            << '\n';
 
-  int totalActive = 0, totalGood = 0;
-  constexpr int maxTraced = 5;
+  int totalTraced = 0, totalGood = 0;
+  constexpr int maxTraced = 8;
   std::vector<int> numTraced(maxTraced, 0);
   std::vector<int> numOnLevel(settings.pyramid.levelNum, 0);
   for (const auto &kfp : keyFrames)
     for (auto &ip : kfp.second.immaturePoints) {
-      ip->traceOn(*preKeyFrame, ImmaturePoint::NO_DEBUG);
-      if (!ip->lastTraced)
-        continue;
+      auto status = ip->traceOn(*preKeyFrame, ImmaturePoint::NO_DEBUG);
+
+      if (status == ImmaturePoint::OK)
+        totalTraced++;
+      if (ip->isReady())
+        totalGood++;
+
       if (ip->numTraced < maxTraced)
         numTraced[ip->numTraced]++;
       if (ip->tracedPyrLevel >= 0)
         numOnLevel[ip->tracedPyrLevel]++;
-      if (ip->state == ImmaturePoint::ACTIVE)
-        totalActive++;
-      if (ip->isReady())
-        totalGood++;
     }
-  std::cout << "active = " << totalActive << " good = " << totalGood
-            << std::endl;
-  std::cout << "succ traced = ";
-  for (int i = 0; i < maxTraced; ++i)
-    std::cout << numTraced[i] << ' ';
-  std::cout << std::endl;
-  std::cout << "traced on levels = ";
-  for (int i = 0; i < settings.pyramid.levelNum; ++i)
-    std::cout << numOnLevel[i] << ' ';
-  std::cout << std::endl;
+
+  LOG(INFO) << "POINT TRACING:";
+  LOG(INFO) << "Successfully traced = " << totalTraced << "\n";
+  LOG(INFO) << "Ready to be optimized = " << totalGood << "\n";
+  LOG(INFO) << "Traced by number: ";
+  outputArrayUndivided(LOG(INFO), numTraced.data(), maxTraced);
+  LOG(INFO) << "Last traced on pyramid levels: ";
+  outputArrayUndivided(LOG(INFO), numOnLevel.data(), settings.pyramid.levelNum);
 
   // for (DsoObserver *obs : observers.dso)
   // obs->pointsTraced ... ;
@@ -495,14 +481,14 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
         depths, weights));
 
     // for (int i = 0; i < points.size(); ++i) {
-      // for (int pl = 0; pl < settings.pyramid.levelNum; ++pl) {
-        // cv::Point p = toCvPoint(points[i]);
-        // if (baseForTrack->depths[pl](p / (1 << pl)) <= 0) {
-          // std::cout << "pl=" << pl << " p=" << p << " psh=" << p / (1 << pl)
-                    // << " i=" << i << " d=" << depths[i] << " w=" << weights[i]
-                    // << " porig=" << points[i] << std::endl;
-        // }
-      // }
+    // for (int pl = 0; pl < settings.pyramid.levelNum; ++pl) {
+    // cv::Point p = toCvPoint(points[i]);
+    // if (baseForTrack->depths[pl](p / (1 << pl)) <= 0) {
+    // std::cout << "pl=" << pl << " p=" << p << " psh=" << p / (1 << pl)
+    // << " i=" << i << " d=" << depths[i] << " w=" << weights[i]
+    // << " porig=" << points[i] << std::endl;
+    // }
+    // }
     // }
 
     frameTracker = std::unique_ptr<FrameTracker>(new FrameTracker(
