@@ -390,9 +390,8 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
   SE3 purePredicted = purePredictBaseKfToCur();
   SE3 predicted = predictBaseKfToCur();
 
-  std::tie(baseKfToCur, lightBaseKfToCur) = frameTracker->trackFrame(
-      ImagePyramid(preKeyFrame->frame(), settings.pyramid.levelNum), predicted,
-      lightKfToLast);
+  std::tie(baseKfToCur, lightBaseKfToCur) =
+      frameTracker->trackFrame(*preKeyFrame, predicted, lightKfToLast);
 
   PreKeyFrame *baseKf = baseKeyFrame().preKeyFrame.get();
 

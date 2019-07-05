@@ -6,17 +6,19 @@
 #include "util/ImagePyramid.h"
 #include "util/settings.h"
 #include "util/types.h"
-#include <ceres/cubic_interpolation.h>
 #include <opencv2/core.hpp>
 #include <sophus/se3.hpp>
 
 namespace fishdso {
+
+class PreKeyFrameInternals;
 
 struct PreKeyFrame {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   PreKeyFrame(CameraModel *cam, const cv::Mat &frameColored, int globalFrameNum,
               const Settings::Pyramid &_pyrSettings = {});
+  ~PreKeyFrame();
 
   cv::Mat frameColored;
   cv::Mat1d gradX, gradY, gradNorm;
@@ -32,6 +34,8 @@ struct PreKeyFrame {
   int globalFrameNum;
 
   Settings::Pyramid pyrSettings;
+
+  std::unique_ptr<PreKeyFrameInternals> internals;
 };
 
 } // namespace fishdso

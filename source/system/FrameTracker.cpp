@@ -1,4 +1,5 @@
 #include "system/FrameTracker.h"
+#include "PreKeyFrameInternals.h"
 #include "output/FrameTrackerObserver.h"
 #include "util/defs.h"
 #include "util/util.h"
@@ -8,6 +9,49 @@
 #include <cmath>
 
 namespace fishdso {
+
+struct PointTrackingResidual {
+  PointTrackingResidual(
+      Vec3 pos, double baseIntensity, const CameraModel *cam,
+      const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
+          *trackedFrame)
+      : pos(pos)
+      , baseIntensity(baseIntensity)
+      , cam(cam)
+      , trackedFrame(trackedFrame) {}
+
+  template <typename T>
+  bool operator()(const T *const rotP, const T *const transP,
+                  const T *const affLightP, T *res) const {
+    typedef Eigen::Matrix<T, 2, 1> Vec2t;
+    typedef Eigen::Matrix<T, 3, 1> Vec3t;
+    typedef Eigen::Matrix<T, 3, 3> Mat33t;
+    typedef Eigen::Quaternion<T> Quatt;
+    typedef Sophus::SE3<T> SE3t;
+
+    Eigen::Map<const Vec3t> transM(transP);
+    Vec3t trans(transM);
+    Eigen::Map<const Quatt> rotM(rotP);
+    Quatt rot(rotM);
+    SE3t motion(rot, trans);
+    AffineLightTransform<T> affLight(affLightP[0], affLightP[1]);
+
+    Vec3t newPos = motion * pos.cast<T>();
+    Vec2t newPosProj = cam->map(newPos.data());
+
+    T trackedIntensity;
+    trackedFrame->Evaluate(newPosProj[1], newPosProj[0], &trackedIntensity);
+    res[0] = affLight(trackedIntensity) - baseIntensity;
+
+    return true;
+  }
+
+  Vec3 pos;
+  double baseIntensity;
+  const CameraModel *cam;
+  const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
+      *trackedFrame;
+};
 
 FrameTracker::FrameTracker(const StdVector<CameraModel> &camPyr,
                            std::unique_ptr<DepthedImagePyramid> _baseFrame,
@@ -30,19 +74,19 @@ void FrameTracker::addObserver(FrameTrackerObserver *observer) {
 }
 
 std::pair<SE3, AffineLightTransform<double>>
-FrameTracker::trackFrame(const ImagePyramid &frame, const SE3 &coarseMotion,
+FrameTracker::trackFrame(const PreKeyFrame &frame, const SE3 &coarseMotion,
                          const AffineLightTransform<double> &coarseAffLight) {
   for (FrameTrackerObserver *obs : observers)
-    obs->startTracking(frame);
+    obs->startTracking(frame.framePyr);
 
   SE3 motion = coarseMotion;
   AffineLightTransform<double> affLight;
 
   for (int i = settings.pyramid.levelNum - 1; i >= 0; --i) {
     LOG(INFO) << "track level #" << i << std::endl;
-    std::tie(motion, affLight) =
-        trackPyrLevel(camPyr[i], baseFrame->images[i], baseFrame->depths[i],
-                      frame.images[i], motion, affLight, i);
+    std::tie(motion, affLight) = trackPyrLevel(
+        camPyr[i], baseFrame->images[i], baseFrame->depths[i],
+        frame.framePyr.images[i], *frame.internals, motion, affLight, i);
   }
 
   // cv::waitKey();
@@ -60,18 +104,16 @@ bool isPointTrackable(const CameraModel &cam, const Vec3 &basePos,
 std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
     const CameraModel &cam, const cv::Mat1b &baseImg,
     const cv::Mat1d &baseDepths, const cv::Mat1b &trackedImg,
-    const SE3 &coarseMotion, const AffineLightTransform<double> &coarseAffLight,
-    int pyrLevel) {
+    const PreKeyFrameInternals &internals, const SE3 &coarseMotion,
+    const AffineLightTransform<double> &coarseAffLight, int pyrLevel) {
   SE3 motion = coarseMotion;
   AffineLightTransform<double> affLight = coarseAffLight;
 
   cv::Size displSz = cv::Size(displayHeight, displayWidth);
   cv::Mat1b resMask(baseImg.size(), CV_WHITE_BYTE);
 
-  ceres::Grid2D<unsigned char, 1> imgGrid(trackedImg.data, 0, trackedImg.rows,
-                                          0, trackedImg.cols);
-  ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> trackedFrame(
-      imgGrid);
+  const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
+      &trackedFrame = internals.interpolator(pyrLevel);
 
   ceres::Problem problem;
 
@@ -96,8 +138,7 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
 
   double pnt[2] = {0.0, 0.0};
 
-  std::map<const ceres::CostFunction *, const PointTrackingResidual *>
-      costFuncToResidual;
+  std::vector<const PointTrackingResidual *> residuals;
   StdVector<Vec2> gotOutside;
 
   int pntTotal = 0;
@@ -132,10 +173,10 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
 
         auto newResidual = new PointTrackingResidual(
             pos, static_cast<double>(baseImg(y, x)), &cam, &trackedFrame);
+        residuals.push_back(newResidual);
         ceres::CostFunction *newCostFunc =
             new ceres::AutoDiffCostFunction<PointTrackingResidual, 1, 4, 3, 2>(
                 newResidual);
-        costFuncToResidual[newCostFunc] = newResidual;
         problem.AddResidualBlock(newCostFunc, lossFunc, motion.so3().data(),
                                  motion.translation().data(), affLight.data);
       }
@@ -153,9 +194,19 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
 
   LOG(INFO) << summary.BriefReport() << std::endl;
 
+  StdVector<std::pair<Vec2, double>> pointResiduals;
+  pointResiduals.reserve(residuals.size());
+
+  for (auto res : residuals) {
+    double eval = -1;
+    (*res)(motion.unit_quaternion().coeffs().data(),
+           motion.translation().data(), affLight.data, &eval);
+    Vec2 onTracked = cam.map(motion * res->pos);
+    pointResiduals.push_back(std::pair(onTracked, eval));
+  }
+
   for (FrameTrackerObserver *obs : observers)
-    obs->levelTracked(pyrLevel, motion, affLight, problem, summary,
-                      costFuncToResidual);
+    obs->levelTracked(pyrLevel, motion, affLight, pointResiduals);
 
   return {motion, affLight};
 }

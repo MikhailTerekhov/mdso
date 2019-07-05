@@ -6,7 +6,6 @@
 #include "util/util.h"
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
-#include <ceres/ceres.h>
 #include <opencv2/core.hpp>
 #include <string>
 
@@ -38,7 +37,7 @@ public:
     pt -= c;
 
     T rho2 = pt.squaredNorm();
-    T rho1 = ceres::sqrt(rho2);
+    T rho1 = sqrt(rho2);
 
     T z = p[0];
     T rhoN = rho2;
@@ -62,7 +61,7 @@ public:
     Vec3t pt = pt_;
     VecXt p = mapPolyCoeffs.cast<T>();
 
-    T angle = ceres::atan2(pt.template head<2>().norm(), pt[2]);
+    T angle = atan2(pt.template head<2>().norm(), pt[2]);
     T r = p[0];
     T angleN = angle;
     for (int i = 1; i < p.rows(); ++i) {

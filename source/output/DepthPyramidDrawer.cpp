@@ -12,11 +12,12 @@ cv::Mat draw(const DepthedImagePyramid &pyr) {
   for (int i = 0; i < pyr.images.size(); ++i) {
     int s = FLAGS_pyr_rel_point_size * (pyr[i].cols + pyr[i].rows) / 2;
     images[i] = cvtGrayToBgr(pyr[i]);
-  for (int y = 0; y < pyr.depths[i].rows; ++y)
-    for (int x = 0; x < pyr.depths[i].cols; ++x)
-      if (pyr.depths[i](y, x) > 0)
-        putSquare(images[i], cv::Point(x, y), s,
-                  depthCol(pyr.depths[i](y, x), minDepthCol, maxDepthCol), cv::FILLED);
+    for (int y = 0; y < pyr.depths[i].rows; ++y)
+      for (int x = 0; x < pyr.depths[i].cols; ++x)
+        if (pyr.depths[i](y, x) > 0)
+          putSquare(images[i], cv::Point(x, y), s,
+                    depthCol(pyr.depths[i](y, x), minDepthCol, maxDepthCol),
+                    cv::FILLED);
   }
   return drawLeveled(images.data(), pyr.depths.size(), pyr[0].cols, pyr[0].rows,
                      FLAGS_pyr_image_width);

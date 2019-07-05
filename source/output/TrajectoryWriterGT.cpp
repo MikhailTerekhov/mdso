@@ -36,8 +36,9 @@ void TrajectoryWriterGT::keyFramesMarginalized(
   std::ofstream matrixFormOfs(matrixFormOutputFileName, std::ios_base::app);
 
   for (const KeyFrame *kf : marginalized) {
-    putInMatrixForm(matrixFormOfs,
-                    worldToFrameUnalignedGT[kf->preKeyFrame->globalFrameNum].inverse());
+    putInMatrixForm(
+        matrixFormOfs,
+        worldToFrameUnalignedGT[kf->preKeyFrame->globalFrameNum].inverse());
     matrixFormOfs << '\n';
 
     posesOfs << kf->preKeyFrame->globalFrameNum << ' ';

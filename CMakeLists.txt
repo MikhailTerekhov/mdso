@@ -12,6 +12,7 @@ if (ASAN_BUILD)
     link_libraries("-fsanitize=address")
 endif()
 
+find_package(Eigen3 REQUIRED)
 find_package(TBB REQUIRED)
 find_package(gflags REQUIRED)
 find_package(Glog REQUIRED)
@@ -108,6 +109,15 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/system/BundleAdjuster.cpp
 )
 
+set(dso_internal_HEADER_FILES
+    ${PROJECT_SOURCE_DIR}/internal/include/PreKeyFrameInternals.h
+)
+
+set(dso_internal_SOURCE_FILES
+    ${PROJECT_SOURCE_DIR}/internal/source/PreKeyFrameInternals.cpp
+)
+
+
 set(essietial_5pt_estimator_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/thirdparty/relative_pose_solver/relativeposeestimator_double.cpp
 )
@@ -119,23 +129,33 @@ set_source_files_properties(essietial_5pt_estimator_SOURCE_FILES
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -march=native")
 
-add_library(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES}
+add_library(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES} 
+    ${dso_internal_SOURCE_FILES} ${dso_internal_HEADER_FILES}
     ${essietial_5pt_estimator_SOURCE_FILES}
 )
 
 target_include_directories(dso
   PUBLIC
-    ${CERES_INCLUDE_DIRS}
     ${GFLAGS_INCLUDE_DIRS}
     ${GLOG_INCLUDE_DIRS}
+    ${EIGEN3_INCLUDE_DIR}
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
   PRIVATE
+    ${CERES_INCLUDE_DIRS}
+    ${PROJECT_SOURCE_DIR}/internal/include
     ${PROJECT_SOURCE_DIR}/thirdparty/relative_pose_solver
 )
 
 
-target_link_libraries(dso ${OpenCV_LIBS} ${CERES_LIBRARIES} ${GLOG_LIBRARIES} ${TBB_LIBRARIES})
+target_link_libraries(dso 
+  PUBLIC
+    ${OpenCV_LIBS}
+    ${GLOG_LIBRARIES}
+  PRIVATE
+    ${CERES_LIBRARIES}
+    ${TBB_LIBRARIES}
+)
 
 add_subdirectory(samples)
 

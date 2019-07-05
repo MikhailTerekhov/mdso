@@ -5,7 +5,6 @@
 #include "util/types.h"
 #include <Eigen/Core>
 #include <Eigen/StdVector>
-#include <ceres/ceres.h>
 #include <cmath>
 #include <opencv2/core.hpp>
 

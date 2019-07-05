@@ -21,7 +21,6 @@ EIGEN_STRONG_INLINE std::vector<T> reservedVector(int toReserve) {
   return res;
 }
 
-
 template <typename T>
 void outputArrayUndivided(std::ostream &os, const T array[], int size) {
   std::stringstream ss;

@@ -16,12 +16,9 @@ public:
                            const Settings::Pyramid &pyrSettings);
 
   void startTracking(const ImagePyramid &frame);
-  void levelTracked(
-      int pyrLevel, const SE3 &baseToLast,
-      const AffineLightTransform<double> &affLightBaseToLast,
-      const ceres::Problem &problem, const ceres::Solver::Summary &summary,
-      const std::map<const ceres::CostFunction *, const PointTrackingResidual *>
-          &costFuncToResidual);
+  void levelTracked(int pyrLevel, const SE3 &baseToLast,
+                    const AffineLightTransform<double> &affLightBaseToLast,
+                    const StdVector<std::pair<Vec2, double>> &pointResiduals);
 
   cv::Mat3b drawAllLevels();
   cv::Mat3b drawFinestLevel();

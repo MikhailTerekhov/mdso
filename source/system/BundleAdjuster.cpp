@@ -1,4 +1,5 @@
 #include "system/BundleAdjuster.h"
+#include "PreKeyFrameInternals.h"
 #include "system/AffineLightTransform.h"
 #include "system/SphericalPlus.h"
 #include "util/defs.h"
@@ -207,8 +208,8 @@ void BundleAdjuster::adjust(int maxNumIterations) {
         for (int i = 0; i < settings.residualPattern.pattern().size(); ++i) {
           const Vec2 &pos = op->p + settings.residualPattern.pattern()[i];
           DirectResidual *newResidual = new DirectResidual(
-              &baseFrame->preKeyFrame->framePyr.interpolator(0),
-              &refFrame->preKeyFrame->framePyr.interpolator(0), cam, op.get(),
+              &baseFrame->preKeyFrame->internals->interpolator(0),
+              &refFrame->preKeyFrame->internals->interpolator(0), cam, op.get(),
               pos, baseFrame, refFrame);
 
           double gradNorm = baseFrame->preKeyFrame->gradNorm(toCvPoint(pos));

@@ -3,6 +3,7 @@
 #include "util/geometry.h"
 #include "util/types.h"
 #include "util/util.h"
+#include <glog/logging.h>
 #include <opencv2/opencv.hpp>
 #include <queue>
 

@@ -1,4 +1,5 @@
 #include "system/ImmaturePoint.h"
+#include "PreKeyFrameInternals.h"
 #include "util/defs.h"
 #include "util/geometry.h"
 #include "util/util.h"
@@ -264,7 +265,7 @@ ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
     double energy = 0;
     for (int i = 0; i < PS; ++i) {
       double refIntencity;
-      refFrame.framePyr.interpolator(pyrLevel).Evaluate(
+      refFrame.internals->interpolator(pyrLevel).Evaluate(
           reproj[i][1], reproj[i][0], &refIntencity);
       double residual = std::abs(intencities[i] - refIntencity);
       energy += residual > TH ? TH * (2 * residual - TH) : residual * residual;
@@ -343,8 +344,9 @@ ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
       Vec2 reproj = cam->map(baseToRef * (bestDepth * baseDirections[i]));
       pattern[i] = scale * (reproj - points[bestInd]);
     }
-    bestPoint = tracePrecise(refFrame.framePyr.interpolator(bestPyrLevel), from,
-                             to, intencities, pattern, bestDispl, bestEnergy);
+    bestPoint =
+        tracePrecise(refFrame.internals->interpolator(bestPyrLevel), from, to,
+                     intencities, pattern, bestDispl, bestEnergy);
     depth = triangulate(baseToRef, baseDirections[0],
                         cam->unmap(bestPoint / scale))[0];
   } else

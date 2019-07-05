@@ -1,6 +1,7 @@
 #include "util/SphericalTriangulation.h"
 #include "util/defs.h"
 #include "util/geometry.h"
+#include <glog/logging.h>
 
 namespace fishdso {
 

@@ -29,37 +29,16 @@ void TrackingDebugImageDrawer::startTracking(const ImagePyramid &frame) {
 void TrackingDebugImageDrawer::levelTracked(
     int levelNum, const SE3 &baseToLast,
     const AffineLightTransform<double> &affLightBaseToLast,
-    const ceres::Problem &problem, const ceres::Solver::Summary &summary,
-    const std::map<const ceres::CostFunction *, const PointTrackingResidual *>
-        &costFuncToResidual) {
+    const StdVector<std::pair<Vec2, double>> &pointResiduals) {
   int w = camPyr[levelNum].getWidth(), h = camPyr[levelNum].getHeight();
   int s = FLAGS_tracking_rel_point_size * (w + h) / 2;
   cv::cvtColor(curFramePyr[levelNum], residualsImg[levelNum],
                cv::COLOR_GRAY2BGR);
 
-  std::vector<ceres::ResidualBlockId> residuals;
-  problem.GetResidualBlocks(&residuals);
-  for (auto resId : residuals) {
-    auto costFunc = problem.GetCostFunctionForResidualBlock(resId);
-    auto iter = costFuncToResidual.find(costFunc);
-    if (iter == costFuncToResidual.end())
-      continue;
-    const PointTrackingResidual *residual = iter->second;
-    const ceres::LossFunction *lossFunc =
-        problem.GetLossFunctionForResidualBlock(resId);
-    double eval = -1;
-    double robustified[3] = {INF, 0, 0};
-    (*residual)(baseToLast.unit_quaternion().coeffs().data(),
-                baseToLast.translation().data(), affLightBaseToLast.data,
-                &eval);
-    lossFunc->Evaluate(eval * eval, robustified);
-    robustified[0] = std::sqrt(robustified[0]);
-    Vec2 onTracked = camPyr[levelNum].map(baseToLast * residual->pos);
-    if (camPyr[levelNum].isOnImage(onTracked, 0))
-      putSquare(residualsImg[levelNum], toCvPoint(onTracked), s,
-                depthCol(robustified[0], 0, FLAGS_debug_max_residual),
-                cv::FILLED);
-  }
+  for (const auto &[point, res] : pointResiduals)
+    if (camPyr[levelNum].isOnImage(point, s))
+      putSquare(residualsImg[levelNum], toCvPoint(point), s,
+                depthCol(res, 0, FLAGS_debug_max_residual), cv::FILLED);
 }
 
 cv::Mat3b TrackingDebugImageDrawer::drawAllLevels() {

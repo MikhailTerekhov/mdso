@@ -65,8 +65,8 @@ std::vector<cv::Point> PixelSelector::selectInternal(const cv::Mat &frame,
   for (int i = 0; i < LI - 1; ++i)
     levLog << pointsOverThres[i].size() << " + ";
   levLog << pointsOverThres[LI - 1].size();
-  LOG(INFO) << "selector: found " << foundTotal << " (= " << levLog.str()
-            << ")" << std::endl;
+  LOG(INFO) << "selector: found " << foundTotal << " (= " << levLog.str() << ")"
+            << std::endl;
 
   if (foundTotal > pointsNeeded) {
     int sz = 0;
