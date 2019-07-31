@@ -17,10 +17,10 @@ BundleAdjuster::BundleAdjuster(CameraModel *cam,
     , firstKeyFrame(nullptr)
     , settings(_settings) {}
 
-bool BundleAdjuster::isOOB(const SE3 &worldToBase, const SE3 &worldToRef,
+bool BundleAdjuster::isOOB(const SE3 &baseToWorld, const SE3 &refToWorld,
                            const OptimizedPoint &baseOP) {
   Vec3 inBase = cam->unmap(baseOP.p).normalized() * baseOP.depth();
-  Vec2 reproj = cam->map(worldToRef * worldToBase.inverse() * inBase);
+  Vec2 reproj = cam->map(refToWorld.inverse() * baseToWorld * inBase);
   return !cam->isOnImage(reproj, settings.residualPattern.height);
 }
 
@@ -60,13 +60,13 @@ struct DirectResidual {
     Vec3t baseTrans(baseTransM);
     Eigen::Map<const Quatt> baseRotM(baseRotP);
     Quatt baseRot(baseRotM);
-    SE3t worldToBase(baseRot, baseTrans);
+    SE3t baseToWorld(baseRot, baseTrans);
 
     Eigen::Map<const Vec3t> refTransM(refTransP);
     Vec3t refTrans(refTransM);
     Eigen::Map<const Quatt> refRotM(refRotP);
     Quatt refRot(refRotM);
-    SE3t worldToRef(refRot, refTrans);
+    SE3t refToWorld(refRot, refTrans);
 
     const T *baseAffLightP = baseAffP;
     AffineLightTransform<T> baseAffLight(baseAffLightP[0], baseAffLightP[1]);
@@ -77,7 +77,7 @@ struct DirectResidual {
     AffineLightTransform<T>::normalizeMultiplier(refAffLight, baseAffLight);
 
     T depth = ceres::exp(-(*logInvDepthP));
-    Vec3t refPos = (worldToRef * worldToBase.inverse()) *
+    Vec3t refPos = (refToWorld.inverse() * baseToWorld) *
                    (baseDirection.cast<T>() * depth);
     Vec2t refPosMapped = cam->map(refPos.data()).template cast<T>();
     T trackedIntensity;
@@ -106,19 +106,16 @@ void BundleAdjuster::adjust(int maxNumIterations) {
       break;
     }
 
-  SE3 oldMotion = secondKeyFrame->preKeyFrame->worldToThis;
-
   std::shared_ptr<ceres::ParameterBlockOrdering> ordering(
       new ceres::ParameterBlockOrdering());
 
   ceres::Problem problem;
 
   for (KeyFrame *keyFrame : keyFrames) {
-    problem.AddParameterBlock(
-        keyFrame->preKeyFrame->worldToThis.translation().data(), 3);
-    problem.AddParameterBlock(keyFrame->preKeyFrame->worldToThis.so3().data(),
-                              4, new ceres::EigenQuaternionParameterization());
-    auto affLight = keyFrame->preKeyFrame->lightWorldToThis.data;
+    problem.AddParameterBlock(keyFrame->thisToWorld.translation().data(), 3);
+    problem.AddParameterBlock(keyFrame->thisToWorld.so3().data(), 4,
+                              new ceres::EigenQuaternionParameterization());
+    auto affLight = keyFrame->lightWorldToThis.data;
     problem.AddParameterBlock(affLight, 2);
     problem.SetParameterLowerBound(affLight, 0,
                                    settings.affineLight.minAffineLightA);
@@ -132,43 +129,35 @@ void BundleAdjuster::adjust(int maxNumIterations) {
     if (!settings.affineLight.optimizeAffineLight)
       problem.SetParameterBlockConstant(affLight);
 
-    ordering->AddElementToGroup(
-        keyFrame->preKeyFrame->worldToThis.translation().data(), 1);
-    ordering->AddElementToGroup(keyFrame->preKeyFrame->worldToThis.so3().data(),
-                                1);
+    ordering->AddElementToGroup(keyFrame->thisToWorld.translation().data(), 1);
+    ordering->AddElementToGroup(keyFrame->thisToWorld.so3().data(), 1);
     ordering->AddElementToGroup(affLight, 1);
   }
 
   problem.SetParameterBlockConstant(
-      firstKeyFrame->preKeyFrame->worldToThis.translation().data());
-  problem.SetParameterBlockConstant(
-      firstKeyFrame->preKeyFrame->worldToThis.so3().data());
-  problem.SetParameterBlockConstant(
-      firstKeyFrame->preKeyFrame->lightWorldToThis.data);
+      firstKeyFrame->thisToWorld.translation().data());
+  problem.SetParameterBlockConstant(firstKeyFrame->thisToWorld.so3().data());
+  problem.SetParameterBlockConstant(firstKeyFrame->lightWorldToThis.data);
 
-  SE3 worldToFirst = firstKeyFrame->preKeyFrame->worldToThis;
-  SE3 worldToSecond = secondKeyFrame->preKeyFrame->worldToThis;
-  SE3 secondToFirst = worldToFirst * worldToSecond.inverse();
-  Vec3 firstFramePos = worldToFirst.inverse().translation();
-  double radius = secondToFirst.translation().norm();
-  Vec3 center = -(worldToSecond.so3() * firstFramePos);
+  SE3 firstToWorld = firstKeyFrame->thisToWorld;
+  SE3 secondToWorld = secondKeyFrame->thisToWorld;
+  double radius =
+      (secondToWorld.translation() - firstToWorld.translation()).norm();
+  Vec3 center = firstToWorld.translation();
   problem.SetParameterization(
-      secondKeyFrame->preKeyFrame->worldToThis.translation().data(),
+      secondKeyFrame->thisToWorld.translation().data(),
       new ceres::AutoDiffLocalParameterization<SphericalPlus, 3, 2>(
-          new SphericalPlus(center, radius, worldToSecond.translation())));
+          new SphericalPlus(center, radius, secondToWorld.translation())));
 
   if (settings.bundleAdjuster.fixedRotationOnSecondKF)
-    problem.SetParameterBlockConstant(
-        secondKeyFrame->preKeyFrame->worldToThis.so3().data());
+    problem.SetParameterBlockConstant(secondKeyFrame->thisToWorld.so3().data());
 
   if (settings.bundleAdjuster.fixedMotionOnFirstAdjustent &&
       keyFrames.size() == 2) {
     problem.SetParameterBlockConstant(
-        secondKeyFrame->preKeyFrame->worldToThis.translation().data());
-    problem.SetParameterBlockConstant(
-        secondKeyFrame->preKeyFrame->worldToThis.so3().data());
-    problem.SetParameterBlockConstant(
-        secondKeyFrame->preKeyFrame->lightWorldToThis.data);
+        secondKeyFrame->thisToWorld.translation().data());
+    problem.SetParameterBlockConstant(secondKeyFrame->thisToWorld.so3().data());
+    problem.SetParameterBlockConstant(secondKeyFrame->lightWorldToThis.data);
   }
 
   LOG(INFO) << "points on the first = " << firstKeyFrame->optimizedPoints.size()
@@ -195,8 +184,7 @@ void BundleAdjuster::adjust(int maxNumIterations) {
         if (refFrame == baseFrame)
           continue;
         pointsTotal++;
-        if (isOOB(baseFrame->preKeyFrame->worldToThis,
-                  refFrame->preKeyFrame->worldToThis, *op)) {
+        if (isOOB(baseFrame->thisToWorld, refFrame->thisToWorld, *op)) {
           pointsOOB++;
           if (baseFrame == secondKeyFrame)
             oobPos.push_back(op->p);
@@ -224,12 +212,12 @@ void BundleAdjuster::adjust(int maxNumIterations) {
               new ceres::AutoDiffCostFunction<DirectResidual, 1, 1, 3, 4, 3, 4,
                                               2, 2>(newResidual),
               lossFunc, &op->logInvDepth,
-              baseFrame->preKeyFrame->worldToThis.translation().data(),
-              baseFrame->preKeyFrame->worldToThis.so3().data(),
-              refFrame->preKeyFrame->worldToThis.translation().data(),
-              refFrame->preKeyFrame->worldToThis.so3().data(),
-              baseFrame->preKeyFrame->lightWorldToThis.data,
-              refFrame->preKeyFrame->lightWorldToThis.data);
+              baseFrame->thisToWorld.translation().data(),
+              baseFrame->thisToWorld.so3().data(),
+              refFrame->thisToWorld.translation().data(),
+              refFrame->thisToWorld.so3().data(),
+              baseFrame->lightWorldToThis.data,
+              refFrame->lightWorldToThis.data);
         }
       }
     }
@@ -272,12 +260,12 @@ void BundleAdjuster::adjust(int maxNumIterations) {
     for (DirectResidual *res : residualsFor[op.get()]) {
       double value;
       double &logInvDepth = op->logInvDepth;
-      PreKeyFrame *base = res->baseKf->preKeyFrame.get();
-      PreKeyFrame *ref = res->refKf->preKeyFrame.get();
-      if (res->operator()(&logInvDepth, base->worldToThis.translation().data(),
-                          base->worldToThis.so3().data(),
-                          ref->worldToThis.translation().data(),
-                          ref->worldToThis.so3().data(),
+      KeyFrame *base = res->baseKf;
+      KeyFrame *ref = res->refKf;
+      if (res->operator()(&logInvDepth, base->thisToWorld.translation().data(),
+                          base->thisToWorld.so3().data(),
+                          ref->thisToWorld.translation().data(),
+                          ref->thisToWorld.so3().data(),
                           base->lightWorldToThis.data,
                           ref->lightWorldToThis.data, &value))
         values.push_back(value);

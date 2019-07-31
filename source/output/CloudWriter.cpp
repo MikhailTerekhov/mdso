@@ -14,14 +14,14 @@ void CloudWriter::keyFramesMarginalized(
     std::vector<cv::Vec3b> colors;
 
     for (const auto &op : kf->optimizedPoints) {
-      points.push_back(kf->preKeyFrame->worldToThis.inverse() *
+      points.push_back(kf->thisToWorld *
                        (op->depth() * cam->unmap(op->p).normalized()));
       colors.push_back(
           kf->preKeyFrame->frameColored.at<cv::Vec3b>(toCvPoint(op->p)));
     }
     for (const auto &ip : kf->immaturePoints) {
       if (ip->numTraced > 0) {
-        points.push_back(kf->preKeyFrame->worldToThis.inverse() *
+        points.push_back(kf->thisToWorld *
                          (ip->depth * cam->unmap(ip->p).normalized()));
         colors.push_back(
             kf->preKeyFrame->frameColored.at<cv::Vec3b>(toCvPoint(ip->p)));

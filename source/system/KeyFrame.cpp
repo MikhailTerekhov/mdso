@@ -11,7 +11,7 @@ KeyFrame::KeyFrame(CameraModel *cam, const cv::Mat &frameColored,
                    const Settings::KeyFrame &_kfSettings,
                    const PointTracerSettings tracingSettings)
     : preKeyFrame(std::shared_ptr<PreKeyFrame>(
-          new PreKeyFrame(cam, frameColored, globalFrameNum)))
+          new PreKeyFrame(nullptr, cam, frameColored, globalFrameNum)))
     , immaturePoints(
           reservedVector<std::unique_ptr<ImmaturePoint>>(_kfSettings.pointsNum))
     , optimizedPoints(reservedVector<std::unique_ptr<OptimizedPoint>>(
@@ -28,6 +28,14 @@ KeyFrame::KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame,
                    const Settings::KeyFrame &_kfSettings,
                    const PointTracerSettings &tracingSettings)
     : preKeyFrame(newPreKeyFrame)
+    , lightWorldToThis(preKeyFrame->baseKeyFrame
+                           ? preKeyFrame->lightBaseToThis *
+                                 preKeyFrame->baseKeyFrame->lightWorldToThis
+                           : preKeyFrame->lightBaseToThis)
+    , thisToWorld(preKeyFrame->baseKeyFrame
+                      ? preKeyFrame->baseKeyFrame->thisToWorld *
+                            preKeyFrame->baseToThis.inverse()
+                      : preKeyFrame->baseToThis.inverse())
     , immaturePoints(
           reservedVector<std::unique_ptr<ImmaturePoint>>(_kfSettings.pointsNum))
     , optimizedPoints(reservedVector<std::unique_ptr<OptimizedPoint>>(
@@ -44,7 +52,7 @@ void KeyFrame::addImmatures(const std::vector<cv::Point> &points) {
   immaturePoints.reserve(immaturePoints.size() + points.size());
   for (const cv::Point &p : points)
     immaturePoints.push_back(std::unique_ptr<ImmaturePoint>(
-        new ImmaturePoint(preKeyFrame.get(), toVec2(p), tracingSettings)));
+        new ImmaturePoint(this, toVec2(p), tracingSettings)));
 }
 
 void KeyFrame::selectPointsDenser(PixelSelector &pixelSelector,
@@ -66,7 +74,7 @@ void KeyFrame::activateAllImmature() {
 void KeyFrame::deactivateAllOptimized() {
   for (const auto &op : optimizedPoints) {
     std::unique_ptr<ImmaturePoint> ip(
-        new ImmaturePoint(preKeyFrame.get(), op->p, tracingSettings));
+        new ImmaturePoint(this, op->p, tracingSettings));
     ip->depth = op->depth();
     immaturePoints.push_back(std::move(ip));
   }

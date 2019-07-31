@@ -11,12 +11,14 @@
 
 namespace fishdso {
 
+struct KeyFrame;
 class PreKeyFrameInternals;
 
 struct PreKeyFrame {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  PreKeyFrame(CameraModel *cam, const cv::Mat &frameColored, int globalFrameNum,
+  PreKeyFrame(KeyFrame *baseKeyFrame, CameraModel *cam,
+              const cv::Mat &frameColored, int globalFrameNum,
               const Settings::Pyramid &_pyrSettings = {});
   ~PreKeyFrame();
 
@@ -26,9 +28,8 @@ struct PreKeyFrame {
   EIGEN_STRONG_INLINE cv::Mat1b &frame() { return framePyr[0]; }
   EIGEN_STRONG_INLINE const cv::Mat1b &frame() const { return framePyr[0]; }
 
+  KeyFrame *baseKeyFrame;
   CameraModel *cam;
-  SE3 worldToThis;
-  AffineLightTransform<double> lightWorldToThis;
   SE3 baseToThis;
   AffineLightTransform<double> lightBaseToThis;
   int globalFrameNum;

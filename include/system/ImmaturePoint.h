@@ -9,6 +9,8 @@
 
 namespace fishdso {
 
+struct KeyFrame;
+
 struct ImmaturePoint {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -28,10 +30,10 @@ struct ImmaturePoint {
   };
 
   // TODO create PointTracer!!!
-  ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p,
+  ImmaturePoint(KeyFrame *baseFrame, const Vec2 &p,
                 const PointTracerSettings &_settings = {});
 
-  TracingStatus traceOn(const PreKeyFrame &refFrame,
+  TracingStatus traceOn(const KeyFrame &baseFrame, const PreKeyFrame &refFrame,
                         TracingDebugType debugType);
 
   static void
@@ -51,7 +53,6 @@ struct ImmaturePoint {
   double bestQuality;
   double lastEnergy;
   double stddev; // predicted disparity error on last successful tracing
-  const PreKeyFrame *baseFrame;
   CameraModel *cam;
   State state;
 

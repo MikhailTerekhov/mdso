@@ -1,5 +1,6 @@
 #include "system/ImmaturePoint.h"
 #include "PreKeyFrameInternals.h"
+#include "system/KeyFrame.h"
 #include "util/defs.h"
 #include "util/geometry.h"
 #include "util/util.h"
@@ -13,7 +14,7 @@ namespace fishdso {
 #define PH (settings.residualPattern.height)
 #define TH (settings.intencity.outlierDiff)
 
-ImmaturePoint::ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p,
+ImmaturePoint::ImmaturePoint(KeyFrame *baseFrame, const Vec2 &p,
                              const PointTracerSettings &_settings)
     : p(p)
     , baseDirections(_settings.residualPattern.pattern().size())
@@ -25,8 +26,7 @@ ImmaturePoint::ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p,
     , bestQuality(-1)
     , lastEnergy(INF)
     , stddev(INF)
-    , baseFrame(baseFrame)
-    , cam(baseFrame->cam)
+    , cam(baseFrame->preKeyFrame->cam)
     , state(ACTIVE)
     , settings(_settings)
     , lastTraced(false)
@@ -41,9 +41,10 @@ ImmaturePoint::ImmaturePoint(PreKeyFrame *baseFrame, const Vec2 &p,
     Vec2 curP = p + settings.residualPattern.pattern()[i];
     cv::Point curPCV = toCvPoint(curP);
     baseDirections[i] = cam->unmap(curP).normalized();
-    baseIntencities[i] = baseFrame->frame()(curPCV);
+    baseIntencities[i] = baseFrame->preKeyFrame->frame()(curPCV);
 
-    baseGrad[i] = Vec2(baseFrame->gradX(curPCV), baseFrame->gradY(curPCV));
+    baseGrad[i] = Vec2(baseFrame->preKeyFrame->gradX(curPCV),
+                       baseFrame->preKeyFrame->gradY(curPCV));
     baseGradNorm[i] = baseGrad[i].normalized();
   }
 }
@@ -90,7 +91,7 @@ bool ImmaturePoint::pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth,
     }
 
     double alpha;
-    for (int sgn : {-1, 1}) {
+    for (int i = 0; i < 2; ++i) {
       alpha = alpha0;
       Vec2 point;
       int pointCnt = 0;
@@ -182,14 +183,17 @@ double ImmaturePoint::estVariance(const Vec2 &searchDirection) {
 }
 
 ImmaturePoint::TracingStatus
-ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
+ImmaturePoint::traceOn(const KeyFrame &baseFrame, const PreKeyFrame &refFrame,
                        TracingDebugType debugType) {
   if (state == OOB)
     return WAS_OOB;
 
   AffineLightTransform<double> lightBaseToRef =
-      refFrame.lightWorldToThis * baseFrame->lightWorldToThis.inverse();
-  SE3 baseToRef = refFrame.worldToThis * baseFrame->worldToThis.inverse();
+      refFrame.lightBaseToThis * refFrame.baseKeyFrame->lightWorldToThis *
+      baseFrame.lightWorldToThis.inverse();
+  SE3 baseToRef = refFrame.baseToThis *
+                  refFrame.baseKeyFrame->thisToWorld.inverse() *
+                  baseFrame.thisToWorld;
 
   Vec3 dirMin = (baseToRef * (minDepth * baseDirections[0])).normalized();
   Vec3 dirMax = maxDepth == INF
@@ -376,7 +380,7 @@ ImmaturePoint::traceOn(const PreKeyFrame &refFrame,
   if (state == ACTIVE && debugType == DRAW_EPIPOLE) {
     cv::Mat base;
     cv::Mat curved;
-    base = baseFrame->frameColored.clone();
+    base = baseFrame.preKeyFrame->frameColored.clone();
     curved = refFrame.frameColored.clone();
 
     cv::circle(base, toCvPoint(p), 4, CV_GREEN, 1);

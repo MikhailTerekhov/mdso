@@ -43,7 +43,7 @@ bool DelaunayDsoInitializer::addFrame(const cv::Mat &frame,
   }
 }
 
-std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFrames() {
+StdVector<KeyFrame> DelaunayDsoInitializer::createKeyFrames() {
   StdVector<Vec2> keyPoints[2];
   std::vector<double> depths[2];
   SE3 firstToSecond = stereoMatcher.match(frames, keyPoints, depths);
@@ -56,7 +56,7 @@ std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFrames() {
   if (dsoSystem)
     dsoSystem->lastKeyPointDepths = std::move(lastKeyPointDepths);
 
-  std::vector<KeyFrame> keyFrames;
+  StdVector<KeyFrame> keyFrames;
   for (int i = 0; i < 2; ++i) {
     keyFrames.push_back(KeyFrame(cam, frames[i], globalFrameNums[i],
                                  *pixelSelector, settings.keyFrame,
@@ -65,8 +65,8 @@ std::vector<KeyFrame> DelaunayDsoInitializer::createKeyFrames() {
       ip->stddev = 1;
   }
 
-  keyFrames[0].preKeyFrame->worldToThis = SE3();
-  keyFrames[1].preKeyFrame->worldToThis = firstToSecond;
+  keyFrames[0].thisToWorld = SE3();
+  keyFrames[1].thisToWorld = firstToSecond.inverse();
 
   if (settings.initializer.usePlainTriangulation) {
     Terrain kpTerrains[2] = {

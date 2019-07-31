@@ -15,6 +15,8 @@
 namespace fishdso {
 
 struct KeyFrame {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
   KeyFrame(const KeyFrame &other) = delete;
   KeyFrame(KeyFrame &&other) = default;
   KeyFrame(CameraModel *cam, const cv::Mat &frameColored, int globalFrameNum,
@@ -37,6 +39,9 @@ struct KeyFrame {
   cv::Mat3b drawDepthedFrame(double minDepth, double maxDepth) const;
 
   std::shared_ptr<PreKeyFrame> preKeyFrame;
+
+  AffineLightTransform<double> lightWorldToThis;
+  SE3 thisToWorld;
 
   std::vector<std::unique_ptr<ImmaturePoint>> immaturePoints;
   std::vector<std::unique_ptr<OptimizedPoint>> optimizedPoints;

@@ -24,7 +24,7 @@ public:
   // returns true if initialization is completed
   bool addFrame(const cv::Mat &frame, int globalFrameNum);
 
-  std::vector<KeyFrame> createKeyFrames();
+  StdVector<KeyFrame> createKeyFrames();
 
 private:
   CameraModel *cam;

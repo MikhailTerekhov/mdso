@@ -19,7 +19,7 @@ void TrajectoryWriter::keyFramesMarginalized(
     curKfNums.erase(kf->preKeyFrame->globalFrameNum);
 
   for (const KeyFrame *kf : marginalized) {
-    SE3 baseToWorld = kf->preKeyFrame->worldToThis.inverse();
+    SE3 baseToWorld = kf->thisToWorld;
     frameToWorldPool.insert({kf->preKeyFrame->globalFrameNum, baseToWorld});
     for (const auto &preKeyFrame : kf->trackedFrames)
       frameToWorldPool.insert(

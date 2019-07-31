@@ -52,8 +52,8 @@ private:
   }
 
   double getTimeLastByLbo();
-  SE3 predictInternal(double timeLastByLbo, const SE3 &worldToBaseKf,
-                      const SE3 &worldToLbo, const SE3 &worldToLast);
+  SE3 predictInternal(double timeLastByLbo, const SE3 &baseToLbo,
+                      const SE3 &baseToLast);
   SE3 predictBaseKfToCur();
   SE3 purePredictBaseKfToCur();
 
@@ -77,7 +77,7 @@ private:
 
   std::unique_ptr<FrameTracker> frameTracker;
 
-  std::map<int, KeyFrame> keyFrames;
+  StdMap<int, KeyFrame> keyFrames;
 
   std::vector<int> frameNumbers;
   StdVector<SE3> worldToFrame;

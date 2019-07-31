@@ -74,24 +74,25 @@ void FrameTracker::addObserver(FrameTrackerObserver *observer) {
 }
 
 std::pair<SE3, AffineLightTransform<double>>
-FrameTracker::trackFrame(const PreKeyFrame &frame, const SE3 &coarseMotion,
+FrameTracker::trackFrame(const PreKeyFrame &frame,
+                         const SE3 &coarseBaseToTracked,
                          const AffineLightTransform<double> &coarseAffLight) {
   for (FrameTrackerObserver *obs : observers)
     obs->startTracking(frame.framePyr);
 
-  SE3 motion = coarseMotion;
-  AffineLightTransform<double> affLight;
+  SE3 baseToTracked = coarseBaseToTracked;
+  AffineLightTransform<double> affLight = coarseAffLight;
 
   for (int i = settings.pyramid.levelNum - 1; i >= 0; --i) {
     LOG(INFO) << "track level #" << i << std::endl;
-    std::tie(motion, affLight) = trackPyrLevel(
+    std::tie(baseToTracked, affLight) = trackPyrLevel(
         camPyr[i], baseFrame->images[i], baseFrame->depths[i],
-        frame.framePyr.images[i], *frame.internals, motion, affLight, i);
+        frame.framePyr.images[i], *frame.internals, baseToTracked, affLight, i);
   }
 
   // cv::waitKey();
 
-  return {motion, affLight};
+  return {baseToTracked, affLight};
 }
 
 bool isPointTrackable(const CameraModel &cam, const Vec3 &basePos,
@@ -104,9 +105,9 @@ bool isPointTrackable(const CameraModel &cam, const Vec3 &basePos,
 std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
     const CameraModel &cam, const cv::Mat1b &baseImg,
     const cv::Mat1d &baseDepths, const cv::Mat1b &trackedImg,
-    const PreKeyFrameInternals &internals, const SE3 &coarseMotion,
+    const PreKeyFrameInternals &internals, const SE3 &coarseBaseToTracked,
     const AffineLightTransform<double> &coarseAffLight, int pyrLevel) {
-  SE3 motion = coarseMotion;
+  SE3 baseToTracked = coarseBaseToTracked;
   AffineLightTransform<double> affLight = coarseAffLight;
 
   cv::Size displSz = cv::Size(displayHeight, displayWidth);
@@ -117,9 +118,9 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
 
   ceres::Problem problem;
 
-  problem.AddParameterBlock(motion.so3().data(), 4,
+  problem.AddParameterBlock(baseToTracked.so3().data(), 4,
                             new ceres::EigenQuaternionParameterization());
-  problem.AddParameterBlock(motion.translation().data(), 3);
+  problem.AddParameterBlock(baseToTracked.translation().data(), 3);
 
   problem.AddParameterBlock(affLight.data, 2);
   problem.SetParameterLowerBound(affLight.data, 0,
@@ -153,7 +154,7 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
         pnt[1] = y;
 
         Vec3 pos = cam.unmap(pnt).normalized() * baseDepths(y, x);
-        if (!isPointTrackable(cam, pos, coarseMotion)) {
+        if (!isPointTrackable(cam, pos, coarseBaseToTracked)) {
           gotOutside.push_back(Vec2(x, y));
           continue;
         }
@@ -177,8 +178,9 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
         ceres::CostFunction *newCostFunc =
             new ceres::AutoDiffCostFunction<PointTrackingResidual, 1, 4, 3, 2>(
                 newResidual);
-        problem.AddResidualBlock(newCostFunc, lossFunc, motion.so3().data(),
-                                 motion.translation().data(), affLight.data);
+        problem.AddResidualBlock(
+            newCostFunc, lossFunc, baseToTracked.so3().data(),
+            baseToTracked.translation().data(), affLight.data);
       }
 
   ceres::Solver::Options options;
@@ -199,16 +201,16 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
 
   for (auto res : residuals) {
     double eval = -1;
-    (*res)(motion.unit_quaternion().coeffs().data(),
-           motion.translation().data(), affLight.data, &eval);
-    Vec2 onTracked = cam.map(motion * res->pos);
+    (*res)(baseToTracked.unit_quaternion().coeffs().data(),
+           baseToTracked.translation().data(), affLight.data, &eval);
+    Vec2 onTracked = cam.map(baseToTracked * res->pos);
     pointResiduals.push_back(std::pair(onTracked, eval));
   }
 
   for (FrameTrackerObserver *obs : observers)
-    obs->levelTracked(pyrLevel, motion, affLight, pointResiduals);
+    obs->levelTracked(pyrLevel, baseToTracked, affLight, pointResiduals);
 
-  return {motion, affLight};
+  return {baseToTracked, affLight};
 }
 
 } // namespace fishdso

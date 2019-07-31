@@ -17,7 +17,7 @@ public:
   // returns true if initialization is completed
   virtual bool addFrame(const cv::Mat &frame, int globalFrameNum) = 0;
 
-  virtual std::vector<KeyFrame> createKeyFrames() = 0;
+  virtual StdVector<KeyFrame> createKeyFrames() = 0;
 };
 
 } // namespace fishdso

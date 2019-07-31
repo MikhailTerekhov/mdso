@@ -98,9 +98,9 @@ void DsoSystem::projectOntoBaseKf(StdVector<Vec2> *points,
     kfs->resize(0);
 
   KeyFrame *baseKf = &baseKeyFrame();
-  for (auto &kfp : keyFrames) {
-    auto &curPoints = getPoints<PointT>(kfp.second);
-    if (&kfp.second == baseKf) {
+  for (auto &[num, kf] : keyFrames) {
+    auto &curPoints = getPoints<PointT>(kf);
+    if (&kf == baseKf) {
       for (auto &p : curPoints)
         if (p->state == PointT::ACTIVE) {
           if (points)
@@ -113,8 +113,7 @@ void DsoSystem::projectOntoBaseKf(StdVector<Vec2> *points,
             kfs->push_back(baseKf);
         }
     } else {
-      SE3 curToBase = baseKeyFrame().preKeyFrame->worldToThis *
-                      kfp.second.preKeyFrame->worldToThis.inverse();
+      SE3 curToBase = baseKf->thisToWorld.inverse() * kf.thisToWorld;
       for (auto &p : curPoints) {
         Vec3 baseDir = curToBase * (depth(p) * cam->unmap(p->p).normalized());
         Vec2 basePos = cam->map(baseDir);
@@ -127,7 +126,7 @@ void DsoSystem::projectOntoBaseKf(StdVector<Vec2> *points,
         if (ptrs)
           ptrs->push_back(p.get());
         if (kfs)
-          kfs->push_back(&kfp.second);
+          kfs->push_back(&kf);
       }
     }
   }
@@ -140,23 +139,21 @@ template void DsoSystem::projectOntoBaseKf<OptimizedPoint>(
     StdVector<Vec2> *points, std::vector<double> *depths,
     std::vector<OptimizedPoint *> *ptrs, std::vector<KeyFrame *> *kfs);
 
-SE3 predictScrewInternal(double timeLastByLbo, const SE3 &worldToBaseKf,
-                         const SE3 &worldToLbo, const SE3 &worldToLast) {
-  SE3 lboToLast = worldToLast * worldToLbo.inverse();
-  return SE3::exp(timeLastByLbo * lboToLast.log()) * worldToLast *
-         worldToBaseKf.inverse();
+SE3 predictScrewInternal(double timeLastByLbo, const SE3 &baseToLbo,
+                         const SE3 &baseToLast) {
+  SE3 lboToLast = baseToLast * baseToLbo.inverse();
+  return SE3::exp(timeLastByLbo * lboToLast.log()) * baseToLast;
 }
 
-SE3 predictSimpleInternal(double timeLastByLbo, const SE3 &worldToBaseKf,
-                          const SE3 &worldToLbo, const SE3 &worldToLast) {
-  SE3 lboToLast = worldToLast * worldToLbo.inverse();
+SE3 predictSimpleInternal(double timeLastByLbo, const SE3 &baseToLbo,
+                          const SE3 &baseToLast) {
+  SE3 lboToLast = baseToLast * baseToLbo.inverse();
   SO3 lastToCurRot = SO3::exp(timeLastByLbo * lboToLast.so3().log());
   Vec3 lastToCurTrans =
       timeLastByLbo *
       (lastToCurRot * lboToLast.so3().inverse() * lboToLast.translation());
 
-  return SE3(lastToCurRot, lastToCurTrans) * worldToLast *
-         worldToBaseKf.inverse();
+  return SE3(lastToCurRot, lastToCurTrans) * baseToLast;
 }
 
 double DsoSystem::getTimeLastByLbo() {
@@ -169,33 +166,31 @@ double DsoSystem::getTimeLastByLbo() {
   return double(lastFramesSkipped) / prevFramesSkipped;
 }
 
-SE3 DsoSystem::predictInternal(double timeLastByLbo, const SE3 &worldToBaseKf,
-                               const SE3 &worldToLbo, const SE3 &worldToLast) {
+SE3 DsoSystem::predictInternal(double timeLastByLbo, const SE3 &baseToLbo,
+                               const SE3 &baseToLast) {
   return settings.predictUsingScrew
-             ? predictScrewInternal(timeLastByLbo, worldToBaseKf, worldToLbo,
-                                    worldToLast)
-             : predictSimpleInternal(timeLastByLbo, worldToBaseKf, worldToLbo,
-                                     worldToLast);
+             ? predictScrewInternal(timeLastByLbo, baseToLbo, baseToLast)
+             : predictSimpleInternal(timeLastByLbo, baseToLbo, baseToLast);
 }
 
 SE3 DsoSystem::predictBaseKfToCur() {
-  PreKeyFrame *baseKf = baseKeyFrame().preKeyFrame.get();
+  double timeLastByLbo = getTimeLastByLbo();
 
-  SE3 worldToLbo = worldToFrame[frameNumbers[frameNumbers.size() - 3]];
-  SE3 worldToLast = worldToFrame[frameNumbers[frameNumbers.size() - 2]];
+  SE3 baseToLbo = worldToFrame[frameNumbers[frameNumbers.size() - 3]] *
+                  baseKeyFrame().thisToWorld;
+  SE3 baseToLast = worldToFrame[frameNumbers[frameNumbers.size() - 2]] *
+                   baseKeyFrame().thisToWorld;
 
-  return predictInternal(getTimeLastByLbo(), baseKf->worldToThis, worldToLbo,
-                         worldToLast);
+  return predictInternal(timeLastByLbo, baseToLbo, baseToLast);
 }
 
 SE3 DsoSystem::purePredictBaseKfToCur() {
-  PreKeyFrame *baseKf = baseKeyFrame().preKeyFrame.get();
+  SE3 baseToLbo = worldToFramePredict[frameNumbers[frameNumbers.size() - 3]] *
+                  baseKeyFrame().thisToWorld;
+  SE3 baseToLast = worldToFramePredict[frameNumbers[frameNumbers.size() - 2]] *
+                   baseKeyFrame().thisToWorld;
 
-  SE3 worldToLbo = worldToFramePredict[frameNumbers[frameNumbers.size() - 3]];
-  SE3 worldToLast = worldToFramePredict[frameNumbers[frameNumbers.size() - 2]];
-
-  return predictInternal(getTimeLastByLbo(), baseKf->worldToThis, worldToLbo,
-                         worldToLast);
+  return predictInternal(getTimeLastByLbo(), baseToLbo, baseToLast);
 }
 
 bool DsoSystem::doNeedKf(PreKeyFrame *lastFrame) {
@@ -228,8 +223,7 @@ void DsoSystem::marginalizeFrames() {
 void DsoSystem::activateNewOptimizedPoints() {
   StdVector<Vec2> optPoints;
   for (const auto &[num, kf] : keyFrames) {
-    SE3 refToBase = baseKeyFrame().preKeyFrame->worldToThis *
-                    kf.preKeyFrame->worldToThis.inverse();
+    SE3 refToBase = baseKeyFrame().thisToWorld.inverse() * kf.thisToWorld;
     for (const auto &op : kf.optimizedPoints)
       if (op->state == OptimizedPoint::ACTIVE) {
         auto [p, depth] = (&kf == &baseKeyFrame()
@@ -245,8 +239,7 @@ void DsoSystem::activateNewOptimizedPoints() {
   std::vector<std::pair<KeyFrame *, int>> immaturePositions;
 
   for (auto &[num, kf] : keyFrames) {
-    SE3 refToBase = baseKeyFrame().preKeyFrame->worldToThis *
-                    kf.preKeyFrame->worldToThis.inverse();
+    SE3 refToBase = baseKeyFrame().thisToWorld.inverse() * kf.thisToWorld;
     for (int ind = 0; ind < kf.immaturePoints.size(); ++ind) {
       const auto &ip = kf.immaturePoints[ind];
       if (ip->isReady()) {
@@ -326,14 +319,15 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
 
     if (isInitialized) {
       LOG(INFO) << "initialization successful" << std::endl;
-      std::vector<KeyFrame> kf = dsoInitializer->createKeyFrames();
+      StdVector<KeyFrame> kf = dsoInitializer->createKeyFrames();
       for (const auto &f : kf)
         worldToFramePredict[f.preKeyFrame->globalFrameNum] =
             worldToFrame[f.preKeyFrame->globalFrameNum] =
-                f.preKeyFrame->worldToThis;
-      for (KeyFrame &keyFrame : kf)
-        keyFrames.insert(std::pair<int, KeyFrame>(
-            keyFrame.preKeyFrame->globalFrameNum, std::move(keyFrame)));
+                f.thisToWorld.inverse();
+      for (KeyFrame &keyFrame : kf) {
+        int num = keyFrame.preKeyFrame->globalFrameNum;
+        keyFrames.insert(std::pair<int, KeyFrame>(num, std::move(keyFrame)));
+      }
 
       std::vector<const KeyFrame *> initializedKFs;
       initializedKFs.reserve(keyFrames.size());
@@ -379,7 +373,7 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
   }
 
   std::shared_ptr<PreKeyFrame> preKeyFrame(
-      new PreKeyFrame(cam, frame, globalFrameNum));
+      new PreKeyFrame(&baseKeyFrame(), cam, frame, globalFrameNum));
 
   for (DsoObserver *obs : observers.dso)
     obs->newFrame(preKeyFrame.get());
@@ -393,19 +387,18 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
   std::tie(baseKfToCur, lightBaseKfToCur) =
       frameTracker->trackFrame(*preKeyFrame, predicted, lightKfToLast);
 
-  PreKeyFrame *baseKf = baseKeyFrame().preKeyFrame.get();
-
   preKeyFrame->lightBaseToThis = lightBaseKfToCur;
-  preKeyFrame->lightWorldToThis = lightBaseKfToCur * baseKf->lightWorldToThis;
 
-  LOG(INFO) << "aff light: (fnum=" << preKeyFrame->globalFrameNum << ")\n"
-            << preKeyFrame->lightWorldToThis << std::endl;
+  LOG(INFO) << "aff light (base to cur): (fnum=" << preKeyFrame->globalFrameNum
+            << ")\n"
+            << preKeyFrame->lightBaseToThis << std::endl;
 
-  worldToFrame[globalFrameNum] = baseKfToCur * baseKf->worldToThis;
-  worldToFramePredict[globalFrameNum] = purePredicted * baseKf->worldToThis;
+  worldToFrame[globalFrameNum] =
+      baseKfToCur * baseKeyFrame().thisToWorld.inverse();
+  worldToFramePredict[globalFrameNum] =
+      purePredicted * baseKeyFrame().thisToWorld.inverse();
 
   preKeyFrame->baseToThis = baseKfToCur;
-  preKeyFrame->worldToThis = worldToFrame[globalFrameNum];
 
   lightKfToLast = lightBaseKfToCur;
 
@@ -418,9 +411,9 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
   constexpr int maxTraced = 8;
   std::vector<int> numTraced(maxTraced, 0);
   std::vector<int> numOnLevel(settings.pyramid.levelNum, 0);
-  for (const auto &kfp : keyFrames)
-    for (auto &ip : kfp.second.immaturePoints) {
-      auto status = ip->traceOn(*preKeyFrame, ImmaturePoint::NO_DEBUG);
+  for (const auto &[num, kf] : keyFrames)
+    for (auto &ip : kf.immaturePoints) {
+      auto status = ip->traceOn(kf, *preKeyFrame, ImmaturePoint::NO_DEBUG);
 
       if (status == ImmaturePoint::OK)
         totalTraced++;
@@ -463,9 +456,16 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
     if (settings.bundleAdjuster.runBA) {
       BundleAdjuster bundleAdjuster(cam, settings.getBundleAdjusterSettings());
 
-      for (auto &kfp : keyFrames)
-        bundleAdjuster.addKeyFrame(&kfp.second);
+      for (auto &[num, kf] : keyFrames)
+        bundleAdjuster.addKeyFrame(&kf);
       bundleAdjuster.adjust(settings.bundleAdjuster.maxIterations);
+      
+      for (const auto &[num, kf] : keyFrames) {
+        SE3 worldToKf = kf.thisToWorld.inverse();
+        worldToFrame[kf.preKeyFrame->globalFrameNum] = worldToKf;
+        for (const auto &pkf : kf.trackedFrames)
+          worldToFrame[pkf->globalFrameNum] = pkf->baseToThis * worldToKf;
+      }
     }
 
     StdVector<Vec2> points;

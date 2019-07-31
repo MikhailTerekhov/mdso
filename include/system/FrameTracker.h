@@ -18,7 +18,7 @@ public:
                const FrameTrackerSettings &_settings = {});
 
   std::pair<SE3, AffineLightTransform<double>>
-  trackFrame(const PreKeyFrame &frame, const SE3 &coarseMotion,
+  trackFrame(const PreKeyFrame &frame, const SE3 &coarseBaseToTracked,
              const AffineLightTransform<double> &coarseAffLight);
 
   void addObserver(FrameTrackerObserver *observer);
@@ -29,11 +29,13 @@ public:
   double lastRmse;
 
 private:
-  std::pair<SE3, AffineLightTransform<double>> trackPyrLevel(
-      const CameraModel &cam, const cv::Mat1b &baseImg,
-      const cv::Mat1d &baseDepths, const cv::Mat1b &trackedImg,
-      const PreKeyFrameInternals &trackedImgInternals, const SE3 &coarseMotion,
-      const AffineLightTransform<double> &coarseAffLight, int pyrLevel);
+  std::pair<SE3, AffineLightTransform<double>>
+  trackPyrLevel(const CameraModel &cam, const cv::Mat1b &baseImg,
+                const cv::Mat1d &baseDepths, const cv::Mat1b &trackedImg,
+                const PreKeyFrameInternals &trackedImgInternals,
+                const SE3 &coarseBaseToTracked,
+                const AffineLightTransform<double> &coarseAffLight,
+                int pyrLevel);
 
   const StdVector<CameraModel> &camPyr;
   std::unique_ptr<DepthedImagePyramid> baseFrame;

@@ -59,8 +59,7 @@ cv::Mat3b DebugImageDrawer::draw() {
               depthCol(optD[i], minDepthCol, maxDepthCol), cv::FILLED);
 
   cv::Mat3b usefulImg = base.clone();
-  SE3 baseToLast =
-      lastFrame->worldToThis * baseFrame->preKeyFrame->worldToThis.inverse();
+  SE3 baseToLast = lastFrame->baseToThis;
   for (int i = 0; i < optPt.size(); ++i) {
     Vec3 p = optD[i] * cam->unmap(optPt[i]).normalized();
     Vec2 reproj = cam->map(baseToLast * p);

@@ -16,8 +16,8 @@ void TrajectoryWriterGT::initialized(
     const std::vector<const KeyFrame *> &initializedKFs) {
   CHECK(initializedKFs.size() > 1);
 
-  SE3 worldToFirst = initializedKFs[0]->preKeyFrame->worldToThis;
-  SE3 worldToLast = initializedKFs.back()->preKeyFrame->worldToThis;
+  SE3 worldToFirst = initializedKFs[0]->thisToWorld.inverse();
+  SE3 worldToLast = initializedKFs.back()->thisToWorld.inverse();
   int firstNum = initializedKFs[0]->preKeyFrame->globalFrameNum;
   int lastNum = initializedKFs.back()->preKeyFrame->globalFrameNum;
   SE3 worldToFirstGT = worldToFrameGT[firstNum];
