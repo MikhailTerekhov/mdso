@@ -7,11 +7,11 @@ namespace fishdso {
 
 class DsoObserver;
 class FrameTrackerObserver;
-class InitializerObserver;
+class DelaunayInitializerObserver;
 
 struct Observers {
   std::vector<DsoObserver *> dso;
-  std::vector<InitializerObserver *> initializer;
+  std::vector<DelaunayInitializerObserver *> initializer;
   std::vector<FrameTrackerObserver *> frameTracker;
 };
 

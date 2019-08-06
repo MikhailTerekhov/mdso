@@ -12,36 +12,32 @@ class FrameTrackerObserver;
 
 class FrameTracker {
 public:
-  FrameTracker(const StdVector<CameraModel> &camPyr,
-               std::unique_ptr<DepthedImagePyramid> _baseFrame,
-               const std::vector<FrameTrackerObserver *> &observers = {},
+  using DepthedMultiFrame =
+      static_vector<DepthedImagePyramid,
+                    Settings::CameraBundle::max_camerasInBundle>;
+
+  struct TrackingResult {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    SE3 baseToTracked;
+    AffLight lightBaseToTracked[Settings::CameraBundle::max_camerasInBundle];
+  };
+
+  FrameTracker(CameraBundle camPyr[], const DepthedMultiFrame &_baseFrame,
+               std::vector<FrameTrackerObserver *> &observers,
                const FrameTrackerSettings &_settings = {});
 
-  std::pair<SE3, AffineLightTransform<double>>
-  trackFrame(const PreKeyFrame &frame, const SE3 &coarseBaseToTracked,
-             const AffineLightTransform<double> &coarseAffLight);
-
-  void addObserver(FrameTrackerObserver *observer);
-
-  // output only
-  std::vector<cv::Mat3b> residualsImg;
-
-  double lastRmse;
+  TrackingResult trackFrame(const PreKeyFrame &frame,
+                            const TrackingResult &coarseTrackingResult);
 
 private:
-  std::pair<SE3, AffineLightTransform<double>>
-  trackPyrLevel(const CameraModel &cam, const cv::Mat1b &baseImg,
-                const cv::Mat1d &baseDepths, const cv::Mat1b &trackedImg,
-                const PreKeyFrameInternals &trackedImgInternals,
-                const SE3 &coarseBaseToTracked,
-                const AffineLightTransform<double> &coarseAffLight,
-                int pyrLevel);
+  TrackingResult trackPyrLevel(const PreKeyFrame &frame,
+                               const TrackingResult &coarseTrackingResult,
+                               int pyrLevel);
 
-  const StdVector<CameraModel> &camPyr;
-  std::unique_ptr<DepthedImagePyramid> baseFrame;
-  int displayWidth, displayHeight;
-
-  std::vector<FrameTrackerObserver *> observers;
+  CameraBundle *camPyr;
+  DepthedMultiFrame baseFrame;
+  std::vector<FrameTrackerObserver *> &observers;
   FrameTrackerSettings settings;
 };
 

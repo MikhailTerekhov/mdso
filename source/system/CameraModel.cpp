@@ -172,12 +172,14 @@ void CameraModel::setMapPolyCoeffs() {
   mapPolyCoeffs = A.fullPivHouseholderQr().solve(b);
 }
 
-StdVector<CameraModel> CameraModel::camPyr(int pyrLevels) {
-  StdVector<CameraModel> result(pyrLevels, *this);
+CameraModel::CamPyr CameraModel::camPyr(int pyrLevels) {
+  CHECK(pyrLevels > 0 && pyrLevels <= Settings::Pyramid::max_levelNum);
+  CamPyr result;
   for (int i = 0; i < pyrLevels; ++i) {
-    result[i].scale /= (1 << i);
-    result[i].width /= (1 << i);
-    result[i].height /= (1 << i);
+    result.emplace_back(*this);
+    result.back().scale /= (1 << i);
+    result.back().width /= (1 << i);
+    result.back().height /= (1 << i);
   }
 
   return result;

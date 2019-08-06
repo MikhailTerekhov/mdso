@@ -188,8 +188,8 @@ void Triangulation::performFlip(Edge *oldEdge) {
   }
 }
 
-EIGEN_STRONG_INLINE Triangulation::Vertex *
-Triangulation::findThirdVert(Triangle *tri, Edge *edge) {
+inline Triangulation::Vertex *Triangulation::findThirdVert(Triangle *tri,
+                                                           Edge *edge) {
   bool edgeFound = false;
   for (int i = 0; i < 3; ++i) {
     if (tri->edges[i] == edge) {
@@ -208,7 +208,7 @@ Triangulation::findThirdVert(Triangle *tri, Edge *edge) {
   return nullptr;
 }
 
-EIGEN_STRONG_INLINE Triangulation::Edge *
+inline Triangulation::Edge *
 Triangulation::findOppositeEdge(Triangulation::Triangle *tri,
                                 Triangulation::Vertex *vert) {
   bool vertFound = false;
@@ -230,18 +230,16 @@ Triangulation::findOppositeEdge(Triangulation::Triangle *tri,
   return nullptr;
 }
 
-EIGEN_STRONG_INLINE bool Triangulation::isIncident(Vertex *vert, Edge *edge) {
+inline bool Triangulation::isIncident(Vertex *vert, Edge *edge) {
   return edge->vert[0] == vert || edge->vert[1] == vert;
 }
 
-EIGEN_STRONG_INLINE bool Triangulation::isIncident(Vertex *vert,
-                                                   Triangle *tri) {
+inline bool Triangulation::isIncident(Vertex *vert, Triangle *tri) {
   return tri->vert[0] == vert || tri->vert[1] == vert || tri->vert[2] == vert;
 }
 
-EIGEN_STRONG_INLINE bool
-Triangulation::doesContain(Triangulation::Triangle *tri,
-                           const Vec2 &point) const {
+inline bool Triangulation::doesContain(Triangulation::Triangle *tri,
+                                       const Vec2 &point) const {
   return doesContain(tri->edges[0], point) ||
          doesContain(tri->edges[1], point) ||
          doesContain(tri->edges[2], point) ||
@@ -249,23 +247,23 @@ Triangulation::doesContain(Triangulation::Triangle *tri,
                           tri->vert[2]->pos, point);
 }
 
-EIGEN_STRONG_INLINE bool Triangulation::isInsideBound(const Vec2 &point) const {
+inline bool Triangulation::isInsideBound(const Vec2 &point) const {
   return isInsideTriangle(_vertices[0]->pos, _vertices[1]->pos,
                           _vertices[2]->pos, point);
 }
 
-EIGEN_STRONG_INLINE bool Triangulation::doesContain(Triangulation::Edge *edge,
-                                                    const Vec2 &point) const {
+inline bool Triangulation::doesContain(Triangulation::Edge *edge,
+                                       const Vec2 &point) const {
   return doesABcontain(edge->vert[0]->pos, edge->vert[1]->pos, point,
                        settings.epsPointIsOnSegment * maxDim);
 }
 
-EIGEN_STRONG_INLINE bool Triangulation::isFromBoundingTri(Vertex *vert) const {
+inline bool Triangulation::isFromBoundingTri(Vertex *vert) const {
   return vert == _vertices[0].get() || vert == _vertices[1].get() ||
          vert == _vertices[2].get();
 }
 
-EIGEN_STRONG_INLINE bool Triangulation::isEdgeLegal(Edge *edge) const {
+inline bool Triangulation::isEdgeLegal(Edge *edge) const {
   bool isInc1Bound = isFromBoundingTri(edge->vert[0]);
   bool isInc2Bound = isFromBoundingTri(edge->vert[1]);
   if (isInc1Bound && isInc2Bound)

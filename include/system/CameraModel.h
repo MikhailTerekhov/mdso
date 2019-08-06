@@ -12,8 +12,9 @@
 namespace fishdso {
 
 class CameraModel {
-
 public:
+  using CamPyr = static_vector<CameraModel, Settings::Pyramid::max_levelNum>;
+
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   CameraModel(int width, int height, double scale, const Vec2 &center,
@@ -76,13 +77,9 @@ public:
     return res;
   }
 
-  EIGEN_STRONG_INLINE Vec3 unmap(const Vec2 &point) const {
-    return unmap(point.data());
-  }
+  inline Vec3 unmap(const Vec2 &point) const { return unmap(point.data()); }
 
-  EIGEN_STRONG_INLINE Vec2 map(const Vec3 &ray) const {
-    return map(ray.data());
-  }
+  inline Vec2 map(const Vec3 &ray) const { return map(ray.data()); }
 
   template <typename T>
   cv::Mat undistort(const cv::Mat &img, const Mat33 &cameraMatrix) const {
@@ -103,10 +100,11 @@ public:
 
   std::pair<Vec2, Mat23> diffMap(const Vec3 &ray) const;
 
-  EIGEN_STRONG_INLINE int getWidth() const { return width; }
-  EIGEN_STRONG_INLINE int getHeight() const { return height; }
-  EIGEN_STRONG_INLINE Vec2 getImgCenter() const { return scale * center; }
-  EIGEN_STRONG_INLINE double getMaxAngle() const { return maxAngle; }
+  inline int getWidth() const { return width; }
+  inline int getHeight() const { return height; }
+  inline Vec2 getImgCenter() const { return scale * center; }
+  inline double getMinZ() const { return minZ; }
+  inline double getMaxAngle() const { return maxAngle; }
 
   bool isOnImage(const Vec2 &p, int border) const;
 
@@ -115,12 +113,12 @@ public:
 
   void setMapPolyCoeffs();
 
-  StdVector<CameraModel> camPyr(int pyrLevels);
+  CamPyr camPyr(int pyrLevels);
 
 private:
   friend std::istream &operator>>(std::istream &is, CameraModel &cc);
 
-  EIGEN_STRONG_INLINE double calcUnmapPoly(double r) const {
+  inline double calcUnmapPoly(double r) const {
     double rN = r * r;
     double res = unmapPolyCoeffs[0];
     for (int i = 1; i < unmapPolyDeg; ++i) {
@@ -129,7 +127,7 @@ private:
     }
     return res;
   }
-  EIGEN_STRONG_INLINE double calcMapPoly(double funcVal) const {
+  inline double calcMapPoly(double funcVal) const {
     double funcValN = funcVal;
     double res = mapPolyCoeffs[0];
     for (int i = 1; i < mapPolyCoeffs.rows(); ++i) {

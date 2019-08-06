@@ -42,16 +42,16 @@ set(dso_HEADER_FILES
 
     ${PROJECT_SOURCE_DIR}/include/output/Observers.h
     ${PROJECT_SOURCE_DIR}/include/output/DsoObserver.h
-    ${PROJECT_SOURCE_DIR}/include/output/DebugImageDrawer.h
-    ${PROJECT_SOURCE_DIR}/include/output/TrajectoryWriter.h
-    ${PROJECT_SOURCE_DIR}/include/output/TrajectoryWriterGT.h
-    ${PROJECT_SOURCE_DIR}/include/output/CloudWriter.h
-    ${PROJECT_SOURCE_DIR}/include/output/CloudWriterGT.h
-    ${PROJECT_SOURCE_DIR}/include/output/InitializerObserver.h
-    ${PROJECT_SOURCE_DIR}/include/output/InterpolationDrawer.h
+    # ${PROJECT_SOURCE_DIR}/include/output/DebugImageDrawer.h
+    # ${PROJECT_SOURCE_DIR}/include/output/TrajectoryWriter.h
+    # ${PROJECT_SOURCE_DIR}/include/output/TrajectoryWriterGT.h
+    # ${PROJECT_SOURCE_DIR}/include/output/CloudWriter.h
+    # ${PROJECT_SOURCE_DIR}/include/output/CloudWriterGT.h
+    ${PROJECT_SOURCE_DIR}/include/output/DelaunayInitializerObserver.h
+    # ${PROJECT_SOURCE_DIR}/include/output/InterpolationDrawer.h
     ${PROJECT_SOURCE_DIR}/include/output/FrameTrackerObserver.h
-    ${PROJECT_SOURCE_DIR}/include/output/TrackingDebugImageDrawer.h
-    ${PROJECT_SOURCE_DIR}/include/output/DepthPyramidDrawer.h
+    # ${PROJECT_SOURCE_DIR}/include/output/TrackingDebugImageDrawer.h
+    # ${PROJECT_SOURCE_DIR}/include/output/DepthPyramidDrawer.h
 
     ${PROJECT_SOURCE_DIR}/include/system/AffineLightTransform.h
     ${PROJECT_SOURCE_DIR}/include/system/SphericalPlus.h
@@ -63,6 +63,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/system/ImmaturePoint.h
     ${PROJECT_SOURCE_DIR}/include/system/OptimizedPoint.h
     ${PROJECT_SOURCE_DIR}/include/system/CameraModel.h
+    ${PROJECT_SOURCE_DIR}/include/system/CameraBundle.h
     ${PROJECT_SOURCE_DIR}/include/system/StereoMatcher.h
     ${PROJECT_SOURCE_DIR}/include/system/StereoGeometryEstimator.h
     ${PROJECT_SOURCE_DIR}/include/system/FrameTracker.h
@@ -86,16 +87,16 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/util/flags.cpp
 
     ${PROJECT_SOURCE_DIR}/source/output/DsoObserver.cpp
-    ${PROJECT_SOURCE_DIR}/source/output/DebugImageDrawer.cpp
-    ${PROJECT_SOURCE_DIR}/source/output/TrajectoryWriter.cpp
-    ${PROJECT_SOURCE_DIR}/source/output/TrajectoryWriterGT.cpp
-    ${PROJECT_SOURCE_DIR}/source/output/CloudWriter.cpp
-    ${PROJECT_SOURCE_DIR}/source/output/CloudWriterGT.cpp
-    ${PROJECT_SOURCE_DIR}/source/output/InitializerObserver.cpp
-    ${PROJECT_SOURCE_DIR}/source/output/InterpolationDrawer.cpp
+    # ${PROJECT_SOURCE_DIR}/source/output/DebugImageDrawer.cpp
+    # ${PROJECT_SOURCE_DIR}/source/output/TrajectoryWriter.cpp
+    # ${PROJECT_SOURCE_DIR}/source/output/TrajectoryWriterGT.cpp
+    # ${PROJECT_SOURCE_DIR}/source/output/CloudWriter.cpp
+    # ${PROJECT_SOURCE_DIR}/source/output/CloudWriterGT.cpp
+    ${PROJECT_SOURCE_DIR}/source/output/DelaunayInitializerObserver.cpp
+    # ${PROJECT_SOURCE_DIR}/source/output/InterpolationDrawer.cpp
     ${PROJECT_SOURCE_DIR}/source/output/FrameTrackerObserver.cpp
-    ${PROJECT_SOURCE_DIR}/source/output/TrackingDebugImageDrawer.cpp
-    ${PROJECT_SOURCE_DIR}/source/output/DepthPyramidDrawer.cpp
+    # ${PROJECT_SOURCE_DIR}/source/output/TrackingDebugImageDrawer.cpp
+    # ${PROJECT_SOURCE_DIR}/source/output/DepthPyramidDrawer.cpp
 
     ${PROJECT_SOURCE_DIR}/source/system/SphericalPlus.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoSystem.cpp

@@ -53,35 +53,27 @@ struct PointTrackingResidual {
       *trackedFrame;
 };
 
-FrameTracker::FrameTracker(const StdVector<CameraModel> &camPyr,
-                           std::unique_ptr<DepthedImagePyramid> _baseFrame,
-                           const std::vector<FrameTrackerObserver *> &observers,
+FrameTracker::FrameTracker(CameraBundle camPyr[], const DepthedMultiFrame &_baseFrame,
+                           std::vector<FrameTrackerObserver *> &observers,
                            const FrameTrackerSettings &_settings)
-    : residualsImg(_settings.pyramid.levelNum)
-    , lastRmse(INF)
-    , camPyr(camPyr)
-    , baseFrame(std::move(_baseFrame))
-    , displayWidth(camPyr[1].getWidth())
-    , displayHeight(camPyr[1].getHeight())
+    : camPyr(camPyr)
+    , baseFrame(_baseFrame)
     , observers(observers)
     , settings(_settings) {
   for (FrameTrackerObserver *obs : observers)
-    obs->newBaseFrame(*baseFrame);
+    obs->newBaseFrame(baseFrame);
 }
 
-void FrameTracker::addObserver(FrameTrackerObserver *observer) {
-  observers.push_back(observer);
-}
-
-std::pair<SE3, AffineLightTransform<double>>
+FrameTracker::TrackingResult
 FrameTracker::trackFrame(const PreKeyFrame &frame,
-                         const SE3 &coarseBaseToTracked,
-                         const AffineLightTransform<double> &coarseAffLight) {
+                         const TrackingResult &coarseTrackingResult) {
+  return coarseTrackingResult;
+  /*
   for (FrameTrackerObserver *obs : observers)
     obs->startTracking(frame.framePyr);
 
   SE3 baseToTracked = coarseBaseToTracked;
-  AffineLightTransform<double> affLight = coarseAffLight;
+  AffLight affLight = coarseAffLight;
 
   for (int i = settings.pyramid.levelNum - 1; i >= 0; --i) {
     LOG(INFO) << "track level #" << i << std::endl;
@@ -93,6 +85,7 @@ FrameTracker::trackFrame(const PreKeyFrame &frame,
   // cv::waitKey();
 
   return {baseToTracked, affLight};
+  */
 }
 
 bool isPointTrackable(const CameraModel &cam, const Vec3 &basePos,
@@ -102,15 +95,15 @@ bool isPointTrackable(const CameraModel &cam, const Vec3 &basePos,
   return cam.isOnImage(coarseCurOnImg, 0);
 }
 
-std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
-    const CameraModel &cam, const cv::Mat1b &baseImg,
-    const cv::Mat1d &baseDepths, const cv::Mat1b &trackedImg,
-    const PreKeyFrameInternals &internals, const SE3 &coarseBaseToTracked,
-    const AffineLightTransform<double> &coarseAffLight, int pyrLevel) {
+FrameTracker::TrackingResult
+FrameTracker::trackPyrLevel(const PreKeyFrame &frame,
+                            const TrackingResult &coarseTrackingResult,
+                            int pyrLevel) {
+  return coarseTrackingResult;
+  /*
   SE3 baseToTracked = coarseBaseToTracked;
-  AffineLightTransform<double> affLight = coarseAffLight;
+  AffLight affLight = coarseAffLight;
 
-  cv::Size displSz = cv::Size(displayHeight, displayWidth);
   cv::Mat1b resMask(baseImg.size(), CV_WHITE_BYTE);
 
   const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
@@ -211,6 +204,7 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
     obs->levelTracked(pyrLevel, baseToTracked, affLight, pointResiduals);
 
   return {baseToTracked, affLight};
+  */
 }
 
 } // namespace fishdso

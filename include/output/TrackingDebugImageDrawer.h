@@ -17,7 +17,7 @@ public:
 
   void startTracking(const ImagePyramid &frame);
   void levelTracked(int pyrLevel, const SE3 &baseToLast,
-                    const AffineLightTransform<double> &affLightBaseToLast,
+                    const AffLight &affLightBaseToLast,
                     const StdVector<std::pair<Vec2, double>> &pointResiduals);
 
   cv::Mat3b drawAllLevels();

@@ -59,21 +59,20 @@ public:
   void drawCurved(CameraModel *cam, cv::Mat &img, cv::Scalar edgeCol) const;
 
 private:
-  EIGEN_STRONG_INLINE static Vertex *findThirdVert(Triangle *tri, Edge *edge);
+  inline static Vertex *findThirdVert(Triangle *tri, Edge *edge);
 
-  EIGEN_STRONG_INLINE static Edge *findOppositeEdge(Triangle *tri,
-                                                    Vertex *vert);
+  inline static Edge *findOppositeEdge(Triangle *tri, Vertex *vert);
 
-  EIGEN_STRONG_INLINE static bool isIncident(Vertex *vert, Edge *edge);
-  EIGEN_STRONG_INLINE static bool isIncident(Vertex *vert, Triangle *tri);
+  inline static bool isIncident(Vertex *vert, Edge *edge);
+  inline static bool isIncident(Vertex *vert, Triangle *tri);
 
-  EIGEN_STRONG_INLINE bool isInsideBound(const Vec2 &point) const;
+  inline bool isInsideBound(const Vec2 &point) const;
 
-  EIGEN_STRONG_INLINE bool doesContain(Triangle *tri, const Vec2 &point) const;
-  EIGEN_STRONG_INLINE bool doesContain(Edge *edge, const Vec2 &point) const;
+  inline bool doesContain(Triangle *tri, const Vec2 &point) const;
+  inline bool doesContain(Edge *edge, const Vec2 &point) const;
 
-  EIGEN_STRONG_INLINE bool isFromBoundingTri(Vertex *vert) const;
-  EIGEN_STRONG_INLINE bool isEdgeLegal(Edge *edge) const;
+  inline bool isFromBoundingTri(Vertex *vert) const;
+  inline bool isEdgeLegal(Edge *edge) const;
 
   Vertex *makeBoundingVertex(const Vec2 &newPos);
   Vertex *makeVertex(const Vec2 &newPos, int newIndex);

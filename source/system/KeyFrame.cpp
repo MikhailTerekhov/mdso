@@ -6,93 +6,61 @@
 
 namespace fishdso {
 
-KeyFrame::KeyFrame(CameraModel *cam, const cv::Mat &frameColored,
-                   int globalFrameNum, PixelSelector &pixelSelector,
+KeyFrame::KeyFrame(const InitializedFrame &initializedFrame, CameraBundle *cam,
+                   int globalFrameNum, long long timestamp,
+                   PixelSelector pixelSelector[],
                    const Settings::KeyFrame &_kfSettings,
-                   const PointTracerSettings tracingSettings)
-    : preKeyFrame(std::shared_ptr<PreKeyFrame>(
-          new PreKeyFrame(nullptr, cam, frameColored, globalFrameNum)))
-    , immaturePoints(
-          reservedVector<std::unique_ptr<ImmaturePoint>>(_kfSettings.pointsNum))
-    , optimizedPoints(reservedVector<std::unique_ptr<OptimizedPoint>>(
-          _kfSettings.pointsNum))
-    , kfSettings(_kfSettings)
+                   const Settings::Pyramid &pyrSettings,
+                   const PointTracerSettings &tracingSettings)
+    : kfSettings(_kfSettings)
     , tracingSettings(tracingSettings) {
-  std::vector<cv::Point> points = pixelSelector.select(
-      frameColored, preKeyFrame->gradNorm, kfSettings.pointsNum, nullptr);
-  addImmatures(points);
+  cv::Mat frames[Settings::CameraBundle::max_camerasInBundle];
+  for (int i = 0; i < cam->bundle.size(); ++i)
+    frames[i] = initializedFrame.frames[i].frame;
+  preKeyFrame = std::unique_ptr<PreKeyFrame>(new PreKeyFrame(
+      this, cam, frames, globalFrameNum, timestamp, pyrSettings));
 }
 
-KeyFrame::KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame,
-                   PixelSelector &pixelSelector,
+KeyFrame::KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame,
+                   PixelSelector pixelSelector[],
                    const Settings::KeyFrame &_kfSettings,
                    const PointTracerSettings &tracingSettings)
-    : preKeyFrame(newPreKeyFrame)
-    , lightWorldToThis(preKeyFrame->baseKeyFrame
-                           ? preKeyFrame->lightBaseToThis *
-                                 preKeyFrame->baseKeyFrame->lightWorldToThis
-                           : preKeyFrame->lightBaseToThis)
-    , thisToWorld(preKeyFrame->baseKeyFrame
-                      ? preKeyFrame->baseKeyFrame->thisToWorld *
-                            preKeyFrame->baseToThis.inverse()
-                      : preKeyFrame->baseToThis.inverse())
-    , immaturePoints(
-          reservedVector<std::unique_ptr<ImmaturePoint>>(_kfSettings.pointsNum))
-    , optimizedPoints(reservedVector<std::unique_ptr<OptimizedPoint>>(
-          _kfSettings.pointsNum))
+    : preKeyFrame(std::move(newPreKeyFrame))
+    , thisToWorld(preKeyFrame->baseFrame ? preKeyFrame->baseFrame->thisToWorld *
+                                               preKeyFrame->baseToThis.inverse()
+                                         : preKeyFrame->baseToThis.inverse())
     , kfSettings(_kfSettings)
     , tracingSettings(tracingSettings) {
-  std::vector<cv::Point> points =
-      pixelSelector.select(newPreKeyFrame->frameColored, preKeyFrame->gradNorm,
-                           kfSettings.pointsNum, nullptr);
-  addImmatures(points);
-}
-
-void KeyFrame::addImmatures(const std::vector<cv::Point> &points) {
-  immaturePoints.reserve(immaturePoints.size() + points.size());
-  for (const cv::Point &p : points)
-    immaturePoints.push_back(std::unique_ptr<ImmaturePoint>(
-        new ImmaturePoint(this, toVec2(p), tracingSettings)));
-}
-
-void KeyFrame::selectPointsDenser(PixelSelector &pixelSelector,
-                                  int pointsNeeded) {
-  std::vector<cv::Point> points = pixelSelector.select(
-      preKeyFrame->frameColored, preKeyFrame->gradNorm, pointsNeeded, nullptr);
-  immaturePoints.clear();
-  optimizedPoints.clear();
-  addImmatures(points);
-}
-
-void KeyFrame::activateAllImmature() {
-  for (const auto &ip : immaturePoints)
-    optimizedPoints.push_back(
-        std::unique_ptr<OptimizedPoint>(new OptimizedPoint(*ip)));
-  immaturePoints.clear();
-}
-
-void KeyFrame::deactivateAllOptimized() {
-  for (const auto &op : optimizedPoints) {
-    std::unique_ptr<ImmaturePoint> ip(
-        new ImmaturePoint(this, op->p, tracingSettings));
-    ip->depth = op->depth();
-    immaturePoints.push_back(std::move(ip));
+  for (int i = 0; i < preKeyFrame->cam->bundle.size(); ++i) {
+    PixelSelector::PointVector selected = pixelSelector[i].select(
+        preKeyFrame->image(i), preKeyFrame->frames[i].gradNorm,
+        kfSettings.immaturePointsNum(), nullptr);
+    addImmatures(selected.data(), selected.size(), i);
+    frames[i].lightWorldToThis =
+        preKeyFrame->baseFrame
+            ? preKeyFrame->frames[i].lightBaseToThis *
+                  preKeyFrame->baseFrame->frames[i].lightWorldToThis
+            : preKeyFrame->frames[i].lightBaseToThis;
   }
-  optimizedPoints.clear();
 }
 
-cv::Mat3b KeyFrame::drawDepthedFrame(double minDepth, double maxDepth) const {
-  cv::Mat res = preKeyFrame->frameColored.clone();
+void KeyFrame::addImmatures(const cv::Point points[], int size,
+                            int numInBundle) {
+  for (int i = 0; i < size; ++i)
+    frames[numInBundle].immaturePoints.emplace_back(
+        this, numInBundle, toVec2(points[i]), tracingSettings);
+}
 
-  for (const auto &ip : immaturePoints)
-    if (ip->state == ImmaturePoint::ACTIVE && ip->maxDepth != INF)
-      putSquare(res, toCvPoint(ip->p), 5,
-                toCvVec3bDummy(depthCol(ip->depth, minDepth, maxDepth)), 2);
-  for (const auto &op : optimizedPoints)
-    cv::circle(res, toCvPoint(op->p), 5,
-               toCvVec3bDummy(depthCol(op->depth(), minDepth, maxDepth)), 2);
-
-  return res;
+void KeyFrame::selectPointsDenser(PixelSelector pixelSelector[],
+                                  int pointsNeeded) {
+  for (int i = 0; i < preKeyFrame->cam->bundle.size(); ++i) {
+    PixelSelector::PointVector points = pixelSelector[i].select(
+        preKeyFrame->image(i), preKeyFrame->frames[i].gradNorm, pointsNeeded,
+        nullptr);
+    frames[i].immaturePoints.clear();
+    frames[i].optimizedPoints.clear();
+    addImmatures(points.data(), points.size(), i);
+  }
 }
 
 } // namespace fishdso

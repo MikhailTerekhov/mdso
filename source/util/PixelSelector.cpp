@@ -4,17 +4,17 @@
 
 namespace fishdso {
 
-#define LI (settings.gradThresholds.size())
+#define LI (Settings::PixelSelector::gradThesholdCount)
 
 PixelSelector::PixelSelector(const Settings::PixelSelector &_settings)
     : lastBlockSize(_settings.initialAdaptiveBlockSize)
     , lastPointsFound(_settings.initialPointsFound)
     , settings(_settings) {}
 
-std::vector<cv::Point> PixelSelector::select(const cv::Mat &frame,
-                                             const cv::Mat1d &gradNorm,
-                                             int pointsNeeded,
-                                             cv::Mat *debugOut) {
+PixelSelector::PointVector PixelSelector::select(const cv::Mat &frame,
+                                                 const cv::Mat1d &gradNorm,
+                                                 int pointsNeeded,
+                                                 cv::Mat *debugOut) {
   int newBlockSize =
       lastBlockSize * std::sqrt(static_cast<double>(lastPointsFound) /
                                 (pointsNeeded * settings.adaptToFactor));
@@ -22,9 +22,13 @@ std::vector<cv::Point> PixelSelector::select(const cv::Mat &frame,
 }
 
 void selectLayer(const cv::Mat &gradNorm, int selBlockSize, double threshold,
-                 std::vector<cv::Point> &res) {
-  for (int i = 0; i + selBlockSize < gradNorm.rows; i += selBlockSize)
-    for (int j = 0; j + selBlockSize < gradNorm.cols; j += selBlockSize) {
+                 PixelSelector::PointVector &res) {
+  for (int i = 0;
+       i + selBlockSize < gradNorm.rows && res.size() < res.capacity();
+       i += selBlockSize)
+    for (int j = 0;
+         j + selBlockSize < gradNorm.cols && res.size() < res.capacity();
+         j += selBlockSize) {
       cv::Mat block = gradNorm(cv::Range(i, i + selBlockSize),
                                cv::Range(j, j + selBlockSize));
       double avg = cv::sum(block)[0] / (selBlockSize * selBlockSize);
@@ -36,30 +40,25 @@ void selectLayer(const cv::Mat &gradNorm, int selBlockSize, double threshold,
     }
 }
 
-std::vector<cv::Point> PixelSelector::selectInternal(const cv::Mat &frame,
-                                                     const cv::Mat1d &gradNorm,
-                                                     int pointsNeeded,
-                                                     int blockSize,
-                                                     cv::Mat *debugOut) {
-  std::vector<std::vector<cv::Point>> pointsOverThres(LI);
-  std::vector<cv::Point> pointsAll;
-
-  for (int i = 0; i < LI; ++i)
-    pointsOverThres[i].reserve(2 * pointsNeeded);
+PixelSelector::PointVector
+PixelSelector::selectInternal(const cv::Mat &frame, const cv::Mat1d &gradNorm,
+                              int pointsNeeded, int blockSize,
+                              cv::Mat *debugOut) {
+  PointVector pointsOverThres[LI];
+  PointVector pointsAll;
 
   for (int i = 0; i < LI; ++i) {
     selectLayer(gradNorm, (1 << i) * blockSize, settings.gradThresholds[i],
                 pointsOverThres[i]);
-    std::random_shuffle(pointsOverThres[i].begin(), pointsOverThres[i].end());
+    std::shuffle(pointsOverThres[i].begin(), pointsOverThres[i].end(), mt);
     // std::cout << "over thres " << i << " are " << pointsOverThres[i].size()
     // << std::endl;
   }
 
-  int foundTotal =
-      std::accumulate(pointsOverThres.begin(), pointsOverThres.end(), 0,
-                      [](int accumulated, const std::vector<cv::Point> &b) {
-                        return accumulated + b.size();
-                      });
+  int foundTotal = std::accumulate(pointsOverThres, pointsOverThres + LI, 0,
+                                   [](int accumulated, const PointVector &b) {
+                                     return accumulated + b.size();
+                                   });
 
   std::stringstream levLog;
   for (int i = 0; i < LI - 1; ++i)

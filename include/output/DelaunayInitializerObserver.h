@@ -7,14 +7,16 @@
 
 namespace fishdso {
 
-class InitializerObserver {
-public:
-  virtual ~InitializerObserver() = 0;
+struct InitializedFrame;
 
-  virtual void initialized(const KeyFrame *lastKeyFrame,
+class DelaunayInitializerObserver {
+public:
+  virtual ~DelaunayInitializerObserver() = 0;
+
+  virtual void initialized(const InitializedFrame *lastFrame,
                            const SphericalTerrain *lastTerrain,
-                           const StdVector<Vec2> &keyPoints,
-                           const std::vector<double> &keyPointDepths) {}
+                           Vec2 keyPoints[], double keyPointDepths[],
+                           int size) {}
 };
 
 } // namespace fishdso

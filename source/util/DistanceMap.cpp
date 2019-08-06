@@ -17,9 +17,9 @@ unsigned clp2(unsigned x) {
   return x + 1;
 }
 
-DistanceMap::DistanceMap(int givenW, int givenH, const StdVector<Vec2> &points,
-                         const Settings::DistanceMap &settings)
-    : settings(settings) {
+DistanceMap::MapEntry::MapEntry(int givenW, int givenH,
+                                const StdVector<Vec2> &points,
+                                const Settings::DistanceMap &settings) {
   const int wdiv = 1 + (givenW - 1) / settings.maxWidth;
   const int hdiv = 1 + (givenH - 1) / settings.maxHeight;
   pyrDown = std::min(clp2(wdiv), clp2(hdiv));
@@ -63,31 +63,52 @@ DistanceMap::DistanceMap(int givenW, int givenH, const StdVector<Vec2> &points,
   }
 }
 
-std::vector<int> DistanceMap::choose(const StdVector<Vec2> &otherPoints,
-                                     int pointsNeeded) {
-  std::vector<int> chosen;
-  std::vector<std::pair<int, int>> otherDist(otherPoints.size());
-  for (int i = 0; i < otherPoints.size(); ++i) {
-    const Vec2 &p = otherPoints[i];
-    Vec2i pi = p.cast<int>() / pyrDown;
+DistanceMap::DistanceMap(CameraBundle *cam, StdVector<Vec2> points[],
+                         const Settings::DistanceMap &settings)
+    : camCount(cam->bundle.size())
+    , settings(settings) {
+  for (int i = 0; i < camCount; ++i)
+    maps.emplace_back(cam->bundle[i].cam.getWidth(),
+                      cam->bundle[i].cam.getHeight(), points[i], settings);
+}
 
-    otherDist[i].first = i;
-    if (!Eigen::AlignedBox2i(Vec2i::Zero(), Vec2i(dist.cols(), dist.rows()))
-             .contains(pi))
-      otherDist[i].second = -1;
-    else
-      otherDist[i].second = dist(pi[1], pi[0]);
-  }
+struct PointDist {
+  int cam, ind, dist;
+};
 
-  int total = std::min(pointsNeeded, int(otherPoints.size()));
+int DistanceMap::choose(StdVector<Vec2> otherPoints[], int pointsNeeded,
+                        std::vector<int> chosenIndices[]) {
+  int totalPoints = std::accumulate(
+      otherPoints, otherPoints + camCount, 0,
+      [](int size, const auto &pointsVec) { return size + pointsVec.size(); });
+  std::vector<PointDist> otherDist;
+  otherDist.reserve(totalPoints);
+  for (int ci = 0; ci < camCount; ++ci)
+    for (int pi = 0; pi < otherPoints[ci].size(); ++pi) {
+      Vec2i pnt = otherPoints[ci][pi].cast<int>() / maps[ci].pyrDown;
+      int curDist =
+          Eigen::AlignedBox2i(Vec2i::Zero(), Vec2i(maps[ci].dist.cols() - 1,
+                                                   maps[ci].dist.rows() - 1))
+                  .contains(pnt)
+              ? maps[ci].dist(pnt[1], pnt[0])
+              : -1;
+      otherDist.push_back({ci, pi, curDist});
+    }
+
+  int total = std::min(pointsNeeded, int(otherDist.size()));
+  int result = 0;
   std::nth_element(
       otherDist.begin(), otherDist.begin() + total, otherDist.end(),
-      [](const auto &a, const auto &b) { return a.second > b.second; });
-  for (int i = 0; i < total; ++i)
-    if (otherDist[i].second != -1)
-      chosen.push_back(otherDist[i].first);
+      [](const auto &a, const auto &b) { return a.dist > b.dist; });
+  for (int i = 0; i < total; ++i) {
+    const PointDist &p = otherDist[i];
+    if (p.dist != -1) {
+      chosenIndices[p.cam].push_back(p.ind);
+      ++result;
+    }
+  }
 
-  return chosen;
+  return result;
 }
 
 } // namespace fishdso

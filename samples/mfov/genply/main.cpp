@@ -121,7 +121,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
 
   DebugImageDrawer debugImageDrawer;
   TrackingDebugImageDrawer trackingDebugImageDrawer(
-      reader.cam->camPyr(settings.pyramid.levelNum), settings.frameTracker,
+      reader.cam->camPyr(settings.pyramid.levelNum()), settings.frameTracker,
       settings.pyramid);
   TrajectoryWriter trajectoryWriter(FLAGS_output_directory, "tracked_pos.txt",
                                     "tracked_frame_to_world.txt");

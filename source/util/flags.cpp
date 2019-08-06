@@ -73,7 +73,7 @@ Settings getFlaggedSettings() {
   Settings settings;
 
   settings.threading.numThreads = FLAGS_num_threads;
-  settings.keyFrame.pointsNum = FLAGS_points_per_frame;
+  settings.keyFrame.setImmaturePointsNum(FLAGS_points_per_frame);
   settings.delaunayDsoInitializer.firstFramesSkip = FLAGS_first_frames_skip;
   settings.stereoMatcher.stereoGeometryEstimator.runMaxRansacIter =
       FLAGS_run_max_RANSAC_iterations;

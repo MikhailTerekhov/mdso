@@ -14,20 +14,18 @@ namespace fishdso {
 #define PH (settings.residualPattern.height)
 #define TH (settings.intencity.outlierDiff)
 
-ImmaturePoint::ImmaturePoint(KeyFrame *baseFrame, const Vec2 &p,
+ImmaturePoint::ImmaturePoint(KeyFrame *baseFrame, int numInBundle,
+                             const Vec2 &p,
                              const PointTracerSettings &_settings)
     : p(p)
-    , baseDirections(_settings.residualPattern.pattern().size())
-    , baseIntencities(_settings.residualPattern.pattern().size())
-    , baseGrad(_settings.residualPattern.pattern().size())
-    , baseGradNorm(_settings.residualPattern.pattern().size())
     , minDepth(0)
     , maxDepth(INF)
     , bestQuality(-1)
     , lastEnergy(INF)
     , stddev(INF)
-    , cam(baseFrame->preKeyFrame->cam)
+    , cam(&baseFrame->preKeyFrame->cam->bundle[numInBundle].cam)
     , state(ACTIVE)
+    , host(&baseFrame->frames[numInBundle])
     , settings(_settings)
     , lastTraced(false)
     , numTraced(0)
@@ -41,14 +39,18 @@ ImmaturePoint::ImmaturePoint(KeyFrame *baseFrame, const Vec2 &p,
     Vec2 curP = p + settings.residualPattern.pattern()[i];
     cv::Point curPCV = toCvPoint(curP);
     baseDirections[i] = cam->unmap(curP).normalized();
-    baseIntencities[i] = baseFrame->preKeyFrame->frame()(curPCV);
+    baseIntencities[i] = baseFrame->preKeyFrame->image(numInBundle)(curPCV);
 
-    baseGrad[i] = Vec2(baseFrame->preKeyFrame->gradX(curPCV),
-                       baseFrame->preKeyFrame->gradY(curPCV));
+    baseGrad[i] =
+        Vec2(baseFrame->preKeyFrame->frames[numInBundle].gradX(curPCV),
+             baseFrame->preKeyFrame->frames[numInBundle].gradY(curPCV));
     baseGradNorm[i] = baseGrad[i].normalized();
   }
+
+  dir = baseDirections[0];
 }
 
+/*
 bool ImmaturePoint::isReady() {
   return state == ACTIVE && stddev < settings.pointTracer.optimizedStddev;
 }
@@ -125,8 +127,8 @@ bool ImmaturePoint::pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth,
 
 Vec2 ImmaturePoint::tracePrecise(
     const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> &refFrame,
-    const Vec2 &from, const Vec2 &to, const std::vector<double> &intencities,
-    const StdVector<Vec2> &pattern, double &bestDispl, double &bestEnergy) {
+    const Vec2 &from, const Vec2 &to, double intencities[], Vec2 pattern[],
+    double &bestDispl, double &bestEnergy) {
   Vec2 dir = to - from;
   dir.normalize();
   Vec2 bestPoint = (from + to) * 0.5;
@@ -188,11 +190,11 @@ ImmaturePoint::traceOn(const KeyFrame &baseFrame, const PreKeyFrame &refFrame,
   if (state == OOB)
     return WAS_OOB;
 
-  AffineLightTransform<double> lightBaseToRef =
-      refFrame.lightBaseToThis * refFrame.baseKeyFrame->lightWorldToThis *
+  AffLight lightBaseToRef =
+      refFrame.lightBaseToThis * refFrame.baseFrame->lightWorldToThis *
       baseFrame.lightWorldToThis.inverse();
   SE3 baseToRef = refFrame.baseToThis *
-                  refFrame.baseKeyFrame->thisToWorld.inverse() *
+                  refFrame.baseFrame->thisToWorld.inverse() *
                   baseFrame.thisToWorld;
 
   Vec3 dirMin = (baseToRef * (minDepth * baseDirections[0])).normalized();
@@ -438,5 +440,6 @@ void ImmaturePoint::drawTracing(
     cv::line(frame, toCvPoint(beg), toCvPoint(end), color, thickness);
   }
 }
+*/
 
 } // namespace fishdso

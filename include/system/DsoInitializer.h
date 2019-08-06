@@ -1,7 +1,6 @@
 #ifndef INCLUDE_DSOINITIALIZER
 #define INCLUDE_DSOINITIALIZER
 
-#include "system/KeyFrame.h"
 #include "system/StereoMatcher.h"
 #include <memory>
 #include <opencv2/opencv.hpp>
@@ -10,14 +9,28 @@ namespace fishdso {
 
 class CameraModel;
 
+struct InitializedFrame {
+  struct FrameEntry {
+    cv::Mat frame;
+    static_vector<std::pair<Vec2, double>, Settings::KeyFrame::max_immaturePointsNum>
+        depthedPoints;
+  };
+
+  FrameEntry frames[Settings::CameraBundle::max_camerasInBundle];
+};
+
 class DsoInitializer {
 public:
+  using InitializedVector =
+      static_vector<InitializedFrame,
+                    Settings::DsoInitializer::max_initializedFrames>;
+
   virtual ~DsoInitializer() {}
 
   // returns true if initialization is completed
-  virtual bool addFrame(const cv::Mat &frame, int globalFrameNum) = 0;
+  virtual bool addMultiFrame(const cv::Mat frames[]) = 0;
 
-  virtual StdVector<KeyFrame> createKeyFrames() = 0;
+  virtual InitializedVector initialize() = 0;
 };
 
 } // namespace fishdso

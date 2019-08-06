@@ -9,9 +9,12 @@
 
 namespace fishdso {
 
+struct KeyFrameEntry;
 struct KeyFrame;
 
 struct ImmaturePoint {
+  static constexpr int MS = Settings::ResidualPattern::max_size;
+
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   enum State { ACTIVE, OOB, OUTLIER };
@@ -30,24 +33,27 @@ struct ImmaturePoint {
   };
 
   // TODO create PointTracer!!!
-  ImmaturePoint(KeyFrame *baseFrame, const Vec2 &p,
-                const PointTracerSettings &_settings = {});
+  ImmaturePoint(KeyFrame *baseFrame, int numInBundle,
+                const Vec2 &p, const PointTracerSettings &_settings = {});
 
+  /*
   TracingStatus traceOn(const KeyFrame &baseFrame, const PreKeyFrame &refFrame,
                         TracingDebugType debugType);
 
   static void
   drawTracing(cv::Mat &frame,
-              const StdVector<std::pair<Vec2, double>> &energiesFound,
+              std::pair<Vec2, double> energiesFound[], int size,
               int lineWidth);
+              */
 
   bool isReady(); // checks if the point is good enough to be optimized
 
   Vec2 p;
-  std::vector<Vec3> baseDirections;
-  std::vector<double> baseIntencities;
-  StdVector<Vec2> baseGrad;
-  StdVector<Vec2> baseGradNorm;
+  Vec3 baseDirections[MS];
+  Vec3 dir;
+  double baseIntencities[MS];
+  Vec2 baseGrad[MS];
+  Vec2 baseGradNorm[MS];
   double minDepth, maxDepth;
   double depth;
   double bestQuality;
@@ -55,6 +61,7 @@ struct ImmaturePoint {
   double stddev; // predicted disparity error on last successful tracing
   CameraModel *cam;
   State state;
+  KeyFrameEntry *host;
 
   PointTracerSettings settings;
 
@@ -68,14 +75,16 @@ struct ImmaturePoint {
   double eBeforeSubpixel, eAfterSubpixel;
 
 private:
+  /*
   bool pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth, Vec3 &dirMaxDepth,
-                     StdVector<Vec2> &points, std::vector<Vec3> &directions);
+                     Vec2 points[], Vec3 directions[], int size);
   double estVariance(const Vec2 &searchDirection);
   Vec2 tracePrecise(
       const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
           &refFrame,
-      const Vec2 &from, const Vec2 &to, const std::vector<double> &intencities,
-      const StdVector<Vec2> &pattern, double &bestDispl, double &bestEnergy);
+      const Vec2 &from, const Vec2 &to, double intencities[],
+      Vec2 pattern[], double &bestDispl, double &bestEnergy);
+      */
 };
 
 } // namespace fishdso

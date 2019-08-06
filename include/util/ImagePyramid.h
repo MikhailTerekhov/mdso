@@ -13,7 +13,7 @@ struct ImagePyramid {
   inline cv::Mat1b &operator[](int ind) { return images[ind]; }
   inline const cv::Mat1b &operator[](int ind) const { return images[ind]; }
 
-  std::vector<cv::Mat1b> images;
+  static_vector<cv::Mat1b, Settings::Pyramid::max_levelNum> images;
 };
 
 } // namespace fishdso

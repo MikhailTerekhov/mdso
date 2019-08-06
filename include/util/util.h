@@ -14,8 +14,7 @@ namespace fishdso {
 extern cv::Mat dbg;
 extern double minDepthCol, maxDepthCol;
 
-template <typename T>
-EIGEN_STRONG_INLINE std::vector<T> reservedVector(int toReserve) {
+template <typename T> inline std::vector<T> reservedVector(int toReserve) {
   std::vector<T> res;
   res.reserve(toReserve);
   return res;

@@ -27,8 +27,7 @@ void TrackingDebugImageDrawer::startTracking(const ImagePyramid &frame) {
 }
 
 void TrackingDebugImageDrawer::levelTracked(
-    int levelNum, const SE3 &baseToLast,
-    const AffineLightTransform<double> &affLightBaseToLast,
+    int levelNum, const SE3 &baseToLast, const AffLight &affLightBaseToLast,
     const StdVector<std::pair<Vec2, double>> &pointResiduals) {
   int w = camPyr[levelNum].getWidth(), h = camPyr[levelNum].getHeight();
   int s = FLAGS_tracking_rel_point_size * (w + h) / 2;

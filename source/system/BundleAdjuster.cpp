@@ -11,24 +11,13 @@
 
 namespace fishdso {
 
-BundleAdjuster::BundleAdjuster(CameraModel *cam,
+BundleAdjuster::BundleAdjuster(CameraBundle *cam, KeyFrame *keyFrames[],
+                               int size,
                                const BundleAdjusterSettings &_settings)
     : cam(cam)
-    , firstKeyFrame(nullptr)
+    , keyFrames(keyFrames)
+    , size(size)
     , settings(_settings) {}
-
-bool BundleAdjuster::isOOB(const SE3 &baseToWorld, const SE3 &refToWorld,
-                           const OptimizedPoint &baseOP) {
-  Vec3 inBase = cam->unmap(baseOP.p).normalized() * baseOP.depth();
-  Vec2 reproj = cam->map(refToWorld.inverse() * baseToWorld * inBase);
-  return !cam->isOnImage(reproj, settings.residualPattern.height);
-}
-
-void BundleAdjuster::addKeyFrame(KeyFrame *keyFrame) {
-  if (firstKeyFrame == nullptr)
-    firstKeyFrame = keyFrame;
-  keyFrames.insert(keyFrame);
-}
 
 struct DirectResidual {
   DirectResidual(
@@ -97,6 +86,7 @@ struct DirectResidual {
 };
 
 void BundleAdjuster::adjust(int maxNumIterations) {
+  /*
   int pointsTotal = 0, pointsOOB = 0, pointsOutliers = 0;
 
   KeyFrame *secondKeyFrame = nullptr;
@@ -292,5 +282,6 @@ void BundleAdjuster::adjust(int maxNumIterations) {
   LOG(INFO) << "outlier points = " << pointsOutliers;
 
   LOG(INFO) << summary.FullReport() << std::endl;
+  */
 }
 } // namespace fishdso

@@ -8,24 +8,22 @@
 
 namespace fishdso {
 
-DelaunayDsoInitializer::DelaunayDsoInitializer(
-    DsoSystem *dsoSystem, CameraModel *cam, PixelSelector *pixelSelector,
-    int pointsNeeded, DelaunayDsoInitializer::DebugOutputType debugOutputType,
-    const std::vector<InitializerObserver *> &observers,
-    const InitializerSettings &_settings)
-    : cam(cam)
-    , dsoSystem(dsoSystem)
-    , pixelSelector(pixelSelector)
-    , stereoMatcher(cam, _settings.stereoMatcher, _settings.threading)
-    , hasFirstFrame(false)
-    , framesSkipped(0)
-    , pointsNeeded(pointsNeeded)
-    , debugOutputType(debugOutputType)
-    , settings(_settings)
-    , observers(observers) {}
+// DelaunayDsoInitializer::DelaunayDsoInitializer(
+// DsoSystem *dsoSystem, CameraBundle *cam, PixelSelector *pixelSelectors,
+// int pointsNeeded, const std::vector<InitializerObserver *> &observers,
+// const InitializerSettings &_settings)
+// : cam(cam)
+// , dsoSystem(dsoSystem)
+// , pixelSelectors(pixelSelectors)
+// , hasFirstFrame(false)
+// , framesSkipped(0)
+// , pointsNeeded(pointsNeeded)
+// , settings(_settings)
+// , observers(observers) {}
 
-bool DelaunayDsoInitializer::addFrame(const cv::Mat &frame,
-                                      int globalFrameNum) {
+bool DelaunayDsoInitializer::addMultiFrame(const cv::Mat frames[]) {
+  return false;
+  /*
   if (!hasFirstFrame) {
     frames[0] = frame;
     globalFrameNums[0] = globalFrameNum;
@@ -41,20 +39,16 @@ bool DelaunayDsoInitializer::addFrame(const cv::Mat &frame,
     globalFrameNums[1] = globalFrameNum;
     return true;
   }
+  */
 }
 
-StdVector<KeyFrame> DelaunayDsoInitializer::createKeyFrames() {
+DsoInitializer::InitializedVector DsoInitializer::initialize() {
+  return InitializedVector();
+  /*
   StdVector<Vec2> keyPoints[2];
   std::vector<double> depths[2];
+
   SE3 firstToSecond = stereoMatcher.match(frames, keyPoints, depths);
-
-  StdVector<std::pair<Vec2, double>> lastKeyPointDepths;
-  lastKeyPointDepths.reserve(keyPoints[1].size());
-  for (int i = 0; i < keyPoints[1].size(); ++i)
-    lastKeyPointDepths.push_back({keyPoints[1][i], depths[1][i]});
-
-  if (dsoSystem)
-    dsoSystem->lastKeyPointDepths = std::move(lastKeyPointDepths);
 
   StdVector<KeyFrame> keyFrames;
   for (int i = 0; i < 2; ++i) {
@@ -132,6 +126,7 @@ StdVector<KeyFrame> DelaunayDsoInitializer::createKeyFrames() {
   }
 
   return keyFrames;
+  */
 }
 
 } // namespace fishdso
