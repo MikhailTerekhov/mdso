@@ -18,6 +18,7 @@ find_package(gflags REQUIRED)
 find_package(Glog REQUIRED)
 find_package(Ceres REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(Boost REQUIRED)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/thirdparty/googletest)
 
@@ -139,6 +140,7 @@ target_include_directories(dso
     ${GFLAGS_INCLUDE_DIRS}
     ${GLOG_INCLUDE_DIRS}
     ${EIGEN3_INCLUDE_DIR}
+    ${Boost_INCLUDE_DIRS}
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
   PRIVATE
