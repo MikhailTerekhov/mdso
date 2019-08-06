@@ -74,6 +74,8 @@ def select(indexed, first, last):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("dir", help="DSO output directory")
+parser.add_argument("-r", "--russian", help="use russian legend",
+                    action="store_true")
 parser.add_argument("-q", "--quiver", help="plot camera directions"
                     " (if not specified, only draw position curve)", 
                     action="store_true")
@@ -142,17 +144,27 @@ ax.view_init(azim=-90, elev=0)
 
 draw_proc = draw_arrowed if args.quiver else draw_track
 
-draw_proc(ax, actual, 'orange', 'полученая оценка')
+if args.russian:
+    label_ours   = 'полученная оценка'
+    label_prec   = 'точная траектория'
+    label_stereo = 'ORB + five point'
+else:
+    label_ours   = 'dso'
+    label_prec   = 'ground truth'
+    label_stereo = 'ORB + five point'
+
+
+draw_proc(ax, actual, 'orange', label_ours)
 #  if has_predicted:
     #  draw_motions(ax, predicted, 'blue', 'предсказанная траектория')
 if has_ground_truth:
-    draw_proc(ax, ground_truth, 'green', 'точная траектория')
+    draw_proc(ax, ground_truth, 'green', label_prec)
 elif has_stereo_matched:
-    draw_proc(ax, stereo_matched, 'green', 'ORB + five point')
+    draw_proc(ax, stereo_matched, 'green', label_stereo)
 
 #  ax.scatter3D([0], [0], [0], color='black', label='базовый кадр')
 
-ax.legend()
+ax.legend(loc='upper center', bbox_to_anchor=(0.5, 0.3), fontsize='large')
 
 set_axes_equal(ax)
 plt.show()
