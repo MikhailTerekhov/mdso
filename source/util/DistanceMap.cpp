@@ -72,7 +72,7 @@ std::vector<int> DistanceMap::choose(const StdVector<Vec2> &otherPoints,
     Vec2i pi = p.cast<int>() / pyrDown;
 
     otherDist[i].first = i;
-    if (!Eigen::AlignedBox2i(Vec2i::Zero(), Vec2i(dist.cols(), dist.rows()))
+    if (!Eigen::AlignedBox2i(Vec2i::Zero(), Vec2i(dist.cols() - 1, dist.rows() - 1))
              .contains(pi))
       otherDist[i].second = -1;
     else
