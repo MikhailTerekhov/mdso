@@ -18,11 +18,18 @@ DEFINE_int32(gt_points, 1'000'000,
              "Number of GT points in the generated cloud.");
 
 DEFINE_bool(gen_gt, true, "Do we need to generate GT pointcloud?");
+DEFINE_bool(gen_cloud, true, "Do we need to save resulting pointcloud?");
+DEFINE_bool(draw_interpolation, true,
+            "Do we need to draw interpolation from initializer?");
 
 DEFINE_bool(gen_gt_only, false, "Generate ground truth point cloud and exit.");
 
 DEFINE_string(debug_img_dir, "output/default/debug",
               "Directory for debug images to be put into.");
+DEFINE_string(trajectory_filename, "tracked_frame_to_world.txt",
+              "Resulting trajectory filename (stored in 3x4 matrix form).");
+DEFINE_bool(gen_gt_trajectory, true,
+            "Do we need to generate ground truth trajectories?");
 DEFINE_string(
     track_img_dir, "output/default/track",
     "Directory for tracking residuals on all pyr levels to be put into.");
@@ -124,12 +131,14 @@ It should contain "info" and "data" subdirectories.)abacaba";
       reader.cam->camPyr(settings.pyramid.levelNum), settings.frameTracker,
       settings.pyramid);
   TrajectoryWriter trajectoryWriter(FLAGS_output_directory, "tracked_pos.txt",
-                                    "tracked_frame_to_world.txt");
+                                    FLAGS_trajectory_filename);
   TrajectoryWriterGT trajectoryWriterGT(
       reader.getAllWorldToFrameGT(), FLAGS_output_directory,
       "ground_truth_pos.txt", "matrix_form_GT_pose.txt");
-  CloudWriter cloudWriter(reader.cam.get(), FLAGS_output_directory,
-                          "points.ply");
+  std::unique_ptr<CloudWriter> cloudWriter;
+  if (FLAGS_gen_cloud)
+    cloudWriter = std::unique_ptr<CloudWriter>(new CloudWriter(
+        reader.cam.get(), FLAGS_output_directory, "points.ply"));
 
   std::unique_ptr<CloudWriterGT> cloudWriterGTPtr;
   if (FLAGS_gen_gt) {
@@ -149,15 +158,18 @@ It should contain "info" and "data" subdirectories.)abacaba";
   if (FLAGS_write_files || FLAGS_show_debug_image)
     observers.dso.push_back(&debugImageDrawer);
   observers.dso.push_back(&trajectoryWriter);
-  observers.dso.push_back(&trajectoryWriterGT);
-  observers.dso.push_back(&cloudWriter);
+  if (FLAGS_gen_gt_trajectory)
+    observers.dso.push_back(&trajectoryWriterGT);
+  if (FLAGS_gen_cloud)
+    observers.dso.push_back(cloudWriter.get());
   if (FLAGS_write_files && FLAGS_draw_depth_pyramid)
     observers.frameTracker.push_back(&depthPyramidDrawer);
   if (cloudWriterGTPtr)
     observers.dso.push_back(cloudWriterGTPtr.get());
   if (FLAGS_write_files || FLAGS_show_track_res)
     observers.frameTracker.push_back(&trackingDebugImageDrawer);
-  observers.initializer.push_back(&interpolationDrawer);
+  if (FLAGS_draw_interpolation)
+    observers.initializer.push_back(&interpolationDrawer);
 
   std::cout << "running DSO.." << std::endl;
   DsoSystem dso(reader.cam.get(), observers, settings);

@@ -27,7 +27,7 @@ void TrajectoryWriter::keyFramesMarginalized(
            baseToWorld * preKeyFrame->baseToThis.inverse()});
   }
 
-  std::ofstream posesOfs(outputFileName, std::ios_base::app);
+  // std::ofstream posesOfs(outputFileName, std::ios_base::app);
   std::ofstream matrixFormOfs(matrixFormOutputFileName, std::ios_base::app);
   int minKfNum = curKfNums.empty() ? INF : (*curKfNums.begin());
   auto it = frameToWorldPool.begin();
@@ -35,9 +35,9 @@ void TrajectoryWriter::keyFramesMarginalized(
     putInMatrixForm(matrixFormOfs, it->second);
     matrixFormOfs << '\n';
 
-    posesOfs << it->first << ' ';
-    putMotion(posesOfs, it->second.inverse());
-    posesOfs << '\n';
+    // posesOfs << it->first << ' ';
+    // putMotion(posesOfs, it->second.inverse());
+    // posesOfs << '\n';
 
     it = frameToWorldPool.erase(it);
   }
