@@ -129,6 +129,10 @@ set_source_files_properties(essietial_5pt_estimator_SOURCE_FILES
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -march=native")
 
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -march=native")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g3 -DNDEBUG -march=native")
+
 add_library(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES} 
     ${dso_internal_SOURCE_FILES} ${dso_internal_HEADER_FILES}
     ${essietial_5pt_estimator_SOURCE_FILES}
