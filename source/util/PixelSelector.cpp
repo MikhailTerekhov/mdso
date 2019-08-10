@@ -50,7 +50,9 @@ std::vector<cv::Point> PixelSelector::selectInternal(const cv::Mat &frame,
   for (int i = 0; i < LI; ++i) {
     selectLayer(gradNorm, (1 << i) * blockSize, settings.gradThresholds[i],
                 pointsOverThres[i]);
-    std::random_shuffle(pointsOverThres[i].begin(), pointsOverThres[i].end());
+
+    std::mt19937 mt;
+    std::shuffle(pointsOverThres[i].begin(), pointsOverThres[i].end(), mt);
     // std::cout << "over thres " << i << " are " << pointsOverThres[i].size()
     // << std::endl;
   }
