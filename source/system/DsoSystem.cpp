@@ -26,8 +26,9 @@ DsoSystem::DsoSystem(CameraBundle *cam, const Observers &observers,
   marginalizedFrames.reserve(settings.expectedFramesCount);
   allFrames.reserve(settings.expectedFramesCount);
 
+  pixelSelector.reserve(cam->bundle.size());
   for (int i = 0; i < cam->bundle.size(); ++i)
-    pixelSelector[i] = PixelSelector(settings.pixelSelector);
+    pixelSelector.emplace_back(settings.pixelSelector);
 
   for (DsoObserver *obs : observers.dso)
     obs->created(this, cam, settings);
@@ -229,7 +230,7 @@ SE3 DsoSystem::predictBaseKfToCur() {
 }
 
 FrameTracker::TrackingResult DsoSystem::predictTracking() {
-  FrameTracker::TrackingResult result;
+  FrameTracker::TrackingResult result(cam->bundle.size());
   result.baseToTracked = predictBaseKfToCur();
   for (int i = 0; i < cam->bundle.size(); ++i)
     result.lightBaseToTracked[i] =
@@ -271,30 +272,30 @@ void DsoSystem::marginalizeFrames() {
 }
 
 void DsoSystem::activateNewOptimizedPoints() {
-  StdVector<Vec2> optPoints[Settings::CameraBundle::max_camerasInBundle];
-  Vec2 *optPointsPtrs[Settings::CameraBundle::max_camerasInBundle];
-  int optSizes[Settings::CameraBundle::max_camerasInBundle];
+  std::vector<StdVector<Vec2>> optPoints(cam->bundle.size());
+  std::vector<Vec2 *> optPointsPtrs(cam->bundle.size());
+  std::vector<int> optSizes(cam->bundle.size());
   for (int i = 0; i < cam->bundle.size(); ++i) {
     optPoints[i].resize(settings.maxOptimizedPoints());
     optPointsPtrs[i] = optPoints[i].data();
     optSizes[i] = 0;
   }
 
-  projectOntoBaseKf<OptimizedPoint>(optPointsPtrs, std::nullopt, std::nullopt,
-                                    std::nullopt, optSizes);
+  projectOntoBaseKf<OptimizedPoint>(optPointsPtrs.data(), std::nullopt,
+                                    std::nullopt, std::nullopt,
+                                    optSizes.data());
   for (int i = 0; i < cam->bundle.size(); ++i)
     optPoints[i].resize(optSizes[i]);
 
-  DistanceMap distMap(cam, optPoints, settings.distanceMap);
+  DistanceMap distMap(cam, optPoints.data(), settings.distanceMap);
 
-  StdVector<Vec2> projImm[Settings::CameraBundle::max_camerasInBundle];
-  std::vector<ImmaturePoint *>
-      refsImm[Settings::CameraBundle::max_camerasInBundle];
-  std::vector<int> pointIndicesImm[Settings::CameraBundle::max_camerasInBundle];
-  Vec2 *projImmPtrs[Settings::CameraBundle::max_camerasInBundle];
-  ImmaturePoint **refsImmPtrs[Settings::CameraBundle::max_camerasInBundle];
-  int *pointIndicesImmPtrs[Settings::CameraBundle::max_camerasInBundle];
-  int immSizes[Settings::CameraBundle::max_camerasInBundle];
+  std::vector<StdVector<Vec2>> projImm(cam->bundle.size());
+  std::vector<std::vector<ImmaturePoint *>> refsImm(cam->bundle.size());
+  std::vector<std::vector<int>> pointIndicesImm(cam->bundle.size());
+  std::vector<Vec2 *> projImmPtrs(cam->bundle.size());
+  std::vector<ImmaturePoint **> refsImmPtrs(cam->bundle.size());
+  std::vector<int *> pointIndicesImmPtrs(cam->bundle.size());
+  std::vector<int> immSizes(cam->bundle.size());
   int toResize =
       settings.maxKeyFrames() * settings.keyFrame.immaturePointsNum();
   for (int i = 0; i < cam->bundle.size(); ++i) {
@@ -305,10 +306,11 @@ void DsoSystem::activateNewOptimizedPoints() {
     refsImmPtrs[i] = refsImm[i].data();
   }
 
-  projectOntoBaseKf<ImmaturePoint>(projImmPtrs, std::make_optional(refsImmPtrs),
-                                   std::make_optional(pointIndicesImmPtrs),
-                                   std::nullopt, immSizes);
-  std::vector<int> chosenInds[Settings::CameraBundle::max_camerasInBundle];
+  projectOntoBaseKf<ImmaturePoint>(
+      projImmPtrs.data(), std::make_optional(refsImmPtrs.data()),
+      std::make_optional(pointIndicesImmPtrs.data()), std::nullopt,
+      immSizes.data());
+  std::vector<std::vector<int>> chosenInds(cam->bundle.size());
   for (int i = 0; i < cam->bundle.size(); ++i) {
     int areReady = 0;
     for (int j = 0; j < immSizes[i]; ++j)
@@ -325,7 +327,8 @@ void DsoSystem::activateNewOptimizedPoints() {
 
   int pointsNeeded = settings.maxOptimizedPoints() - curOptPoints;
 
-  int chosenCount = distMap.choose(projImm, pointsNeeded, chosenInds);
+  int chosenCount =
+      distMap.choose(projImm.data(), pointsNeeded, chosenInds.data());
 
   std::vector<std::pair<ImmaturePoint *, int>> chosenPoints;
   chosenPoints.reserve(chosenCount);
@@ -372,7 +375,7 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], long long timestamps[]) {
       DsoInitializer::InitializedVector init = dsoInitializer->initialize();
       for (const InitializedFrame &f : init)
         keyFrames.emplace_back(new KeyFrame(
-            f, cam, globalFrameNum, pixelSelector, settings.keyFrame,
+            f, cam, globalFrameNum, pixelSelector.data(), settings.keyFrame,
             settings.pyramid, settings.getPointTracerSettings()));
 
       const KeyFrame *initializedKFs[Settings::max_maxKeyFrames];
@@ -393,11 +396,11 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], long long timestamps[]) {
       for (const auto &kf : keyFrames)
         for (const auto &e : kf->frames)
           curPoints += e.immaturePoints.size();
-      StdVector<Vec2> points[Settings::CameraBundle::max_camerasInBundle];
-      std::vector<double> depths[Settings::CameraBundle::max_camerasInBundle];
-      int sizes[Settings::CameraBundle::max_camerasInBundle];
-      Vec2 *pointPtrs[Settings::CameraBundle::max_camerasInBundle];
-      double *depthPtrs[Settings::CameraBundle::max_camerasInBundle];
+      std::vector<StdVector<Vec2>> points(cam->bundle.size());
+      std::vector<std::vector<double>> depths(cam->bundle.size());
+      std::vector<int> sizes(cam->bundle.size());
+      std::vector<Vec2 *> pointPtrs(cam->bundle.size());
+      std::vector<double *> depthPtrs(cam->bundle.size());
       for (int i = 0; i < cam->bundle.size(); ++i) {
         points[i].resize(curPoints);
         depths[i].resize(curPoints);
@@ -405,9 +408,11 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], long long timestamps[]) {
         depthPtrs[i] = depths[i].data();
       }
 
-      projectOntoBaseKf<ImmaturePoint>(pointPtrs, std::nullopt, std::nullopt,
-                                       std::make_optional(depthPtrs), sizes);
+      projectOntoBaseKf<ImmaturePoint>(
+          pointPtrs.data(), std::nullopt, std::nullopt,
+          std::make_optional(depthPtrs.data()), sizes.data());
       FrameTracker::DepthedMultiFrame baseForTrack;
+      baseForTrack.reserve(cam->bundle.size());
       for (int i = 0; i < cam->bundle.size(); ++i) {
         points[i].resize(sizes[i]);
         depths[i].resize(sizes[i]);
@@ -458,8 +463,8 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], long long timestamps[]) {
 
   if (settings.continueChoosingKeyFrames && needNewKf) {
     keyFrames.push_back(std::unique_ptr<KeyFrame>(
-        new KeyFrame(std::move(preKeyFrame), pixelSelector, settings.keyFrame,
-                     settings.getPointTracerSettings())));
+        new KeyFrame(std::move(preKeyFrame), pixelSelector.data(),
+                     settings.keyFrame, settings.getPointTracerSettings())));
 
     marginalizeFrames();
     activateNewOptimizedPoints();
@@ -468,22 +473,21 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], long long timestamps[]) {
       obs->newBaseFrame(baseFrame());
 
     if (settings.bundleAdjuster.runBA) {
-      KeyFrame *kfPtrs[Settings::CameraBundle::max_camerasInBundle];
+      std::vector<KeyFrame *> kfPtrs(cam->bundle.size());
       for (int i = 0; i < keyFrames.size(); ++i)
         kfPtrs[i] = keyFrames[i].get();
-      BundleAdjuster bundleAdjuster(cam, kfPtrs, keyFrames.size(),
+      BundleAdjuster bundleAdjuster(cam, kfPtrs.data(), keyFrames.size(),
                                     settings.getBundleAdjusterSettings());
       bundleAdjuster.adjust(settings.bundleAdjuster.maxIterations);
     }
 
-    StdVector<Vec2> points[Settings::CameraBundle::max_camerasInBundle];
-    std::vector<double> depths[Settings::CameraBundle::max_camerasInBundle];
-    std::vector<OptimizedPoint *>
-        refs[Settings::CameraBundle::max_camerasInBundle];
-    Vec2 *pointsPtrs[Settings::CameraBundle::max_camerasInBundle];
-    double *depthsPtrs[Settings::CameraBundle::max_camerasInBundle];
-    OptimizedPoint **refsPtrs[Settings::CameraBundle::max_camerasInBundle];
-    int sizes[Settings::CameraBundle::max_camerasInBundle];
+    std::vector<StdVector<Vec2>> points(cam->bundle.size());
+    std::vector<std::vector<double>> depths(cam->bundle.size());
+    std::vector<std::vector<OptimizedPoint *>> refs(cam->bundle.size());
+    std::vector<Vec2 *> pointsPtrs(cam->bundle.size());
+    std::vector<double *> depthsPtrs(cam->bundle.size());
+    std::vector<OptimizedPoint **> refsPtrs(cam->bundle.size());
+    std::vector<int> sizes(cam->bundle.size());
     for (int i = 0; i < cam->bundle.size(); ++i) {
       points[i].resize(settings.maxOptimizedPoints());
       refs[i].resize(settings.maxOptimizedPoints());
@@ -493,11 +497,12 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], long long timestamps[]) {
       depthsPtrs[i] = depths[i].data();
     }
 
-    projectOntoBaseKf<OptimizedPoint>(pointsPtrs, std::make_optional(refsPtrs),
-                                      std::nullopt,
-                                      std::make_optional(depthsPtrs), sizes);
+    projectOntoBaseKf<OptimizedPoint>(
+        pointsPtrs.data(), std::make_optional(refsPtrs.data()), std::nullopt,
+        std::make_optional(depthsPtrs.data()), sizes.data());
 
     FrameTracker::DepthedMultiFrame baseForTrack;
+    baseForTrack.reserve(cam->bundle.size());
     for (int i = 0; i < cam->bundle.size(); ++i) {
       points[i].resize(sizes[i]);
       refs[i].resize(sizes[i]);

@@ -13,8 +13,9 @@ MarginalizedPreKeyFrame::FrameEntry::FrameEntry(
 MarginalizedPreKeyFrame::MarginalizedPreKeyFrame(
     MarginalizedKeyFrame *baseFrame, const PreKeyFrame &preKeyFrame)
     : baseFrame(baseFrame) {
+  frames.reserve(preKeyFrame.cam->bundle.size());
   for (int i = 0; i < preKeyFrame.cam->bundle.size(); ++i)
-    frames[i] = FrameEntry(preKeyFrame.frames[i]);
+    frames.emplace_back(preKeyFrame.frames[i]);
 }
 
 } // namespace fishdso

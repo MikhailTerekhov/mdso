@@ -12,15 +12,15 @@ class FrameTrackerObserver;
 
 class FrameTracker {
 public:
-  using DepthedMultiFrame =
-      static_vector<DepthedImagePyramid,
-                    Settings::CameraBundle::max_camerasInBundle>;
+  using DepthedMultiFrame = std::vector<DepthedImagePyramid>;
 
   struct TrackingResult {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
+    TrackingResult(int camNumber);
+
     SE3 baseToTracked;
-    AffLight lightBaseToTracked[Settings::CameraBundle::max_camerasInBundle];
+    std::vector<AffLight> lightBaseToTracked;
   };
 
   FrameTracker(CameraBundle camPyr[], const DepthedMultiFrame &_baseFrame,

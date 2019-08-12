@@ -44,9 +44,8 @@ struct KeyFrame {
 
   std::unique_ptr<PreKeyFrame> preKeyFrame;
   SE3 thisToWorld;
-  KeyFrameEntry frames[Settings::CameraBundle::max_camerasInBundle];
-  static_vector<std::unique_ptr<PreKeyFrame>, Settings::max_keyFrameDist>
-      trackedFrames;
+  std::vector<KeyFrameEntry> frames;
+  std::vector<std::unique_ptr<PreKeyFrame>> trackedFrames;
 
   Settings::KeyFrame kfSettings;
   PointTracerSettings tracingSettings;

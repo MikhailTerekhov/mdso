@@ -11,17 +11,20 @@ KeyFrame::KeyFrame(const InitializedFrame &initializedFrame, CameraBundle *cam,
                    const Settings::KeyFrame &_kfSettings,
                    const Settings::Pyramid &pyrSettings,
                    const PointTracerSettings &tracingSettings)
-    : kfSettings(_kfSettings)
+    : thisToWorld(initializedFrame.thisToWorld)
+    , frames(cam->bundle.size())
+    , kfSettings(_kfSettings)
     , tracingSettings(tracingSettings) {
-  cv::Mat frames[Settings::CameraBundle::max_camerasInBundle];
-  long long timestamps[Settings::CameraBundle::max_camerasInBundle];
+  std::vector<cv::Mat> images(cam->bundle.size());
+  std::vector<long long> timestamps(cam->bundle.size());
   for (int i = 0; i < cam->bundle.size(); ++i) {
-    frames[i] = initializedFrame.frames[i].frame;
+    images[i] = initializedFrame.frames[i].frame;
     timestamps[i] = initializedFrame.frames[i].timestamp;
   }
 
-  preKeyFrame = std::unique_ptr<PreKeyFrame>(new PreKeyFrame(
-      this, cam, frames, globalFrameNum, timestamps, pyrSettings));
+  preKeyFrame = std::unique_ptr<PreKeyFrame>(
+      new PreKeyFrame(this, cam, images.data(), globalFrameNum,
+                      timestamps.data(), pyrSettings));
 }
 
 KeyFrame::KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame,

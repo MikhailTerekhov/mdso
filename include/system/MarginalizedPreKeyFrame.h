@@ -20,12 +20,14 @@ struct MarginalizedPreKeyFrame {
     AffLight lightBaseToThis;
   };
 
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
   MarginalizedPreKeyFrame(MarginalizedKeyFrame *baseFrame,
                           const PreKeyFrame &preKeyFrame);
 
   MarginalizedKeyFrame *baseFrame;
   SE3 baseToThis;
-  FrameEntry frames[Settings::CameraBundle::max_camerasInBundle];
+  std::vector<FrameEntry> frames;
   long long timestamp;
 };
 

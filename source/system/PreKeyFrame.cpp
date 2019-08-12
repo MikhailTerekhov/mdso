@@ -24,14 +24,15 @@ PreKeyFrame::PreKeyFrame(KeyFrame *baseFrame, CameraBundle *cam,
     , cam(cam)
     , globalFrameNum(globalFrameNum)
     , pyrSettings(_pyrSettings) {
+  frames.reserve(cam->bundle.size());
   for (int i = 0; i < frames.size(); ++i)
     frames.emplace_back(coloredFrames[i], timestamps[i], pyrSettings);
 
-  const ImagePyramid *refs[Settings::CameraBundle::max_camerasInBundle];
+  std::vector<const ImagePyramid *> refs(cam->bundle.size());
   for (int i = 0; i < frames.size(); ++i)
     refs[i] = &frames[i].framePyr;
   internals = std::unique_ptr<PreKeyFrameInternals>(
-      new PreKeyFrameInternals(refs, frames.size(), pyrSettings));
+      new PreKeyFrameInternals(refs.data(), frames.size(), pyrSettings));
 }
 
 PreKeyFrame::~PreKeyFrame() {}

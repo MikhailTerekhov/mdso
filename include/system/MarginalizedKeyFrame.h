@@ -29,10 +29,8 @@ struct MarginalizedKeyFrame {
 
   MarginalizedKeyFrame(const KeyFrame &keyFrame);
 
-  static_vector<FrameEntry, Settings::CameraBundle::max_camerasInBundle> frames;
-  static_vector<std::unique_ptr<MarginalizedPreKeyFrame>,
-                Settings::max_keyFrameDist>
-      trackedFrames;
+  std::vector<FrameEntry> frames;
+  std::vector<std::unique_ptr<MarginalizedPreKeyFrame>> trackedFrames;
   SE3 thisToWorld;
 };
 

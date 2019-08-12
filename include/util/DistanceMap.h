@@ -24,7 +24,7 @@ private:
   };
 
   int camCount;
-  static_vector<MapEntry, Settings::CameraBundle::max_camerasInBundle> maps;
+  std::vector<MapEntry> maps;
 
   Settings::DistanceMap settings;
 };

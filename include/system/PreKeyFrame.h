@@ -46,7 +46,7 @@ struct PreKeyFrame {
     return frames[num].framePyr[0];
   }
 
-  static_vector<FrameEntry, Settings::CameraBundle::max_camerasInBundle> frames;
+  std::vector<FrameEntry> frames;
 
   KeyFrame *baseFrame;
   CameraBundle *cam;

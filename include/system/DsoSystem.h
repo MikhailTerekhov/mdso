@@ -62,7 +62,7 @@ private:
   CameraBundle *cam;
   CameraBundle::CamPyr camPyr;
 
-  PixelSelector pixelSelector[Settings::CameraBundle::max_camerasInBundle];
+  std::vector<PixelSelector> pixelSelector;
 
   std::unique_ptr<DsoInitializer> dsoInitializer;
   bool isInitialized;

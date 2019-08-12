@@ -26,10 +26,6 @@ struct Settings {
     int mapPolyPoints = default_mapPolyPoints;
   } cameraModel;
 
-  struct CameraBundle {
-    static constexpr int max_camerasInBundle = 8;
-  };
-
   struct PixelSelector {
     static constexpr int max_points = 10000;
 

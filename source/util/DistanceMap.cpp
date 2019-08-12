@@ -67,6 +67,7 @@ DistanceMap::DistanceMap(CameraBundle *cam, StdVector<Vec2> points[],
                          const Settings::DistanceMap &settings)
     : camCount(cam->bundle.size())
     , settings(settings) {
+  maps.reserve(cam->bundle.size());
   for (int i = 0; i < camCount; ++i)
     maps.emplace_back(cam->bundle[i].cam.getWidth(),
                       cam->bundle[i].cam.getHeight(), points[i], settings);

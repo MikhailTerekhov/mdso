@@ -5,8 +5,6 @@ namespace fishdso {
 PreKeyFrameInternals::PreKeyFrameInternals(
     const ImagePyramid *pyrRefs[], int size,
     const Settings::Pyramid &pyrSettings) {
-  CHECK(size > 0 && size <= Settings::CameraBundle::max_camerasInBundle);
-
   for (int i = 0; i < size; ++i)
     frames.emplace_back(*pyrRefs[i], pyrSettings);
 }

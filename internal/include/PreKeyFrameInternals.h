@@ -33,7 +33,7 @@ public:
   PreKeyFrameInternals(const ImagePyramid *pyrRefs[], int size,
                        const Settings::Pyramid &pyrSettings);
 
-  static_vector<FrameEntry, Settings::CameraBundle::max_camerasInBundle> frames;
+  std::vector<FrameEntry> frames;
 };
 
 } // namespace fishdso

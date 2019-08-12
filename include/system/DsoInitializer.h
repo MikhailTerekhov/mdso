@@ -18,7 +18,8 @@ struct InitializedFrame {
     long long timestamp;
   };
 
-  FrameEntry frames[Settings::CameraBundle::max_camerasInBundle];
+  SE3 thisToWorld;
+  std::vector<FrameEntry> frames;
 };
 
 class DsoInitializer {

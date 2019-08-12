@@ -53,6 +53,9 @@ struct PointTrackingResidual {
       *trackedFrame;
 };
 
+FrameTracker::TrackingResult::TrackingResult(int camNumber)
+    : lightBaseToTracked(camNumber) {}
+
 FrameTracker::FrameTracker(CameraBundle camPyr[],
                            const DepthedMultiFrame &_baseFrame,
                            std::vector<FrameTrackerObserver *> &observers,

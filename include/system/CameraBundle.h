@@ -24,8 +24,7 @@ struct CameraBundle {
 
   CamPyr camPyr(int levelNum);
 
-  static_vector<CameraEntry, Settings::CameraBundle::max_camerasInBundle>
-      bundle;
+  StdVector<CameraEntry> bundle;
 };
 
 } // namespace fishdso

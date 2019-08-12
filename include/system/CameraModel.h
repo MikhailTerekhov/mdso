@@ -13,7 +13,7 @@ namespace fishdso {
 
 class CameraModel {
 public:
-  using CamPyr = static_vector<CameraModel, Settings::Pyramid::max_levelNum>;
+  using CamPyr = StdVector<CameraModel>;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
