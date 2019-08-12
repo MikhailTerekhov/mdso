@@ -2,7 +2,8 @@
 
 namespace fishdso {
 
-CameraBundle::CameraEntry::CameraEntry(const SE3 &_bodyToThis, const CameraModel &cam)
+CameraBundle::CameraEntry::CameraEntry(const SE3 &_bodyToThis,
+                                       const CameraModel &cam)
     : bodyToThis(_bodyToThis)
     , thisToBody(_bodyToThis.inverse())
     , cam(cam) {}

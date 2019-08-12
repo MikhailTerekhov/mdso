@@ -13,7 +13,7 @@ public:
               const Settings::DistanceMap &settings = {});
 
   int choose(StdVector<Vec2> otherPoints[], int pointsNeeded,
-              std::vector<int> chosenIndices[]);
+             std::vector<int> chosenIndices[]);
 
 private:
   struct MapEntry {

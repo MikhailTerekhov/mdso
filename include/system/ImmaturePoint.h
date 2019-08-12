@@ -33,8 +33,8 @@ struct ImmaturePoint {
   };
 
   // TODO create PointTracer!!!
-  ImmaturePoint(KeyFrame *baseFrame, int numInBundle,
-                const Vec2 &p, const PointTracerSettings &_settings = {});
+  ImmaturePoint(KeyFrame *baseFrame, int numInBundle, const Vec2 &p,
+                const PointTracerSettings &_settings = {});
 
   /*
   TracingStatus traceOn(const KeyFrame &baseFrame, const PreKeyFrame &refFrame,

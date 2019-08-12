@@ -23,6 +23,7 @@ struct MarginalizedKeyFrame {
     FrameEntry(const KeyFrameEntry &entry);
 
     static_vector<Point, Settings::KeyFrame::max_immaturePointsNum> points;
+    long long timestamp;
     AffLight lightWorldToThis;
   };
 
@@ -33,7 +34,6 @@ struct MarginalizedKeyFrame {
                 Settings::max_keyFrameDist>
       trackedFrames;
   SE3 thisToWorld;
-  long long timestamp;
 };
 
 } // namespace fishdso

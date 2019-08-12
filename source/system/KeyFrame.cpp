@@ -7,18 +7,21 @@
 namespace fishdso {
 
 KeyFrame::KeyFrame(const InitializedFrame &initializedFrame, CameraBundle *cam,
-                   int globalFrameNum, long long timestamp,
-                   PixelSelector pixelSelector[],
+                   int globalFrameNum, PixelSelector pixelSelector[],
                    const Settings::KeyFrame &_kfSettings,
                    const Settings::Pyramid &pyrSettings,
                    const PointTracerSettings &tracingSettings)
     : kfSettings(_kfSettings)
     , tracingSettings(tracingSettings) {
   cv::Mat frames[Settings::CameraBundle::max_camerasInBundle];
-  for (int i = 0; i < cam->bundle.size(); ++i)
+  long long timestamps[Settings::CameraBundle::max_camerasInBundle];
+  for (int i = 0; i < cam->bundle.size(); ++i) {
     frames[i] = initializedFrame.frames[i].frame;
+    timestamps[i] = initializedFrame.frames[i].timestamp;
+  }
+
   preKeyFrame = std::unique_ptr<PreKeyFrame>(new PreKeyFrame(
-      this, cam, frames, globalFrameNum, timestamp, pyrSettings));
+      this, cam, frames, globalFrameNum, timestamps, pyrSettings));
 }
 
 KeyFrame::KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame,

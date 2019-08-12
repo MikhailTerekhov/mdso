@@ -20,7 +20,7 @@ public:
   // const InitializerSettings &settings = {});
 
   // returns true if initialization is completed
-  bool addMultiFrame(const cv::Mat frame[]);
+  bool addMultiFrame(const cv::Mat frame[], long long timestamps[]);
 
   InitializedVector initialize();
 

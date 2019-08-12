@@ -13,7 +13,8 @@ MarginalizedKeyFrame::FrameEntry::Point::Point(const OptimizedPoint &op)
     , maxDepth(op.maxDepth) {}
 
 MarginalizedKeyFrame::FrameEntry::FrameEntry(const KeyFrameEntry &entry)
-    : lightWorldToThis(entry.lightWorldToThis) {
+    : timestamp(entry.timestamp)
+    , lightWorldToThis(entry.lightWorldToThis) {
   for (const ImmaturePoint &ip : entry.immaturePoints)
     points.emplace_back(ip);
   for (const OptimizedPoint &op : entry.optimizedPoints)
@@ -21,12 +22,11 @@ MarginalizedKeyFrame::FrameEntry::FrameEntry(const KeyFrameEntry &entry)
 }
 
 MarginalizedKeyFrame::MarginalizedKeyFrame(const KeyFrame &keyFrame)
-    : thisToWorld(keyFrame.thisToWorld)
-    , timestamp(keyFrame.preKeyFrame->timestamp) {
+    : thisToWorld(keyFrame.thisToWorld) {
   for (int i = 0; i < keyFrame.preKeyFrame->cam->bundle.size(); ++i)
     frames.emplace_back(keyFrame.frames[i]);
   for (const auto &pkf : keyFrame.trackedFrames)
-    trackedFrames.emplace_back(this, pkf);
+    trackedFrames.emplace_back(new MarginalizedPreKeyFrame(this, *pkf));
 }
 
 } // namespace fishdso

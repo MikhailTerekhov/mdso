@@ -2,13 +2,19 @@
 
 namespace fishdso {
 
+MarginalizedPreKeyFrame::FrameEntry::FrameEntry()
+    : timestamp(0) {}
+
+MarginalizedPreKeyFrame::FrameEntry::FrameEntry(
+    const PreKeyFrame::FrameEntry &entry)
+    : timestamp(entry.timestamp)
+    , lightBaseToThis(entry.lightBaseToThis) {}
+
 MarginalizedPreKeyFrame::MarginalizedPreKeyFrame(
     MarginalizedKeyFrame *baseFrame, const PreKeyFrame &preKeyFrame)
-    : baseFrame(baseFrame)
-    , baseToThis(preKeyFrame.baseToThis)
-    , timestamp(preKeyFrame.timestamp) {
+    : baseFrame(baseFrame) {
   for (int i = 0; i < preKeyFrame.cam->bundle.size(); ++i)
-    lightBaseToFrame[i] = preKeyFrame.frames[i].lightBaseToThis;
+    frames[i] = FrameEntry(preKeyFrame.frames[i]);
 }
 
 } // namespace fishdso

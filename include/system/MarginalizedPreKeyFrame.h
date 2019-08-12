@@ -11,12 +11,21 @@ namespace fishdso {
 struct MarginalizedKeyFrame;
 
 struct MarginalizedPreKeyFrame {
+
+  struct FrameEntry {
+    FrameEntry();
+    FrameEntry(const PreKeyFrame::FrameEntry &entry);
+
+    long long timestamp;
+    AffLight lightBaseToThis;
+  };
+
   MarginalizedPreKeyFrame(MarginalizedKeyFrame *baseFrame,
                           const PreKeyFrame &preKeyFrame);
 
   MarginalizedKeyFrame *baseFrame;
   SE3 baseToThis;
-  AffLight lightBaseToFrame[Settings::CameraBundle::max_camerasInBundle];
+  FrameEntry frames[Settings::CameraBundle::max_camerasInBundle];
   long long timestamp;
 };
 

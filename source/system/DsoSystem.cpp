@@ -115,11 +115,23 @@ void DsoSystem::projectOntoBaseKf(Vec2 *points[],
 class TimestampExtractor {
 public:
   template <typename T> long long operator()(T pointer) {
-    if constexpr (std::is_same_v<T, KeyFrame *>)
-      return pointer->preKeyFrame->timestamp;
-    else
-      return pointer->timestamp;
+    if constexpr (std::is_same_v<T, KeyFrame *>) {
+      auto frames = pointer->preKeyFrame->frames;
+      long long sum = 0;
+      for (int i = 0; i < numCams; ++i)
+        sum += frames[i].timestamp;
+      return sum / numCams;
+    } else {
+      auto frames = pointer->frames;
+      long long sum = 0;
+      for (int i = 0; i < numCams; ++i)
+        sum += frames[i].timestamp;
+      return sum / numCams;
+    }
   }
+
+private:
+  int numCams;
 };
 
 long long DsoSystem::getTimestamp(int frameNumber) {
@@ -153,7 +165,7 @@ public:
     return f->frames[ind].lightWorldToThis;
   }
   AffLight operator()(MarginalizedPreKeyFrame *f) {
-    return f->lightBaseToFrame[ind] *
+    return f->frames[ind].lightBaseToThis *
            f->baseFrame->frames[ind].lightWorldToThis;
   }
   AffLight operator()(KeyFrame *f) { return f->frames[ind].lightWorldToThis; }
@@ -346,22 +358,22 @@ void DsoSystem::activateNewOptimizedPoints() {
 
 void DsoSystem::traceOn(const PreKeyFrame &frame) {}
 
-void DsoSystem::addMultiFrame(const cv::Mat frames[], long long timestamp) {
+void DsoSystem::addMultiFrame(const cv::Mat frames[], long long timestamps[]) {
   int globalFrameNum = allFrames.size();
 
   LOG(INFO) << "add frame #" << globalFrameNum << std::endl;
 
   if (!isInitialized) {
     LOG(INFO) << "put into initializer" << std::endl;
-    isInitialized = dsoInitializer->addMultiFrame(frames);
+    isInitialized = dsoInitializer->addMultiFrame(frames, timestamps);
 
     if (isInitialized) {
       LOG(INFO) << "initialization successful" << std::endl;
       DsoInitializer::InitializedVector init = dsoInitializer->initialize();
       for (const InitializedFrame &f : init)
-        keyFrames.emplace_back(new KeyFrame(f, cam, globalFrameNum, timestamp, pixelSelector,
-                               settings.keyFrame, settings.pyramid,
-                               settings.getPointTracerSettings()));
+        keyFrames.emplace_back(new KeyFrame(
+            f, cam, globalFrameNum, pixelSelector, settings.keyFrame,
+            settings.pyramid, settings.getPointTracerSettings()));
 
       const KeyFrame *initializedKFs[Settings::max_maxKeyFrames];
       for (int i = 0; i < keyFrames.size(); ++i)
@@ -421,7 +433,7 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], long long timestamp) {
   }
 
   std::unique_ptr<PreKeyFrame> preKeyFrame(new PreKeyFrame(
-      &baseFrame(), cam, frames, globalFrameNum, timestamp, settings.pyramid));
+      &baseFrame(), cam, frames, globalFrameNum, timestamps, settings.pyramid));
 
   for (DsoObserver *obs : observers.dso)
     obs->newFrame(*preKeyFrame);

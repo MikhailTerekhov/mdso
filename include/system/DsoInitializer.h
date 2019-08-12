@@ -12,8 +12,10 @@ class CameraModel;
 struct InitializedFrame {
   struct FrameEntry {
     cv::Mat frame;
-    static_vector<std::pair<Vec2, double>, Settings::KeyFrame::max_immaturePointsNum>
+    static_vector<std::pair<Vec2, double>,
+                  Settings::KeyFrame::max_immaturePointsNum>
         depthedPoints;
+    long long timestamp;
   };
 
   FrameEntry frames[Settings::CameraBundle::max_camerasInBundle];
@@ -28,7 +30,8 @@ public:
   virtual ~DsoInitializer() {}
 
   // returns true if initialization is completed
-  virtual bool addMultiFrame(const cv::Mat frames[]) = 0;
+  virtual bool addMultiFrame(const cv::Mat frames[],
+                             long long timestamps[]) = 0;
 
   virtual InitializedVector initialize() = 0;
 };

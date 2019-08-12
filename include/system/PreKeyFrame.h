@@ -17,13 +17,14 @@ class PreKeyFrameInternals;
 struct PreKeyFrame {
 
   struct FrameEntry {
-    FrameEntry(const cv::Mat &_frameColored,
+    FrameEntry(const cv::Mat &_frameColored, long long timestamp,
                const Settings::Pyramid &pyrSettings);
 
     cv::Mat frameColored;
     cv::Mat1d gradX, gradY, gradNorm;
     ImagePyramid framePyr;
 
+    long long timestamp;
     AffLight lightBaseToThis;
   };
 
@@ -31,7 +32,8 @@ struct PreKeyFrame {
 
   PreKeyFrame(KeyFrame *baseFrame, CameraBundle *cam,
               const cv::Mat coloredFrames[], int globalFrameNum,
-              long long timestamp, const Settings::Pyramid &_pyrSettings = {});
+              long long timestamps[],
+              const Settings::Pyramid &_pyrSettings = {});
   ~PreKeyFrame();
 
   inline cv::Mat1b &image(int num) {
@@ -50,7 +52,6 @@ struct PreKeyFrame {
   CameraBundle *cam;
   SE3 baseToThis;
   int globalFrameNum;
-  long long timestamp;
 
   Settings::Pyramid pyrSettings;
 

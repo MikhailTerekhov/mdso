@@ -21,6 +21,7 @@ struct KeyFrameEntry {
   static_vector<OptimizedPoint, Settings::max_maxOptimizedPoints>
       optimizedPoints;
 
+  long long timestamp;
   AffLight lightWorldToThis;
 };
 
@@ -29,9 +30,8 @@ struct KeyFrame {
 
   KeyFrame(const KeyFrame &other) = delete;
   KeyFrame(KeyFrame &&other) = delete;
-  KeyFrame(const InitializedFrame &initializedFrame,
-           CameraBundle *cam, int globalFrameNum, long long timestamp,
-           PixelSelector pixelSelector[],
+  KeyFrame(const InitializedFrame &initializedFrame, CameraBundle *cam,
+           int globalFrameNum, PixelSelector pixelSelector[],
            const Settings::KeyFrame &_kfSettings = {},
            const Settings::Pyramid &pyrSettings = {},
            const PointTracerSettings &tracingSettings = {});

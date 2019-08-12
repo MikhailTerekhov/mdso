@@ -21,7 +21,8 @@ namespace fishdso {
 // , settings(_settings)
 // , observers(observers) {}
 
-bool DelaunayDsoInitializer::addMultiFrame(const cv::Mat frames[]) {
+bool DelaunayDsoInitializer::addMultiFrame(const cv::Mat frames[],
+                                           long long timestamps[]) {
   return false;
   /*
   if (!hasFirstFrame) {

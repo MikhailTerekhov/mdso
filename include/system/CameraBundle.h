@@ -19,7 +19,7 @@ struct CameraBundle {
     const SE3 thisToBody;
     CameraModel cam;
   };
-  
+
   CameraBundle(SE3 bodyToCam[], CameraModel cam[], int size);
 
   CamPyr camPyr(int levelNum);

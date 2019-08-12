@@ -53,7 +53,8 @@ struct PointTrackingResidual {
       *trackedFrame;
 };
 
-FrameTracker::FrameTracker(CameraBundle camPyr[], const DepthedMultiFrame &_baseFrame,
+FrameTracker::FrameTracker(CameraBundle camPyr[],
+                           const DepthedMultiFrame &_baseFrame,
                            std::vector<FrameTrackerObserver *> &observers,
                            const FrameTrackerSettings &_settings)
     : camPyr(camPyr)
