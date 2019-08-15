@@ -1,5 +1,6 @@
 #include "system/CameraModel.h"
 #include "util/defs.h"
+#include "util/flags.h"
 #include "util/settings.h"
 #include "util/types.h"
 #include <algorithm>
@@ -137,7 +138,7 @@ void CameraModel::setMapPolyCoeffs() {
   int deg = settings.mapPolyDegree;
   StdVector<Vec2> funcGraph;
   funcGraph.reserve(nPnts);
-  std::mt19937 gen;
+  std::mt19937 gen(FLAGS_deterministic ? 42 : std::random_device()());
   std::uniform_real_distribution<> distr(0, maxRadius);
 
   for (int it = 0; it < nPnts; ++it) {

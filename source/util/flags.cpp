@@ -67,6 +67,9 @@ DEFINE_bool(fixed_motion_on_first_ba,
 DEFINE_double(optimized_stddev, Settings::PointTracer::default_optimizedStddev,
               "Max disparity error for a point to become optimized.");
 
+DEFINE_bool(deterministic, true,
+            "Do we need deterministic random number generation?");
+
 namespace fishdso {
 
 Settings getFlaggedSettings() {

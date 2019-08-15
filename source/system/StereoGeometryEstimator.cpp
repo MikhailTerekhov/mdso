@@ -1,10 +1,12 @@
 #include "system/StereoGeometryEstimator.h"
 #include "system/SphericalPlus.h"
+#include "util/flags.h"
 #include "util/geometry.h"
 #include <RelativePoseEstimator.h>
 #include <ceres/ceres.h>
 #include <fstream>
 #include <glog/logging.h>
+#include <random>
 
 namespace fishdso {
 
@@ -176,7 +178,7 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
 
   SE3 bestMotion;
 
-  std::mt19937 mt;
+  std::mt19937 mt(FLAGS_deterministic ? 42 : std::random_device()());
   std::uniform_int_distribution<> inds(0, rays.size() - 1);
 
   int hypotesisInd[N];

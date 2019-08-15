@@ -1,6 +1,8 @@
 #include "util/PixelSelector.h"
 #include "util/defs.h"
+#include "util/flags.h"
 #include <glog/logging.h>
+#include <random>
 
 namespace fishdso {
 
@@ -51,7 +53,7 @@ std::vector<cv::Point> PixelSelector::selectInternal(const cv::Mat &frame,
     selectLayer(gradNorm, (1 << i) * blockSize, settings.gradThresholds[i],
                 pointsOverThres[i]);
 
-    std::mt19937 mt;
+    std::mt19937 mt(FLAGS_deterministic ? 42 : std::random_device()());
     std::shuffle(pointsOverThres[i].begin(), pointsOverThres[i].end(), mt);
     // std::cout << "over thres " << i << " are " << pointsOverThres[i].size()
     // << std::endl;
