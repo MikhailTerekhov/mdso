@@ -69,6 +69,8 @@ DEFINE_double(optimized_stddev, Settings::PointTracer::default_optimizedStddev,
 
 DEFINE_int32(shift_between_keyframes, Settings::default_shiftBetweenKeyFrames,
              "Difference in frame numbers between chosen keyFrames.");
+DEFINE_bool(deterministic, true,
+            "Do we need deterministic random number generation?");
 
 namespace fishdso {
 

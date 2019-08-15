@@ -6,12 +6,15 @@
 #include <glog/logging.h>
 #include <opencv2/opencv.hpp>
 #include <queue>
+#include "util/flags.h"
+#include <random>
 
 namespace fishdso {
 
 Triangulation::Triangulation(const StdVector<Vec2> &newPoints,
                              const Settings::Triangulation &settings)
     : indicesInv(newPoints.size())
+    , mt(FLAGS_deterministic ? 42 : std::random_device()())
     , settings(settings) {
   //_vertices.reserve(newPoints.size() + 3);
 

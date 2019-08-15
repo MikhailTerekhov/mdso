@@ -37,6 +37,7 @@ DECLARE_bool(fixed_motion_on_first_ba);
 DECLARE_double(optimized_stddev);
 
 DECLARE_int32(shift_between_keyframes);
+DECLARE_bool(deterministic);
 
 namespace fishdso {
 
