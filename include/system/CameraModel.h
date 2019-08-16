@@ -15,12 +15,15 @@ class CameraModel {
 public:
   using CamPyr = StdVector<CameraModel>;
 
+  enum InputType { POLY_UNMAP, POLY_MAP };
+
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   CameraModel(int width, int height, double scale, const Vec2 &center,
               VecX unmapPolyCoeffs, const Settings::CameraModel &settings = {});
+
   CameraModel(int width, int height, const std::string &calibFileName,
-              const Settings::CameraModel &settings = {});
+              InputType type, const Settings::CameraModel &settings = {});
   CameraModel(int width, int height, double f, double cx, double cy,
               const Settings::CameraModel &settings = {});
 
@@ -111,12 +114,16 @@ public:
   double getImgRadiusByAngle(double observeAngle) const;
   void getRectByAngle(double observeAngle, int &width, int &height) const;
 
+  void setImageCenter(const Vec2 &imcenter);
+
   void setMapPolyCoeffs();
+  void setUnmapPolyCoeffs();
 
   CamPyr camPyr(int pyrLevels);
 
 private:
-  friend std::istream &operator>>(std::istream &is, CameraModel &cc);
+  void readUnmap(std::istream &is);
+  void readMap(std::istream &is);
 
   inline double calcUnmapPoly(double r) const {
     double rN = r * r;

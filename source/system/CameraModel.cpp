@@ -27,18 +27,30 @@ CameraModel::CameraModel(int width, int height, double scale,
 }
 
 CameraModel::CameraModel(int width, int height,
-                         const std::string &calibFileName,
+                         const std::string &calibFileName, InputType type,
                          const Settings::CameraModel &settings)
     : width(width)
     , height(height)
     , settings(settings) {
   std::ifstream ifs(calibFileName, std::ifstream::in);
-  if (!ifs.is_open()) {
+  if (!ifs.is_open())
     throw std::runtime_error("camera model file could not be open!");
+
+  switch (type) {
+  case POLY_UNMAP:
+    readUnmap(ifs);
+    normalize();
+    setMapPolyCoeffs();
+    break;
+  case POLY_MAP:
+    readMap(ifs);
+    setUnmapPolyCoeffs();
+    // normalize();
+    // std::cout << "after normalization:\n";
+    // std::cout << "coeffs: " << unmapPolyCoeffs.transpose() << '\n';
+    // setMapPolyCoeffs();
+    break;
   }
-  ifs >> *this;
-  normalize();
-  setMapPolyCoeffs();
 }
 
 CameraModel::CameraModel(int width, int height, double f, double cx, double cy,
@@ -112,22 +124,48 @@ void CameraModel::getRectByAngle(double observeAngle, int &retWidth,
   retHeight = int(r * height / maxRadius);
 }
 
-std::istream &operator>>(std::istream &is, CameraModel &cc) {
+void CameraModel::setImageCenter(const Vec2 &imcenter) {
+  center = imcenter / scale;
+}
+
+void CameraModel::readUnmap(std::istream &is) {
   std::string tag;
   is >> tag;
   if (tag != "omnidirectional")
     throw std::runtime_error("Invalid camera type");
 
-  is >> cc.scale >> cc.center[0] >> cc.center[1] >> cc.unmapPolyDeg;
-  cc.unmapPolyCoeffs.resize(cc.unmapPolyDeg, 1);
+  is >> scale >> center[0] >> center[1] >> unmapPolyDeg;
+  unmapPolyCoeffs.resize(unmapPolyDeg, 1);
 
-  for (int i = 0; i < cc.unmapPolyDeg; ++i)
-    is >> cc.unmapPolyCoeffs[i];
+  for (int i = 0; i < unmapPolyDeg; ++i)
+    is >> unmapPolyCoeffs[i];
 
-  cc.maxRadius = 2;
-  double minZUnnorm = cc.calcUnmapPoly(cc.maxRadius);
-  cc.minZ = minZUnnorm / std::hypot(minZUnnorm, cc.maxRadius);
-  return is;
+  maxRadius = 2;
+  double minZUnnorm = calcUnmapPoly(maxRadius);
+  minZ = minZUnnorm / std::hypot(minZUnnorm, maxRadius);
+}
+
+void CameraModel::readMap(std::istream &is) {
+  int mapPolyDeg = 0;
+  double fx, fy, cx, cy, skew;
+  is >> mapPolyDeg >> fx >> fy >> cx >> cy >> skew;
+  // CHECK(std::abs(skew) < 0.05) << "Our CameraModel expects zero skew";
+  mapPolyCoeffs.resize(mapPolyDeg + 2);
+  mapPolyCoeffs[0] = 0;
+  mapPolyCoeffs[1] = 1;
+  for (int i = 0; i < mapPolyDeg; ++i)
+    is >> mapPolyCoeffs[i + 2];
+
+  scale = (fx + fy) / 2;
+  Vec2 imcenter(cx, cy);
+  center = imcenter / scale;
+
+  // double wd = getWidth(), hd = getHeight();
+  // double cornersDist[] = {
+      // (Vec2(0, 0) - imcenter).norm(), (Vec2(wd, 0) - imcenter).norm(),
+      // (Vec2(0, hd) - imcenter).norm(), (Vec2(wd, hd) - imcenter).norm()};
+
+  maxAngle = settings.magicMaxAngle;
 }
 
 void CameraModel::setMapPolyCoeffs() {
@@ -170,6 +208,39 @@ void CameraModel::setMapPolyCoeffs() {
   }
 
   mapPolyCoeffs = A.fullPivHouseholderQr().solve(b);
+}
+
+void CameraModel::setUnmapPolyCoeffs() {
+  unmapPolyDeg = settings.unmapPolyDegree;
+
+  StdVector<std::pair<double, double>> funcGraph;
+  funcGraph.reserve(settings.unmapPolyPoints);
+
+  std::mt19937 gen;
+  const double eps = 1e-3;
+  std::uniform_real_distribution<double> distr(eps, maxAngle);
+  for (int i = 0; i < settings.unmapPolyPoints; ++i) {
+    double theta = distr(gen);
+    double r = calcMapPoly(theta);
+    double z = r * std::tan(M_PI_2 - theta);
+    funcGraph.push_back({r, z});
+  }
+
+  MatXX A(funcGraph.size(), settings.unmapPolyDegree);
+  VecX b(funcGraph.size());
+  for (int i = 0; i < funcGraph.size(); ++i) {
+    A(i, 0) = 1;
+    const double &r = funcGraph[i].first;
+    double rN = r * r;
+    for (int j = 1; j < settings.unmapPolyDegree; ++j) {
+      A(i, j) = rN;
+      rN *= r;
+    }
+    b(i) = funcGraph[i].second;
+  }
+
+  unmapPolyCoeffs = A.fullPivHouseholderQr().solve(b);
+  std::cout << "coeffs: " << unmapPolyCoeffs.transpose() << '\n';
 }
 
 CameraModel::CamPyr CameraModel::camPyr(int pyrLevels) {
