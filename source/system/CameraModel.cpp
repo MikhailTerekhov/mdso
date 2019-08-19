@@ -19,10 +19,12 @@ CameraModel::CameraModel(int width, int height, double scale,
     , height(height)
     , unmapPolyDeg(unmapPolyCoeffs.rows())
     , unmapPolyCoeffs(unmapPolyCoeffs)
-    , center(center)
-    , scale(scale)
+    , fx(scale)
+    , fy(scale)
+    , principalPoint(fx * center[0], fy * center[1])
+    , skew(0)
     , settings(settings) {
-  normalize();
+  recalcBoundaries();
   setMapPolyCoeffs();
 }
 
@@ -31,6 +33,7 @@ CameraModel::CameraModel(int width, int height,
                          const Settings::CameraModel &settings)
     : width(width)
     , height(height)
+    , skew(0)
     , settings(settings) {
   std::ifstream ifs(calibFileName, std::ifstream::in);
   if (!ifs.is_open())
@@ -39,16 +42,14 @@ CameraModel::CameraModel(int width, int height,
   switch (type) {
   case POLY_UNMAP:
     readUnmap(ifs);
-    normalize();
+    recalcBoundaries();
     setMapPolyCoeffs();
     break;
   case POLY_MAP:
     readMap(ifs);
+    maxAngle = settings.magicMaxAngle;
     setUnmapPolyCoeffs();
-    // normalize();
-    // std::cout << "after normalization:\n";
-    // std::cout << "coeffs: " << unmapPolyCoeffs.transpose() << '\n';
-    // setMapPolyCoeffs();
+    recalcBoundaries();
     break;
   }
 }
@@ -58,40 +59,19 @@ CameraModel::CameraModel(int width, int height, double f, double cx, double cy,
     : width(width)
     , height(height)
     , unmapPolyDeg(0)
-    , center(cx, cy)
-    , scale(1)
+    , fx(f)
+    , fy(f)
+    , principalPoint(f * cx, f * cy)
     , settings(settings) {
   unmapPolyCoeffs.resize(1, 1);
   unmapPolyCoeffs[0] = f;
-  normalize();
+  recalcBoundaries();
+
   setMapPolyCoeffs();
 
   LOG(INFO) << "\n\n CAMERA MODEL:\n";
   LOG(INFO) << "unmap coeffs  = " << unmapPolyCoeffs.transpose() << "\n";
   LOG(INFO) << "\nmap poly coeffs = " << mapPolyCoeffs.transpose() << "\n\n";
-}
-
-void CameraModel::normalize() {
-  double wd = width, hd = height;
-  Vec2 imcenter = center * scale;
-  double cornersDist[] = {
-      (Vec2(0, 0) - imcenter).norm(), (Vec2(wd, 0) - imcenter).norm(),
-      (Vec2(0, hd) - imcenter).norm(), (Vec2(wd, hd) - imcenter).norm()};
-  double newScale = *std::max_element(cornersDist, cornersDist + 4);
-  double s = newScale / scale;
-  double sK = scale / newScale;
-  unmapPolyCoeffs[0] *= sK;
-  sK = s;
-  for (int i = 1; i < unmapPolyDeg; ++i) {
-    unmapPolyCoeffs[i] *= sK;
-    sK *= s;
-  }
-  center /= s;
-  scale = newScale;
-  maxRadius = 1;
-  double minZUnnorm = calcUnmapPoly(maxRadius);
-  minZ = minZUnnorm / std::hypot(minZUnnorm, maxRadius);
-  maxAngle = std::atan2(maxRadius, minZUnnorm);
 }
 
 std::pair<Vec2, Mat23> CameraModel::diffMap(const Vec3 &ray) const {
@@ -114,7 +94,8 @@ bool CameraModel::isOnImage(const Vec2 &p, int border) const {
 }
 
 double CameraModel::getImgRadiusByAngle(double observeAngle) const {
-  return scale * calcMapPoly(observeAngle);
+  double mapped = calcMapPoly(observeAngle);
+  return std::min(fx * mapped, fy * mapped);
 }
 
 void CameraModel::getRectByAngle(double observeAngle, int &retWidth,
@@ -125,7 +106,7 @@ void CameraModel::getRectByAngle(double observeAngle, int &retWidth,
 }
 
 void CameraModel::setImageCenter(const Vec2 &imcenter) {
-  center = imcenter / scale;
+  principalPoint = imcenter;
 }
 
 void CameraModel::readUnmap(std::istream &is) {
@@ -134,38 +115,27 @@ void CameraModel::readUnmap(std::istream &is) {
   if (tag != "omnidirectional")
     throw std::runtime_error("Invalid camera type");
 
-  is >> scale >> center[0] >> center[1] >> unmapPolyDeg;
+  double scale, cx, cy;
+
+  is >> scale >> cx >> cy >> unmapPolyDeg;
+  fx = fy = scale;
+  principalPoint = Vec2(fx * cx, fy * cy);
   unmapPolyCoeffs.resize(unmapPolyDeg, 1);
 
   for (int i = 0; i < unmapPolyDeg; ++i)
     is >> unmapPolyCoeffs[i];
-
-  maxRadius = 2;
-  double minZUnnorm = calcUnmapPoly(maxRadius);
-  minZ = minZUnnorm / std::hypot(minZUnnorm, maxRadius);
 }
 
 void CameraModel::readMap(std::istream &is) {
   int mapPolyDeg = 0;
-  double fx, fy, cx, cy, skew;
-  is >> mapPolyDeg >> fx >> fy >> cx >> cy >> skew;
+  is >> mapPolyDeg >> fx >> fy >> principalPoint[0] >> principalPoint[1] >>
+      skew;
   // CHECK(std::abs(skew) < 0.05) << "Our CameraModel expects zero skew";
   mapPolyCoeffs.resize(mapPolyDeg + 2);
   mapPolyCoeffs[0] = 0;
   mapPolyCoeffs[1] = 1;
   for (int i = 0; i < mapPolyDeg; ++i)
     is >> mapPolyCoeffs[i + 2];
-
-  scale = (fx + fy) / 2;
-  Vec2 imcenter(cx, cy);
-  center = imcenter / scale;
-
-  // double wd = getWidth(), hd = getHeight();
-  // double cornersDist[] = {
-      // (Vec2(0, 0) - imcenter).norm(), (Vec2(wd, 0) - imcenter).norm(),
-      // (Vec2(0, hd) - imcenter).norm(), (Vec2(wd, hd) - imcenter).norm()};
-
-  maxAngle = settings.magicMaxAngle;
 }
 
 void CameraModel::setMapPolyCoeffs() {
@@ -248,12 +218,30 @@ CameraModel::CamPyr CameraModel::camPyr(int pyrLevels) {
   CamPyr result;
   for (int i = 0; i < pyrLevels; ++i) {
     result.emplace_back(*this);
-    result.back().scale /= (1 << i);
     result.back().width /= (1 << i);
     result.back().height /= (1 << i);
+    result.back().principalPoint /= (1 << i);
+    result.back().fx /= (1 << i);
+    result.back().fy /= (1 << i);
   }
 
   return result;
+}
+
+void CameraModel::recalcMaxRadius() {
+  Vec2 normPp(principalPoint[0] / fx, principalPoint[1] / fy);
+  Vec2 normSz(width / fx, height / fy);
+  double dist[] = {normPp.norm(), (normPp - Vec2(0, normSz[1])).norm(),
+                   (normPp - Vec2(normSz[0], 0)).norm(),
+                   (normPp - normSz).norm()};
+  maxRadius = *std::max_element(dist, dist + 4);
+}
+
+void CameraModel::recalcBoundaries() {
+  recalcMaxRadius();
+  double minZUnnorm = calcUnmapPoly(maxRadius);
+  minZ = minZUnnorm / std::hypot(minZUnnorm, maxRadius);
+  maxAngle = std::atan2(maxRadius, minZUnnorm);
 }
 
 } // namespace fishdso

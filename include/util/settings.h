@@ -22,8 +22,17 @@ struct Settings {
     static constexpr int default_mapPolyDegree = 10;
     int mapPolyDegree = default_mapPolyDegree;
 
+    static constexpr int default_unmapPolyDegree = 6;
+    int unmapPolyDegree = default_unmapPolyDegree;
+
     static constexpr int default_mapPolyPoints = 2000;
     int mapPolyPoints = default_mapPolyPoints;
+
+    static constexpr int default_unmapPolyPoints = 2000;
+    int unmapPolyPoints = default_unmapPolyPoints;
+
+    static constexpr int default_magicMaxAngle = 100.0 * (M_PI / 180);
+    int magicMaxAngle = default_magicMaxAngle;
   } cameraModel;
 
   struct PixelSelector {

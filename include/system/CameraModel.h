@@ -33,12 +33,11 @@ public:
     typedef Eigen::Matrix<T, Eigen::Dynamic, 1> VecXt;
     Eigen::Map<const Vec2t> pt_(point);
     Vec2t pt = pt_;
+    
+    pt[1] = (pt[1] - principalPoint[1]) / fy;
+    pt[0] = (pt[0] - skew * pt[1] - principalPoint[0]) / fx;
 
     VecXt p = unmapPolyCoeffs.cast<T>();
-    Vec2t c = center.cast<T>();
-
-    pt /= scale;
-    pt -= c;
 
     T rho2 = pt.squaredNorm();
     T rho1 = sqrt(rho2);
@@ -73,10 +72,9 @@ public:
       angleN *= angle;
     }
 
-    Vec2t c = center.cast<T>();
     Vec2t res = pt.template head<2>().normalized() * r;
-    res += c;
-    res *= T(scale);
+    res[0] = T(fx) * res[0] + T(skew) * res[1] + T(principalPoint[0]);
+    res[1] = T(fy) * res[1] + T(principalPoint[1]);
     return res;
   }
 
@@ -105,7 +103,7 @@ public:
 
   inline int getWidth() const { return width; }
   inline int getHeight() const { return height; }
-  inline Vec2 getImgCenter() const { return scale * center; }
+  inline Vec2 getImgCenter() const { return principalPoint; }
   inline double getMinZ() const { return minZ; }
   inline double getMaxAngle() const { return maxAngle; }
 
@@ -144,13 +142,17 @@ private:
     return res;
   }
 
-  void normalize();
+  // void normalize();
+
+  void recalcMaxRadius();
+  void recalcBoundaries();
 
   int width, height;
   int unmapPolyDeg;
   VecX unmapPolyCoeffs;
-  Vec2 center;
-  double scale;
+  double fx, fy;
+  Vec2 principalPoint;
+  double skew;
   double maxRadius;
   double minZ;
   double maxAngle;
