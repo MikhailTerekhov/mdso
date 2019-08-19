@@ -25,15 +25,14 @@ KeyFrame kfFromEpipolar(CameraModel *cam, const cv::Mat &baseFrame,
                         PixelSelector &pixelSelector,
                         const Settings &settings) {
   KeyFrame result(cam, baseFrame, 0, pixelSelector, settings.keyFrame,
-                  settings.pointTracer, settings.intencity,
-                  settings.residualPattern, settings.pyramid);
-  PreKeyFrame toTraceOn(cam, frameToTraceOn, 1, settings.pyramid);
-  toTraceOn.worldToThis = firstToSecond;
+                  settings.getPointTracerSettings());
+  PreKeyFrame toTraceOn(&result, cam, frameToTraceOn, 1, settings.pyramid);
+  toTraceOn.baseToThis = firstToSecond;
 
   auto deb = FLAGS_show_epipolar ? ImmaturePoint::DRAW_EPIPOLE
                                  : ImmaturePoint::NO_DEBUG;
   for (const auto &ip : result.immaturePoints)
-    ip->traceOn(toTraceOn, deb);
+    ip->traceOn(result, toTraceOn, deb);
 
   return result;
 }
