@@ -158,12 +158,12 @@ void putCross(cv::Mat &img, const cv::Point &pos, int size,
 }
 void putSquare(cv::Mat &img, const cv::Point &pos, int size,
                const cv::Scalar &col, int thickness) {
-  Eigen::AlignedBox2i bounds(Vec2i::Zero(), Vec2i(img.cols, img.rows));
-  if (!(bounds.contains(toVec2i(pos - cv::Point(size, size))) &&
-        bounds.contains(toVec2i(pos + cv::Point(size, size)))))
+  Eigen::AlignedBox2i bounds(Vec2i::Zero(), Vec2i(img.cols - 1, img.rows - 1));
+  cv::Point from = pos - cv::Point(size, size);
+  cv::Point to = pos + cv::Point(size, size);
+  if (!(bounds.contains(toVec2i(from)) && bounds.contains(toVec2i(to))))
     return;
-  cv::rectangle(img, pos - cv::Point(size, size), pos + cv::Point(size, size),
-                col, thickness);
+  cv::rectangle(img, from, to, col, thickness);
 }
 
 void grad(const cv::Mat &img, cv::Mat1d &gradX, cv::Mat1d &gradY,

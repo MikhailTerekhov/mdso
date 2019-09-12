@@ -224,7 +224,7 @@ void BundleAdjuster::adjust(int maxNumIterations) {
 
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_SCHUR;
-  // options.linear_solver_ordering = ordering;
+  options.linear_solver_ordering = ordering;
   // options.minimizer_progress_to_stdout = true;
   options.max_num_iterations = maxNumIterations;
   options.num_threads = settings.threading.numThreads;

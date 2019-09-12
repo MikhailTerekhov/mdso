@@ -206,42 +206,42 @@ double DsoSystem::getTimeLastByLbo() {
       getTimestamp(allFrames.size() - 2) - getTimestamp(allFrames.size() - 3);
   Timestamp lastTime =
       getTimestamp(allFrames.size() - 1) - getTimestamp(allFrames.size() - 2);
-  return double(lboTime) / lastTime;
+  return double(lastTime) / lboTime;
 }
 
-SE3 predictScrewInternal(double timeLastByLbo, const SE3 &baseToLbo,
-                         const SE3 &baseToLast) {
-  SE3 lboToLast = baseToLast * baseToLbo.inverse();
-  return SE3::exp(timeLastByLbo * lboToLast.log()) * baseToLast;
+SE3 predictScrewInternal(double timeLastByLbo, const SE3 &baseToLBTwo,
+                         const SE3 &baseToLBOne) {
+  SE3 lbtToLbo = baseToLBOne * baseToLBTwo.inverse();
+  return SE3::exp(timeLastByLbo * lbtToLbo.log()) * baseToLBOne;
 }
 
-SE3 predictSimpleInternal(double timeLastByLbo, const SE3 &baseToLbo,
-                          const SE3 &baseToLast) {
-  SE3 lboToLast = baseToLast * baseToLbo.inverse();
-  SO3 lastToCurRot = SO3::exp(timeLastByLbo * lboToLast.so3().log());
-  Vec3 lastToCurTrans =
+SE3 predictSimpleInternal(double timeLastByLbo, const SE3 &baseToLBTwo,
+                          const SE3 &baseToLBOne) {
+  SE3 lbtToLbo = baseToLBOne * baseToLBTwo.inverse();
+  SO3 lboToLastRot = SO3::exp(timeLastByLbo * lbtToLbo.so3().log());
+  Vec3 lboToLastTrans =
       timeLastByLbo *
-      (lastToCurRot * lboToLast.so3().inverse() * lboToLast.translation());
+      (lboToLastRot * lbtToLbo.so3().inverse() * lbtToLbo.translation());
 
-  return SE3(lastToCurRot, lastToCurTrans) * baseToLast;
+  return SE3(lboToLastRot, lboToLastTrans) * baseToLBOne;
 }
 
-SE3 DsoSystem::predictInternal(double timeLastByLbo, const SE3 &baseToLbo,
-                               const SE3 &baseToLast) {
+SE3 DsoSystem::predictInternal(double timeLastByLbo, const SE3 &baseToLBTwo,
+                               const SE3 &baseToLBOne) {
   return settings.predictUsingScrew
-             ? predictScrewInternal(timeLastByLbo, baseToLbo, baseToLast)
-             : predictSimpleInternal(timeLastByLbo, baseToLbo, baseToLast);
+             ? predictScrewInternal(timeLastByLbo, baseToLBTwo, baseToLBOne)
+             : predictSimpleInternal(timeLastByLbo, baseToLBTwo, baseToLBOne);
 }
 
 SE3 DsoSystem::predictBaseKfToCur() {
   double timeLastByLbo = getTimeLastByLbo();
 
-  SE3 baseToLbo =
+  SE3 baseToLBTwo =
+      getFrameToWorld(allFrames.size() - 3).inverse() * baseFrame().thisToWorld;
+  SE3 baseToLBOne =
       getFrameToWorld(allFrames.size() - 2).inverse() * baseFrame().thisToWorld;
-  SE3 baseToLast =
-      getFrameToWorld(allFrames.size() - 1).inverse() * baseFrame().thisToWorld;
 
-  return predictInternal(timeLastByLbo, baseToLbo, baseToLast);
+  return predictInternal(timeLastByLbo, baseToLBTwo, baseToLBOne);
 }
 
 FrameTracker::TrackingResult DsoSystem::predictTracking() {
@@ -503,12 +503,21 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], Timestamp timestamps[]) {
   for (DsoObserver *obs : observers.dso)
     obs->newFrame(*preKeyFrame);
 
+  FrameTracker::TrackingResult predicted = predictTracking();
+
   FrameTracker::TrackingResult tracked =
-      frameTracker->trackFrame(*preKeyFrame, predictTracking());
+      frameTracker->trackFrame(*preKeyFrame, predicted);
 
   preKeyFrame->baseToThis = tracked.baseToTracked;
   for (int i = 0; i < cam->bundle.size(); ++i)
     preKeyFrame->frames[i].lightBaseToThis = tracked.lightBaseToTracked[i];
+
+  SE3 diffPos = predicted.baseToTracked * tracked.baseToTracked.inverse();
+  LOG(INFO) << "\ndiff to predicted:\n"
+            << "rel trans = "
+            << diffPos.translation().norm() /
+                   predicted.baseToTracked.translation().norm()
+            << "\nrot (deg) = " << diffPos.so3().log().norm() * 180. / M_PI;
 
   traceOn(*preKeyFrame);
 

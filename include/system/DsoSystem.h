@@ -47,10 +47,9 @@ private:
   AffLight getLightWorldToFrame(int frameNumber, int ind);
 
   double getTimeLastByLbo();
-  SE3 predictInternal(double timeLastByLbo, const SE3 &baseToLbo,
-                      const SE3 &baseToLast);
+  SE3 predictInternal(double timeLastByLbo, const SE3 &baseToLBTwo,
+                      const SE3 &baseToLBOne);
   SE3 predictBaseKfToCur();
-  SE3 purePredictBaseKfToCur();
 
   FrameTracker::TrackingResult predictTracking();
 
