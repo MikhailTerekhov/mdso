@@ -8,6 +8,7 @@
 #include "system/FrameTracker.h"
 #include "system/KeyFrame.h"
 #include "system/MarginalizedKeyFrame.h"
+#include "system/Preprocessor.h"
 #include "util/DepthedImagePyramid.h"
 #include "util/DistanceMap.h"
 #include "util/PlyHolder.h"
@@ -21,8 +22,8 @@ namespace fishdso {
 
 class DsoSystem {
 public:
-  DsoSystem(CameraBundle *cam, const Observers &observers = {},
-            const Settings &settings = {});
+  DsoSystem(CameraBundle *cam, Preprocessor *preprocessor,
+            const Observers &observers = {}, const Settings &settings = {});
   ~DsoSystem();
 
   void addMultiFrame(const cv::Mat frames[], Timestamp timestamps[]);
@@ -80,6 +81,8 @@ private:
   PointTracerSettings pointTracerSettings;
 
   Observers observers;
+
+  Preprocessor *preprocessor;
 };
 
 } // namespace fishdso

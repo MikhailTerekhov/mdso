@@ -14,15 +14,16 @@
 
 namespace fishdso {
 
-DsoSystem::DsoSystem(CameraBundle *cam, const Observers &observers,
-                     const Settings &_settings)
+DsoSystem::DsoSystem(CameraBundle *cam, Preprocessor *preprocessor,
+                     const Observers &observers, const Settings &_settings)
     : cam(cam)
     , camPyr(cam->camPyr(_settings.pyramid.levelNum()))
     , isInitialized(false)
     , frameTracker(nullptr)
     , settings(_settings)
     , pointTracerSettings(_settings.getPointTracerSettings())
-    , observers(observers) {
+    , observers(observers)
+    , preprocessor(preprocessor) {
   LOG(INFO) << "create DsoSystem" << std::endl;
 
   marginalizedFrames.reserve(settings.expectedFramesCount);
@@ -427,9 +428,9 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], Timestamp timestamps[]) {
 
       for (int i = 0; i < init.size(); ++i) {
         const InitializedFrame &f = init[i];
-        keyFrames.emplace_back(new KeyFrame(f, cam, i, pixelSelector.data(),
-                                            settings.keyFrame, settings.pyramid,
-                                            settings.getPointTracerSettings()));
+        keyFrames.emplace_back(new KeyFrame(
+            f, cam, preprocessor, i, pixelSelector.data(), settings.keyFrame,
+            settings.pyramid, settings.getPointTracerSettings()));
         allFrames.push_back(keyFrames.back().get());
       }
 
@@ -495,8 +496,9 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], Timestamp timestamps[]) {
   LOG(INFO) << "add frame #" << globalFrameNum << ", ts[0] = " << timestamps[0]
             << std::endl;
 
-  std::unique_ptr<PreKeyFrame> preKeyFrame(new PreKeyFrame(
-      &baseFrame(), cam, frames, globalFrameNum, timestamps, settings.pyramid));
+  std::unique_ptr<PreKeyFrame> preKeyFrame(
+      new PreKeyFrame(&baseFrame(), cam, preprocessor, frames, globalFrameNum,
+                      timestamps, settings.pyramid));
 
   allFrames.push_back(preKeyFrame.get());
 

@@ -3,6 +3,7 @@
 
 #include "system/AffineLightTransform.h"
 #include "system/CameraBundle.h"
+#include "system/Preprocessor.h"
 #include "util/ImagePyramid.h"
 #include "util/settings.h"
 #include "util/types.h"
@@ -17,7 +18,8 @@ class PreKeyFrameInternals;
 struct PreKeyFrame {
 
   struct FrameEntry {
-    FrameEntry(PreKeyFrame *host, int ind, const cv::Mat &_frameColored, Timestamp timestamp,
+    FrameEntry(PreKeyFrame *host, int ind, const cv::Mat &_frameColored,
+               const cv::Mat1b &frameProcessed, Timestamp timestamp,
                const Settings::Pyramid &pyrSettings);
 
     PreKeyFrame *host;
@@ -33,8 +35,8 @@ struct PreKeyFrame {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   PreKeyFrame(KeyFrame *baseFrame, CameraBundle *cam,
-              const cv::Mat coloredFrames[], int globalFrameNum,
-              Timestamp timestamps[],
+              Preprocessor *preprocessor, const cv::Mat coloredFrames[],
+              int globalFrameNum, Timestamp timestamps[],
               const Settings::Pyramid &_pyrSettings = {});
   ~PreKeyFrame();
 

@@ -37,7 +37,8 @@ struct KeyFrame {
   KeyFrame(const KeyFrame &other) = delete;
   KeyFrame(KeyFrame &&other) = delete;
   KeyFrame(const InitializedFrame &initializedFrame, CameraBundle *cam,
-           int globalFrameNum, PixelSelector pixelSelector[],
+           Preprocessor *preprocessor, int globalFrameNum,
+           PixelSelector pixelSelector[],
            const Settings::KeyFrame &_kfSettings = {},
            const Settings::Pyramid &pyrSettings = {},
            const PointTracerSettings &tracingSettings = {});

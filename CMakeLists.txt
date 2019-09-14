@@ -71,6 +71,9 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/system/StereoGeometryEstimator.h
     ${PROJECT_SOURCE_DIR}/include/system/FrameTracker.h
     ${PROJECT_SOURCE_DIR}/include/system/BundleAdjuster.h
+    ${PROJECT_SOURCE_DIR}/include/system/Preprocessor.h
+    ${PROJECT_SOURCE_DIR}/include/system/IdentityPreprocessor.h
+    ${PROJECT_SOURCE_DIR}/include/system/DoGPreprocessor.h
 )
 
 set(dso_SOURCE_FILES
@@ -117,6 +120,8 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/system/StereoGeometryEstimator.cpp
     ${PROJECT_SOURCE_DIR}/source/system/FrameTracker.cpp
     ${PROJECT_SOURCE_DIR}/source/system/BundleAdjuster.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/IdentityPreprocessor.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/DoGPreprocessor.cpp
 )
 
 set(dso_internal_HEADER_FILES

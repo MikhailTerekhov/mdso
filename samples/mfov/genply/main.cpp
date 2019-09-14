@@ -7,7 +7,9 @@
 #include "output/TrackingDebugImageDrawer.h"
 #include "output/TrajectoryWriterDso.h"
 #include "output/TrajectoryWriterGT.h"
+#include "system/DoGPreprocessor.h"
 #include "system/DsoSystem.h"
+#include "system/IdentityPreprocessor.h"
 #include "util/defs.h"
 #include "util/flags.h"
 #include <iostream>
@@ -21,6 +23,14 @@ DEFINE_bool(gen_gt, true, "Do we need to generate GT pointcloud?");
 DEFINE_bool(gen_cloud, true, "Do we need to save resulting pointcloud?");
 DEFINE_bool(draw_interpolation, true,
             "Do we need to draw interpolation from initializer?");
+
+DEFINE_bool(use_DoG, false, "Do we need to apply DoG preprocessing first?");
+DEFINE_double(sigma1, 0, "Smaller sigma in the DoG filter.");
+DEFINE_double(sigma2, 2, "Bigger sigma in  the DoG filter.");
+DEFINE_double(DoG_multiplier, 6, "Multiplier after the DoG filter.");
+DEFINE_bool(decr_grad_on_DoG, false,
+            "Do we need to decrease gradient thresholds for PixelSelector, "
+            "when using DoG filter?");
 
 DEFINE_bool(gen_gt_only, false, "Generate ground truth point cloud and exit.");
 
@@ -134,7 +144,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
   TrackingDebugImageDrawer trackingDebugImageDrawer(
       camPyr.data(), settings.frameTracker, settings.pyramid);
   TrajectoryWriterDso trajectoryWriter(FLAGS_output_directory,
-                                    FLAGS_trajectory_filename);
+                                       FLAGS_trajectory_filename);
   StdVector<SE3> frameToWorldGT(reader.getFrameCount());
   std::vector<Timestamp> timestamps(reader.getFrameCount());
   for (int i = 0; i < timestamps.size(); ++i) {
@@ -182,8 +192,19 @@ It should contain "info" and "data" subdirectories.)abacaba";
   if (FLAGS_draw_interpolation)
     observers.initializer.push_back(&interpolationDrawer);
 
+  IdentityPreprocessor idPreprocessor;
+  DoGPreprocessor dogPreprocessor(FLAGS_sigma1, FLAGS_sigma2,
+                                  FLAGS_DoG_multiplier);
+  Preprocessor *preprocessor =
+      FLAGS_use_DoG ? static_cast<Preprocessor *>(&dogPreprocessor)
+                    : static_cast<Preprocessor *>(&idPreprocessor);
+
+  if (FLAGS_use_DoG && FLAGS_decr_grad_on_DoG)
+    for (int i = 0; i < settings.pixelSelector.gradThesholdCount; ++i)
+      settings.pixelSelector.gradThresholds[i] *= 0.6;
+
   std::cout << "running DSO.." << std::endl;
-  DsoSystem dso(&cam, observers, settings);
+  DsoSystem dso(&cam, preprocessor, observers, settings);
   for (int it = FLAGS_start; it < FLAGS_start + FLAGS_count; ++it) {
     std::cout << "add frame #" << it << std::endl;
     cv::Mat frame = reader.getFrame(it);

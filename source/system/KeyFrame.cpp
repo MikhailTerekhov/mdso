@@ -24,7 +24,8 @@ KeyFrameEntry::KeyFrameEntry(KeyFrame *host, int ind, Timestamp timestamp)
     , timestamp(timestamp) {}
 
 KeyFrame::KeyFrame(const InitializedFrame &initializedFrame, CameraBundle *cam,
-                   int globalFrameNum, PixelSelector pixelSelector[],
+                   Preprocessor *preprocessor, int globalFrameNum,
+                   PixelSelector pixelSelector[],
                    const Settings::KeyFrame &_kfSettings,
                    const Settings::Pyramid &pyrSettings,
                    const PointTracerSettings &tracingSettings)
@@ -39,7 +40,7 @@ KeyFrame::KeyFrame(const InitializedFrame &initializedFrame, CameraBundle *cam,
   }
 
   preKeyFrame = std::unique_ptr<PreKeyFrame>(
-      new PreKeyFrame(this, cam, images.data(), globalFrameNum,
+      new PreKeyFrame(this, cam, preprocessor, images.data(), globalFrameNum,
                       timestamps.data(), pyrSettings));
 
   for (int i = 0; i < cam->bundle.size(); ++i)
