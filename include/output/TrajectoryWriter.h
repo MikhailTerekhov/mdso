@@ -2,24 +2,24 @@
 #define INCLUDE_TRAJECTORYWRITER
 
 #include "output/DsoObserver.h"
-#include <set>
 
 namespace fishdso {
 
 class TrajectoryWriter : public DsoObserver {
 public:
-  TrajectoryWriter(const std::string &outputDirectory,
-                   const std::string &fileName);
+  virtual ~TrajectoryWriter();
 
   void newBaseFrame(const KeyFrame &baseFrame) override;
   void keyFramesMarginalized(const KeyFrame *marginalized[], int size) override;
   void destructed(const KeyFrame *lastKeyFrames[], int size) override;
 
+  virtual void addToPool(const KeyFrame &keyFrame) = 0;
+  virtual void addToPool(const PreKeyFrame &frame) = 0;
+  virtual PosesPool &frameToWorldPool() = 0;
+  virtual const std::string &outputFileName() = 0;
+
 private:
   std::vector<Timestamp> curKfTs;
-  PosesPool frameToWorldPool;
-
-  std::string outputFileName;
 };
 
 } // namespace fishdso

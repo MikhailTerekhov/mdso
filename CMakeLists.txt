@@ -44,6 +44,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/output/DsoObserver.h
     ${PROJECT_SOURCE_DIR}/include/output/DebugImageDrawer.h
     ${PROJECT_SOURCE_DIR}/include/output/TrajectoryWriter.h
+    ${PROJECT_SOURCE_DIR}/include/output/TrajectoryWriterDso.h
     ${PROJECT_SOURCE_DIR}/include/output/TrajectoryWriterGT.h
     ${PROJECT_SOURCE_DIR}/include/output/CloudWriter.h
     ${PROJECT_SOURCE_DIR}/include/output/CloudWriterGT.h
@@ -91,6 +92,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/output/DsoObserver.cpp
     ${PROJECT_SOURCE_DIR}/source/output/DebugImageDrawer.cpp
     ${PROJECT_SOURCE_DIR}/source/output/TrajectoryWriter.cpp
+    ${PROJECT_SOURCE_DIR}/source/output/TrajectoryWriterDso.cpp
     ${PROJECT_SOURCE_DIR}/source/output/TrajectoryWriterGT.cpp
     ${PROJECT_SOURCE_DIR}/source/output/CloudWriter.cpp
     ${PROJECT_SOURCE_DIR}/source/output/CloudWriterGT.cpp

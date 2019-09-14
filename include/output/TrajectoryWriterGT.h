@@ -1,26 +1,28 @@
 #ifndef INCLUDE_TRAJECTORYWRITERGT
 #define INCLUDE_TRAJECTORYWRITERGT
 
-#include "output/DsoObserver.h"
-#include "util/Sim3Aligner.h"
+#include "output/TrajectoryWriter.h"
 
 namespace fishdso {
 
-class TrajectoryWriterGT : public DsoObserver {
+class TrajectoryWriterGT : public TrajectoryWriter {
 public:
-  TrajectoryWriterGT(const SE3 frameToWorldGT[], Timestamp timestamps[],
+  TrajectoryWriterGT(const SE3 _frameToWorldGT[], Timestamp _timestamps[],
                      int size, const std::string &outputDirectory,
                      const std::string &fileName);
 
-  void newBaseFrame(const KeyFrame &baseFrame) override;
-  void keyFramesMarginalized(const KeyFrame *marginalized[], int size) override;
-  void destructed(const KeyFrame *lastKeyFrames[], int size) override;
+  void addToPool(const KeyFrame &keyFrame) override;
+  void addToPool(const PreKeyFrame &frame) override;
+  PosesPool &frameToWorldPool() override;
+  const std::string &outputFileName() override;
 
 private:
-  std::vector<Timestamp> curKfTs;
-  PosesPool frameToWorldGTPool;
+  void addToPoolByTimestamp(Timestamp ts);
 
-  std::string outputFileName;
+  StdVector<SE3> frameToWorldGT;
+  std::vector<Timestamp> timestamps;
+  std::string mOutputFileName;
+  PosesPool frameToWorldGTPool;
 };
 
 } // namespace fishdso

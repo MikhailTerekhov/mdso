@@ -2,9 +2,7 @@
 
 namespace fishdso {
 
-TrajectoryWriter::TrajectoryWriter(const std::string &outputDirectory,
-                                   const std::string &fileName)
-    : outputFileName(fileInDir(outputDirectory, fileName)) {}
+TrajectoryWriter::~TrajectoryWriter() {}
 
 void TrajectoryWriter::newBaseFrame(const KeyFrame &baseFrame) {
   curKfTs.push_back(baseFrame.preKeyFrame->frames[0].timestamp);
@@ -24,23 +22,22 @@ void TrajectoryWriter::keyFramesMarginalized(const KeyFrame *marginalized[],
                           margKfTs.end(), newKfTs.begin()) -
       newKfTs.begin();
   newKfTs.resize(numLeft);
-  std::swap(curKfTs, newKfTs);
+  curKfTs = std::move(newKfTs);
 
   for (int i = 0; i < size; ++i) {
     const KeyFrame *kf = marginalized[i];
-    SE3 baseToWorld = kf->thisToWorld;
-    frameToWorldPool.push({kf->preKeyFrame->frames[0].timestamp, baseToWorld});
+    addToPool(*kf);
     for (const auto &preKeyFrame : kf->trackedFrames)
-      frameToWorldPool.push({preKeyFrame->frames[0].timestamp,
-                             baseToWorld * preKeyFrame->baseToThis.inverse()});
+      addToPool(*preKeyFrame);
   }
 
-  std::ofstream ofs(outputFileName, std::ios_base::app);
+  std::ofstream ofs(outputFileName(), std::ios_base::app);
   int minKfTs = curKfTs.empty() ? INF : curKfTs[0];
-  while (!frameToWorldPool.empty() && frameToWorldPool.top().first < minKfTs) {
-    putInMatrixForm(ofs, frameToWorldPool.top().second);
+  PosesPool &pool = frameToWorldPool();
+  while (!pool.empty() && pool.top().first < minKfTs) {
+    putInMatrixForm(ofs, pool.top().second);
     ofs << '\n';
-    frameToWorldPool.pop();
+    pool.pop();
   }
 }
 

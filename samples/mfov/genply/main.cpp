@@ -5,7 +5,7 @@
 #include "output/DepthPyramidDrawer.h"
 #include "output/InterpolationDrawer.h"
 #include "output/TrackingDebugImageDrawer.h"
-#include "output/TrajectoryWriter.h"
+#include "output/TrajectoryWriterDso.h"
 #include "output/TrajectoryWriterGT.h"
 #include "system/DsoSystem.h"
 #include "util/defs.h"
@@ -133,9 +133,8 @@ It should contain "info" and "data" subdirectories.)abacaba";
   DebugImageDrawer debugImageDrawer;
   TrackingDebugImageDrawer trackingDebugImageDrawer(
       camPyr.data(), settings.frameTracker, settings.pyramid);
-  TrajectoryWriter trajectoryWriter(FLAGS_output_directory,
+  TrajectoryWriterDso trajectoryWriter(FLAGS_output_directory,
                                     FLAGS_trajectory_filename);
-
   StdVector<SE3> frameToWorldGT(reader.getFrameCount());
   std::vector<Timestamp> timestamps(reader.getFrameCount());
   for (int i = 0; i < timestamps.size(); ++i) {
@@ -193,8 +192,8 @@ It should contain "info" and "data" subdirectories.)abacaba";
 
     if (FLAGS_draw_interpolation && interpolationDrawer.didInitialize()) {
       cv::Mat3b interpolation = interpolationDrawer.draw();
-        cv::imwrite(fileInDir(FLAGS_output_directory, "interpolation.jpg"),
-                    interpolation);
+      cv::imwrite(fileInDir(FLAGS_output_directory, "interpolation.jpg"),
+                  interpolation);
     }
 
     if (FLAGS_write_files) {
