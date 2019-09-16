@@ -10,7 +10,7 @@ using namespace fishdso;
 
 class MultiFovReader {
 public:
-  MultiFovReader(const std::string &newDatasetDir);
+  MultiFovReader(const fs::path &newDatasetDir);
 
   cv::Mat getFrame(int globalFrameNum) const;
   cv::Mat1d getDepths(int globalFrameNum) const;
@@ -21,7 +21,7 @@ public:
   std::unique_ptr<CameraModel> cam;
 
 private:
-  std::string datasetDir;
+  fs::path datasetDir;
   StdVector<SE3> worldToFrameGT;
 };
 

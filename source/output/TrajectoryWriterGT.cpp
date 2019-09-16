@@ -4,11 +4,11 @@ namespace fishdso {
 
 TrajectoryWriterGT::TrajectoryWriterGT(const SE3 _frameToWorldGT[],
                                        Timestamp _timestamps[], int size,
-                                       const std::string &outputDirectory,
-                                       const std::string &fileName)
+                                       const fs::path &outputDirectory,
+                                       const fs::path &fileName)
     : frameToWorldGT(_frameToWorldGT, _frameToWorldGT + size)
     , timestamps(_timestamps, _timestamps + size)
-    , mOutputFileName(fileInDir(outputDirectory, fileName)) {}
+    , mOutputFileName(outputDirectory / fileName) {}
 
 void TrajectoryWriterGT::addToPool(const KeyFrame &keyFrame) {
   addToPoolByTimestamp(keyFrame.frames[0].timestamp);
@@ -29,6 +29,6 @@ void TrajectoryWriterGT::addToPoolByTimestamp(Timestamp ts) {
 
 PosesPool &TrajectoryWriterGT::frameToWorldPool() { return frameToWorldGTPool; }
 
-const std::string &TrajectoryWriterGT::outputFileName() { return mOutputFileName; }
+const fs::path &TrajectoryWriterGT::outputFileName() { return mOutputFileName; }
 
 } // namespace fishdso

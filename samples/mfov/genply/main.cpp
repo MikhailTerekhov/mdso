@@ -13,6 +13,8 @@
 #include "util/defs.h"
 #include "util/flags.h"
 #include <iostream>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 DEFINE_int32(start, 1, "Number of the starting frame.");
 DEFINE_int32(count, 100, "Number of frames to process.");
@@ -99,6 +101,10 @@ void readPointsInFrameGT(const MultiFovReader &reader,
   }
 }
 
+void mkdir(const fs::path &dirname) {
+  fs::create_directories(dirname);
+}
+
 int main(int argc, char **argv) {
   std::string usage = "Usage: " + std::string(argv[0]) + R"abacaba( data_dir
 Where data_dir names a directory with MultiFoV fishseye dataset.
@@ -111,6 +117,14 @@ It should contain "info" and "data" subdirectories.)abacaba";
   if (argc != 2) {
     std::cerr << "Wrong number of arguments!\n" << usage << std::endl;
     return 1;
+  }
+
+  if (FLAGS_write_files) {
+    mkdir(FLAGS_output_directory);
+    mkdir(FLAGS_debug_img_dir);
+    mkdir(FLAGS_track_img_dir);
+    if (FLAGS_draw_depth_pyramid)
+      mkdir(FLAGS_depth_pyramid_dir);
   }
 
   MultiFovReader reader(argv[1]);
@@ -213,24 +227,25 @@ It should contain "info" and "data" subdirectories.)abacaba";
 
     if (FLAGS_draw_interpolation && interpolationDrawer.didInitialize()) {
       cv::Mat3b interpolation = interpolationDrawer.draw();
-      cv::imwrite(fileInDir(FLAGS_output_directory, "interpolation.jpg"),
-                  interpolation);
+      fs::path out =
+          fs::path(FLAGS_output_directory) / fs::path("interpolation.jpg");
+      cv::imwrite(out.native(), interpolation);
     }
 
     if (FLAGS_write_files) {
       cv::Mat3b debugImage = debugImageDrawer.draw();
-      cv::imwrite(fileInDir(FLAGS_debug_img_dir,
-                            "frame#" + std::to_string(it) + ".jpg"),
-                  debugImage);
+      fs::path outDeb = fs::path(FLAGS_debug_img_dir) /
+                        fs::path("frame#" + std::to_string(it) + ".jpg");
+      cv::imwrite(outDeb.native(), debugImage);
       cv::Mat3b trackImage = trackingDebugImageDrawer.drawAllLevels();
-      cv::imwrite(fileInDir(FLAGS_track_img_dir,
-                            "frame#" + std::to_string(it) + ".jpg"),
-                  trackImage);
+      fs::path outTrack = fs::path(FLAGS_track_img_dir) /
+                          fs::path("frame#" + std::to_string(it) + ".jpg");
+      cv::imwrite(outTrack.native(), trackImage);
       if (FLAGS_draw_depth_pyramid && depthPyramidDrawer.pyrChanged()) {
         cv::Mat pyrImage = depthPyramidDrawer.getLastPyr();
-        cv::imwrite(fileInDir(FLAGS_depth_pyramid_dir,
-                              "frame#" + std::to_string(it) + ".jpg"),
-                    pyrImage);
+        fs::path outPyr = fs::path(FLAGS_depth_pyramid_dir) /
+                          fs::path("frame#" + std::to_string(it) + ".jpg");
+        cv::imwrite(outPyr.native(), pyrImage);
       }
     }
     if (FLAGS_show_debug_image)

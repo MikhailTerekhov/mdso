@@ -5,13 +5,13 @@ namespace fishdso {
 
 const int countSpace = 19;
 
-PlyHolder::PlyHolder(const std::string &fname)
+PlyHolder::PlyHolder(const fs::path &fname)
     : fname(fname)
     , pointCount(0) {
   std::ofstream fs(fname);
 
   if (!fs.good())
-    throw std::runtime_error("File \"" + fname + "\" could not be created.");
+    throw std::runtime_error("File \"" + fname.native() + "\" could not be created.");
 
   fs << R"__(ply
 format ascii 1.0

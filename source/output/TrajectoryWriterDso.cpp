@@ -2,9 +2,9 @@
 
 namespace fishdso {
 
-TrajectoryWriterDso::TrajectoryWriterDso(const std::string &outputDirectory,
-                                         const std::string &fileName)
-    : mOutputFileName(fileInDir(outputDirectory, fileName)) {}
+TrajectoryWriterDso::TrajectoryWriterDso(const fs::path &outputDirectory,
+                                         const fs::path &fileName)
+    : mOutputFileName(outputDirectory / fileName) {}
 
 void TrajectoryWriterDso::addToPool(const KeyFrame &keyFrame) {
   mFrameToWorldPool.push(
@@ -20,7 +20,7 @@ void TrajectoryWriterDso::addToPool(const PreKeyFrame &frame) {
 
 PosesPool &TrajectoryWriterDso::frameToWorldPool() { return mFrameToWorldPool; }
 
-const std::string &TrajectoryWriterDso::outputFileName() {
+const fs::path &TrajectoryWriterDso::outputFileName() {
   return mOutputFileName;
 }
 

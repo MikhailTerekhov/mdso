@@ -8,14 +8,14 @@ namespace fishdso {
 
 class CloudWriter : public DsoObserver {
 public:
-  CloudWriter(CameraBundle *cam, const std::string &outputDirectory,
-              const std::string &fileName);
+  CloudWriter(CameraBundle *cam, const fs::path &outputDirectory,
+              const fs::path &fileName);
   void keyFramesMarginalized(const KeyFrame *marginalized[], int size) override;
   void destructed(const KeyFrame *lastKeyFrames[], int size) override;
 
 private:
   CameraBundle *cam;
-  std::string outputDirectory;
+  fs::path outputDirectory;
   PlyHolder cloudHolder;
 };
 

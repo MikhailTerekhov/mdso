@@ -5,13 +5,13 @@ namespace fishdso {
 CloudWriterGT::CloudWriterGT(SE3 frameToWorldGT[], Timestamp timestamps[],
                              std::vector<Vec3> pointsInFrameGT[],
                              std::vector<cv::Vec3b> colors[], int size,
-                             const std::string &outputDirectory,
-                             const std::string &fileName)
+                             const fs::path &outputDirectory,
+                             const fs::path &fileName)
     : timestamps(timestamps, timestamps + size)
     , frameToWorldGT(frameToWorldGT, frameToWorldGT + size)
     , pointsInFrameGT(pointsInFrameGT, pointsInFrameGT + size)
     , colors(colors, colors + size)
-    , cloudHolder(fileInDir(outputDirectory, fileName)) {}
+    , cloudHolder(outputDirectory / fileName) {}
 
 int CloudWriterGT::findInd(Timestamp timestamp) {
   int ind = std::lower_bound(timestamps.begin(), timestamps.end(), timestamp) -

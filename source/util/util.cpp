@@ -290,11 +290,4 @@ cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
   return res;
 }
 
-std::string fileInDir(const std::string &directoryName,
-                      const std::string &fileName) {
-  return directoryName.size() > 1 && directoryName.back() == '/'
-             ? directoryName + fileName
-             : directoryName + "/" + fileName;
-}
-
 } // namespace fishdso

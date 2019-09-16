@@ -1,25 +1,21 @@
 #include "MultiFovReader.h"
 #include "util/types.h"
 
-MultiFovReader::MultiFovReader(const std::string &newMultiFovDir)
+MultiFovReader::MultiFovReader(const fs::path &newMultiFovDir)
     : datasetDir(newMultiFovDir) {
-  if (datasetDir.back() == '/')
-    datasetDir = datasetDir.substr(0, datasetDir.size() - 1);
-
   // Our CameraModel is partially compatible with the provided one (affine
   // transformation used in omni_cam is just scaling in our case, but no problem
   // raises since in this dataset no affine transformation is happening). We
   // also compute the inverse polynomial ourselves instead of using the provided
   // one.
-  char camFName[256];
-  sprintf(camFName, "%s/info/intrinsics.txt", datasetDir.c_str());
+  fs::path camFName = datasetDir / fs::path("info/intrinsics.txt");
   int width, height;
   double unmapPolyCoeffs[5];
   Vec2 center;
   std::ifstream camIfs(camFName);
   if (!camIfs.is_open())
     throw std::runtime_error("could not open camera intrinsics file \"" +
-                             std::string(camFName) + "\"");
+                             camFName.native() + "\"");
   camIfs >> width >> height;
   for (int i = 0; i < 5; ++i)
     camIfs >> unmapPolyCoeffs[i];
@@ -31,12 +27,11 @@ MultiFovReader::MultiFovReader(const std::string &newMultiFovDir)
   cam = std::unique_ptr<CameraModel>(
       new CameraModel(width, height, 1.0, center, ourCoeffs));
 
-  char posesFName[256];
-  sprintf(posesFName, "%s/info/groundtruth.txt", datasetDir.c_str());
+  fs::path posesFName = datasetDir / fs::path("info/groundtruth.txt");
   std::ifstream posesIfs(posesFName);
   if (!posesIfs.is_open())
     throw std::runtime_error("could not open ground truth poses file \"" +
-                             std::string(posesFName) + "\"");
+                             posesFName.native() + "\"");
   worldToFrameGT.push_back(SE3());
   while (!posesIfs.eof()) {
     int frameNum;
@@ -49,24 +44,25 @@ MultiFovReader::MultiFovReader(const std::string &newMultiFovDir)
 }
 
 cv::Mat MultiFovReader::getFrame(int globalFrameNum) const {
-  char frameFName[256];
-  sprintf(frameFName, "%s/data/img/img%04i_0.png", datasetDir.c_str(),
-          globalFrameNum);
-  cv::Mat result = cv::imread(frameFName);
+  char innerName[15];
+  snprintf(innerName, 15, "img%04i_0.png", globalFrameNum);
+  fs::path frameFName = datasetDir / fs::path("data/img") / fs::path(innerName);
+  cv::Mat result = cv::imread(frameFName.native());
   if (result.data == NULL)
     throw std::runtime_error("couldn't read frame from \"" +
-                             std::string(frameFName) + "\"");
+                             frameFName.native() + "\"");
   return result;
 }
 
 cv::Mat1d MultiFovReader::getDepths(int globalFrameNum) const {
-  char depthsFName[256];
-  sprintf(depthsFName, "%s/data/depth/img%04i_0.depth", datasetDir.c_str(),
-          globalFrameNum);
+  char innerName[18];
+  snprintf(innerName, 18, "img%04i_0.depth", globalFrameNum);
+  fs::path depthsFName =
+      datasetDir / fs::path("data/depth") / fs::path(innerName);
   std::ifstream depthsIfs(depthsFName);
   if (!depthsIfs.is_open())
     throw std::runtime_error("could not open depths file \"" +
-                             std::string(depthsFName) + "\"");
+                             depthsFName.native() + "\"");
   cv::Mat1d depths(cam->getHeight(), cam->getWidth());
   for (int y = 0; y < depths.rows; ++y)
     for (int x = 0; x < depths.cols; ++x)

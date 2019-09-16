@@ -170,6 +170,7 @@ target_include_directories(dso
 
 target_link_libraries(dso 
   PUBLIC
+    stdc++fs
     ${OpenCV_LIBS}
     ${GLOG_LIBRARIES}
   PRIVATE

@@ -5,6 +5,7 @@
 #include <Eigen/Core>
 #include <Eigen/StdVector>
 #include <boost/container/static_vector.hpp>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <queue>
@@ -46,6 +47,8 @@ typedef Sophus::SE3d SE3;
 typedef Sophus::SO3d SO3;
 
 typedef AffineLightTransform<double> AffLight;
+
+namespace fs = std::filesystem;
 
 using boost::container::static_vector;
 

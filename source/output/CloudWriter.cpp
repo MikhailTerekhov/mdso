@@ -2,10 +2,11 @@
 
 namespace fishdso {
 
-CloudWriter::CloudWriter(CameraBundle *cam, const std::string &outputDirectory,
-                         const std::string &fileName)
+CloudWriter::CloudWriter(CameraBundle *cam, const fs::path &outputDirectory,
+                         const fs::path &fileName)
     : cam(cam)
-    , cloudHolder(fileInDir(outputDirectory, fileName)) {}
+    , outputDirectory(outputDirectory)
+    , cloudHolder(outputDirectory / fileName) {}
 
 void CloudWriter::keyFramesMarginalized(const KeyFrame *marginalized[],
                                         int size) {
@@ -36,9 +37,9 @@ void CloudWriter::keyFramesMarginalized(const KeyFrame *marginalized[],
       }
     }
 
-    int kfnum = kf->preKeyFrame->globalFrameNum;
-    std::ofstream kfOut(outputDirectory + "/kf" + std::to_string(kfnum) +
-                        ".ply");
+    Timestamp kfnum = kf->preKeyFrame->frames[0].timestamp;
+    std::ofstream kfOut(outputDirectory /
+                        fs::path("kf" + std::to_string(kfnum) + ".ply"));
     printInPly(kfOut, points, colors);
     kfOut.close();
     cloudHolder.putPoints(points, colors);

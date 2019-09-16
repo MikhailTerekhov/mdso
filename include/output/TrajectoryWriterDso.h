@@ -7,16 +7,16 @@ namespace fishdso {
 
 class TrajectoryWriterDso : public TrajectoryWriter {
 public:
-  TrajectoryWriterDso(const std::string &outputDirectory,
-                      const std::string &fileName);
+  TrajectoryWriterDso(const fs::path &outputDirectory,
+                      const fs::path &fileName);
 
   void addToPool(const KeyFrame &keyFrame) override;
   void addToPool(const PreKeyFrame &frame) override;
   PosesPool &frameToWorldPool() override;
-  const std::string &outputFileName() override;
+  const fs::path &outputFileName() override;
 
 private:
-  std::string mOutputFileName;
+  fs::path mOutputFileName;
   PosesPool mFrameToWorldPool;
 };
 

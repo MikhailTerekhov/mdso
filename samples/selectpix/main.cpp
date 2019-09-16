@@ -7,15 +7,12 @@
 
 using namespace fishdso;
 
-std::string ext[] = {".jpg", ".png"};
+constexpr int extSize = 2;
+std::string ext[extSize] = {".jpg", ".png"};
 
-bool isImage(const std::string &fname) {
-  for (const auto &e : ext)
-    if (fname.size() >= e.size() &&
-        fname.substr(fname.size() - e.size(), e.size()) == e)
-      return true;
-
-  return false;
+bool isImage(const fs::path &fname) {
+  std::string extension = fname.extension();
+  return std::find(ext, ext + extSize, extension) != ext + extSize; 
 }
 
 int main(int argc, const char **argv) {
@@ -31,20 +28,14 @@ Where dir names a directory with images with .jpg extension
 
   PixelSelector pixelSelector;
 
-  std::string dirname(argv[1]);
-  if (!dirname.empty() && dirname.back() != '/')
-    dirname.push_back('/');
-  DIR *dir = opendir(argv[1]);
-  dirent *curfile;
-  std::vector<std::string> fnames;
-
-  while ((curfile = readdir(dir)) != NULL)
-    fnames.push_back(std::string(curfile->d_name));
+  fs::path dirname(argv[1]);
+  std::vector<fs::path> fnames;
+  for (const fs::path &p : fs::directory_iterator(dirname))
+    fnames.push_back(p);
 
   std::sort(fnames.begin(), fnames.end());
 
-  for (const auto &nm : fnames) {
-    std::string fname = dirname + nm;
+  for (const fs::path &fname : fnames) {
     if (isImage(fname)) {
       cv::Mat imCol = cv::imread(fname.c_str());
       cv::Mat im = cvtBgrToGray(imCol);

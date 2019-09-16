@@ -10,14 +10,14 @@ namespace fishdso {
 
 class PlyHolder {
 public:
-  PlyHolder(const std::string &fname);
+  PlyHolder(const fs::path &fname);
 
   void putPoints(const std::vector<Vec3> &points,
                  const std::vector<cv::Vec3b> &colors);
   void updatePointCount();
 
 private:
-  std::string fname;
+  fs::path fname;
   int pointCount;
 };
 
