@@ -46,6 +46,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/output/TrajectoryWriter.h
     ${PROJECT_SOURCE_DIR}/include/output/TrajectoryWriterDso.h
     ${PROJECT_SOURCE_DIR}/include/output/TrajectoryWriterGT.h
+    ${PROJECT_SOURCE_DIR}/include/output/TrajectoryWriterPredict.h
     ${PROJECT_SOURCE_DIR}/include/output/CloudWriter.h
     ${PROJECT_SOURCE_DIR}/include/output/CloudWriterGT.h
     ${PROJECT_SOURCE_DIR}/include/output/DelaunayInitializerObserver.h
@@ -97,6 +98,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/output/TrajectoryWriter.cpp
     ${PROJECT_SOURCE_DIR}/source/output/TrajectoryWriterDso.cpp
     ${PROJECT_SOURCE_DIR}/source/output/TrajectoryWriterGT.cpp
+    ${PROJECT_SOURCE_DIR}/source/output/TrajectoryWriterPredict.cpp
     ${PROJECT_SOURCE_DIR}/source/output/CloudWriter.cpp
     ${PROJECT_SOURCE_DIR}/source/output/CloudWriterGT.cpp
     ${PROJECT_SOURCE_DIR}/source/output/DelaunayInitializerObserver.cpp

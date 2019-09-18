@@ -55,6 +55,7 @@ struct PreKeyFrame {
   KeyFrame *baseFrame;
   CameraBundle *cam;
   SE3 baseToThis;
+  SE3 baseToThisPredicted;
   int globalFrameNum;
 
   Settings::Pyramid pyrSettings;

@@ -7,6 +7,7 @@
 #include "output/TrackingDebugImageDrawer.h"
 #include "output/TrajectoryWriterDso.h"
 #include "output/TrajectoryWriterGT.h"
+#include "output/TrajectoryWriterPredict.h"
 #include "system/DoGPreprocessor.h"
 #include "system/DsoSystem.h"
 #include "system/IdentityPreprocessor.h"
@@ -46,6 +47,12 @@ DEFINE_string(resulting_cloud_filename, "points.ply", "Output cloud filename.");
 DEFINE_string(gt_cloud_filename, "points.ply", "Ground truth cloud filename.");
 DEFINE_bool(gen_gt_trajectory, true,
             "Do we need to generate ground truth trajectories?");
+
+DEFINE_string(pred_trajectory_filename, "predicted.txt",
+              "Predicted trajectory filename (stored in 3x4 matrix form)");
+DEFINE_bool(gen_pred_trajectory, true,
+            "Do we need to generate predicted trajectory?");
+
 DEFINE_string(
     track_img_dir, "output/default/track",
     "Directory for tracking residuals on all pyr levels to be put into.");
@@ -101,9 +108,7 @@ void readPointsInFrameGT(const MultiFovReader &reader,
   }
 }
 
-void mkdir(const fs::path &dirname) {
-  fs::create_directories(dirname);
-}
+void mkdir(const fs::path &dirname) { fs::create_directories(dirname); }
 
 int main(int argc, char **argv) {
   std::string usage = "Usage: " + std::string(argv[0]) + R"abacaba( data_dir
@@ -159,6 +164,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
       camPyr.data(), settings.frameTracker, settings.pyramid);
   TrajectoryWriterDso trajectoryWriter(FLAGS_output_directory,
                                        FLAGS_trajectory_filename);
+
   StdVector<SE3> frameToWorldGT(reader.getFrameCount());
   std::vector<Timestamp> timestamps(reader.getFrameCount());
   for (int i = 0; i < timestamps.size(); ++i) {
@@ -168,6 +174,9 @@ It should contain "info" and "data" subdirectories.)abacaba";
   TrajectoryWriterGT trajectoryWriterGT(
       frameToWorldGT.data(), timestamps.data(), timestamps.size(),
       FLAGS_output_directory, FLAGS_gt_trajectory_filename);
+
+  TrajectoryWriterPredict trajectoryWriterPredict(
+      FLAGS_output_directory, FLAGS_pred_trajectory_filename);
 
   std::unique_ptr<CloudWriter> cloudWriter;
   if (FLAGS_gen_cloud)
@@ -195,6 +204,8 @@ It should contain "info" and "data" subdirectories.)abacaba";
   observers.dso.push_back(&trajectoryWriter);
   if (FLAGS_gen_gt_trajectory)
     observers.dso.push_back(&trajectoryWriterGT);
+  if (FLAGS_gen_pred_trajectory)
+    observers.dso.push_back(&trajectoryWriterPredict);
   if (FLAGS_gen_cloud)
     observers.dso.push_back(cloudWriter.get());
   if (FLAGS_write_files && FLAGS_draw_depth_pyramid)

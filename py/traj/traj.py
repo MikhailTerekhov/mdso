@@ -12,6 +12,9 @@ class se3:
     def __mul__(self, other):
         return se3(np.matmul(self.R, other.R), np.matmul(self.R, other.t) + self.t)
 
+    def __str__(self):
+        return str(np.hstack((self.R, self.t.reshape((3, 1)))))
+
 arr_len = 0.05
 
 def to_motion(s):
@@ -31,10 +34,11 @@ def align_to_zero(traj):
 def align(traj, gt):
     t01 = traj[1].inverse() * traj[0]
     g01 = gt[1].inverse() * gt[0]
-    tg = gt[0].inverse() * traj[0]
-    res = [tg * m for m in traj]
     scale_fix = norm(g01.t) / norm(t01.t)
-    res = [se3(m.R, scale_fix * m.t) for m in res]
+    res = [se3(m.R, scale_fix * m.t) for m in traj]
+    tg = gt[0] * traj[0].inverse()
+    res = [tg * m for m in res]
+    print(f'sf={scale_fix}\ntg=\n{tg}')
     return res
 
 

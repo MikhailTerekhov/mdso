@@ -502,10 +502,12 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], Timestamp timestamps[]) {
 
   allFrames.push_back(preKeyFrame.get());
 
+  FrameTracker::TrackingResult predicted = predictTracking();
+
+  preKeyFrame->baseToThisPredicted = predicted.baseToTracked;
+
   for (DsoObserver *obs : observers.dso)
     obs->newFrame(*preKeyFrame);
-
-  FrameTracker::TrackingResult predicted = predictTracking();
 
   FrameTracker::TrackingResult tracked =
       frameTracker->trackFrame(*preKeyFrame, predicted);

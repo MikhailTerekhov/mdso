@@ -78,6 +78,8 @@ ax.view_init(azim=-90, elev=0)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--gt", help="file with ground truth trajectory")
+parser.add_argument("-a", "--align", help="Align GT trajectory?",
+                    action="store_true")
 parser.add_argument("--video_dir", help="directory to put video with sliding "
                     "window of trajectories into")
 parser.add_argument("-r", "--russian", help="use russian legend",
@@ -104,7 +106,8 @@ if args.gt:
     firstgt = 0 if args.first is None else args.first
     lastgt  = len(ground_truth) if args.last is None else args.last;
     ground_truth = ground_truth[firstgt:lastgt]
-    ground_truth = align_to_zero(ground_truth)
+    if args.align:
+        ground_truth = align_to_zero(ground_truth)
     draw_proc(ax, ground_truth, 'green', label_prec)
     has_gt = True
 else:
@@ -125,7 +128,8 @@ for fname in args.traj:
     last = len(traj) if args.last is None else args.last;
 
     traj = traj[first:last]
-    if has_gt:
+    if has_gt and args.align:
+        print(f'align, len={len(traj)} {len(ground_truth)}')
         traj = align(traj, ground_truth)
     artists.append(draw_proc(ax, traj, mpl.colors.to_rgba('orange', alpha=alpha),
                             label_ours))
