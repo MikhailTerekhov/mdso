@@ -75,6 +75,11 @@ CameraModel::CameraModel(int width, int height, double f, double cx, double cy,
   LOG(INFO) << "\nmap poly coeffs = " << mapPolyCoeffs.transpose() << "\n\n";
 }
 
+bool CameraModel::isMappable(const Vec3 &point) const {
+  double angle = atan2(point.head<2>().norm(), point[2]);
+  return angle < maxAngle;
+}
+
 std::pair<Vec2, Mat23> CameraModel::diffMap(const Vec3 &ray) const {
   ceres::Jet<double, 3> rayJet[3];
   for (int i = 0; i < 3; ++i) {

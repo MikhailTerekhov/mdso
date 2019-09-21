@@ -65,6 +65,7 @@ public:
     VecXt p = mapPolyCoeffs.cast<T>();
 
     T angle = atan2(pt.template head<2>().norm(), pt[2]);
+
     T r = p[0];
     T angleN = angle;
     for (int i = 1; i < p.rows(); ++i) {
@@ -81,6 +82,8 @@ public:
   inline Vec3 unmap(const Vec2 &point) const { return unmap(point.data()); }
 
   inline Vec2 map(const Vec3 &ray) const { return map(ray.data()); }
+
+  bool isMappable(const Vec3 &point) const;
 
   template <typename T>
   cv::Mat undistort(const cv::Mat &img, const Mat33 &cameraMatrix) const {

@@ -290,4 +290,16 @@ cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
   return res;
 }
 
+std::vector<double> readBin(const fs::path &filename) {
+  CHECK(fs::is_regular_file(filename));
+  std::ifstream ifs(filename, std::ios::binary);
+  ifs.seekg(0, std::ios::end);
+  int size = ifs.tellg();
+  ifs.seekg(0, std::ios::beg);
+  std::vector<double> result(size / sizeof(double));
+  ifs.read(reinterpret_cast<char *>(result.data()),
+           result.size() * sizeof(double));
+  return result;
+}
+
 } // namespace fishdso

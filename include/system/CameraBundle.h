@@ -13,8 +13,6 @@ struct CameraBundle {
 
     CameraEntry(const SE3 &_bodyToThis, const CameraModel &cam);
 
-    inline SE3 conj(const SE3 &e) { return bodyToThis * e * thisToBody; }
-
     const SE3 bodyToThis;
     const SE3 thisToBody;
     CameraModel cam;
