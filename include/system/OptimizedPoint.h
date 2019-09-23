@@ -8,7 +8,7 @@
 #include <cmath>
 #include <opencv2/core.hpp>
 
-namespace fishdso {
+namespace mdso {
 
 struct OptimizedPoint {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -39,6 +39,6 @@ struct OptimizedPoint {
   State state;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

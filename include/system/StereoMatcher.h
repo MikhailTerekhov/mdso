@@ -10,7 +10,7 @@
 
 DECLARE_bool(draw_inlier_matches);
 
-namespace fishdso {
+namespace mdso {
 
 class StereoMatcher {
 public:
@@ -40,6 +40,6 @@ private:
   Settings::Threading threadingSettings;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

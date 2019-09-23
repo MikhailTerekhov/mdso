@@ -7,7 +7,7 @@ DECLARE_double(tracking_rel_point_size);
 DECLARE_int32(tracking_res_image_width);
 DECLARE_double(debug_max_residual);
 
-namespace fishdso {
+namespace mdso {
 
 class TrackingDebugImageDrawer : public FrameTrackerObserver {
 public:
@@ -32,6 +32,6 @@ private:
   std::vector<cv::Mat3b> residualsImg;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

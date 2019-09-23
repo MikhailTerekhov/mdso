@@ -18,7 +18,7 @@
 #include <opencv2/core.hpp>
 #include <variant>
 
-namespace fishdso {
+namespace mdso {
 
 class DsoSystem {
 public:
@@ -90,6 +90,6 @@ private:
   Preprocessor *preprocessor;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

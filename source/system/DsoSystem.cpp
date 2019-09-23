@@ -13,7 +13,7 @@
 
 #define PH (settings.residualPattern.height)
 
-namespace fishdso {
+namespace mdso {
 
 DsoSystem::DsoSystem(CameraBundle *cam, Preprocessor *preprocessor,
                      const Observers &observers, const Settings &_settings)
@@ -654,4 +654,4 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], Timestamp timestamps[]) {
   }
 }
 
-} // namespace fishdso
+} // namespace mdso

@@ -5,7 +5,7 @@
 #include <ceres/cubic_interpolation.h>
 #include <opencv2/opencv.hpp>
 
-namespace fishdso {
+namespace mdso {
 
 PreKeyFrame::FrameEntry::FrameEntry(PreKeyFrame *host, int ind,
                                     const cv::Mat &_frameColored,
@@ -51,4 +51,4 @@ PreKeyFrame::PreKeyFrame(KeyFrame *baseFrame, CameraBundle *cam,
 
 PreKeyFrame::~PreKeyFrame() {}
 
-}; // namespace fishdso
+}; // namespace mdso

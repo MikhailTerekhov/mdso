@@ -3,7 +3,7 @@
 
 #include <opencv2/opencv.hpp>
 
-namespace fishdso {
+namespace mdso {
 
 class Preprocessor {
 public:
@@ -11,6 +11,6 @@ public:
                        int size) = 0;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

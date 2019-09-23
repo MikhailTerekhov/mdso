@@ -5,7 +5,7 @@
 #include <dirent.h>
 #include <glog/logging.h>
 
-using namespace fishdso;
+using namespace mdso;
 
 constexpr int extSize = 2;
 std::string ext[extSize] = {".jpg", ".png"};

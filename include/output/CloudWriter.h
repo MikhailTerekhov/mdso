@@ -4,7 +4,7 @@
 #include "output/DsoObserver.h"
 #include "util/PlyHolder.h"
 
-namespace fishdso {
+namespace mdso {
 
 class CloudWriter : public DsoObserver {
 public:
@@ -19,6 +19,6 @@ private:
   PlyHolder cloudHolder;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

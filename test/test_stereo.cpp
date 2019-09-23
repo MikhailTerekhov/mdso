@@ -5,7 +5,7 @@
 #include <random>
 #include <sophus/se3.hpp>
 
-using namespace fishdso;
+using namespace mdso;
 
 class StereoPositioningTest : public ::testing::Test {
 protected:

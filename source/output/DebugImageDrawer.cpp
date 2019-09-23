@@ -7,7 +7,7 @@ DEFINE_int32(debug_image_width, 1200,
 DEFINE_double(debug_max_stddev, 6.0,
               "Max predicted stddev when displaying debug image with stddevs.");
 
-namespace fishdso {
+namespace mdso {
 
 DebugImageDrawer::DebugImageDrawer()
     : baseFrame(nullptr)
@@ -191,4 +191,4 @@ cv::Mat3b DebugImageDrawer::draw() {
   return result;
 }
 
-} // namespace fishdso
+} // namespace mdso

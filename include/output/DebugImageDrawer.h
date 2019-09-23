@@ -9,7 +9,7 @@ DECLARE_double(debug_rel_point_size);
 DECLARE_int32(debug_image_width);
 DECLARE_double(debug_max_stddev);
 
-namespace fishdso {
+namespace mdso {
 
 class DebugImageDrawer : public DsoObserver {
 public:
@@ -44,6 +44,6 @@ private:
   std::unique_ptr<TrackingDebugImageDrawer> residualsDrawer;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

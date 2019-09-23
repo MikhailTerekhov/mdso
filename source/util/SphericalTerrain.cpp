@@ -1,7 +1,7 @@
 #include "util/SphericalTerrain.h"
 #include "util/defs.h"
 
-namespace fishdso {
+namespace mdso {
 
 SphericalTerrain::SphericalTerrain(
     const std::vector<Vec3> &depthedRays,
@@ -63,4 +63,4 @@ void SphericalTerrain::drawDenseTriangle(
     }
 }
 
-} // namespace fishdso
+} // namespace mdso

@@ -4,7 +4,7 @@
 #include <glog/logging.h>
 #include <random>
 
-namespace fishdso {
+namespace mdso {
 
 #define LI (Settings::PixelSelector::gradThesholdCount)
 
@@ -100,4 +100,4 @@ PixelSelector::selectInternal(const cv::Mat &frame, const cv::Mat1d &gradNorm,
   return pointsAll;
 }
 
-} // namespace fishdso
+} // namespace mdso

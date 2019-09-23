@@ -12,7 +12,7 @@
 #define PS (settings.residualPattern.pattern().size())
 #define PH (settings.residualPattern.height)
 
-namespace fishdso {
+namespace mdso {
 
 BundleAdjuster::BundleAdjuster(CameraBundle *cam, KeyFrame *keyFrames[],
                                int size,
@@ -233,4 +233,4 @@ void BundleAdjuster::adjust(int maxNumIterations) {
 
   LOG(INFO) << summary.FullReport() << std::endl;
 }
-} // namespace fishdso
+} // namespace mdso

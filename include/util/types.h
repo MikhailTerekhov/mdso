@@ -15,7 +15,7 @@
 #include <utility>
 #include <vector>
 
-namespace fishdso {
+namespace mdso {
 
 typedef Eigen::Matrix<double, 2, 1> Vec2;
 typedef Eigen::Matrix<double, 3, 1> Vec3;
@@ -98,6 +98,6 @@ using PosesPool = std::priority_queue<std::pair<Timestamp, SE3>,
                                       std::vector<std::pair<Timestamp, SE3>>,
                                       TimestampPoseComp>;
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

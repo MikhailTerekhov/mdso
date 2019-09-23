@@ -1,7 +1,7 @@
 #include "util/PlyHolder.h"
 #include <glog/logging.h>
 
-namespace fishdso {
+namespace mdso {
 
 const int countSpace = 19;
 
@@ -60,4 +60,4 @@ void PlyHolder::updatePointCount() {
   fs.close();
 }
 
-} // namespace fishdso
+} // namespace mdso

@@ -6,7 +6,7 @@
 #include <gtest/gtest.h>
 #include <tuple>
 
-using namespace fishdso;
+using namespace mdso;
 
 TEST(GeometryTest, IntersectOnSphereTest) {
   std::vector<std::tuple<double, Vec3, Vec3>> tests{

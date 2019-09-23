@@ -4,7 +4,7 @@
 #include "system/FrameTracker.h"
 #include <ceres/ceres.h>
 
-namespace fishdso {
+namespace mdso {
 
 class FrameTrackerObserver {
 public:
@@ -18,6 +18,6 @@ public:
                             int size) {}
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

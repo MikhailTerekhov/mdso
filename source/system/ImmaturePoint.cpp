@@ -7,7 +7,7 @@
 #include <ceres/internal/autodiff.h>
 #include <ceres/jet.h>
 
-namespace fishdso {
+namespace mdso {
 
 #define PL (settings.pyramid.levelNum())
 #define PS (settings.residualPattern.pattern().size())
@@ -467,4 +467,4 @@ void ImmaturePoint::drawTracing(cv::Mat &frame,
   }
 }
 
-} // namespace fishdso
+} // namespace mdso

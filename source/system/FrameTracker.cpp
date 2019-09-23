@@ -8,7 +8,7 @@
 #include <chrono>
 #include <cmath>
 
-namespace fishdso {
+namespace mdso {
 
 struct PointTrackingResidual {
   PointTrackingResidual(
@@ -212,4 +212,4 @@ FrameTracker::trackPyrLevel(const PreKeyFrame &frame,
   return result;
 }
 
-} // namespace fishdso
+} // namespace mdso

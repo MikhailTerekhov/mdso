@@ -5,7 +5,7 @@ DEFINE_double(pyr_rel_point_size, 0.004,
               "Relative to w+h point size on the debug image pyramid.");
 DEFINE_int32(pyr_image_width, 1200, "Width of the debug image pyramid.");
 
-namespace fishdso {
+namespace mdso {
 
 cv::Mat draw(const DepthedImagePyramid &pyr) {
   std::vector<cv::Mat3b> images(pyr.images.size());
@@ -36,4 +36,4 @@ cv::Mat DepthPyramidDrawer::getLastPyr() {
   return lastPyr;
 }
 
-} // namespace fishdso
+} // namespace mdso

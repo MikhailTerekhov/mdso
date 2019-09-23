@@ -3,7 +3,7 @@
 
 #include "output/DsoObserver.h"
 
-namespace fishdso {
+namespace mdso {
 
 class TrajectoryWriter : public DsoObserver {
 public:
@@ -22,6 +22,6 @@ private:
   std::vector<Timestamp> curKfTs;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

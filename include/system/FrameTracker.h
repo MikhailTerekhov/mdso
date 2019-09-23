@@ -6,7 +6,7 @@
 #include "system/KeyFrame.h"
 #include "util/DepthedImagePyramid.h"
 
-namespace fishdso {
+namespace mdso {
 
 class FrameTrackerObserver;
 
@@ -41,6 +41,6 @@ private:
   FrameTrackerSettings settings;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

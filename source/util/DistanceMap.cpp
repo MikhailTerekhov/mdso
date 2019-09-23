@@ -4,7 +4,7 @@
 #include <glog/logging.h>
 #include <queue>
 
-namespace fishdso {
+namespace mdso {
 
 // lowest power of 2 greater than x
 unsigned clp2(unsigned x) {
@@ -112,4 +112,4 @@ int DistanceMap::choose(StdVector<Vec2> otherPoints[], int pointsNeeded,
   return result;
 }
 
-} // namespace fishdso
+} // namespace mdso

@@ -42,7 +42,7 @@ DECLARE_bool(disable_marginalization);
 
 DECLARE_bool(deterministic);
 
-namespace fishdso {
+namespace mdso {
 
 Settings getFlaggedSettings();
 }

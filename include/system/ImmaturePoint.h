@@ -7,7 +7,7 @@
 #include "util/settings.h"
 #include "util/types.h"
 
-namespace fishdso {
+namespace mdso {
 
 struct KeyFrameEntry;
 struct KeyFrame;
@@ -88,6 +88,6 @@ private:
                const PointTracerSettings &settings);
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

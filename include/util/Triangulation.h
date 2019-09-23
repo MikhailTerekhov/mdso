@@ -7,7 +7,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace fishdso {
+namespace mdso {
 
 class Triangulation {
 public:
@@ -114,6 +114,6 @@ private:
 void drawCurvedInternal(CameraModel *cam, Vec2 ptFrom, Vec2 ptTo, cv::Mat &img,
                         cv::Scalar edgeCol);
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

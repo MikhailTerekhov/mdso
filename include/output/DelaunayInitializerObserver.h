@@ -5,7 +5,7 @@
 #include "util/SphericalTerrain.h"
 #include <vector>
 
-namespace fishdso {
+namespace mdso {
 
 struct InitializedFrame;
 
@@ -18,6 +18,6 @@ public:
                            double *keyPointDepths[], int sizes[]) {}
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

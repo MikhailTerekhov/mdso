@@ -1,6 +1,6 @@
 #include "output/TrajectoryWriterPredict.h"
 
-namespace fishdso {
+namespace mdso {
 
 TrajectoryWriterPredict::TrajectoryWriterPredict(
     const fs::path &outputDirectory, const fs::path &fileName)
@@ -37,4 +37,4 @@ const fs::path &TrajectoryWriterPredict::outputFileName() {
   return mOutputFileName;
 }
 
-} // namespace fishdso
+} // namespace mdso

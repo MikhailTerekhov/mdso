@@ -1,6 +1,6 @@
 #include "util/types.h"
 
-namespace fishdso {
+namespace mdso {
 
 double angle(const Vec3 &a, const Vec3 &b);
 Mat33 toEssential(const SE3 &motion);
@@ -28,4 +28,4 @@ bool isInSector(const Vec3 &ray, Vec3 *s[3]);
 // with angle sectorAngle
 bool intersectOnSphere(double sectorAngle, Vec3 &dir1, Vec3 &dir2);
 
-} // namespace fishdso
+} // namespace mdso

@@ -1,6 +1,6 @@
 #include "system/IdentityPreprocessor.h"
 
-namespace fishdso {
+namespace mdso {
 
 void IdentityPreprocessor::process(cv::Mat1b multiFrame[], cv::Mat1b output[], int size) {
   for (int i = 0; i < size; ++i)

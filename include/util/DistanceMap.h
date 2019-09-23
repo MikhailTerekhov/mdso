@@ -5,7 +5,7 @@
 #include "util/settings.h"
 #include "util/types.h"
 
-namespace fishdso {
+namespace mdso {
 
 class DistanceMap {
 public:
@@ -29,6 +29,6 @@ private:
   Settings::DistanceMap settings;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

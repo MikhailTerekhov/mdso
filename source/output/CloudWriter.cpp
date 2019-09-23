@@ -1,6 +1,6 @@
 #include "output/CloudWriter.h"
 
-namespace fishdso {
+namespace mdso {
 
 CloudWriter::CloudWriter(CameraBundle *cam, const fs::path &outputDirectory,
                          const fs::path &fileName)
@@ -52,4 +52,4 @@ void CloudWriter::destructed(const KeyFrame *lastKeyFrames[], int size) {
   keyFramesMarginalized(lastKeyFrames, size);
 }
 
-} // namespace fishdso
+} // namespace mdso

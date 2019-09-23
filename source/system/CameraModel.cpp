@@ -11,7 +11,7 @@
 #include <random>
 #include <vector>
 
-namespace fishdso {
+namespace mdso {
 
 CameraModel::CameraModel(int width, int height, double scale,
                          const Vec2 &center, VecX unmapPolyCoeffs,
@@ -250,4 +250,4 @@ void CameraModel::recalcBoundaries() {
   maxAngle = std::atan2(maxRadius, minZUnnorm);
 }
 
-} // namespace fishdso
+} // namespace mdso

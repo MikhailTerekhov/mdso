@@ -13,7 +13,7 @@
 #include <opencv2/core.hpp>
 #include <vector>
 
-namespace fishdso {
+namespace mdso {
 
 struct KeyFrame;
 
@@ -59,6 +59,6 @@ private:
   void addImmatures(const cv::Point points[], int size, int numInBundle);
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

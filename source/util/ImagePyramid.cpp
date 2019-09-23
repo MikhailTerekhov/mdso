@@ -1,7 +1,7 @@
 #include "util/ImagePyramid.h"
 #include "util/util.h"
 
-namespace fishdso {
+namespace mdso {
 
 ImagePyramid::ImagePyramid(const cv::Mat1b &baseImage, int levelNum)
     : images(levelNum) {
@@ -10,4 +10,4 @@ ImagePyramid::ImagePyramid(const cv::Mat1b &baseImage, int levelNum)
     images[lvl] = boxFilterPyrDown<unsigned char>(images[lvl - 1]);
 }
 
-} // namespace fishdso
+} // namespace mdso

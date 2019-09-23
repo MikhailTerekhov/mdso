@@ -8,7 +8,7 @@
 #include <glog/logging.h>
 #include <random>
 
-namespace fishdso {
+namespace mdso {
 
 const int inlierVectorsUsed = 5;
 const int motionInliers = 0;
@@ -361,4 +361,4 @@ SE3 StereoGeometryEstimator::findPreciseMotion() {
   return motion;
 }
 
-} // namespace fishdso
+} // namespace mdso

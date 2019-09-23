@@ -1,6 +1,6 @@
 #include "output/CloudWriterGT.h"
 
-namespace fishdso {
+namespace mdso {
 
 CloudWriterGT::CloudWriterGT(SE3 frameToWorldGT[], Timestamp timestamps[],
                              std::vector<Vec3> pointsInFrameGT[],
@@ -71,4 +71,4 @@ void CloudWriterGT::destructed(const KeyFrame *lastKeyFrames[], int size) {
   keyFramesMarginalized(lastKeyFrames, size);
 }
 
-} // namespace fishdso
+} // namespace mdso

@@ -6,7 +6,7 @@
 #include "util/settings.h"
 #include "util/types.h"
 
-namespace fishdso {
+namespace mdso {
 
 struct MarginalizedKeyFrame;
 
@@ -31,6 +31,6 @@ struct MarginalizedPreKeyFrame {
   Timestamp timestamp;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

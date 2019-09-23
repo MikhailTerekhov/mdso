@@ -3,7 +3,7 @@
 
 #include "system/Preprocessor.h"
 
-namespace fishdso {
+namespace mdso {
 
 class DoGPreprocessor : public Preprocessor {
 public:
@@ -16,6 +16,6 @@ private:
   double multiplier;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

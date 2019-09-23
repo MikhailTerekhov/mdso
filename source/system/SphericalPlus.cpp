@@ -1,6 +1,6 @@
 #include "system/SphericalPlus.h"
 
-namespace fishdso {
+namespace mdso {
 
 // clang-format off
 Mat33 SphericalPlus::degenerateR =
@@ -9,4 +9,4 @@ Mat33 SphericalPlus::degenerateR =
                 0.0,  0.0, -1.0).finished();
 // clang-format on
 
-} // namespace fishdso
+} // namespace mdso

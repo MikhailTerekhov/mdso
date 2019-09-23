@@ -10,7 +10,7 @@
 #include <opencv2/core.hpp>
 #include <sophus/se3.hpp>
 
-namespace fishdso {
+namespace mdso {
 
 struct KeyFrame;
 class PreKeyFrameInternals;
@@ -63,6 +63,6 @@ struct PreKeyFrame {
   std::unique_ptr<PreKeyFrameInternals> internals;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

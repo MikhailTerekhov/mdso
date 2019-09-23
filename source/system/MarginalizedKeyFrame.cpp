@@ -1,6 +1,6 @@
 #include "system/MarginalizedKeyFrame.h"
 
-namespace fishdso {
+namespace mdso {
 
 MarginalizedKeyFrame::FrameEntry::Point::Point(const ImmaturePoint &ip)
     : point(ip.depth * ip.baseDirections[0])
@@ -31,4 +31,4 @@ MarginalizedKeyFrame::MarginalizedKeyFrame(const KeyFrame &keyFrame)
     trackedFrames.emplace_back(new MarginalizedPreKeyFrame(this, *pkf));
 }
 
-} // namespace fishdso
+} // namespace mdso

@@ -1,7 +1,7 @@
 #include "util/Sim3Aligner.h"
 #include <glog/logging.h>
 
-namespace fishdso {
+namespace mdso {
 
 Sim3Aligner::Sim3Aligner(const SE3 &worldToFirst, const SE3 &worldToSecond,
                          const SE3 &worldToFirstGT,
@@ -31,4 +31,4 @@ Vec3 Sim3Aligner::alignScale(const Vec3 &pointInFrameGT) const {
   return scaleGTToDso * pointInFrameGT;
 }
 
-} // namespace fishdso
+} // namespace mdso

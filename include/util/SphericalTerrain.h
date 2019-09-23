@@ -5,7 +5,7 @@
 #include "util/SphericalTriangulation.h"
 #include <opencv2/opencv.hpp>
 
-namespace fishdso {
+namespace mdso {
 
 class SphericalTerrain {
 public:
@@ -33,6 +33,6 @@ private:
   Settings::Triangulation settings;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

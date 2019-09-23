@@ -7,7 +7,7 @@
 #include <gtest/gtest.h>
 #include <opencv2/opencv.hpp>
 
-using namespace fishdso;
+using namespace mdso;
 
 bool cmp(const cv::Point &a, const cv::Point &b) {
   return a.x == b.x ? a.y < b.y : a.x < b.x;

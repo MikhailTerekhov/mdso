@@ -6,7 +6,7 @@
 #include "system/PreKeyFrame.h"
 #include <opencv2/opencv.hpp>
 
-namespace fishdso {
+namespace mdso {
 
 class DsoSystem;
 
@@ -24,6 +24,6 @@ public:
   virtual void destructed(const KeyFrame *lastKeyFrames[], int size) {}
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

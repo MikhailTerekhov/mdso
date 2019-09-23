@@ -5,7 +5,7 @@
 #include <memory>
 #include <opencv2/opencv.hpp>
 
-namespace fishdso {
+namespace mdso {
 
 class CameraModel;
 
@@ -41,6 +41,6 @@ public:
   virtual InitializedVector initialize() = 0;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

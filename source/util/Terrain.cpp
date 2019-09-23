@@ -1,6 +1,6 @@
 #include "util/Terrain.h"
 
-namespace fishdso {
+namespace mdso {
 
 Terrain::Terrain(CameraModel *cam, const StdVector<Vec2> &points,
                  const std::vector<double> &depths,
@@ -67,4 +67,4 @@ void Terrain::drawCurved(CameraModel *cam, cv::Mat &img, cv::Scalar edgeCol) {
   triang.drawCurved(cam, img, edgeCol);
 }
 
-} // namespace fishdso
+} // namespace mdso

@@ -3,7 +3,7 @@
 #include <iostream>
 #include <tbb/parallel_for.h>
 
-using namespace fishdso;
+using namespace mdso;
 
 using LUT_t = Eigen::Matrix<Vec2, Eigen::Dynamic, Eigen::Dynamic>;
 

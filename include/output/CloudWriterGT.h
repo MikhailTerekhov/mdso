@@ -6,7 +6,7 @@
 #include "util/Sim3Aligner.h"
 #include "util/types.h"
 
-namespace fishdso {
+namespace mdso {
 
 class CloudWriterGT : public DsoObserver {
 public:
@@ -30,6 +30,6 @@ private:
   std::unique_ptr<Sim3Aligner> sim3Aligner;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

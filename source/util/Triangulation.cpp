@@ -9,7 +9,7 @@
 #include "util/flags.h"
 #include <random>
 
-namespace fishdso {
+namespace mdso {
 
 Triangulation::Triangulation(const StdVector<Vec2> &newPoints,
                              const Settings::Triangulation &settings)
@@ -669,4 +669,4 @@ void Triangulation::drawCurved(CameraModel *cam, cv::Mat &img,
     }
 }
 
-} // namespace fishdso
+} // namespace mdso

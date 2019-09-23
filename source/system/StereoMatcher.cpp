@@ -6,7 +6,7 @@
 
 DEFINE_bool(draw_inlier_matches, false, "Debug output stereo inlier matches.");
 
-namespace fishdso {
+namespace mdso {
 
 StereoMatcher::StereoMatcher(CameraModel *cam,
                              const Settings::StereoMatcher &_settings,
@@ -109,4 +109,4 @@ SE3 StereoMatcher::match(cv::Mat frames[2], StdVector<Vec2> resPoints[2],
   return motion;
 }
 
-} // namespace fishdso
+} // namespace mdso

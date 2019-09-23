@@ -5,7 +5,7 @@
 #include "util/settings.h"
 #include <opencv2/opencv.hpp>
 
-namespace fishdso {
+namespace mdso {
 
 struct DepthedImagePyramid : ImagePyramid {
   DepthedImagePyramid(const cv::Mat1b &baseImage, int levelNum, Vec2 points[],
@@ -14,6 +14,6 @@ struct DepthedImagePyramid : ImagePyramid {
   static_vector<cv::Mat1d, Settings::Pyramid::max_levelNum> depths;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

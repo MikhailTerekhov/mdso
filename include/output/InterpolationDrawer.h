@@ -3,7 +3,7 @@
 
 #include "output/DelaunayInitializerObserver.h"
 
-namespace fishdso {
+namespace mdso {
 
 class InterpolationDrawer : public DelaunayInitializerObserver {
 public:
@@ -22,6 +22,6 @@ private:
   cv::Mat3b result;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

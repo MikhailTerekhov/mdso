@@ -4,7 +4,7 @@
 #include "util/util.h"
 #include <opencv2/opencv.hpp>
 
-namespace fishdso {
+namespace mdso {
 
 KeyFrameEntry::KeyFrameEntry(const InitializedFrame::FrameEntry &entry,
                              KeyFrame *host, int ind)
@@ -78,4 +78,4 @@ void KeyFrame::addImmatures(const cv::Point points[], int size,
         &frames[numInBundle], toVec2(points[i]), tracingSettings);
 }
 
-} // namespace fishdso
+} // namespace mdso

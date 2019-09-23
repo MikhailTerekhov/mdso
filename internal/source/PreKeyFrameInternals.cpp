@@ -1,6 +1,6 @@
 #include "PreKeyFrameInternals.h"
 
-namespace fishdso {
+namespace mdso {
 
 PreKeyFrameInternals::PreKeyFrameInternals(
     const ImagePyramid *pyrRefs[], int size,
@@ -45,4 +45,4 @@ PreKeyFrameInternals::FrameEntry::interpolator(int lvl) const {
       &interpolatorsData[lvl * sizeof(Interpolator_t)]);
 }
 
-} // namespace fishdso
+} // namespace mdso

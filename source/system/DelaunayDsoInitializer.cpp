@@ -6,7 +6,7 @@
 #include <glog/logging.h>
 #include <opencv2/opencv.hpp>
 
-namespace fishdso {
+namespace mdso {
 
 DelaunayDsoInitializer::DelaunayDsoInitializer(
     DsoSystem *dsoSystem, CameraBundle *cam, PixelSelector pixelSelectors[],
@@ -128,4 +128,4 @@ DsoInitializer::InitializedVector DelaunayDsoInitializer::initialize() {
   return initFrames;
 }
 
-} // namespace fishdso
+} // namespace mdso

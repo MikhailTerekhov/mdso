@@ -6,7 +6,7 @@
 #include "util/settings.h"
 #include "util/types.h"
 
-namespace fishdso {
+namespace mdso {
 
 struct MarginalizedKeyFrame {
 
@@ -34,6 +34,6 @@ struct MarginalizedKeyFrame {
   SE3 thisToWorld;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

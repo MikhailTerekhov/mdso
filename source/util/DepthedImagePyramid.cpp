@@ -2,7 +2,7 @@
 #include "util/util.h"
 #include <glog/logging.h>
 
-namespace fishdso {
+namespace mdso {
 
 DepthedImagePyramid::DepthedImagePyramid(const cv::Mat1b &baseImage,
                                          int levelNum, Vec2 points[],
@@ -29,4 +29,4 @@ DepthedImagePyramid::DepthedImagePyramid(const cv::Mat1b &baseImage,
     depths[il] = pyrNUpDepth(integralWeightedDepths, integralWeights, il);
 }
 
-} // namespace fishdso
+} // namespace mdso

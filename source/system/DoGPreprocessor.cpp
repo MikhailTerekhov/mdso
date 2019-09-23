@@ -1,6 +1,6 @@
 #include "system/DoGPreprocessor.h"
 
-namespace fishdso {
+namespace mdso {
 
 DoGPreprocessor::DoGPreprocessor(double sigma1, double sigma2,
                                  double multiplier)
@@ -25,4 +25,4 @@ void DoGPreprocessor::process(cv::Mat1b multiFrame[], cv::Mat1b output[],
     }
 }
 
-} // namespace fishdso
+} // namespace mdso

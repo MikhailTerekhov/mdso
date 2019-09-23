@@ -9,7 +9,7 @@
 DECLARE_double(red_depths_part);
 DECLARE_double(blue_depths_part);
 
-namespace fishdso {
+namespace mdso {
 
 extern cv::Mat dbg;
 extern double minDepthCol, maxDepthCol;
@@ -112,6 +112,6 @@ cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
 
 std::vector<double> readBin(const fs::path &filename);
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

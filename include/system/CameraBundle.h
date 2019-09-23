@@ -3,7 +3,7 @@
 
 #include "system/CameraModel.h"
 
-namespace fishdso {
+namespace mdso {
 
 struct CameraBundle {
   using CamPyr = static_vector<CameraBundle, Settings::Pyramid::max_levelNum>;
@@ -25,6 +25,6 @@ struct CameraBundle {
   StdVector<CameraEntry> bundle;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

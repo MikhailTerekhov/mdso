@@ -9,7 +9,7 @@
 #include <memory>
 #include <opencv2/opencv.hpp>
 
-namespace fishdso {
+namespace mdso {
 
 class DelaunayDsoInitializer : public DsoInitializer {
 public:
@@ -39,6 +39,6 @@ private:
   std::vector<DelaunayInitializerObserver *> observers;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

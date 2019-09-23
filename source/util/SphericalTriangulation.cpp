@@ -3,7 +3,7 @@
 #include "util/geometry.h"
 #include <glog/logging.h>
 
-namespace fishdso {
+namespace mdso {
 
 Vec2 stereographicProject(Vec3 ray) {
   static const Vec3 t(0.0, 0.0, 1.0);
@@ -189,4 +189,4 @@ void SphericalTriangulation::draw(cv::Mat &img, CameraModel *cam,
   }
 }
 
-} // namespace fishdso
+} // namespace mdso

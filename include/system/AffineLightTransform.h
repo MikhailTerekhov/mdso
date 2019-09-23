@@ -5,7 +5,7 @@
 #include <cstring>
 #include <ostream>
 
-namespace fishdso {
+namespace mdso {
 
 template <typename T> struct AffineLightTransform {
   AffineLightTransform()
@@ -48,6 +48,6 @@ template <typename T> struct AffineLightTransform {
   T data[2];
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

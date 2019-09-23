@@ -13,7 +13,7 @@
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 
-using namespace fishdso;
+using namespace mdso;
 
 const int totalFrames = 2500;
 

@@ -1,7 +1,7 @@
 #include "output/DsoObserver.h"
 
-namespace fishdso {
+namespace mdso {
 
 DsoObserver::~DsoObserver() {}
 
-} // namespace fishdso
+} // namespace mdso

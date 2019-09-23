@@ -1,7 +1,7 @@
 #include "system/CameraModel.h"
 #include "util/Triangulation.h"
 
-namespace fishdso {
+namespace mdso {
 
 class Terrain {
   using Vertex = Triangulation::Vertex;
@@ -28,4 +28,4 @@ private:
   std::vector<Vec3> refRays;
 };
 
-} // namespace fishdso
+} // namespace mdso

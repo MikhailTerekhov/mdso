@@ -1,6 +1,6 @@
 #include "system/CameraModel.h"
 
-namespace fishdso {
+namespace mdso {
 
 class StereoGeometryEstimator {
 public:
@@ -42,4 +42,4 @@ private:
   Settings::Threading threadingSettings;
 };
 
-} // namespace fishdso
+} // namespace mdso

@@ -7,7 +7,7 @@
 DECLARE_double(pyr_rel_point_size);
 DECLARE_int32(pyr_image_width);
 
-namespace fishdso {
+namespace mdso {
 
 class DepthPyramidDrawer : public FrameTrackerObserver {
 public:
@@ -21,6 +21,6 @@ private:
   bool mPyrChanged = false;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

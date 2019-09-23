@@ -1,7 +1,7 @@
 #include "output/DelaunayInitializerObserver.h"
 
-namespace fishdso {
+namespace mdso {
 
 DelaunayInitializerObserver::~DelaunayInitializerObserver() {}
 
-} // namespace fishdso
+} // namespace mdso

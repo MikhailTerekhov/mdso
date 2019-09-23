@@ -3,7 +3,7 @@
 
 #include <opencv2/core.hpp>
 
-namespace fishdso {
+namespace mdso {
 
 const std::array<double, Settings::PixelSelector::gradThesholdCount>
     Settings::PixelSelector::default_gradThresholds{20.0, 8.0, 5.0};
@@ -38,4 +38,4 @@ BundleAdjusterSettings Settings::getBundleAdjusterSettings() const {
           affineLight,    threading,       depth};
 }
 
-} // namespace fishdso
+} // namespace mdso

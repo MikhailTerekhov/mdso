@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace fishdso {
+namespace mdso {
 
 class PlyHolder {
 public:
@@ -21,6 +21,6 @@ private:
   int pointCount;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

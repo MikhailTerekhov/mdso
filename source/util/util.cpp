@@ -29,7 +29,7 @@ DEFINE_double(blue_depths_part, 0.7,
               "(i.e. they are not too far to be distinguished)");
 DEFINE_validator(blue_depths_part, validateDepthsPart);
 
-namespace fishdso {
+namespace mdso {
 
 cv::Mat dbg;
 double minDepthCol = 0, maxDepthCol = 1;
@@ -306,4 +306,4 @@ std::vector<double> readBin(const fs::path &filename) {
   return result;
 }
 
-} // namespace fishdso
+} // namespace mdso

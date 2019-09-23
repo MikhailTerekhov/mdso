@@ -1,6 +1,6 @@
 #include "util/flags.h"
 
-using namespace fishdso;
+using namespace mdso;
 
 DEFINE_int32(num_threads, Settings::Threading::default_numThreads,
              "Number of threads for Ceres Solver to use.");
@@ -80,7 +80,7 @@ DEFINE_bool(disable_marginalization, Settings::default_disableMarginalization,
 DEFINE_bool(deterministic, true,
             "Do we need deterministic random number generation?");
 
-namespace fishdso {
+namespace mdso {
 
 Settings getFlaggedSettings() {
   Settings settings;
@@ -112,4 +112,4 @@ Settings getFlaggedSettings() {
   return settings;
 }
 
-} // namespace fishdso
+} // namespace mdso

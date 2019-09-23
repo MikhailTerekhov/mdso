@@ -3,7 +3,7 @@
 
 #include <vector>
 
-namespace fishdso {
+namespace mdso {
 
 class DsoObserver;
 class FrameTrackerObserver;
@@ -15,6 +15,6 @@ struct Observers {
   std::vector<FrameTrackerObserver *> frameTracker;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

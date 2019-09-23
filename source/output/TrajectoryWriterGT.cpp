@@ -1,6 +1,6 @@
 #include "output/TrajectoryWriterGT.h"
 
-namespace fishdso {
+namespace mdso {
 
 TrajectoryWriterGT::TrajectoryWriterGT(const SE3 _frameToWorldGT[],
                                        Timestamp _timestamps[], int size,
@@ -31,4 +31,4 @@ PosesPool &TrajectoryWriterGT::frameToWorldPool() { return frameToWorldGTPool; }
 
 const fs::path &TrajectoryWriterGT::outputFileName() { return mOutputFileName; }
 
-} // namespace fishdso
+} // namespace mdso

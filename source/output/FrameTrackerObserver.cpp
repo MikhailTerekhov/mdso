@@ -1,7 +1,7 @@
 #include "output/FrameTrackerObserver.h"
 
-namespace fishdso {
+namespace mdso {
 
 FrameTrackerObserver::~FrameTrackerObserver() {}
 
-} // namespace fishdso
+} // namespace mdso

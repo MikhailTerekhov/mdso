@@ -5,7 +5,7 @@
 #include "util/Triangulation.h"
 #include "util/types.h"
 
-namespace fishdso {
+namespace mdso {
 
 class SphericalTriangulation {
 public:
@@ -36,6 +36,6 @@ private:
   std::map<const Triangulation::Triangle *, TrihedralSector> _sectors;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

@@ -1,6 +1,6 @@
 #include "output/TrajectoryWriterDso.h"
 
-namespace fishdso {
+namespace mdso {
 
 TrajectoryWriterDso::TrajectoryWriterDso(const fs::path &outputDirectory,
                                          const fs::path &fileName)
@@ -24,4 +24,4 @@ const fs::path &TrajectoryWriterDso::outputFileName() {
   return mOutputFileName;
 }
 
-} // namespace fishdso
+} // namespace mdso

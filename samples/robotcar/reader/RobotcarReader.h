@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <opencv2/opencv.hpp>
 
-using namespace fishdso;
+using namespace mdso;
 
 struct ReaderSettings {
   Settings::CameraModel cam = {};

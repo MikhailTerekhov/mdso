@@ -1,6 +1,6 @@
 #include "system/DsoInitializer.h"
 
-namespace fishdso {
+namespace mdso {
 
 InitializedFrame::FrameEntry::FrameEntry(const cv::Mat &frame,
                                          Timestamp timestamp)
@@ -13,4 +13,4 @@ InitializedFrame::InitializedFrame(cv::Mat frame[], Timestamp timestamps[], int 
     frames.emplace_back(frame[i], timestamps[i]);
 }
 
-} // namespace fishdso
+} // namespace mdso

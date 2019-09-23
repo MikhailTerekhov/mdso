@@ -3,7 +3,7 @@
 
 #include "util/types.h"
 
-namespace fishdso {
+namespace mdso {
 
 class Sim3Aligner {
 public:
@@ -20,6 +20,6 @@ private:
   SE3 gtToDso;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

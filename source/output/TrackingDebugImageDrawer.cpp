@@ -1,6 +1,6 @@
 #include "output/TrackingDebugImageDrawer.h"
 
-namespace fishdso {
+namespace mdso {
 
 DEFINE_double(tracking_rel_point_size, 0.004,
               "Relative to w+h point size on tracking residuals images.");
@@ -73,4 +73,4 @@ cv::Mat3b TrackingDebugImageDrawer::drawFinestLevel() {
   return residualsImg[0];
 }
 
-} // namespace fishdso
+} // namespace mdso

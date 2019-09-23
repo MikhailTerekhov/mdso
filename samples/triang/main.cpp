@@ -5,7 +5,7 @@
 #include <opencv2/opencv.hpp>
 #include <random>
 
-using namespace fishdso;
+using namespace mdso;
 
 int main() {
   std::random_device rd;

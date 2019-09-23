@@ -3,7 +3,7 @@
 #include <cmath>
 #include <glog/logging.h>
 
-namespace fishdso {
+namespace mdso {
 
 double angle(const Vec3 &a, const Vec3 &b) {
   double cosAngle = a.normalized().dot(b.normalized());
@@ -157,4 +157,4 @@ bool intersectOnSphere(double sectorAngle, Vec3 &dir1, Vec3 &dir2) {
   return true;
 }
 
-} // namespace fishdso
+} // namespace mdso

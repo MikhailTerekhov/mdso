@@ -3,7 +3,7 @@
 
 #include "output/TrajectoryWriter.h"
 
-namespace fishdso {
+namespace mdso {
 
 class TrajectoryWriterPredict : public TrajectoryWriter {
 public:
@@ -20,6 +20,6 @@ private:
   PosesPool mFrameToWorldPool;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

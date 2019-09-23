@@ -5,7 +5,7 @@
 #include "util/settings.h"
 #include <opencv2/opencv.hpp>
 
-namespace fishdso {
+namespace mdso {
 
 class PixelSelector {
 public:
@@ -30,6 +30,6 @@ private:
   std::mt19937 mt;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

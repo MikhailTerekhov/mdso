@@ -4,7 +4,7 @@
 #include <gtest/gtest.h>
 #include <set>
 
-using namespace fishdso;
+using namespace mdso;
 
 class TriangulationTest
     : public ::testing::TestWithParam<std::shared_ptr<Triangulation>> {};

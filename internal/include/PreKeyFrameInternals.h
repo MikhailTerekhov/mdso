@@ -5,7 +5,7 @@
 #include "util/types.h"
 #include <ceres/cubic_interpolation.h>
 
-namespace fishdso {
+namespace mdso {
 
 class PreKeyFrameInternals {
 public:
@@ -36,6 +36,6 @@ public:
   std::vector<FrameEntry> frames;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

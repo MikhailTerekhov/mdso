@@ -1,6 +1,6 @@
 #include "output/TrajectoryWriter.h"
 
-namespace fishdso {
+namespace mdso {
 
 TrajectoryWriter::~TrajectoryWriter() {}
 
@@ -45,4 +45,4 @@ void TrajectoryWriter::destructed(const KeyFrame *lastKeyFrames[], int size) {
   keyFramesMarginalized(lastKeyFrames, size);
 }
 
-} // namespace fishdso
+} // namespace mdso

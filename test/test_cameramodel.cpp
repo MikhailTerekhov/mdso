@@ -4,7 +4,7 @@
 #include <Eigen/Core>
 #include <gtest/gtest.h>
 
-using namespace fishdso;
+using namespace mdso;
 
 TEST(CameraModelTest, CoreanCameraReprojection) {
   // some real-world data

@@ -1,6 +1,6 @@
 #include "system/CameraBundle.h"
 
-namespace fishdso {
+namespace mdso {
 
 CameraBundle::CameraEntry::CameraEntry(const SE3 &_bodyToThis,
                                        const CameraModel &cam)
@@ -39,4 +39,4 @@ CameraBundle::CamPyr CameraBundle::camPyr(int pyrLevels) {
   return result;
 }
 
-} // namespace fishdso
+} // namespace mdso

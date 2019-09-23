@@ -5,7 +5,7 @@
 #include "system/KeyFrame.h"
 #include <sophus/se3.hpp>
 
-namespace fishdso {
+namespace mdso {
 
 class BundleAdjuster {
 public:
@@ -21,6 +21,6 @@ private:
   BundleAdjusterSettings settings;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

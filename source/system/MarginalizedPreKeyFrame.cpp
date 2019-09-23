@@ -1,6 +1,6 @@
 #include "system/MarginalizedPreKeyFrame.h"
 
-namespace fishdso {
+namespace mdso {
 
 MarginalizedPreKeyFrame::FrameEntry::FrameEntry()
     : timestamp(0) {}
@@ -18,4 +18,4 @@ MarginalizedPreKeyFrame::MarginalizedPreKeyFrame(
     frames.emplace_back(preKeyFrame.frames[i]);
 }
 
-} // namespace fishdso
+} // namespace mdso

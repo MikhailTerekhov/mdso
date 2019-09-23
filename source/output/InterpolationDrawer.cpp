@@ -1,7 +1,7 @@
 #include "output/InterpolationDrawer.h"
 #include "util/util.h"
 
-namespace fishdso {
+namespace mdso {
 
 InterpolationDrawer::InterpolationDrawer(CameraModel *cam)
     : cam(cam)
@@ -45,4 +45,4 @@ bool InterpolationDrawer::didInitialize() { return mDidInitialize; }
 
 cv::Mat3b InterpolationDrawer::draw() { return result; }
 
-} // namespace fishdso
+} // namespace mdso

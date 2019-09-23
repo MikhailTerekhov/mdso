@@ -7,7 +7,7 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-namespace fishdso {
+namespace mdso {
 
 struct InitializerSettings;
 
@@ -376,6 +376,6 @@ struct BundleAdjusterSettings {
   Settings::Depth depth = {};
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

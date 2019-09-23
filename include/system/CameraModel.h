@@ -9,7 +9,7 @@
 #include <opencv2/core.hpp>
 #include <string>
 
-namespace fishdso {
+namespace mdso {
 
 class CameraModel {
 public:
@@ -165,6 +165,6 @@ private:
   Settings::CameraModel settings;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif

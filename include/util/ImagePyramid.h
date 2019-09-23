@@ -5,7 +5,7 @@
 #include <ceres/cubic_interpolation.h>
 #include <opencv2/opencv.hpp>
 
-namespace fishdso {
+namespace mdso {
 
 struct ImagePyramid {
   ImagePyramid(const cv::Mat1b &baseImage, int levelNum);
@@ -16,6 +16,6 @@ struct ImagePyramid {
   static_vector<cv::Mat1b, Settings::Pyramid::max_levelNum> images;
 };
 
-} // namespace fishdso
+} // namespace mdso
 
 #endif
