@@ -54,10 +54,11 @@ void TrackingDebugImageDrawer::levelTracked(
 
   for (int i = 0; i < size; ++i) {
     const auto &[point, res] = pointResiduals[i];
-    if (camPyr[pyrLevel].bundle[0].cam.isOnImage(point, s))
+    if (camPyr[pyrLevel].bundle[0].cam.isOnImage(point, s)) {
       putSquare(residualsImg[pyrLevel], toCvPoint(point), s,
                 depthCol(std::abs(res), 0, FLAGS_debug_max_residual),
                 cv::FILLED);
+    }
   }
 }
 

@@ -54,8 +54,13 @@ private:
 
   FrameTracker::TrackingResult predictTracking();
 
+  int totalOptimized() const;
+
   bool doNeedKf(PreKeyFrame *lastFrame);
   void marginalizeFrames();
+  
+  void activateOptimizedRandom();
+  void activateOptimizedDist();
   void activateNewOptimizedPoints();
 
   void traceOn(const PreKeyFrame &frame);

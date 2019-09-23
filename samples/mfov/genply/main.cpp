@@ -229,6 +229,11 @@ It should contain "info" and "data" subdirectories.)abacaba";
       settings.pixelSelector.gradThresholds[i] *= 0.6;
 
   std::cout << "running DSO.." << std::endl;
+
+  LOG(INFO) << "Total DSO observers: " << observers.dso.size() <<
+                "\nTracker observers: " << observers.frameTracker.size() <<
+                "\nInit observers: " << observers.initializer.size();
+
   DsoSystem dso(&cam, preprocessor, observers, settings);
   for (int it = FLAGS_start; it < FLAGS_start + FLAGS_count; ++it) {
     std::cout << "add frame #" << it << std::endl;

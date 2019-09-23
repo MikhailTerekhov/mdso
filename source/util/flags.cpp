@@ -68,6 +68,15 @@ DEFINE_bool(fixed_motion_on_first_ba,
 DEFINE_double(optimized_stddev, Settings::PointTracer::default_optimizedStddev,
               "Max disparity error for a point to become optimized.");
 
+DEFINE_bool(use_random_optimized_choice,
+            Settings::default_useRandomOptimizedChoice,
+            "If set to true, new OptimizedPoint-s are chosen randomly. "
+            "Distance-based heuristic is used otherwise.");
+
+DEFINE_bool(disable_marginalization, Settings::default_disableMarginalization,
+            "If set to true, no keyframes are ever marginalized, despite "
+            "performance issues.");
+
 DEFINE_bool(deterministic, true,
             "Do we need deterministic random number generation?");
 
@@ -97,6 +106,8 @@ Settings getFlaggedSettings() {
   settings.bundleAdjuster.fixedMotionOnFirstAdjustent =
       FLAGS_fixed_motion_on_first_ba;
   settings.pointTracer.optimizedStddev = FLAGS_optimized_stddev;
+  settings.useRandomOptimizedChoice = FLAGS_use_random_optimized_choice;
+  settings.disableMarginalization = FLAGS_disable_marginalization;
 
   return settings;
 }

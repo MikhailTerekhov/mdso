@@ -5,6 +5,7 @@
 #include "system/DelaunayDsoInitializer.h"
 #include "system/StereoMatcher.h"
 #include "util/defs.h"
+#include "util/flags.h"
 #include "util/geometry.h"
 #include "util/settings.h"
 #include <glog/logging.h>
@@ -256,6 +257,14 @@ FrameTracker::TrackingResult DsoSystem::predictTracking() {
   return result;
 }
 
+int DsoSystem::totalOptimized() const {
+  int curOptPoints = 0;
+  for (const auto &kf : keyFrames)
+    for (const auto &e : kf->frames)
+      curOptPoints += e.optimizedPoints.size();
+  return curOptPoints;
+}
+
 bool DsoSystem::doNeedKf(PreKeyFrame *lastFrame) {
   return allFrames.size() % settings.keyFrameDist() ==
          (settings.keyFrameDist() - 1);
@@ -266,28 +275,32 @@ void DsoSystem::addFrameTrackerObserver(FrameTrackerObserver *observer) {
 }
 
 void DsoSystem::marginalizeFrames() {
-  if (keyFrames.size() > settings.maxKeyFrames()) {
-    int count = static_cast<int>(keyFrames.size()) - settings.maxKeyFrames();
-    std::vector<const KeyFrame *> marginalized(count);
-    for (int i = 0; i < count; ++i) {
-      marginalized[i] = keyFrames[i].get();
-      marginalizedFrames.emplace_back(new MarginalizedKeyFrame(*keyFrames[i]));
-      allFrames[keyFrames[i]->preKeyFrame->globalFrameNum] =
-          marginalizedFrames.back().get();
-      for (int pi = 0; pi < keyFrames[i]->trackedFrames.size(); ++pi) {
-        int num = keyFrames[i]->trackedFrames[pi]->globalFrameNum;
-        allFrames[num] = marginalizedFrames.back()->trackedFrames[pi].get();
-      }
+  if (settings.disableMarginalization ||
+      keyFrames.size() <= settings.maxKeyFrames())
+    return;
+
+  int count = static_cast<int>(keyFrames.size()) - settings.maxKeyFrames();
+  std::vector<const KeyFrame *> marginalized(count);
+  for (int i = 0; i < count; ++i) {
+    marginalized[i] = keyFrames[i].get();
+    marginalizedFrames.emplace_back(new MarginalizedKeyFrame(*keyFrames[i]));
+    allFrames[keyFrames[i]->preKeyFrame->globalFrameNum] =
+        marginalizedFrames.back().get();
+    for (int pi = 0; pi < keyFrames[i]->trackedFrames.size(); ++pi) {
+      int num = keyFrames[i]->trackedFrames[pi]->globalFrameNum;
+      allFrames[num] = marginalizedFrames.back()->trackedFrames[pi].get();
     }
-
-    for (DsoObserver *obs : observers.dso)
-      obs->keyFramesMarginalized(marginalized.data(), count);
-
-    keyFrames.erase(keyFrames.begin(), keyFrames.begin() + count);
   }
+
+  for (DsoObserver *obs : observers.dso)
+    obs->keyFramesMarginalized(marginalized.data(), count);
+
+  keyFrames.erase(keyFrames.begin(), keyFrames.begin() + count);
+
+  LOG(INFO) << "marginalized " << count << " frame(s)";
 }
 
-void DsoSystem::activateNewOptimizedPoints() {
+void DsoSystem::activateOptimizedDist() {
   std::vector<StdVector<Vec2>> optPoints(cam->bundle.size());
   std::vector<Vec2 *> optPointsPtrs(cam->bundle.size());
   std::vector<int> optSizes(cam->bundle.size(), 0);
@@ -345,11 +358,7 @@ void DsoSystem::activateNewOptimizedPoints() {
     chosenInds[i].reserve(areReady);
   }
 
-  int curOptPoints = 0;
-  for (const auto &kf : keyFrames)
-    for (const auto &e : kf->frames)
-      curOptPoints += e.optimizedPoints.size();
-
+  int curOptPoints = totalOptimized();
   int pointsNeeded = settings.maxOptimizedPoints() - curOptPoints;
 
   int chosenCount =
@@ -385,6 +394,45 @@ void DsoSystem::activateNewOptimizedPoints() {
       std::swap(entry.immaturePoints[ind], entry.immaturePoints.back());
     entry.immaturePoints.pop_back();
   }
+}
+
+void DsoSystem::activateOptimizedRandom() {
+  std::vector<std::tuple<KeyFrame *, int, int>> readyInds;
+  for (int ki = 0; ki < keyFrames.size(); ++ki) {
+    KeyFrame *kf = keyFrames[ki].get();
+    for (int ci = 0; ci < cam->bundle.size(); ++ci)
+      for (int i = 0; i < kf->frames[ci].immaturePoints.size(); ++i) {
+        const ImmaturePoint &ip = kf->frames[ci].immaturePoints[i];
+        if (ip.isReady())
+          readyInds.push_back({kf, ci, i});
+      }
+  }
+
+  int curOptPoints = totalOptimized();
+  int pointsNeeded = settings.maxOptimizedPoints() - curOptPoints;
+  if (pointsNeeded < readyInds.size()) {
+    std::mt19937 mt(FLAGS_deterministic ? 42 : std::random_device()());
+    std::shuffle(readyInds.begin(), readyInds.end(), mt);
+    readyInds.resize(pointsNeeded);
+  }
+  std::sort(readyInds.begin(), readyInds.end(),
+            [](const auto &a, const auto &b) {
+              return std::get<2>(a) > std::get<2>(b);
+            });
+
+  for (const auto &[kf, ci, i] : readyInds) {
+    ImmaturePoint &ip = kf->frames[ci].immaturePoints[i];
+    kf->frames[ci].optimizedPoints.emplace_back(ip);
+    std::swap(ip, kf->frames[ci].immaturePoints.back());
+    kf->frames[ci].immaturePoints.pop_back();
+  }
+}
+
+void DsoSystem::activateNewOptimizedPoints() {
+  if (FLAGS_use_random_optimized_choice)
+    activateOptimizedRandom();
+  else
+    activateOptimizedDist();
 }
 
 void DsoSystem::traceOn(const PreKeyFrame &frame) {
@@ -434,12 +482,12 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], Timestamp timestamps[]) {
         allFrames.push_back(keyFrames.back().get());
       }
 
-      const KeyFrame *initializedKFs[Settings::max_maxKeyFrames];
+      std::vector<const KeyFrame *> initializedKFs(settings.maxKeyFrames());
       for (int i = 0; i < keyFrames.size(); ++i)
         initializedKFs[i] = keyFrames[i].get();
 
       for (DsoObserver *obs : observers.dso)
-        obs->initialized(initializedKFs, keyFrames.size());
+        obs->initialized(initializedKFs.data(), keyFrames.size());
 
       // BundleAdjuster bundleAdjuster(cam, settings.bundleAdjuster,
       // settings.residualPattern, settings.gradWeighting, settings.intencity,

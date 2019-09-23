@@ -94,7 +94,7 @@ ImmaturePoint::ImmaturePoint(KeyFrameEntry *host, const Vec2 &p,
   dir = baseDirections[0];
 }
 
-bool ImmaturePoint::isReady() { return mIsReady; }
+bool ImmaturePoint::isReady() const { return mIsReady; }
 
 int ImmaturePoint::pointsToTrace(const CameraModel &camRef,
                                  const SE3 &baseToRef, Vec3 &dirMinDepth,

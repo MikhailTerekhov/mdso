@@ -36,6 +36,10 @@ DECLARE_bool(run_ba);
 DECLARE_bool(fixed_motion_on_first_ba);
 DECLARE_double(optimized_stddev);
 
+DECLARE_bool(use_random_optimized_choice);
+
+DECLARE_bool(disable_marginalization);
+
 DECLARE_bool(deterministic);
 
 namespace fishdso {

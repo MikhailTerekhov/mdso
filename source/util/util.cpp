@@ -163,7 +163,11 @@ void putSquare(cv::Mat &img, const cv::Point &pos, int size,
   cv::Point to = pos + cv::Point(size, size);
   if (!(bounds.contains(toVec2i(from)) && bounds.contains(toVec2i(to))))
     return;
-  cv::rectangle(img, from, to, col, thickness);
+
+  if (size > 0)
+    cv::rectangle(img, from, to, col, thickness);
+  else if (size == 0)
+    img.at<cv::Vec3b>(from) = toCvVec3bDummy(col);
 }
 
 void grad(const cv::Mat &img, cv::Mat1d &gradX, cv::Mat1d &gradY,

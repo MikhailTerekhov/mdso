@@ -47,7 +47,7 @@ struct ImmaturePoint {
                           std::pair<Vec2, double> energiesFound[], int size,
                           int lineWidth);
 
-  bool isReady(); // checks if the point is good enough to be optimized
+  bool isReady() const; // checks if the point is good enough to be optimized
 
   Vec2 p;
   Vec3 baseDirections[MS];

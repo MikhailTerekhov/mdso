@@ -298,10 +298,9 @@ struct Settings {
   }
 
   static constexpr int default_maxKeyFrames = 6;
-  static constexpr int max_maxKeyFrames = 7;
   inline int maxKeyFrames() const { return mMaxKeyFrames; }
   inline void setMaxKeyFrames(int newMaxKeyFrames) {
-    CHECK(newMaxKeyFrames > 0 && newMaxKeyFrames <= max_maxKeyFrames);
+    CHECK(newMaxKeyFrames > 0);
     mMaxKeyFrames = newMaxKeyFrames;
   }
   int mMaxKeyFrames = default_maxKeyFrames;
@@ -325,6 +324,12 @@ struct Settings {
 
   static constexpr int default_expectedFramesCount = 2500;
   int expectedFramesCount = default_expectedFramesCount;
+
+  static constexpr bool default_useRandomOptimizedChoice = false;
+  int useRandomOptimizedChoice = default_useRandomOptimizedChoice;
+
+  static constexpr bool default_disableMarginalization = false;
+  int disableMarginalization = default_disableMarginalization;
 
   InitializerSettings getInitializerSettings() const;
   PointTracerSettings getPointTracerSettings() const;
