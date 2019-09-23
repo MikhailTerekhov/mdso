@@ -5,21 +5,18 @@
 namespace fishdso {
 
 DepthedImagePyramid::DepthedImagePyramid(const cv::Mat1b &baseImage,
-                                         int levelNum,
-                                         const StdVector<Vec2> &points,
-                                         const std::vector<double> &depthsVec,
-                                         const std::vector<double> &weightsVec)
+                                         int levelNum, Vec2 points[],
+                                         double depthsArray[],
+                                         double weightsArray[], int size)
     : ImagePyramid(baseImage, levelNum)
     , depths(levelNum) {
-  CHECK(points.size() == depthsVec.size() &&
-        depthsVec.size() == weightsVec.size());
-
   depths[0] = cv::Mat1d(baseImage.rows, baseImage.cols, -1.0);
   cv::Mat1d weights = cv::Mat1d(baseImage.rows, baseImage.cols, 0.0);
-  for (int i = 0; i < points.size(); ++i) {
+  for (int i = 0; i < size; ++i) {
     cv::Point cvp = toCvPoint(points[i]);
-    depths[0](cvp) = depthsVec[i];
-    weights(cvp) = weightsVec[i];
+    weights(cvp) = weightsArray[i];
+    if (weightsArray[i] > 1e-4)
+      depths[0](cvp) = depthsArray[i];
   }
 
   cv::Mat1d weightedDepths = depths[0].mul(weights, 1);

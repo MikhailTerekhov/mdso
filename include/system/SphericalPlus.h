@@ -15,7 +15,10 @@ public:
       : center(center)
       , radius(radius)
       , k((initialValue - center).normalized()) {
-    CHECK(((initialValue - center).norm() - radius) / radius < 1e-4);
+    CHECK(((initialValue - center).norm() - radius) / radius < 1e-4)
+        << "initial point does not lie on the sphere.\ncenter = "
+        << center.transpose() << "\nradius = " << radius
+        << "\ninitial point = " << initialValue.transpose();
     int minI = std::min_element(k.data(), k.data() + 3,
                                 [](double a, double b) {
                                   return std::abs(a) < std::abs(b);

@@ -12,14 +12,18 @@
 namespace fishdso {
 
 class CameraModel {
-
 public:
+  using CamPyr = StdVector<CameraModel>;
+
+  enum InputType { POLY_UNMAP, POLY_MAP };
+
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   CameraModel(int width, int height, double scale, const Vec2 &center,
               VecX unmapPolyCoeffs, const Settings::CameraModel &settings = {});
+
   CameraModel(int width, int height, const std::string &calibFileName,
-              const Settings::CameraModel &settings = {});
+              InputType type, const Settings::CameraModel &settings = {});
   CameraModel(int width, int height, double f, double cx, double cy,
               const Settings::CameraModel &settings = {});
 
@@ -29,12 +33,11 @@ public:
     typedef Eigen::Matrix<T, Eigen::Dynamic, 1> VecXt;
     Eigen::Map<const Vec2t> pt_(point);
     Vec2t pt = pt_;
+    
+    pt[1] = (pt[1] - principalPoint[1]) / fy;
+    pt[0] = (pt[0] - skew * pt[1] - principalPoint[0]) / fx;
 
     VecXt p = unmapPolyCoeffs.cast<T>();
-    Vec2t c = center.cast<T>();
-
-    pt /= scale;
-    pt -= c;
 
     T rho2 = pt.squaredNorm();
     T rho1 = sqrt(rho2);
@@ -69,20 +72,15 @@ public:
       angleN *= angle;
     }
 
-    Vec2t c = center.cast<T>();
     Vec2t res = pt.template head<2>().normalized() * r;
-    res += c;
-    res *= T(scale);
+    res[0] = T(fx) * res[0] + T(skew) * res[1] + T(principalPoint[0]);
+    res[1] = T(fy) * res[1] + T(principalPoint[1]);
     return res;
   }
 
-  EIGEN_STRONG_INLINE Vec3 unmap(const Vec2 &point) const {
-    return unmap(point.data());
-  }
+  inline Vec3 unmap(const Vec2 &point) const { return unmap(point.data()); }
 
-  EIGEN_STRONG_INLINE Vec2 map(const Vec3 &ray) const {
-    return map(ray.data());
-  }
+  inline Vec2 map(const Vec3 &ray) const { return map(ray.data()); }
 
   template <typename T>
   cv::Mat undistort(const cv::Mat &img, const Mat33 &cameraMatrix) const {
@@ -103,24 +101,29 @@ public:
 
   std::pair<Vec2, Mat23> diffMap(const Vec3 &ray) const;
 
-  EIGEN_STRONG_INLINE int getWidth() const { return width; }
-  EIGEN_STRONG_INLINE int getHeight() const { return height; }
-  EIGEN_STRONG_INLINE Vec2 getImgCenter() const { return scale * center; }
-  EIGEN_STRONG_INLINE double getMaxAngle() const { return maxAngle; }
+  inline int getWidth() const { return width; }
+  inline int getHeight() const { return height; }
+  inline Vec2 getImgCenter() const { return principalPoint; }
+  inline double getMinZ() const { return minZ; }
+  inline double getMaxAngle() const { return maxAngle; }
 
   bool isOnImage(const Vec2 &p, int border) const;
 
   double getImgRadiusByAngle(double observeAngle) const;
   void getRectByAngle(double observeAngle, int &width, int &height) const;
 
-  void setMapPolyCoeffs();
+  void setImageCenter(const Vec2 &imcenter);
 
-  StdVector<CameraModel> camPyr(int pyrLevels);
+  void setMapPolyCoeffs();
+  void setUnmapPolyCoeffs();
+
+  CamPyr camPyr(int pyrLevels);
 
 private:
-  friend std::istream &operator>>(std::istream &is, CameraModel &cc);
+  void readUnmap(std::istream &is);
+  void readMap(std::istream &is);
 
-  EIGEN_STRONG_INLINE double calcUnmapPoly(double r) const {
+  inline double calcUnmapPoly(double r) const {
     double rN = r * r;
     double res = unmapPolyCoeffs[0];
     for (int i = 1; i < unmapPolyDeg; ++i) {
@@ -129,7 +132,7 @@ private:
     }
     return res;
   }
-  EIGEN_STRONG_INLINE double calcMapPoly(double funcVal) const {
+  inline double calcMapPoly(double funcVal) const {
     double funcValN = funcVal;
     double res = mapPolyCoeffs[0];
     for (int i = 1; i < mapPolyCoeffs.rows(); ++i) {
@@ -139,13 +142,17 @@ private:
     return res;
   }
 
-  void normalize();
+  // void normalize();
+
+  void recalcMaxRadius();
+  void recalcBoundaries();
 
   int width, height;
   int unmapPolyDeg;
   VecX unmapPolyCoeffs;
-  Vec2 center;
-  double scale;
+  double fx, fy;
+  Vec2 principalPoint;
+  double skew;
   double maxRadius;
   double minZ;
   double maxAngle;

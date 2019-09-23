@@ -14,8 +14,7 @@ namespace fishdso {
 extern cv::Mat dbg;
 extern double minDepthCol, maxDepthCol;
 
-template <typename T>
-EIGEN_STRONG_INLINE std::vector<T> reservedVector(int toReserve) {
+template <typename T> inline std::vector<T> reservedVector(int toReserve) {
   std::vector<T> res;
   res.reserve(toReserve);
   return res;
@@ -65,11 +64,12 @@ double gradNormAt(const cv::Mat1b &img, const cv::Point &p);
 
 cv::Scalar depthCol(double d, double mind, double maxd);
 
-void insertDepths(cv::Mat &img, const StdVector<Vec2> &points,
-                  const std::vector<double> &depths, double minDepth,
-                  double maxDepth, bool areSolidPnts);
+void insertDepths(cv::Mat &img, const Vec2 points[], const double depths[],
+                  int size, double minDepth, double maxDepth,
+                  bool areSolidPnts);
 
 Vec2 toVec2(cv::Point p);
+Vec2i toVec2i(cv::Point p);
 cv::Point toCvPoint(Vec2 vec);
 cv::Point toCvPoint(const Vec2 &vec, double scaleX, double scaleY,
                     cv::Point shift);

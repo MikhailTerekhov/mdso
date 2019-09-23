@@ -12,10 +12,13 @@ namespace fishdso {
 
 struct PointTrackingResidual {
   PointTrackingResidual(
-      Vec3 pos, double baseIntensity, const CameraModel *cam,
+      Vec3 pos, double baseIntensity, const SE3 &baseToBody,
+      const SE3 &bodyToRef, const CameraModel *cam,
       const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
           *trackedFrame)
       : pos(pos)
+      , baseToBody(baseToBody)
+      , bodyToRef(bodyToRef)
       , baseIntensity(baseIntensity)
       , cam(cam)
       , trackedFrame(trackedFrame) {}
@@ -34,9 +37,12 @@ struct PointTrackingResidual {
     Eigen::Map<const Quatt> rotM(rotP);
     Quatt rot(rotM);
     SE3t motion(rot, trans);
+    SE3t baseToBodyT = baseToBody.cast<T>();
+    SE3t bodyToRefT = bodyToRef.cast<T>();
+
     AffineLightTransform<T> affLight(affLightP[0], affLightP[1]);
 
-    Vec3t newPos = motion * pos.cast<T>();
+    Vec3t newPos = bodyToRefT * motion * baseToBodyT * pos.cast<T>();
     Vec2t newPosProj = cam->map(newPos.data());
 
     T trackedIntensity;
@@ -47,52 +53,45 @@ struct PointTrackingResidual {
   }
 
   Vec3 pos;
+  SE3 baseToBody, bodyToRef;
   double baseIntensity;
   const CameraModel *cam;
   const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
       *trackedFrame;
 };
 
-FrameTracker::FrameTracker(const StdVector<CameraModel> &camPyr,
-                           std::unique_ptr<DepthedImagePyramid> _baseFrame,
-                           const std::vector<FrameTrackerObserver *> &observers,
+FrameTracker::TrackingResult::TrackingResult(int camNumber)
+    : lightBaseToTracked(camNumber) {}
+
+FrameTracker::FrameTracker(CameraBundle camPyr[],
+                           const DepthedMultiFrame &_baseFrame,
+                           std::vector<FrameTrackerObserver *> &observers,
                            const FrameTrackerSettings &_settings)
-    : residualsImg(_settings.pyramid.levelNum)
-    , lastRmse(INF)
-    , camPyr(camPyr)
-    , baseFrame(std::move(_baseFrame))
-    , displayWidth(camPyr[1].getWidth())
-    , displayHeight(camPyr[1].getHeight())
+    : camPyr(camPyr)
+    , baseFrame(_baseFrame)
     , observers(observers)
     , settings(_settings) {
+  CHECK(camPyr[0].bundle.size() == 1) << "Multicamera case is NIY";
   for (FrameTrackerObserver *obs : observers)
-    obs->newBaseFrame(*baseFrame);
+    obs->newBaseFrame(baseFrame);
 }
 
-void FrameTracker::addObserver(FrameTrackerObserver *observer) {
-  observers.push_back(observer);
-}
-
-std::pair<SE3, AffineLightTransform<double>>
+FrameTracker::TrackingResult
 FrameTracker::trackFrame(const PreKeyFrame &frame,
-                         const SE3 &coarseBaseToTracked,
-                         const AffineLightTransform<double> &coarseAffLight) {
+                         const TrackingResult &coarseTrackingResult) {
   for (FrameTrackerObserver *obs : observers)
-    obs->startTracking(frame.framePyr);
+    obs->startTracking(frame);
 
-  SE3 baseToTracked = coarseBaseToTracked;
-  AffineLightTransform<double> affLight = coarseAffLight;
+  TrackingResult result = coarseTrackingResult;
 
-  for (int i = settings.pyramid.levelNum - 1; i >= 0; --i) {
+  for (int i = settings.pyramid.levelNum() - 1; i >= 0; --i) {
     LOG(INFO) << "track level #" << i << std::endl;
-    std::tie(baseToTracked, affLight) = trackPyrLevel(
-        camPyr[i], baseFrame->images[i], baseFrame->depths[i],
-        frame.framePyr.images[i], *frame.internals, baseToTracked, affLight, i);
+    result = trackPyrLevel(frame, result, i);
   }
 
   // cv::waitKey();
 
-  return {baseToTracked, affLight};
+  return result;
 }
 
 bool isPointTrackable(const CameraModel &cam, const Vec3 &basePos,
@@ -102,86 +101,84 @@ bool isPointTrackable(const CameraModel &cam, const Vec3 &basePos,
   return cam.isOnImage(coarseCurOnImg, 0);
 }
 
-std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
-    const CameraModel &cam, const cv::Mat1b &baseImg,
-    const cv::Mat1d &baseDepths, const cv::Mat1b &trackedImg,
-    const PreKeyFrameInternals &internals, const SE3 &coarseBaseToTracked,
-    const AffineLightTransform<double> &coarseAffLight, int pyrLevel) {
-  SE3 baseToTracked = coarseBaseToTracked;
-  AffineLightTransform<double> affLight = coarseAffLight;
+FrameTracker::TrackingResult
+FrameTracker::trackPyrLevel(const PreKeyFrame &frame,
+                            const TrackingResult &coarseTrackingResult,
+                            int pyrLevel) {
+  CameraBundle &cam = camPyr[pyrLevel];
 
-  cv::Size displSz = cv::Size(displayHeight, displayWidth);
-  cv::Mat1b resMask(baseImg.size(), CV_WHITE_BYTE);
+  CHECK(cam.bundle.size() == 1) << "Multicamera case is NIY";
 
-  const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
-      &trackedFrame = internals.interpolator(pyrLevel);
+  TrackingResult result = coarseTrackingResult;
+  // const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
+  // &trackedFrame = internals.interpolator(pyrLevel);
 
   ceres::Problem problem;
 
-  problem.AddParameterBlock(baseToTracked.so3().data(), 4,
+  problem.AddParameterBlock(result.baseToTracked.so3().data(), 4,
                             new ceres::EigenQuaternionParameterization());
-  problem.AddParameterBlock(baseToTracked.translation().data(), 3);
+  problem.AddParameterBlock(result.baseToTracked.translation().data(), 3);
 
-  problem.AddParameterBlock(affLight.data, 2);
-  problem.SetParameterLowerBound(affLight.data, 0,
-                                 settings.affineLight.minAffineLightA);
-  problem.SetParameterUpperBound(affLight.data, 0,
-                                 settings.affineLight.maxAffineLightA);
-  problem.SetParameterLowerBound(affLight.data, 1,
-                                 settings.affineLight.minAffineLightB);
-  problem.SetParameterUpperBound(affLight.data, 1,
-                                 settings.affineLight.maxAffineLightB);
-
-  if (!settings.affineLight.optimizeAffineLight)
-    problem.SetParameterBlockConstant(affLight.data);
-
-  std::vector<double> pixUsed;
-
-  double pnt[2] = {0.0, 0.0};
+  for (auto &affLight : result.lightBaseToTracked) {
+    problem.AddParameterBlock(affLight.data, 2);
+    problem.SetParameterLowerBound(affLight.data, 0,
+                                   settings.affineLight.minAffineLightA);
+    problem.SetParameterUpperBound(affLight.data, 0,
+                                   settings.affineLight.maxAffineLightA);
+    problem.SetParameterLowerBound(affLight.data, 1,
+                                   settings.affineLight.minAffineLightB);
+    problem.SetParameterUpperBound(affLight.data, 1,
+                                   settings.affineLight.maxAffineLightB);
+    if (!settings.affineLight.optimizeAffineLight)
+      problem.SetParameterBlockConstant(affLight.data);
+  }
 
   std::vector<const PointTrackingResidual *> residuals;
   StdVector<Vec2> gotOutside;
 
   int pntTotal = 0;
 
-  for (int y = 0; y < baseImg.rows; ++y)
-    for (int x = 0; x < baseImg.cols; ++x)
-      if (baseDepths(y, x) > 0) {
-        if (!resMask(y, x))
-          continue;
-        ++pntTotal;
-        pnt[0] = x;
-        pnt[1] = y;
+  for (int y = 0; y < baseFrame[0].depths[pyrLevel].rows; ++y)
+    for (int x = 0; x < baseFrame[0].depths[pyrLevel].cols; ++x) {
+      double baseDepth = baseFrame[0].depths[pyrLevel](y, x);
+      if (baseDepth <= 0)
+        continue;
 
-        Vec3 pos = cam.unmap(pnt).normalized() * baseDepths(y, x);
-        if (!isPointTrackable(cam, pos, coarseBaseToTracked)) {
-          gotOutside.push_back(Vec2(x, y));
-          continue;
-        }
+      ++pntTotal;
 
-        pixUsed.push_back(baseImg(y, x));
-
-        ceres::LossFunction *lossFunc = nullptr;
-        if (settings.frameTracker.useGradWeighting) {
-          double gradNorm = gradNormAt(baseImg, cv::Point(x, y));
-          double c = settings.gradWeighting.c;
-          double weight = c / std::hypot(c, gradNorm);
-          lossFunc = new ceres::ScaledLoss(
-              new ceres::HuberLoss(settings.intencity.outlierDiff), weight,
-              ceres::Ownership::TAKE_OWNERSHIP);
-        } else
-          lossFunc = new ceres::HuberLoss(settings.intencity.outlierDiff);
-
-        auto newResidual = new PointTrackingResidual(
-            pos, static_cast<double>(baseImg(y, x)), &cam, &trackedFrame);
-        residuals.push_back(newResidual);
-        ceres::CostFunction *newCostFunc =
-            new ceres::AutoDiffCostFunction<PointTrackingResidual, 1, 4, 3, 2>(
-                newResidual);
-        problem.AddResidualBlock(
-            newCostFunc, lossFunc, baseToTracked.so3().data(),
-            baseToTracked.translation().data(), affLight.data);
+      Vec3 pos = cam.bundle[0].cam.unmap(Vec2(x, y)).normalized() * baseDepth;
+      if (!isPointTrackable(cam.bundle[0].cam, pos, result.baseToTracked)) {
+        gotOutside.push_back(Vec2(x, y));
+        continue;
       }
+
+      ceres::LossFunction *lossFunc = nullptr;
+      if (settings.frameTracker.useGradWeighting) {
+        double gradNorm = frame.frames[0].gradNorm(y, x);
+        double c = settings.gradWeighting.c;
+        double weight = c / std::hypot(c, gradNorm);
+        lossFunc = new ceres::ScaledLoss(
+            new ceres::HuberLoss(settings.intencity.outlierDiff), weight,
+            ceres::Ownership::TAKE_OWNERSHIP);
+      } else
+        lossFunc = new ceres::HuberLoss(settings.intencity.outlierDiff);
+
+      double intencity = baseFrame[0].images[pyrLevel](y, x);
+
+      // TODO inds in multicamera
+      auto newResidual = new PointTrackingResidual(
+          pos, intencity, cam.bundle[0].bodyToThis, cam.bundle[0].thisToBody,
+          &cam.bundle[0].cam,
+          &frame.internals->frames[0].interpolator(pyrLevel));
+      residuals.push_back(newResidual);
+      ceres::CostFunction *newCostFunc =
+          new ceres::AutoDiffCostFunction<PointTrackingResidual, 1, 4, 3, 2>(
+              newResidual);
+      problem.AddResidualBlock(newCostFunc, lossFunc,
+                               result.baseToTracked.so3().data(),
+                               result.baseToTracked.translation().data(),
+                               result.lightBaseToTracked[0].data);
+    }
 
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_QR;
@@ -191,7 +188,7 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
   ceres::Solver::Summary summary;
 
   ceres::Solve(options, &problem, &summary);
-  LOG(INFO) << "time (mcs) = " << summary.total_time_in_seconds * 1000
+  LOG(INFO) << "time (ms) = " << summary.total_time_in_seconds * 1000
             << std::endl;
 
   LOG(INFO) << summary.BriefReport() << std::endl;
@@ -201,16 +198,18 @@ std::pair<SE3, AffineLightTransform<double>> FrameTracker::trackPyrLevel(
 
   for (auto res : residuals) {
     double eval = -1;
-    (*res)(baseToTracked.unit_quaternion().coeffs().data(),
-           baseToTracked.translation().data(), affLight.data, &eval);
-    Vec2 onTracked = cam.map(baseToTracked * res->pos);
+    (*res)(result.baseToTracked.unit_quaternion().coeffs().data(),
+           result.baseToTracked.translation().data(),
+           result.lightBaseToTracked[0].data, &eval);
+    Vec2 onTracked = cam.bundle[0].cam.map(result.baseToTracked * res->pos);
     pointResiduals.push_back(std::pair(onTracked, eval));
   }
 
   for (FrameTrackerObserver *obs : observers)
-    obs->levelTracked(pyrLevel, baseToTracked, affLight, pointResiduals);
+    obs->levelTracked(pyrLevel, result, pointResiduals.data(),
+                      pointResiduals.size());
 
-  return {baseToTracked, affLight};
+  return result;
 }
 
 } // namespace fishdso

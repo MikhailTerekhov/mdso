@@ -1,6 +1,7 @@
 #ifndef INCLUDE_KEYFRAME
 #define INCLUDE_KEYFRAME
 
+#include "system/DsoInitializer.h"
 #include "system/ImmaturePoint.h"
 #include "system/OptimizedPoint.h"
 #include "system/PreKeyFrame.h"
@@ -14,42 +15,47 @@
 
 namespace fishdso {
 
+struct KeyFrame;
+
+struct KeyFrameEntry {
+  KeyFrameEntry(const InitializedFrame::FrameEntry &entry, KeyFrame *host,
+                int ind);
+  KeyFrameEntry(KeyFrame *host, int ind, Timestamp timestamp);
+
+  StdVector<ImmaturePoint> immaturePoints;
+  StdVector<OptimizedPoint> optimizedPoints;
+
+  KeyFrame *host;
+  int ind;
+  Timestamp timestamp;
+  AffLight lightWorldToThis;
+};
+
 struct KeyFrame {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   KeyFrame(const KeyFrame &other) = delete;
-  KeyFrame(KeyFrame &&other) = default;
-  KeyFrame(CameraModel *cam, const cv::Mat &frameColored, int globalFrameNum,
-           PixelSelector &pixelSelector,
+  KeyFrame(KeyFrame &&other) = delete;
+  KeyFrame(const InitializedFrame &initializedFrame, CameraBundle *cam,
+           int globalFrameNum, PixelSelector pixelSelector[],
            const Settings::KeyFrame &_kfSettings = {},
-           const PointTracerSettings tracingSettings = {});
-
-  KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame,
-           PixelSelector &pixelSelector,
+           const Settings::Pyramid &pyrSettings = {},
+           const PointTracerSettings &tracingSettings = {});
+  KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame,
+           PixelSelector pixelSelector[],
            const Settings::KeyFrame &_kfSettings = {},
            const PointTracerSettings &tracingSettings = {});
 
-  void activateAllImmature();
-  void deactivateAllOptimized();
-
-  void addImmatures(const std::vector<cv::Point> &points);
-
-  void selectPointsDenser(PixelSelector &pixelSelector, int pointsNeeded);
-
-  cv::Mat3b drawDepthedFrame(double minDepth, double maxDepth) const;
-
-  std::shared_ptr<PreKeyFrame> preKeyFrame;
-
-  AffineLightTransform<double> lightWorldToThis;
+  std::unique_ptr<PreKeyFrame> preKeyFrame;
   SE3 thisToWorld;
-
-  std::vector<std::unique_ptr<ImmaturePoint>> immaturePoints;
-  std::vector<std::unique_ptr<OptimizedPoint>> optimizedPoints;
-
-  std::vector<std::shared_ptr<PreKeyFrame>> trackedFrames;
+  std::vector<KeyFrameEntry> frames;
+  std::vector<std::unique_ptr<PreKeyFrame>> trackedFrames;
 
   Settings::KeyFrame kfSettings;
   PointTracerSettings tracingSettings;
+
+private:
+  void addImmatures(const cv::Point points[], int size, int numInBundle);
 };
 
 } // namespace fishdso

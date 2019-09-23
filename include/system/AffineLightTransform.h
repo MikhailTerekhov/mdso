@@ -18,24 +18,21 @@ template <typename T> struct AffineLightTransform {
     return *this;
   }
 
-  EIGEN_STRONG_INLINE T operator()(const T &x) {
-    return exp(data[0]) * (x + data[1]);
-  }
+  inline T operator()(const T &x) { return exp(data[0]) * (x + data[1]); }
 
-  EIGEN_STRONG_INLINE friend AffineLightTransform<T>
+  inline friend AffineLightTransform<T>
   operator*(AffineLightTransform<T> first, AffineLightTransform<T> second) {
     return AffineLightTransform<T>(first.data[0] + second.data[0],
                                    exp(second.data[0]) * second.data[1] +
                                        first.data[1]);
   }
 
-  EIGEN_STRONG_INLINE AffineLightTransform<T> inverse() const {
+  inline AffineLightTransform<T> inverse() const {
     return AffineLightTransform<T>(-data[0], -data[1] * exp(-data[0]));
   }
 
-  EIGEN_STRONG_INLINE static void
-  normalizeMultiplier(AffineLightTransform<T> &toNormalize,
-                      AffineLightTransform<T> &relative) {
+  inline static void normalizeMultiplier(AffineLightTransform<T> &toNormalize,
+                                         AffineLightTransform<T> &relative) {
     relative.data[0] -= toNormalize.data[0];
     toNormalize.data[0] = T(0);
   }

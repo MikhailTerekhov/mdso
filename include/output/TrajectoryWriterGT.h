@@ -8,21 +8,19 @@ namespace fishdso {
 
 class TrajectoryWriterGT : public DsoObserver {
 public:
-  TrajectoryWriterGT(const StdVector<SE3> &worldToFrameUnalignedGT,
-                     const std::string &outputDirectory,
-                     const std::string &fileName,
-                     const std::string &matrixFormFileName);
+  TrajectoryWriterGT(const SE3 frameToWorldGT[], Timestamp timestamps[],
+                     int size, const std::string &outputDirectory,
+                     const std::string &fileName);
 
-  void initialized(const std::vector<const KeyFrame *> &marginalized);
-  void keyFramesMarginalized(const std::vector<const KeyFrame *> &marginalized);
-  void destructed(const std::vector<const KeyFrame *> &lastKeyFrames);
+  void newBaseFrame(const KeyFrame &baseFrame) override;
+  void keyFramesMarginalized(const KeyFrame *marginalized[], int size) override;
+  void destructed(const KeyFrame *lastKeyFrames[], int size) override;
 
 private:
-  StdVector<SE3> worldToFrameGT;
-  StdVector<SE3> worldToFrameUnalignedGT;
+  std::vector<Timestamp> curKfTs;
+  PosesPool frameToWorldGTPool;
+
   std::string outputFileName;
-  std::string matrixFormOutputFileName;
-  std::unique_ptr<Sim3Aligner> sim3Aligner;
 };
 
 } // namespace fishdso

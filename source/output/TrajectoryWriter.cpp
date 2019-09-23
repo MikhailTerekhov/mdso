@@ -3,49 +3,49 @@
 namespace fishdso {
 
 TrajectoryWriter::TrajectoryWriter(const std::string &outputDirectory,
-                                   const std::string &fileName,
-                                   const std::string &matrixFormFileName)
-    : outputFileName(fileInDir(outputDirectory, fileName))
-    , matrixFormOutputFileName(fileInDir(outputDirectory, matrixFormFileName)) {
+                                   const std::string &fileName)
+    : outputFileName(fileInDir(outputDirectory, fileName)) {}
+
+void TrajectoryWriter::newBaseFrame(const KeyFrame &baseFrame) {
+  curKfTs.push_back(baseFrame.preKeyFrame->frames[0].timestamp);
 }
 
-void TrajectoryWriter::newKeyFrame(const KeyFrame *keyFrame) {
-  curKfNums.insert(keyFrame->preKeyFrame->globalFrameNum);
-}
+void TrajectoryWriter::keyFramesMarginalized(const KeyFrame *marginalized[],
+                                             int size) {
+  std::vector<Timestamp> margKfTs;
+  margKfTs.reserve(size);
+  std::vector<Timestamp> newKfTs(curKfTs.size());
 
-void TrajectoryWriter::keyFramesMarginalized(
-    const std::vector<const KeyFrame *> &marginalized) {
-  for (const KeyFrame *kf : marginalized)
-    curKfNums.erase(kf->preKeyFrame->globalFrameNum);
+  for (int i = 0; i < size; ++i)
+    margKfTs.push_back(marginalized[i]->preKeyFrame->frames[0].timestamp);
 
-  for (const KeyFrame *kf : marginalized) {
+  int numLeft =
+      std::set_difference(curKfTs.begin(), curKfTs.end(), margKfTs.begin(),
+                          margKfTs.end(), newKfTs.begin()) -
+      newKfTs.begin();
+  newKfTs.resize(numLeft);
+  std::swap(curKfTs, newKfTs);
+
+  for (int i = 0; i < size; ++i) {
+    const KeyFrame *kf = marginalized[i];
     SE3 baseToWorld = kf->thisToWorld;
-    frameToWorldPool.insert({kf->preKeyFrame->globalFrameNum, baseToWorld});
+    frameToWorldPool.push({kf->preKeyFrame->frames[0].timestamp, baseToWorld});
     for (const auto &preKeyFrame : kf->trackedFrames)
-      frameToWorldPool.insert(
-          {preKeyFrame->globalFrameNum,
-           baseToWorld * preKeyFrame->baseToThis.inverse()});
+      frameToWorldPool.push({preKeyFrame->frames[0].timestamp,
+                             baseToWorld * preKeyFrame->baseToThis.inverse()});
   }
 
-  // std::ofstream posesOfs(outputFileName, std::ios_base::app);
-  std::ofstream matrixFormOfs(matrixFormOutputFileName, std::ios_base::app);
-  int minKfNum = curKfNums.empty() ? INF : (*curKfNums.begin());
-  auto it = frameToWorldPool.begin();
-  while (it != frameToWorldPool.end() && it->first < minKfNum) {
-    putInMatrixForm(matrixFormOfs, it->second);
-    matrixFormOfs << '\n';
-
-    // posesOfs << it->first << ' ';
-    // putMotion(posesOfs, it->second.inverse());
-    // posesOfs << '\n';
-
-    it = frameToWorldPool.erase(it);
+  std::ofstream ofs(outputFileName, std::ios_base::app);
+  int minKfTs = curKfTs.empty() ? INF : curKfTs[0];
+  while (!frameToWorldPool.empty() && frameToWorldPool.top().first < minKfTs) {
+    putInMatrixForm(ofs, frameToWorldPool.top().second);
+    ofs << '\n';
+    frameToWorldPool.pop();
   }
 }
 
-void TrajectoryWriter::destructed(
-    const std::vector<const KeyFrame *> &lastKeyFrames) {
-  keyFramesMarginalized(lastKeyFrames);
+void TrajectoryWriter::destructed(const KeyFrame *lastKeyFrames[], int size) {
+  keyFramesMarginalized(lastKeyFrames, size);
 }
 
 } // namespace fishdso

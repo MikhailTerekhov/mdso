@@ -9,9 +9,12 @@
 
 namespace fishdso {
 
+struct KeyFrameEntry;
 struct KeyFrame;
 
 struct ImmaturePoint {
+  static constexpr int MS = Settings::ResidualPattern::max_size;
+
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   enum State { ACTIVE, OOB, OUTLIER };
@@ -26,56 +29,63 @@ struct ImmaturePoint {
     INF_ENERGY,
     BIG_ENERGY,
     SMALL_ABS_SECOND_BEST,
-    LOW_QUALITY
+    LOW_QUALITY,
+    STATUS_COUNT
   };
 
+  static std::string statusName(ImmaturePoint::TracingStatus status);
+
   // TODO create PointTracer!!!
-  ImmaturePoint(KeyFrame *baseFrame, const Vec2 &p,
-                const PointTracerSettings &_settings = {});
+  ImmaturePoint(KeyFrameEntry *host, const Vec2 &p,
+                const PointTracerSettings &settings = {});
 
-  TracingStatus traceOn(const KeyFrame &baseFrame, const PreKeyFrame &refFrame,
-                        TracingDebugType debugType);
+  TracingStatus traceOn(const PreKeyFrame::FrameEntry &refFrameEntry,
+                        TracingDebugType debugType,
+                        const PointTracerSettings &settings);
 
-  static void
-  drawTracing(cv::Mat &frame,
-              const StdVector<std::pair<Vec2, double>> &energiesFound,
-              int lineWidth);
+  static void drawTracing(cv::Mat &frame,
+                          std::pair<Vec2, double> energiesFound[], int size,
+                          int lineWidth);
 
   bool isReady(); // checks if the point is good enough to be optimized
 
   Vec2 p;
-  std::vector<Vec3> baseDirections;
-  std::vector<double> baseIntencities;
-  StdVector<Vec2> baseGrad;
-  StdVector<Vec2> baseGradNorm;
+  Vec3 baseDirections[MS];
+  Vec3 dir;
+  double baseIntencities[MS];
+  Vec2 baseGrad[MS];
+  Vec2 baseGradNorm[MS];
   double minDepth, maxDepth;
   double depth;
   double bestQuality;
   double lastEnergy;
   double stddev; // predicted disparity error on last successful tracing
-  CameraModel *cam;
+  CameraBundle *cam;
+  CameraModel *camBase;
   State state;
-
-  PointTracerSettings settings;
+  KeyFrameEntry *host;
+  bool mIsReady;
 
   // output only
   bool lastTraced;
   int numTraced;
   double depthBeforeSubpixel;
-  double lastIntVar, lastGeomVar, lastFullVar;
+  double lastVar;
   int tracedPyrLevel;
   bool pyrChanged;
   double eBeforeSubpixel, eAfterSubpixel;
 
 private:
-  bool pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth, Vec3 &dirMaxDepth,
-                     StdVector<Vec2> &points, std::vector<Vec3> &directions);
-  double estVariance(const Vec2 &searchDirection);
-  Vec2 tracePrecise(
-      const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
-          &refFrame,
-      const Vec2 &from, const Vec2 &to, const std::vector<double> &intencities,
-      const StdVector<Vec2> &pattern, double &bestDispl, double &bestEnergy);
+  int pointsToTrace(const CameraModel &camRef, const SE3 &baseToRef,
+                    Vec3 &dirMinDepth, Vec3 &dirMaxDepth, Vec2 points[],
+                    Vec3 directions[], const PointTracerSettings &settings);
+  double estVariance(const Vec2 &searchDirection, const PointTracerSettings &settings);
+  Vec2
+  tracePrecise(const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
+                   &refFrame,
+               const Vec2 &from, const Vec2 &to, double intencities[],
+               Vec2 pattern[], double &bestDispl, double &bestEnergy,
+               const PointTracerSettings &settings);
 };
 
 } // namespace fishdso

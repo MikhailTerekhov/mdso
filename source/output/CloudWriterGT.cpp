@@ -2,60 +2,73 @@
 
 namespace fishdso {
 
-CloudWriterGT::CloudWriterGT(
-    const StdVector<SE3> &worldToFrameGT,
-    const std::vector<std::vector<Vec3>> &pointsInFrameGT,
-    const std::vector<std::vector<cv::Vec3b>> &colors,
-    const std::string &outputDirectory, const std::string &fileName)
-    : worldToFrameGT(worldToFrameGT)
-    , pointsInFrameGT(pointsInFrameGT)
-    , colors(colors)
+CloudWriterGT::CloudWriterGT(SE3 frameToWorldGT[], Timestamp timestamps[],
+                             std::vector<Vec3> pointsInFrameGT[],
+                             std::vector<cv::Vec3b> colors[], int size,
+                             const std::string &outputDirectory,
+                             const std::string &fileName)
+    : timestamps(timestamps, timestamps + size)
+    , frameToWorldGT(frameToWorldGT, frameToWorldGT + size)
+    , pointsInFrameGT(pointsInFrameGT, pointsInFrameGT + size)
+    , colors(colors, colors + size)
     , cloudHolder(fileInDir(outputDirectory, fileName)) {}
 
-void CloudWriterGT::initialized(
-    const std::vector<const KeyFrame *> &initializedKFs) {
-  CHECK(initializedKFs.size() > 1);
+int CloudWriterGT::findInd(Timestamp timestamp) {
+  int ind = std::lower_bound(timestamps.begin(), timestamps.end(), timestamp) -
+            timestamps.begin();
+  CHECK(ind < timestamps.size() && timestamps[ind] == timestamp)
+      << "timestamp not found in CloudWrierGT";
+  return ind;
+}
+
+void CloudWriterGT::initialized(const KeyFrame *initializedKFs[], int size) {
+  CHECK(size > 1);
 
   SE3 worldToFirst = initializedKFs[0]->thisToWorld.inverse();
-  SE3 worldToLast = initializedKFs.back()->thisToWorld.inverse();
-  int firstNum = initializedKFs[0]->preKeyFrame->globalFrameNum;
-  int lastNum = initializedKFs.back()->preKeyFrame->globalFrameNum;
-  SE3 worldToFirstGT = worldToFrameGT[firstNum];
-  SE3 worldToLastGT = worldToFrameGT[lastNum];
+  SE3 worldToLast = initializedKFs[size - 1]->thisToWorld.inverse();
+  Timestamp firstTs = initializedKFs[0]->preKeyFrame->frames[0].timestamp;
+  Timestamp lastTs = initializedKFs[size - 1]->preKeyFrame->frames[0].timestamp;
+
+  SE3 worldToFirstGT = frameToWorldGT[findInd(firstTs)].inverse();
+  SE3 worldToLastGT = frameToWorldGT[findInd(lastTs)].inverse();
 
   sim3Aligner = std::unique_ptr<Sim3Aligner>(new Sim3Aligner(
       worldToFirst, worldToLast, worldToFirstGT, worldToLastGT));
 
-  for (auto &pose : worldToFrameGT)
-    pose = sim3Aligner->alignWorldToFrameGT(pose);
+  for (auto &pose : frameToWorldGT)
+    pose = sim3Aligner->alignWorldToFrameGT(pose).inverse();
 }
 
-void CloudWriterGT::keyFramesMarginalized(
-    const std::vector<const KeyFrame *> &marginalized) {
+void CloudWriterGT::keyFramesMarginalized(const KeyFrame *marginalized[],
+                                          int size) {
   CHECK(sim3Aligner);
 
-  for (const KeyFrame *kf : marginalized) {
+  for (int i = 0; i < size; ++i) {
+    const KeyFrame *kf = marginalized[i];
+    Timestamp ts = kf->preKeyFrame->frames[0].timestamp;
+    int ind = findInd(ts);
     std::vector<Vec3> points;
-    points.reserve(pointsInFrameGT[kf->preKeyFrame->globalFrameNum].size());
-    for (const Vec3 &p : pointsInFrameGT[kf->preKeyFrame->globalFrameNum])
+    points.reserve(pointsInFrameGT[ind].size());
+    for (const Vec3 &p : pointsInFrameGT[ind])
       points.push_back(kf->thisToWorld * sim3Aligner->alignScale(p));
-    cloudHolder.putPoints(points, colors[kf->preKeyFrame->globalFrameNum]);
+    cloudHolder.putPoints(points, colors[ind]);
 
     for (const auto &preKeyFrame : kf->trackedFrames) {
+      Timestamp pkfTs = kf->preKeyFrame->frames[0].timestamp;
+      int pkfInd = findInd(pkfTs);
       std::vector<Vec3> points;
-      points.reserve(pointsInFrameGT[preKeyFrame->globalFrameNum].size());
+      points.reserve(pointsInFrameGT[pkfInd].size());
       SE3 frameToWorld = kf->thisToWorld * preKeyFrame->baseToThis.inverse();
-      for (const Vec3 &p : pointsInFrameGT[preKeyFrame->globalFrameNum])
+      for (const Vec3 &p : pointsInFrameGT[pkfInd])
         points.push_back(frameToWorld * sim3Aligner->alignScale(p));
-      cloudHolder.putPoints(points, colors[preKeyFrame->globalFrameNum]);
+      cloudHolder.putPoints(points, colors[pkfInd]);
     }
   }
   cloudHolder.updatePointCount();
 }
 
-void CloudWriterGT::destructed(
-    const std::vector<const KeyFrame *> &lastKeyFrames) {
-  keyFramesMarginalized(lastKeyFrames);
+void CloudWriterGT::destructed(const KeyFrame *lastKeyFrames[], int size) {
+  keyFramesMarginalized(lastKeyFrames, size);
 }
 
 } // namespace fishdso

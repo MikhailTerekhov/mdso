@@ -28,6 +28,10 @@ DEFINE_string(debug_img_dir, "output/default/debug",
               "Directory for debug images to be put into.");
 DEFINE_string(trajectory_filename, "tracked_frame_to_world.txt",
               "Resulting trajectory filename (stored in 3x4 matrix form).");
+DEFINE_string(gt_trajectory_filename, "frame_to_world_GT.txt",
+              "Ground truth trajectory filename (stored in 3x4 matrix form).");
+DEFINE_string(resulting_cloud_filename, "points.ply", "Output cloud filename.");
+DEFINE_string(gt_cloud_filename, "points.ply", "Ground truth cloud filename.");
 DEFINE_bool(gen_gt_trajectory, true,
             "Do we need to generate ground truth trajectories?");
 DEFINE_string(
@@ -52,9 +56,6 @@ DEFINE_string(depth_pyramid_dir, "output/default/pyr",
 DEFINE_bool(draw_depth_pyramid, false,
             "Draw the depth pyramid, that is used for tracking? Will be "
             "overridden to false if write_files is set to false.");
-
-DEFINE_bool(show_interpolation, false,
-            "Show interpolated depths after initialization?");
 
 DEFINE_bool(write_files, true,
             "Do we need to write output files into output_directory?");
@@ -104,6 +105,12 @@ It should contain "info" and "data" subdirectories.)abacaba";
 
   MultiFovReader reader(argv[1]);
 
+  Settings settings = getFlaggedSettings();
+
+  SE3 identity;
+  CameraBundle cam(&identity, reader.cam.get(), 1);
+  CameraBundle::CamPyr camPyr = cam.camPyr(settings.pyramid.levelNum());
+
   if (FLAGS_gen_gt_only) {
     std::vector<std::vector<Vec3>> pointsInFrameGT(reader.getFrameCount());
     std::vector<std::vector<cv::Vec3b>> colors(reader.getFrameCount());
@@ -123,31 +130,36 @@ It should contain "info" and "data" subdirectories.)abacaba";
     return 0;
   }
 
-  Settings settings = getFlaggedSettings();
-  // settings.bundleAdjuster.fixedRotationOnSecondKF = true;
-
   DebugImageDrawer debugImageDrawer;
   TrackingDebugImageDrawer trackingDebugImageDrawer(
-      reader.cam->camPyr(settings.pyramid.levelNum), settings.frameTracker,
-      settings.pyramid);
-  TrajectoryWriter trajectoryWriter(FLAGS_output_directory, "tracked_pos.txt",
+      camPyr.data(), settings.frameTracker, settings.pyramid);
+  TrajectoryWriter trajectoryWriter(FLAGS_output_directory,
                                     FLAGS_trajectory_filename);
+
+  StdVector<SE3> frameToWorldGT(reader.getFrameCount());
+  std::vector<Timestamp> timestamps(reader.getFrameCount());
+  for (int i = 0; i < timestamps.size(); ++i) {
+    timestamps[i] = i;
+    frameToWorldGT[i] = reader.getWorldToFrameGT(i).inverse();
+  }
   TrajectoryWriterGT trajectoryWriterGT(
-      reader.getAllWorldToFrameGT(), FLAGS_output_directory,
-      "ground_truth_pos.txt", "matrix_form_GT_pose.txt");
+      frameToWorldGT.data(), timestamps.data(), timestamps.size(),
+      FLAGS_output_directory, FLAGS_gt_trajectory_filename);
+
   std::unique_ptr<CloudWriter> cloudWriter;
   if (FLAGS_gen_cloud)
     cloudWriter = std::unique_ptr<CloudWriter>(new CloudWriter(
-        reader.cam.get(), FLAGS_output_directory, "points.ply"));
+        &cam, FLAGS_output_directory, FLAGS_resulting_cloud_filename));
 
   std::unique_ptr<CloudWriterGT> cloudWriterGTPtr;
   if (FLAGS_gen_gt) {
     std::vector<std::vector<Vec3>> pointsInFrameGT(reader.getFrameCount());
     std::vector<std::vector<cv::Vec3b>> colors(reader.getFrameCount());
     readPointsInFrameGT(reader, pointsInFrameGT, colors, FLAGS_gt_points);
-    cloudWriterGTPtr.reset(
-        new CloudWriterGT(reader.getAllWorldToFrameGT(), pointsInFrameGT,
-                          colors, FLAGS_output_directory, "pointsGT.ply"));
+    cloudWriterGTPtr.reset(new CloudWriterGT(
+        frameToWorldGT.data(), timestamps.data(), pointsInFrameGT.data(),
+        colors.data(), reader.getFrameCount(), FLAGS_output_directory,
+        FLAGS_gt_cloud_filename));
   }
 
   InterpolationDrawer interpolationDrawer(reader.cam.get());
@@ -172,20 +184,17 @@ It should contain "info" and "data" subdirectories.)abacaba";
     observers.initializer.push_back(&interpolationDrawer);
 
   std::cout << "running DSO.." << std::endl;
-  DsoSystem dso(reader.cam.get(), observers, settings);
+  DsoSystem dso(&cam, observers, settings);
   for (int it = FLAGS_start; it < FLAGS_start + FLAGS_count; ++it) {
     std::cout << "add frame #" << it << std::endl;
-    dso.addFrame(reader.getFrame(it), it);
+    cv::Mat frame = reader.getFrame(it);
+    Timestamp timestamp = it;
+    dso.addMultiFrame(&frame, &timestamp);
 
-    if (interpolationDrawer.didInitialize()) {
+    if (FLAGS_draw_interpolation && interpolationDrawer.didInitialize()) {
       cv::Mat3b interpolation = interpolationDrawer.draw();
-      if (FLAGS_write_files)
         cv::imwrite(fileInDir(FLAGS_output_directory, "interpolation.jpg"),
                     interpolation);
-      if (FLAGS_show_interpolation) {
-        cv::imshow("interpolation", interpolation);
-        cv::waitKey();
-      }
     }
 
     if (FLAGS_write_files) {

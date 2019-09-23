@@ -1,8 +1,10 @@
 #ifndef INCLUDE_TYPES
 #define INCLUDE_TYPES
 
+#include "system/AffineLightTransform.h"
 #include <Eigen/Core>
 #include <Eigen/StdVector>
+#include <boost/container/static_vector.hpp>
 #include <map>
 #include <memory>
 #include <queue>
@@ -43,6 +45,10 @@ typedef Sophus::Sim3d Sim3;
 typedef Sophus::SE3d SE3;
 typedef Sophus::SO3d SO3;
 
+typedef AffineLightTransform<double> AffLight;
+
+using boost::container::static_vector;
+
 template <typename T>
 using StdVector = std::vector<T, Eigen::aligned_allocator<T>>;
 
@@ -71,8 +77,23 @@ template <typename T> SetUniquePtr<T> makeFindPtr(T *ptr) {
   return SetUniquePtr<T>(ptr, false);
 }
 
+using Timestamp = int64_t;
+
 template <typename T>
 using StdUnorderedSetOfPtrs = std::unordered_set<SetUniquePtr<T>>;
+
+class TimestampPoseComp {
+public:
+  bool operator()(const std::pair<Timestamp, SE3> &a,
+                  const std::pair<Timestamp, SE3> &b) {
+    return a.first > b.first;
+  }
+};
+
+// used to store poses in trajectory writers
+using PosesPool = std::priority_queue<std::pair<Timestamp, SE3>,
+                                      std::vector<std::pair<Timestamp, SE3>>,
+                                      TimestampPoseComp>;
 
 } // namespace fishdso
 

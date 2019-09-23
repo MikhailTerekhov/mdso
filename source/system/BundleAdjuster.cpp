@@ -9,25 +9,20 @@
 #include <ceres/cubic_interpolation.h>
 #include <ceres/local_parameterization.h>
 
+#define PS (settings.residualPattern.pattern().size())
+#define PH (settings.residualPattern.height)
+
 namespace fishdso {
 
-BundleAdjuster::BundleAdjuster(CameraModel *cam,
+BundleAdjuster::BundleAdjuster(CameraBundle *cam, KeyFrame *keyFrames[],
+                               int size,
                                const BundleAdjusterSettings &_settings)
     : cam(cam)
-    , firstKeyFrame(nullptr)
-    , settings(_settings) {}
-
-bool BundleAdjuster::isOOB(const SE3 &baseToWorld, const SE3 &refToWorld,
-                           const OptimizedPoint &baseOP) {
-  Vec3 inBase = cam->unmap(baseOP.p).normalized() * baseOP.depth();
-  Vec2 reproj = cam->map(refToWorld.inverse() * baseToWorld * inBase);
-  return !cam->isOnImage(reproj, settings.residualPattern.height);
-}
-
-void BundleAdjuster::addKeyFrame(KeyFrame *keyFrame) {
-  if (firstKeyFrame == nullptr)
-    firstKeyFrame = keyFrame;
-  keyFrames.insert(keyFrame);
+    , keyFrames(keyFrames)
+    , size(size)
+    , settings(_settings) {
+  CHECK(size >= 2);
+  CHECK(cam->bundle.size() == 1) << "Multicamera case is NIY";
 }
 
 struct DirectResidual {
@@ -35,9 +30,12 @@ struct DirectResidual {
       ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> *baseFrame,
       ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> *refFrame,
       const CameraModel *cam, OptimizedPoint *optimizedPoint, const Vec2 &pos,
-      KeyFrame *baseKf, KeyFrame *refKf)
+      const SE3 &baseToBody, const SE3 &bodyToRef, KeyFrame *baseKf,
+      KeyFrame *refKf)
       : cam(cam)
       , baseDirection(cam->unmap(pos).normalized())
+      , baseToBody(baseToBody)
+      , bodyToRef(bodyToRef)
       , refFrame(refFrame)
       , optimizedPoint(optimizedPoint)
       , baseKf(baseKf)
@@ -90,6 +88,7 @@ struct DirectResidual {
   const CameraModel *cam;
   Vec3 baseDirection;
   double baseIntencity;
+  SE3 baseToBody, bodyToRef;
   ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> *refFrame;
   OptimizedPoint *optimizedPoint;
   KeyFrame *baseKf;
@@ -97,199 +96,140 @@ struct DirectResidual {
 };
 
 void BundleAdjuster::adjust(int maxNumIterations) {
-  int pointsTotal = 0, pointsOOB = 0, pointsOutliers = 0;
+  int pointsTotal = 0, pointsOOB = 0;
 
-  KeyFrame *secondKeyFrame = nullptr;
-  for (auto kf : keyFrames)
-    if (kf != firstKeyFrame) {
-      secondKeyFrame = kf;
-      break;
-    }
+  CameraModel &camera = cam->bundle[0].cam;
 
   std::shared_ptr<ceres::ParameterBlockOrdering> ordering(
       new ceres::ParameterBlockOrdering());
 
   ceres::Problem problem;
 
-  for (KeyFrame *keyFrame : keyFrames) {
+  for (int i = 0; i < size; ++i) {
+    KeyFrame *keyFrame = keyFrames[i];
+
     problem.AddParameterBlock(keyFrame->thisToWorld.translation().data(), 3);
     problem.AddParameterBlock(keyFrame->thisToWorld.so3().data(), 4,
                               new ceres::EigenQuaternionParameterization());
-    auto affLight = keyFrame->lightWorldToThis.data;
-    problem.AddParameterBlock(affLight, 2);
-    problem.SetParameterLowerBound(affLight, 0,
-                                   settings.affineLight.minAffineLightA);
-    problem.SetParameterUpperBound(affLight, 0,
-                                   settings.affineLight.maxAffineLightA);
-    problem.SetParameterLowerBound(affLight, 1,
-                                   settings.affineLight.minAffineLightB);
-    problem.SetParameterUpperBound(affLight, 1,
-                                   settings.affineLight.maxAffineLightB);
-
-    if (!settings.affineLight.optimizeAffineLight)
-      problem.SetParameterBlockConstant(affLight);
 
     ordering->AddElementToGroup(keyFrame->thisToWorld.translation().data(), 1);
     ordering->AddElementToGroup(keyFrame->thisToWorld.so3().data(), 1);
-    ordering->AddElementToGroup(affLight, 1);
+
+    for (KeyFrameEntry &entry : keyFrame->frames) {
+      double *affLight = entry.lightWorldToThis.data;
+      problem.AddParameterBlock(affLight, 2);
+      problem.SetParameterLowerBound(affLight, 0,
+                                     settings.affineLight.minAffineLightA);
+      problem.SetParameterUpperBound(affLight, 0,
+                                     settings.affineLight.maxAffineLightA);
+      problem.SetParameterLowerBound(affLight, 1,
+                                     settings.affineLight.minAffineLightB);
+      problem.SetParameterUpperBound(affLight, 1,
+                                     settings.affineLight.maxAffineLightB);
+      if (!settings.affineLight.optimizeAffineLight)
+        problem.SetParameterBlockConstant(affLight);
+      ordering->AddElementToGroup(affLight, 1);
+    }
   }
 
   problem.SetParameterBlockConstant(
-      firstKeyFrame->thisToWorld.translation().data());
-  problem.SetParameterBlockConstant(firstKeyFrame->thisToWorld.so3().data());
-  problem.SetParameterBlockConstant(firstKeyFrame->lightWorldToThis.data);
+      keyFrames[0]->thisToWorld.translation().data());
+  problem.SetParameterBlockConstant(keyFrames[0]->thisToWorld.so3().data());
+  for (KeyFrameEntry &entry : keyFrames[0]->frames)
+    problem.SetParameterBlockConstant(entry.lightWorldToThis.data);
 
-  SE3 firstToWorld = firstKeyFrame->thisToWorld;
-  SE3 secondToWorld = secondKeyFrame->thisToWorld;
+  SE3 firstToWorld = keyFrames[0]->thisToWorld;
+  SE3 secondToWorld = keyFrames[1]->thisToWorld;
   double radius =
       (secondToWorld.translation() - firstToWorld.translation()).norm();
   Vec3 center = firstToWorld.translation();
-  problem.SetParameterization(
-      secondKeyFrame->thisToWorld.translation().data(),
-      new ceres::AutoDiffLocalParameterization<SphericalPlus, 3, 2>(
-          new SphericalPlus(center, radius, secondToWorld.translation())));
+  if (radius > settings.bundleAdjuster.minFirstToSecondRadius)
+    problem.SetParameterization(
+        keyFrames[1]->thisToWorld.translation().data(),
+        new ceres::AutoDiffLocalParameterization<SphericalPlus, 3, 2>(
+            new SphericalPlus(center, radius, secondToWorld.translation())));
+  else
+    problem.SetParameterBlockConstant(
+        keyFrames[1]->thisToWorld.translation().data());
 
   if (settings.bundleAdjuster.fixedRotationOnSecondKF)
-    problem.SetParameterBlockConstant(secondKeyFrame->thisToWorld.so3().data());
+    problem.SetParameterBlockConstant(keyFrames[1]->thisToWorld.so3().data());
 
-  if (settings.bundleAdjuster.fixedMotionOnFirstAdjustent &&
-      keyFrames.size() == 2) {
+  if (settings.bundleAdjuster.fixedMotionOnFirstAdjustent && size == 2) {
     problem.SetParameterBlockConstant(
-        secondKeyFrame->thisToWorld.translation().data());
-    problem.SetParameterBlockConstant(secondKeyFrame->thisToWorld.so3().data());
-    problem.SetParameterBlockConstant(secondKeyFrame->lightWorldToThis.data);
+        keyFrames[1]->thisToWorld.translation().data());
+    problem.SetParameterBlockConstant(keyFrames[1]->thisToWorld.so3().data());
   }
 
-  LOG(INFO) << "points on the first = " << firstKeyFrame->optimizedPoints.size()
-            << std::endl;
-  LOG(INFO) << "points on the second = "
-            << secondKeyFrame->optimizedPoints.size() << std::endl;
-
-  std::map<OptimizedPoint *, std::vector<DirectResidual *>> residualsFor;
-
-  StdVector<Vec2> oobPos;
-  StdVector<Vec2> oobKf1;
-
-  for (KeyFrame *baseFrame : keyFrames)
-    for (const auto &op : baseFrame->optimizedPoints) {
-      problem.AddParameterBlock(&op->logInvDepth, 1);
-      problem.SetParameterLowerBound(&op->logInvDepth, 0,
+  for (int indBase = 0; indBase < size; ++indBase) {
+    KeyFrame *baseFrame = keyFrames[indBase];
+    for (auto &op : baseFrame->frames[0].optimizedPoints) {
+      problem.AddParameterBlock(&op.logInvDepth, 1);
+      problem.SetParameterLowerBound(&op.logInvDepth, 0,
                                      -std::log(settings.depth.max));
-      problem.SetParameterUpperBound(&op->logInvDepth, 0,
+      problem.SetParameterUpperBound(&op.logInvDepth, 0,
                                      -std::log(settings.depth.min));
 
-      ordering->AddElementToGroup(&op->logInvDepth, 0);
+      ordering->AddElementToGroup(&op.logInvDepth, 0);
 
-      for (KeyFrame *refFrame : keyFrames) {
+      for (int indRef = 0; indRef < size; ++indRef) {
+        KeyFrame *refFrame = keyFrames[indRef];
         if (refFrame == baseFrame)
           continue;
+
+        // TODO inds in multicamera
+        SE3 baseToBody = cam->bundle[0].thisToBody;
+        SE3 bodyToRef = cam->bundle[0].bodyToThis;
+        SE3 baseToRef = bodyToRef * refFrame->thisToWorld.inverse() *
+                        baseFrame->thisToWorld * baseToBody;
         pointsTotal++;
-        if (isOOB(baseFrame->thisToWorld, refFrame->thisToWorld, *op)) {
+        if (!camera.isOnImage(camera.map(baseToRef * (op.depth() * op.dir)),
+                              PH)) {
           pointsOOB++;
-          if (baseFrame == secondKeyFrame)
-            oobPos.push_back(op->p);
-          else
-            oobKf1.push_back(op->p);
           continue;
         }
 
-        for (int i = 0; i < settings.residualPattern.pattern().size(); ++i) {
-          const Vec2 &pos = op->p + settings.residualPattern.pattern()[i];
+        for (int i = 0; i < PS; ++i) {
+          const Vec2 &pos = op.p + settings.residualPattern.pattern()[i];
+          // TODO inds in multicamera
           DirectResidual *newResidual = new DirectResidual(
-              &baseFrame->preKeyFrame->internals->interpolator(0),
-              &refFrame->preKeyFrame->internals->interpolator(0), cam, op.get(),
-              pos, baseFrame, refFrame);
+              &baseFrame->preKeyFrame->internals->frames[0].interpolator(0),
+              &refFrame->preKeyFrame->internals->frames[0].interpolator(0),
+              &camera, &op, pos, baseToBody, bodyToRef, baseFrame, refFrame);
 
-          double gradNorm = baseFrame->preKeyFrame->gradNorm(toCvPoint(pos));
+          // TODO inds in multicamera
+          double gradNorm =
+              baseFrame->preKeyFrame->frames[0].gradNorm(toCvPoint(pos));
           const double c = settings.gradWeighting.c;
           double weight = c / std::hypot(c, gradNorm);
           ceres::LossFunction *lossFunc = new ceres::ScaledLoss(
               new ceres::HuberLoss(settings.intencity.outlierDiff), weight,
               ceres::Ownership::TAKE_OWNERSHIP);
 
-          residualsFor[op.get()].push_back(newResidual);
+          // TODO inds in multicamera
           problem.AddResidualBlock(
               new ceres::AutoDiffCostFunction<DirectResidual, 1, 1, 3, 4, 3, 4,
                                               2, 2>(newResidual),
-              lossFunc, &op->logInvDepth,
+              lossFunc, &op.logInvDepth,
               baseFrame->thisToWorld.translation().data(),
               baseFrame->thisToWorld.so3().data(),
               refFrame->thisToWorld.translation().data(),
               refFrame->thisToWorld.so3().data(),
-              baseFrame->lightWorldToThis.data,
-              refFrame->lightWorldToThis.data);
+              baseFrame->frames[0].lightWorldToThis.data,
+              refFrame->frames[0].lightWorldToThis.data);
         }
       }
     }
+  }
 
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_SCHUR;
-  options.linear_solver_ordering = ordering;
+  // options.linear_solver_ordering = ordering;
   // options.minimizer_progress_to_stdout = true;
   options.max_num_iterations = maxNumIterations;
   options.num_threads = settings.threading.numThreads;
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
-
-  if (secondKeyFrame->optimizedPoints.size() > 0) {
-    auto p = std::minmax_element(secondKeyFrame->optimizedPoints.begin(),
-                                 secondKeyFrame->optimizedPoints.end(),
-                                 [](const auto &op1, const auto &op2) {
-                                   return op1->depth() < op2->depth();
-                                 });
-    LOG(INFO) << "minmax d = " << (*p.first)->depth() << ' '
-              << (*p.second)->depth() << std::endl;
-  }
-
-  std::vector<double> depthsVec;
-  depthsVec.reserve(secondKeyFrame->optimizedPoints.size());
-  for (const auto &op : secondKeyFrame->optimizedPoints)
-    depthsVec.push_back(op->depth());
-  // setDepthColBounds(depthsVec);
-
-  cv::Mat kfDepths = secondKeyFrame->drawDepthedFrame(minDepthCol, maxDepthCol);
-
-  StdVector<Vec2> outliers;
-  StdVector<Vec2> badDepth;
-  for (const auto &op : secondKeyFrame->optimizedPoints) {
-    if (op->state == OptimizedPoint::OOB)
-      continue;
-
-    std::vector<double> values =
-        reservedVector<double>(residualsFor[op.get()].size());
-    for (DirectResidual *res : residualsFor[op.get()]) {
-      double value;
-      double &logInvDepth = op->logInvDepth;
-      KeyFrame *base = res->baseKf;
-      KeyFrame *ref = res->refKf;
-      if (res->operator()(&logInvDepth, base->thisToWorld.translation().data(),
-                          base->thisToWorld.so3().data(),
-                          ref->thisToWorld.translation().data(),
-                          ref->thisToWorld.so3().data(),
-                          base->lightWorldToThis.data,
-                          ref->lightWorldToThis.data, &value))
-        values.push_back(value);
-    }
-
-    if (values.empty()) {
-      op->state = OptimizedPoint::OOB;
-      continue;
-    }
-
-    std::nth_element(values.begin(), values.begin() + values.size() / 2,
-                     values.end());
-    double median = values[values.size() / 2];
-    if (median > settings.intencity.outlierDiff) {
-      op->state = OptimizedPoint::OUTLIER;
-      outliers.push_back(op->p);
-    }
-  }
-  pointsOutliers = outliers.size();
-
-  LOG(INFO) << "BA results:";
-  LOG(INFO) << "total points = " << pointsTotal;
-  LOG(INFO) << "OOB points = " << pointsOOB;
-  LOG(INFO) << "outlier points = " << pointsOutliers;
 
   LOG(INFO) << summary.FullReport() << std::endl;
 }

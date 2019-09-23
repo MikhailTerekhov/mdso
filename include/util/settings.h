@@ -5,6 +5,7 @@
 #include "util/types.h"
 #include <cmath>
 #include <gflags/gflags.h>
+#include <glog/logging.h>
 
 namespace fishdso {
 
@@ -21,11 +22,22 @@ struct Settings {
     static constexpr int default_mapPolyDegree = 10;
     int mapPolyDegree = default_mapPolyDegree;
 
+    static constexpr int default_unmapPolyDegree = 6;
+    int unmapPolyDegree = default_unmapPolyDegree;
+
     static constexpr int default_mapPolyPoints = 2000;
     int mapPolyPoints = default_mapPolyPoints;
+
+    static constexpr int default_unmapPolyPoints = 2000;
+    int unmapPolyPoints = default_unmapPolyPoints;
+
+    static constexpr int default_magicMaxAngle = 100.0 * (M_PI / 180);
+    int magicMaxAngle = default_magicMaxAngle;
   } cameraModel;
 
   struct PixelSelector {
+    static constexpr int max_points = 10000;
+
     static constexpr int default_initialAdaptiveBlockSize = 25;
     int initialAdaptiveBlockSize = default_initialAdaptiveBlockSize;
 
@@ -35,11 +47,16 @@ struct Settings {
     static constexpr double default_adaptToFactor = 1.1;
     double adaptToFactor = default_adaptToFactor;
 
-    static const std::vector<double> default_gradThresholds;
-    std::vector<double> gradThresholds = default_gradThresholds;
+    static constexpr int gradThesholdCount = 3;
+    static const std::array<double, gradThesholdCount> default_gradThresholds;
+    std::array<double, gradThesholdCount> gradThresholds =
+        default_gradThresholds;
 
-    static const std::vector<cv::Scalar> default_pointColors;
-    std::vector<cv::Scalar> pointColors = default_pointColors;
+    static const std::array<cv::Scalar, gradThesholdCount> default_pointColors;
+    std::array<cv::Scalar, gradThesholdCount> pointColors = default_pointColors;
+
+    static constexpr double default_relDebugPointRadius = 5e-3;
+    double relDebugPointRadius = default_relDebugPointRadius;
   } pixelSelector;
 
   struct DistanceMap {
@@ -94,6 +111,10 @@ struct Settings {
     double drawPadding = default_drawPadding;
   } triangulation;
 
+  struct DsoInitializer {
+    static constexpr int max_initializedFrames = 2;
+  };
+
   struct DelaunayDsoInitializer {
     static constexpr int default_firstFramesSkip = 15;
     int firstFramesSkip = default_firstFramesSkip;
@@ -103,8 +124,17 @@ struct Settings {
   } delaunayDsoInitializer;
 
   struct KeyFrame {
-    static constexpr int default_pointsNum = 2000;
-    int pointsNum = default_pointsNum;
+    static constexpr int default_immaturePointsNum = 2000;
+    static constexpr int max_immaturePointsNum = 10000;
+    inline int immaturePointsNum() const { return mImmaturePointsNum; }
+    inline void setImmaturePointsNum(int newImmaturePointsNum) {
+      CHECK(newImmaturePointsNum > 0 &&
+            newImmaturePointsNum <= max_immaturePointsNum);
+      mImmaturePointsNum = newImmaturePointsNum;
+    }
+
+  private:
+    int mImmaturePointsNum = default_immaturePointsNum;
   } keyFrame;
 
   struct PointTracer {
@@ -113,6 +143,14 @@ struct Settings {
 
     static constexpr double default_maxSearchRel = 0.027;
     double maxSearchRel = default_maxSearchRel;
+
+    static constexpr int max_maxSearchAbs = 100;
+    static constexpr int default_maxSearchAbs = 100;
+    inline int maxSearchAbs() const { return mMaxSearchAbs; }
+    inline void setMaxSearchAbs(int newMaxSearchAbs) {
+      CHECK(newMaxSearchAbs <= max_maxSearchAbs);
+      mMaxSearchAbs = newMaxSearchAbs;
+    }
 
     static constexpr double default_positionVariance = 3.2;
     double positionVariance = default_positionVariance;
@@ -123,7 +161,7 @@ struct Settings {
     static constexpr double default_imprFactor = 1.0;
     double imprFactor = default_imprFactor;
 
-    static constexpr double default_outlierEnergyFactor = 0.444;
+    static constexpr double default_outlierEnergyFactor = 0.7;
     double outlierEnergyFactor = default_outlierEnergyFactor;
 
     static constexpr double default_secondBestEnergyThresFactor = 0.004;
@@ -138,11 +176,11 @@ struct Settings {
     static constexpr int default_gnIter = 3;
     int gnIter = default_gnIter;
 
-    static constexpr bool default_performFullTracing = false;
-    bool performFullTracing = default_performFullTracing;
-
     static constexpr bool default_useAltHWeighting = true;
     bool useAltHWeighting = default_useAltHWeighting;
+
+  private:
+    int mMaxSearchAbs = default_maxSearchAbs;
   } pointTracer;
 
   struct FrameTracker {
@@ -165,12 +203,24 @@ struct Settings {
 
     static constexpr bool default_runBA = true;
     bool runBA = default_runBA;
+
+    static constexpr double default_minFirstToSecondRadius = 1e-2;
+    double minFirstToSecondRadius = default_minFirstToSecondRadius;
   } bundleAdjuster;
 
   struct Pyramid {
     static constexpr int max_levelNum = 8;
     static constexpr int default_levelNum = 6;
-    int levelNum = default_levelNum;
+
+    inline void setLevelNum(int newLevelNum) {
+      CHECK(newLevelNum > 0 && newLevelNum <= max_levelNum);
+      mLevelNum = max_levelNum;
+    }
+
+    inline int levelNum() const { return mLevelNum; }
+
+  private:
+    int mLevelNum = default_levelNum;
   } pyramid;
 
   struct AffineLight {
@@ -204,7 +254,10 @@ struct Settings {
   } gradWeighting;
 
   struct ResidualPattern {
-    ResidualPattern(const StdVector<Vec2> &newPattern = default_pattern)
+    static constexpr int max_size = 9;
+
+    ResidualPattern(
+        const static_vector<Vec2, max_size> &newPattern = default_pattern)
         : _pattern(newPattern) {
       height =
           int(std::ceil(std::max_element(_pattern.begin(), _pattern.end(),
@@ -215,12 +268,14 @@ struct Settings {
                             ->lpNorm<Eigen::Infinity>()));
     }
 
-    inline const StdVector<Vec2> &pattern() const { return _pattern; }
+    inline const static_vector<Vec2, max_size> &pattern() const {
+      return _pattern;
+    }
     int height;
 
   private:
-    StdVector<Vec2> _pattern;
-    static const StdVector<Vec2> default_pattern;
+    static_vector<Vec2, max_size> _pattern;
+    static const static_vector<Vec2, max_size> default_pattern;
   } residualPattern;
 
   struct Intencity {
@@ -234,27 +289,51 @@ struct Settings {
   } threading;
 
   static constexpr int default_maxOptimizedPoints = 2000;
-  int maxOptimizedPoints = default_maxOptimizedPoints;
+  static constexpr int max_maxOptimizedPoints = 10000;
+  inline int maxOptimizedPoints() const { return mMaxOptimizedPoints; }
+  inline void setMaxOptimizedPoints(int newMaxOptimizedPoints) {
+    CHECK(newMaxOptimizedPoints > 0 &&
+          newMaxOptimizedPoints <= max_maxOptimizedPoints);
+    mMaxOptimizedPoints = newMaxOptimizedPoints;
+  }
 
   static constexpr int default_maxKeyFrames = 6;
-  int maxKeyFrames = default_maxKeyFrames;
+  static constexpr int max_maxKeyFrames = 7;
+  inline int maxKeyFrames() const { return mMaxKeyFrames; }
+  inline void setMaxKeyFrames(int newMaxKeyFrames) {
+    CHECK(newMaxKeyFrames > 0 && newMaxKeyFrames <= max_maxKeyFrames);
+    mMaxKeyFrames = newMaxKeyFrames;
+  }
+  int mMaxKeyFrames = default_maxKeyFrames;
+
+  static constexpr int default_keyFrameDist = 10;
+  static constexpr int max_keyFrameDist = 20;
+  inline int keyFrameDist() const { return mKeyFrameDist; }
+  inline void setKeyFrameDist(int newKeyFrameDist) {
+    CHECK(newKeyFrameDist > 0 && newKeyFrameDist <= max_keyFrameDist);
+    mKeyFrameDist = newKeyFrameDist;
+  }
 
   static constexpr bool default_trackFromLastKf = true;
   bool trackFromLastKf = default_trackFromLastKf;
 
-  static constexpr bool default_predictUsingScrew = false;
+  static constexpr bool default_predictUsingScrew = true;
   bool predictUsingScrew = default_predictUsingScrew;
 
   static constexpr bool default_continueChoosingKeyFrames = true;
   bool continueChoosingKeyFrames = default_continueChoosingKeyFrames;
 
-  static constexpr int default_initialMaxFrame = 2500;
-  int initialMaxFrame = default_initialMaxFrame;
+  static constexpr int default_expectedFramesCount = 2500;
+  int expectedFramesCount = default_expectedFramesCount;
 
   InitializerSettings getInitializerSettings() const;
   PointTracerSettings getPointTracerSettings() const;
   FrameTrackerSettings getFrameTrackerSettings() const;
   BundleAdjusterSettings getBundleAdjusterSettings() const;
+
+private:
+  int mKeyFrameDist = default_keyFrameDist;
+  int mMaxOptimizedPoints = default_maxOptimizedPoints;
 };
 
 struct PointTracerSettings {

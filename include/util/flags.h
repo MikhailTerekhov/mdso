@@ -15,7 +15,6 @@ DECLARE_bool(switch_first_motion_to_GT);
 
 DECLARE_bool(optimize_affine_light);
 
-DECLARE_bool(perform_full_tracing);
 DECLARE_bool(use_alt_H_weighting);
 DECLARE_int32(tracing_GN_iter);
 
@@ -25,6 +24,7 @@ DECLARE_double(tracing_impr_factor);
 DECLARE_double(epi_outlier_e);
 DECLARE_double(epi_outlier_q);
 
+DECLARE_bool(continue_choosing_keyframes);
 DECLARE_bool(track_from_lask_kf);
 DECLARE_bool(predict_using_screw);
 DECLARE_bool(use_grad_weights_on_tracking);

@@ -2,29 +2,37 @@
 
 namespace fishdso {
 
-CloudWriter::CloudWriter(CameraModel *cam, const std::string &outputDirectory,
+CloudWriter::CloudWriter(CameraBundle *cam, const std::string &outputDirectory,
                          const std::string &fileName)
     : cam(cam)
     , cloudHolder(fileInDir(outputDirectory, fileName)) {}
 
-void CloudWriter::keyFramesMarginalized(
-    const std::vector<const KeyFrame *> &marginalized) {
-  for (const KeyFrame *kf : marginalized) {
+void CloudWriter::keyFramesMarginalized(const KeyFrame *marginalized[],
+                                        int size) {
+  for (int i = 0; i < size; ++i) {
+    const KeyFrame *kf = marginalized[i];
     std::vector<Vec3> points;
     std::vector<cv::Vec3b> colors;
 
-    for (const auto &op : kf->optimizedPoints) {
-      points.push_back(kf->thisToWorld *
-                       (op->depth() * cam->unmap(op->p).normalized()));
-      colors.push_back(
-          kf->preKeyFrame->frameColored.at<cv::Vec3b>(toCvPoint(op->p)));
-    }
-    for (const auto &ip : kf->immaturePoints) {
-      if (ip->numTraced > 0) {
-        points.push_back(kf->thisToWorld *
-                         (ip->depth * cam->unmap(ip->p).normalized()));
-        colors.push_back(
-            kf->preKeyFrame->frameColored.at<cv::Vec3b>(toCvPoint(ip->p)));
+    for (int j = 0; j < kf->frames.size(); ++j) {
+      const KeyFrameEntry &e = kf->frames[j];
+      SE3 thisToWorld = kf->thisToWorld * cam->bundle[j].thisToBody;
+      for (const auto &op : e.optimizedPoints) {
+        points.push_back(
+            thisToWorld *
+            (op.depth() * cam->bundle[j].cam.unmap(op.p).normalized()));
+        colors.push_back(kf->preKeyFrame->frames[j].frameColored.at<cv::Vec3b>(
+            toCvPoint(op.p)));
+      }
+      for (const auto &ip : e.immaturePoints) {
+        if (ip.numTraced > 0) {
+          points.push_back(
+              kf->thisToWorld *
+              (ip.depth * cam->bundle[j].cam.unmap(ip.p).normalized()));
+          colors.push_back(
+              kf->preKeyFrame->frames[j].frameColored.at<cv::Vec3b>(
+                  toCvPoint(ip.p)));
+        }
       }
     }
 
@@ -39,9 +47,8 @@ void CloudWriter::keyFramesMarginalized(
   cloudHolder.updatePointCount();
 }
 
-void CloudWriter::destructed(
-    const std::vector<const KeyFrame *> &lastKeyFrames) {
-  keyFramesMarginalized(lastKeyFrames);
+void CloudWriter::destructed(const KeyFrame *lastKeyFrames[], int size) {
+  keyFramesMarginalized(lastKeyFrames, size);
 }
 
 } // namespace fishdso

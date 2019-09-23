@@ -18,6 +18,7 @@ find_package(gflags REQUIRED)
 find_package(Glog REQUIRED)
 find_package(Ceres REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(Boost REQUIRED)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/thirdparty/googletest)
 
@@ -46,7 +47,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/output/TrajectoryWriterGT.h
     ${PROJECT_SOURCE_DIR}/include/output/CloudWriter.h
     ${PROJECT_SOURCE_DIR}/include/output/CloudWriterGT.h
-    ${PROJECT_SOURCE_DIR}/include/output/InitializerObserver.h
+    ${PROJECT_SOURCE_DIR}/include/output/DelaunayInitializerObserver.h
     ${PROJECT_SOURCE_DIR}/include/output/InterpolationDrawer.h
     ${PROJECT_SOURCE_DIR}/include/output/FrameTrackerObserver.h
     ${PROJECT_SOURCE_DIR}/include/output/TrackingDebugImageDrawer.h
@@ -59,9 +60,12 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/system/DelaunayDsoInitializer.h
     ${PROJECT_SOURCE_DIR}/include/system/PreKeyFrame.h
     ${PROJECT_SOURCE_DIR}/include/system/KeyFrame.h
+    ${PROJECT_SOURCE_DIR}/include/system/MarginalizedKeyFrame.h
+    ${PROJECT_SOURCE_DIR}/include/system/MarginalizedPreKeyFrame.h
     ${PROJECT_SOURCE_DIR}/include/system/ImmaturePoint.h
     ${PROJECT_SOURCE_DIR}/include/system/OptimizedPoint.h
     ${PROJECT_SOURCE_DIR}/include/system/CameraModel.h
+    ${PROJECT_SOURCE_DIR}/include/system/CameraBundle.h
     ${PROJECT_SOURCE_DIR}/include/system/StereoMatcher.h
     ${PROJECT_SOURCE_DIR}/include/system/StereoGeometryEstimator.h
     ${PROJECT_SOURCE_DIR}/include/system/FrameTracker.h
@@ -90,7 +94,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/output/TrajectoryWriterGT.cpp
     ${PROJECT_SOURCE_DIR}/source/output/CloudWriter.cpp
     ${PROJECT_SOURCE_DIR}/source/output/CloudWriterGT.cpp
-    ${PROJECT_SOURCE_DIR}/source/output/InitializerObserver.cpp
+    ${PROJECT_SOURCE_DIR}/source/output/DelaunayInitializerObserver.cpp
     ${PROJECT_SOURCE_DIR}/source/output/InterpolationDrawer.cpp
     ${PROJECT_SOURCE_DIR}/source/output/FrameTrackerObserver.cpp
     ${PROJECT_SOURCE_DIR}/source/output/TrackingDebugImageDrawer.cpp
@@ -98,11 +102,15 @@ set(dso_SOURCE_FILES
 
     ${PROJECT_SOURCE_DIR}/source/system/SphericalPlus.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoSystem.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/DsoInitializer.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DelaunayDsoInitializer.cpp
     ${PROJECT_SOURCE_DIR}/source/system/PreKeyFrame.cpp
     ${PROJECT_SOURCE_DIR}/source/system/KeyFrame.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/MarginalizedKeyFrame.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/MarginalizedPreKeyFrame.cpp
     ${PROJECT_SOURCE_DIR}/source/system/ImmaturePoint.cpp
     ${PROJECT_SOURCE_DIR}/source/system/CameraModel.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/CameraBundle.cpp
     ${PROJECT_SOURCE_DIR}/source/system/StereoMatcher.cpp
     ${PROJECT_SOURCE_DIR}/source/system/StereoGeometryEstimator.cpp
     ${PROJECT_SOURCE_DIR}/source/system/FrameTracker.cpp
@@ -143,6 +151,7 @@ target_include_directories(dso
     ${GFLAGS_INCLUDE_DIRS}
     ${GLOG_INCLUDE_DIRS}
     ${EIGEN3_INCLUDE_DIR}
+    ${Boost_INCLUDE_DIRS}
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
   PRIVATE

@@ -2,64 +2,47 @@
 
 namespace fishdso {
 
-TrajectoryWriterGT::TrajectoryWriterGT(
-    const StdVector<SE3> &worldToFrameUnalignedGT,
-    const std::string &outputDirectory, const std::string &fileName,
-    const std::string &matrixFormFileName)
-    : worldToFrameGT(worldToFrameUnalignedGT)
-    , worldToFrameUnalignedGT(worldToFrameUnalignedGT)
-    , outputFileName(fileInDir(outputDirectory, fileName))
-    , matrixFormOutputFileName(fileInDir(outputDirectory, matrixFormFileName)) {
+TrajectoryWriterGT::TrajectoryWriterGT(const SE3 frameToWorldGT[],
+                                       Timestamp timestamps[], int size,
+                                       const std::string &outputDirectory,
+                                       const std::string &fileName)
+    : outputFileName(fileInDir(outputDirectory, fileName)) {
+  for (int i = 0; i < size; ++i)
+    frameToWorldGTPool.push({timestamps[i], frameToWorldGT[i]});
 }
 
-void TrajectoryWriterGT::initialized(
-    const std::vector<const KeyFrame *> &initializedKFs) {
-  CHECK(initializedKFs.size() > 1);
-
-  SE3 worldToFirst = initializedKFs[0]->thisToWorld.inverse();
-  SE3 worldToLast = initializedKFs.back()->thisToWorld.inverse();
-  int firstNum = initializedKFs[0]->preKeyFrame->globalFrameNum;
-  int lastNum = initializedKFs.back()->preKeyFrame->globalFrameNum;
-  SE3 worldToFirstGT = worldToFrameGT[firstNum];
-  SE3 worldToLastGT = worldToFrameGT[lastNum];
-
-  sim3Aligner = std::unique_ptr<Sim3Aligner>(new Sim3Aligner(
-      worldToFirst, worldToLast, worldToFirstGT, worldToLastGT));
-
-  for (auto &pose : worldToFrameGT)
-    pose = sim3Aligner->alignWorldToFrameGT(pose);
+void TrajectoryWriterGT::newBaseFrame(const KeyFrame &baseFrame) {
+  curKfTs.push_back(baseFrame.preKeyFrame->frames[0].timestamp);
 }
 
-void TrajectoryWriterGT::keyFramesMarginalized(
-    const std::vector<const KeyFrame *> &marginalized) {
-  std::ofstream posesOfs(outputFileName, std::ios_base::app);
-  std::ofstream matrixFormOfs(matrixFormOutputFileName, std::ios_base::app);
+void TrajectoryWriterGT::keyFramesMarginalized(const KeyFrame *marginalized[],
+                                               int size) {
+  std::vector<Timestamp> margKfTs;
+  margKfTs.reserve(size);
+  std::vector<Timestamp> newKfTs(curKfTs.size());
 
-  for (const KeyFrame *kf : marginalized) {
-    putInMatrixForm(
-        matrixFormOfs,
-        worldToFrameUnalignedGT[kf->preKeyFrame->globalFrameNum].inverse());
-    matrixFormOfs << '\n';
+  for (int i = 0; i < size; ++i)
+    margKfTs.push_back(marginalized[i]->preKeyFrame->frames[0].timestamp);
 
-    posesOfs << kf->preKeyFrame->globalFrameNum << ' ';
-    putMotion(posesOfs, worldToFrameGT[kf->preKeyFrame->globalFrameNum]);
-    posesOfs << '\n';
-    for (const auto &preKeyFrame : kf->trackedFrames) {
-      putInMatrixForm(
-          matrixFormOfs,
-          worldToFrameUnalignedGT[preKeyFrame->globalFrameNum].inverse());
-      matrixFormOfs << '\n';
+  int numLeft =
+      std::set_difference(curKfTs.begin(), curKfTs.end(), margKfTs.begin(),
+                          margKfTs.end(), newKfTs.begin()) -
+      newKfTs.begin();
+  newKfTs.resize(numLeft);
+  std::swap(curKfTs, newKfTs);
 
-      posesOfs << preKeyFrame->globalFrameNum << ' ';
-      putMotion(posesOfs, worldToFrameGT[preKeyFrame->globalFrameNum]);
-      posesOfs << '\n';
-    }
+  std::ofstream ofs(outputFileName, std::ios_base::app);
+  int minKfTs = curKfTs.empty() ? INF : curKfTs[0];
+  while (!frameToWorldGTPool.empty() &&
+         frameToWorldGTPool.top().first < minKfTs) {
+    putInMatrixForm(ofs, frameToWorldGTPool.top().second);
+    ofs << '\n';
+    frameToWorldGTPool.pop();
   }
 }
 
-void TrajectoryWriterGT::destructed(
-    const std::vector<const KeyFrame *> &lastKeyFrames) {
-  keyFramesMarginalized(lastKeyFrames);
+void TrajectoryWriterGT::destructed(const KeyFrame *lastKeyFrames[], int size) {
+  keyFramesMarginalized(lastKeyFrames, size);
 }
 
 } // namespace fishdso

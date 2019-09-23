@@ -20,7 +20,7 @@ bool doesABIntersectCD(const Vec2 &a, const Vec2 &b, const Vec2 &c,
 
 // approximates a point with a given coordinate along the curve given points on
 // the curve with integer coordinates
-Vec2 approxOnCurve(const StdVector<Vec2> &points, double displ);
+Vec2 approxOnCurve(Vec2 points[], int size, double displ);
 
 bool isInSector(const Vec3 &ray, Vec3 *s[3]);
 

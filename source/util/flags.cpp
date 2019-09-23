@@ -24,9 +24,6 @@ DEFINE_bool(optimize_affine_light,
             Settings::AffineLight::default_optimizeAffineLight,
             "Perform affine light transform optimization while tracking?");
 
-DEFINE_bool(perform_full_tracing,
-            Settings::PointTracer::default_performFullTracing,
-            "Do we need to search through full epipolar curve?");
 DEFINE_bool(use_alt_H_weighting,
             Settings::PointTracer::default_useAltHWeighting,
             "Do we need to use alternative formula for H robust weighting when "
@@ -39,6 +36,10 @@ DEFINE_double(pos_variance, Settings::PointTracer::default_positionVariance,
 DEFINE_double(tracing_impr_factor, Settings::PointTracer::default_imprFactor,
               "Minimum predicted stddev improvement for tracing to happen.");
 
+DEFINE_bool(continue_choosing_keyframes,
+            Settings::default_continueChoosingKeyFrames,
+            "Do we need to use keyframes other than those we have from "
+            "initialization?");
 DEFINE_bool(track_from_last_kf, Settings::default_trackFromLastKf,
             "Use last keyframe as the base one for tracking? If set to false, "
             "last but one keyframe is used");
@@ -76,7 +77,7 @@ Settings getFlaggedSettings() {
   Settings settings;
 
   settings.threading.numThreads = FLAGS_num_threads;
-  settings.keyFrame.pointsNum = FLAGS_points_per_frame;
+  settings.keyFrame.setImmaturePointsNum(FLAGS_points_per_frame);
   settings.delaunayDsoInitializer.firstFramesSkip = FLAGS_first_frames_skip;
   settings.stereoMatcher.stereoGeometryEstimator.runMaxRansacIter =
       FLAGS_run_max_RANSAC_iterations;
@@ -84,10 +85,10 @@ Settings getFlaggedSettings() {
       FLAGS_average_ORB_motion;
   settings.bundleAdjuster.runBA = FLAGS_run_ba;
   settings.affineLight.optimizeAffineLight = FLAGS_optimize_affine_light;
-  settings.pointTracer.performFullTracing = FLAGS_perform_full_tracing;
   settings.pointTracer.useAltHWeighting = FLAGS_use_alt_H_weighting;
   settings.pointTracer.gnIter = FLAGS_tracing_GN_iter;
   settings.pointTracer.positionVariance = FLAGS_pos_variance;
+  settings.continueChoosingKeyFrames = FLAGS_continue_choosing_keyframes;
   settings.trackFromLastKf = FLAGS_track_from_last_kf;
   settings.predictUsingScrew = FLAGS_predict_using_screw;
   settings.frameTracker.useGradWeighting = FLAGS_use_grad_weights_on_tracking;

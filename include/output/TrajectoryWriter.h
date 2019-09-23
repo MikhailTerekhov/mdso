@@ -9,19 +9,17 @@ namespace fishdso {
 class TrajectoryWriter : public DsoObserver {
 public:
   TrajectoryWriter(const std::string &outputDirectory,
-                   const std::string &fileName,
-                   const std::string &matrixFormFileName);
+                   const std::string &fileName);
 
-  void newKeyFrame(const KeyFrame *baseFrame);
-  void keyFramesMarginalized(const std::vector<const KeyFrame *> &marginalized);
-  void destructed(const std::vector<const KeyFrame *> &lastKeyFrames);
+  void newBaseFrame(const KeyFrame &baseFrame) override;
+  void keyFramesMarginalized(const KeyFrame *marginalized[], int size) override;
+  void destructed(const KeyFrame *lastKeyFrames[], int size) override;
 
 private:
-  std::set<int> curKfNums;
-  StdMap<int, SE3> frameToWorldPool;
+  std::vector<Timestamp> curKfTs;
+  PosesPool frameToWorldPool;
 
   std::string outputFileName;
-  std::string matrixFormOutputFileName;
 };
 
 } // namespace fishdso

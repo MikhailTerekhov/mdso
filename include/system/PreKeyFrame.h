@@ -2,7 +2,7 @@
 #define INCLUDE_PREKEYFRAME
 
 #include "system/AffineLightTransform.h"
-#include "system/CameraModel.h"
+#include "system/CameraBundle.h"
 #include "util/ImagePyramid.h"
 #include "util/settings.h"
 #include "util/types.h"
@@ -15,23 +15,44 @@ struct KeyFrame;
 class PreKeyFrameInternals;
 
 struct PreKeyFrame {
+
+  struct FrameEntry {
+    FrameEntry(PreKeyFrame *host, int ind, const cv::Mat &_frameColored, Timestamp timestamp,
+               const Settings::Pyramid &pyrSettings);
+
+    PreKeyFrame *host;
+    int ind;
+    cv::Mat frameColored;
+    cv::Mat1d gradX, gradY, gradNorm;
+    ImagePyramid framePyr;
+
+    Timestamp timestamp;
+    AffLight lightBaseToThis;
+  };
+
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  PreKeyFrame(KeyFrame *baseKeyFrame, CameraModel *cam,
-              const cv::Mat &frameColored, int globalFrameNum,
+  PreKeyFrame(KeyFrame *baseFrame, CameraBundle *cam,
+              const cv::Mat coloredFrames[], int globalFrameNum,
+              Timestamp timestamps[],
               const Settings::Pyramid &_pyrSettings = {});
   ~PreKeyFrame();
 
-  cv::Mat frameColored;
-  cv::Mat1d gradX, gradY, gradNorm;
-  ImagePyramid framePyr;
-  EIGEN_STRONG_INLINE cv::Mat1b &frame() { return framePyr[0]; }
-  EIGEN_STRONG_INLINE const cv::Mat1b &frame() const { return framePyr[0]; }
+  inline cv::Mat1b &image(int num) {
+    CHECK(num >= 0 && num < frames.size());
+    return frames[num].framePyr[0];
+  }
 
-  KeyFrame *baseKeyFrame;
-  CameraModel *cam;
+  inline const cv::Mat1b &image(int num) const {
+    CHECK(num >= 0 && num < frames.size());
+    return frames[num].framePyr[0];
+  }
+
+  std::vector<FrameEntry> frames;
+
+  KeyFrame *baseFrame;
+  CameraBundle *cam;
   SE3 baseToThis;
-  AffineLightTransform<double> lightBaseToThis;
   int globalFrameNum;
 
   Settings::Pyramid pyrSettings;

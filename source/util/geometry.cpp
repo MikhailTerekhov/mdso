@@ -88,17 +88,21 @@ bool doesABIntersectCD(const Vec2 &a, const Vec2 &b, const Vec2 &c,
 
 // approximates a point with a given coordinate along the curve given points on
 // the curve with integer coordinates
-Vec2 approxOnCurve(const StdVector<Vec2> &points, double displ) {
-  CHECK(points.size() >= 2);
+Vec2 approxOnCurve(Vec2 points[], int size, double displ) {
+  CHECK(size >= 2);
   if (displ <= 0)
     return points[0] - displ * (points[0] - points[1]);
-  if (displ + 1 >= points.size()) {
-    const Vec2 &last = points.back();
-    const Vec2 &lbo = points[points.size() - 2];
-    double res = displ - points.size() + 1;
+  if (displ + 1 >= size) {
+    const Vec2 &last = points[size - 1];
+    const Vec2 &lbo = points[size - 2];
+    double res = displ - size + 1;
     return last + res * (last - lbo);
   }
   int intDispl = displ;
+  if (intDispl < 0)
+    intDispl = 0;
+  if (intDispl > size - 2)
+    intDispl = size - 2;
   double fracDispl = displ - intDispl;
   return points[intDispl] +
          fracDispl * (points[intDispl + 1] - points[intDispl]);

@@ -10,40 +10,48 @@ DEFINE_double(debug_max_residual, 12.0,
               "Max tracking residual when displaying debug image.");
 
 TrackingDebugImageDrawer::TrackingDebugImageDrawer(
-    const StdVector<CameraModel> &camPyr,
-    const Settings::FrameTracker &frameTrackerSettings,
+    CameraBundle camPyr[], const Settings::FrameTracker &frameTrackerSettings,
     const Settings::Pyramid &pyrSettings)
     : frameTrackerSettings(frameTrackerSettings)
     , pyrSettings(pyrSettings)
     , camPyr(camPyr)
-    , residualsImg(
-          pyrSettings.levelNum,
-          cv::Mat3b::zeros(camPyr[0].getHeight(), camPyr[0].getWidth())) {}
+    , residualsImg(pyrSettings.levelNum(),
+                   cv::Mat3b::zeros(camPyr[0].bundle[0].cam.getHeight(),
+                                    camPyr[0].bundle[0].cam.getWidth())) {
+  curFramePyr.reserve(pyrSettings.levelNum());
+}
 
-void TrackingDebugImageDrawer::startTracking(const ImagePyramid &frame) {
-  curFramePyr = frame.images;
+void TrackingDebugImageDrawer::startTracking(const PreKeyFrame &frame) {
+  curFramePyr.resize(0);
+  for (const cv::Mat1b &img : frame.frames[0].framePyr.images)
+    curFramePyr.push_back(img.clone());
   residualsImg.resize(0);
-  residualsImg.resize(pyrSettings.levelNum);
+  residualsImg.resize(pyrSettings.levelNum());
 }
 
 void TrackingDebugImageDrawer::levelTracked(
-    int levelNum, const SE3 &baseToLast,
-    const AffineLightTransform<double> &affLightBaseToLast,
-    const StdVector<std::pair<Vec2, double>> &pointResiduals) {
-  int w = camPyr[levelNum].getWidth(), h = camPyr[levelNum].getHeight();
+    int pyrLevel, const FrameTracker::TrackingResult &result,
+    std::pair<Vec2, double> pointResiduals[], int size) {
+  CHECK(camPyr[0].bundle.size() == 1) << "Multicamera case is NIY";
+
+  int w = camPyr[pyrLevel].bundle[0].cam.getWidth(),
+      h = camPyr[pyrLevel].bundle[0].cam.getHeight();
   int s = FLAGS_tracking_rel_point_size * (w + h) / 2;
-  cv::cvtColor(curFramePyr[levelNum], residualsImg[levelNum],
+  cv::cvtColor(curFramePyr[pyrLevel], residualsImg[pyrLevel],
                cv::COLOR_GRAY2BGR);
 
-  for (const auto &[point, res] : pointResiduals)
-    if (camPyr[levelNum].isOnImage(point, s))
-      putSquare(residualsImg[levelNum], toCvPoint(point), s,
-                depthCol(res, 0, FLAGS_debug_max_residual), cv::FILLED);
+  for (int i = 0; i < size; ++i) {
+    const auto &[point, res] = pointResiduals[i];
+    if (camPyr[pyrLevel].bundle[0].cam.isOnImage(point, s))
+      putSquare(residualsImg[pyrLevel], toCvPoint(point), s,
+                depthCol(std::abs(res), 0, FLAGS_debug_max_residual), cv::FILLED);
+  }
 }
 
 cv::Mat3b TrackingDebugImageDrawer::drawAllLevels() {
   return drawLeveled(residualsImg.data(), residualsImg.size(),
-                     camPyr[0].getWidth(), camPyr[0].getHeight(),
+                     camPyr[0].bundle[0].cam.getWidth(),
+                     camPyr[0].bundle[0].cam.getHeight(),
                      FLAGS_tracking_res_image_width);
 }
 

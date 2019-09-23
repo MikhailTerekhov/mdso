@@ -31,8 +31,8 @@ TEST(UtilTest, DepthedImagePyramid) {
   }
 
   cv::Mat1b base(h, w, CV_BLACK_BYTE);
-  DepthedImagePyramid tst(base, Settings::Pyramid::default_levelNum, pnts, dps,
-                          ws);
+  DepthedImagePyramid tst(base, Settings::Pyramid::default_levelNum,
+                          pnts.data(), dps.data(), ws.data(), pnts.size());
 
   for (int i = 0; i < pnts.size(); ++i) {
     for (int pl = 0; pl < Settings::Pyramid::default_levelNum; ++pl) {

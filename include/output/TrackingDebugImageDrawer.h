@@ -11,14 +11,14 @@ namespace fishdso {
 
 class TrackingDebugImageDrawer : public FrameTrackerObserver {
 public:
-  TrackingDebugImageDrawer(const StdVector<CameraModel> &camPyr,
+  TrackingDebugImageDrawer(CameraBundle camPyr[],
                            const Settings::FrameTracker &frameTrackerSettings,
                            const Settings::Pyramid &pyrSettings);
 
-  void startTracking(const ImagePyramid &frame);
-  void levelTracked(int pyrLevel, const SE3 &baseToLast,
-                    const AffineLightTransform<double> &affLightBaseToLast,
-                    const StdVector<std::pair<Vec2, double>> &pointResiduals);
+  void startTracking(const PreKeyFrame &frame) override;
+  void levelTracked(int pyrLevel, const FrameTracker::TrackingResult &result,
+                    std::pair<Vec2, double> pointResiduals[],
+                    int size) override;
 
   cv::Mat3b drawAllLevels();
   cv::Mat3b drawFinestLevel();
@@ -27,7 +27,7 @@ private:
   Settings::FrameTracker frameTrackerSettings;
   Settings::Pyramid pyrSettings;
 
-  StdVector<CameraModel> camPyr;
+  CameraBundle *camPyr;
   std::vector<cv::Mat1b> curFramePyr;
   std::vector<cv::Mat3b> residualsImg;
 };

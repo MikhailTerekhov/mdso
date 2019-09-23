@@ -11,7 +11,7 @@ namespace fishdso {
 
 class DepthPyramidDrawer : public FrameTrackerObserver {
 public:
-  void newBaseFrame(const DepthedImagePyramid &pyr);
+  void newBaseFrame(const FrameTracker::DepthedMultiFrame &pyr) override;
 
   bool pyrChanged();
   cv::Mat getLastPyr();

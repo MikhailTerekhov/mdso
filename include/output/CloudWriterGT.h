@@ -10,18 +10,21 @@ namespace fishdso {
 
 class CloudWriterGT : public DsoObserver {
 public:
-  CloudWriterGT(const StdVector<SE3> &worldToFrameGT,
-                const std::vector<std::vector<Vec3>> &pointsInFrameGT,
-                const std::vector<std::vector<cv::Vec3b>> &colors,
+  CloudWriterGT(SE3 frameToWorldGT[], Timestamp timestamps[],
+                std::vector<Vec3> pointsInFrameGT[],
+                std::vector<cv::Vec3b> colors[], int size,
                 const std::string &outputDirectory,
                 const std::string &fileName);
 
-  void initialized(const std::vector<const KeyFrame *> &initializedKFs);
-  void keyFramesMarginalized(const std::vector<const KeyFrame *> &marginalized);
-  void destructed(const std::vector<const KeyFrame *> &lastKeyFrames);
+  void initialized(const KeyFrame *initializedKFs[], int size) override;
+  void keyFramesMarginalized(const KeyFrame *marginalized[], int size) override;
+  void destructed(const KeyFrame *lastKeyFrames[], int size) override;
 
 private:
-  StdVector<SE3> worldToFrameGT;
+  int findInd(Timestamp timestamp);
+  
+  std::vector<Timestamp> timestamps;
+  StdVector<SE3> frameToWorldGT;
   std::vector<std::vector<Vec3>> pointsInFrameGT;
   std::vector<std::vector<cv::Vec3b>> colors;
   PlyHolder cloudHolder;

@@ -136,11 +136,21 @@ void putInMatrixForm(std::ostream &out, const SE3 &motion) {
 }
 
 void putDot(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col) {
+  int r = 4;
+  Eigen::AlignedBox2i bounds(Vec2i(r, r), Vec2i(img.cols - r, img.rows - r));
+  if (!(bounds.contains(toVec2i(pos - cv::Point(r, r))) &&
+        bounds.contains(toVec2i(pos + cv::Point(r, r)))))
+    return;
   cv::circle(img, pos, 4, col, cv::FILLED);
 }
 
 void putCross(cv::Mat &img, const cv::Point &pos, int size,
               const cv::Scalar &col, int thickness) {
+  Eigen::AlignedBox2i bounds(Vec2i::Zero(), Vec2i(img.cols, img.rows));
+  if (!(bounds.contains(toVec2i(pos - cv::Point(size, size))) &&
+        bounds.contains(toVec2i(pos + cv::Point(size, size)))))
+    return;
+
   cv::line(img, pos - cv::Point(size, size), pos + cv::Point(size, size), col,
            thickness);
   cv::line(img, pos + cv::Point(-size, size), pos + cv::Point(size, -size), col,
@@ -148,6 +158,10 @@ void putCross(cv::Mat &img, const cv::Point &pos, int size,
 }
 void putSquare(cv::Mat &img, const cv::Point &pos, int size,
                const cv::Scalar &col, int thickness) {
+  Eigen::AlignedBox2i bounds(Vec2i::Zero(), Vec2i(img.cols, img.rows));
+  if (!(bounds.contains(toVec2i(pos - cv::Point(size, size))) &&
+        bounds.contains(toVec2i(pos + cv::Point(size, size)))))
+    return;
   cv::rectangle(img, pos - cv::Point(size, size), pos + cv::Point(size, size),
                 col, thickness);
 }
@@ -183,18 +197,16 @@ cv::Scalar depthCol(double d, double mind, double maxd) {
                  : CV_RED * ((mid - d) / dist) + CV_GREEN * ((d - mind) / dist);
 }
 
-void insertDepths(cv::Mat &img, const StdVector<Vec2> &points,
-                  const std::vector<double> &depths, double minDepth,
-                  double maxDepth, bool areSolidPnts) {
-  if (points.size() != depths.size())
-    throw std::runtime_error("insertDepths error!");
-  if (points.empty())
+void insertDepths(cv::Mat &img, const Vec2 points[], const double depths[],
+                  int size, double minDepth, double maxDepth,
+                  bool areSolidPnts) {
+  if (size == 0)
     return;
 
-  std::cout << "mind, maxd = " << minDepth << ' ' << maxDepth << std::endl;
-  for (int i = 0; i < int(points.size()); ++i) {
-    cv::Point cvp(static_cast<int>(points[i][0]),
-                  static_cast<int>(points[i][1]));
+  LOG(INFO) << "insertDepths : mind, maxd = " << minDepth << ' ' << maxDepth
+            << std::endl;
+  for (int i = 0; i < size; ++i) {
+    cv::Point cvp(toCvPoint(points[i]));
     cv::circle(img, cvp, areSolidPnts ? 6 : 5,
                depthCol(depths[i], minDepth, maxDepth),
                areSolidPnts ? cv::FILLED : 2);
@@ -203,6 +215,8 @@ void insertDepths(cv::Mat &img, const StdVector<Vec2> &points,
 }
 
 Vec2 toVec2(cv::Point p) { return Vec2(double(p.x), double(p.y)); }
+
+Vec2i toVec2i(cv::Point p) { return Vec2i(p.x, p.y); }
 
 cv::Vec3b toCvVec3bDummy(cv::Scalar scalar) {
   return cv::Vec3b(scalar[0], scalar[1], scalar[2]);

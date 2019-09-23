@@ -1,18 +1,17 @@
 #ifndef INCLUDE_INTERPOLATIONDRAWER
 #define INCLUDE_INTERPOLATIONDRAWER
 
-#include "output/InitializerObserver.h"
+#include "output/DelaunayInitializerObserver.h"
 
 namespace fishdso {
 
-class InterpolationDrawer : public InitializerObserver {
+class InterpolationDrawer : public DelaunayInitializerObserver {
 public:
   InterpolationDrawer(CameraModel *cam);
 
-  void initialized(const KeyFrame *lastKeyFrame,
-                   const SphericalTerrain *lastTerrain,
-                   const StdVector<Vec2> &keyPoints,
-                   const std::vector<double> &keyPointDepths);
+  void initialized(const InitializedFrame frames[],
+                   const SphericalTerrain terrains[], Vec2 *keyPoints[],
+                   double *keyPointDepths[], int sizes[]) override;
 
   bool didInitialize();
   cv::Mat3b draw();

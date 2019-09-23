@@ -189,7 +189,7 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
   std::vector<int> curInliersInds = inlierVectorsPool[ransacCurInliers],
                    bestInliersInds = inlierVectorsPool[ransacBestInliers];
 
-  long long iterNum = settings.maxRansacIter;
+  Timestamp iterNum = settings.maxRansacIter;
   double q = std::pow(1.0 - std::pow(1 - p, 1.0 / iterNum), 1.0 / N);
 
   for (int it = 0; it < iterNum; ++it) {
@@ -230,7 +230,7 @@ SE3 StereoGeometryEstimator::findCoarseMotion() {
       q = curQ;
       double newIterNum = std::log(1 - p) / std::log(1 - std::pow(curQ, N));
       if (!settings.runMaxRansacIter)
-        iterNum = static_cast<long long>(newIterNum);
+        iterNum = static_cast<Timestamp>(newIterNum);
     }
   }
 

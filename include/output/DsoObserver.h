@@ -14,15 +14,14 @@ class DsoObserver {
 public:
   virtual ~DsoObserver() = 0;
 
-  virtual void created(DsoSystem *newDso, CameraModel *newCam,
+  virtual void created(DsoSystem *newDso, CameraBundle *newCam,
                        const Settings &newSettings) {}
-  virtual void
-  initialized(const std::vector<const KeyFrame *> &initializedKFs) {}
-  virtual void newFrame(const PreKeyFrame *frame) {}
-  virtual void newKeyFrame(const KeyFrame *baseFrame) {}
-  virtual void
-  keyFramesMarginalized(const std::vector<const KeyFrame *> &marginalized) {}
-  virtual void destructed(const std::vector<const KeyFrame *> &lastKeyFrames) {}
+  virtual void initialized(const KeyFrame *initializedKFs[], int size) {}
+  virtual void newFrame(const PreKeyFrame &frame) {}
+  virtual void newBaseFrame(const KeyFrame &baseFrame) {}
+  virtual void keyFramesMarginalized(const KeyFrame *marginalized[], int size) {
+  }
+  virtual void destructed(const KeyFrame *lastKeyFrames[], int size) {}
 };
 
 } // namespace fishdso

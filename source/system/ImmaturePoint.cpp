@@ -9,30 +9,73 @@
 
 namespace fishdso {
 
-#define PL (settings.pyramid.levelNum)
+#define PL (settings.pyramid.levelNum())
 #define PS (settings.residualPattern.pattern().size())
 #define PH (settings.residualPattern.height)
 #define TH (settings.intencity.outlierDiff)
 
-ImmaturePoint::ImmaturePoint(KeyFrame *baseFrame, const Vec2 &p,
-                             const PointTracerSettings &_settings)
+std::string ImmaturePoint::statusName(ImmaturePoint::TracingStatus status) {
+  switch (status) {
+  case OK:
+    return "OK";
+    break;
+  case WAS_OOB:
+    return "WAS_OOB";
+    break;
+  case BIG_PREDICTED_ERROR:
+    return "BIG_PREDICTED_ERROR";
+    break;
+  case EPIPOLAR_OOB:
+    return "EPIPOLAR_OOB";
+    break;
+  case TOO_COARSE_PYR_LEVEL:
+    return "TOO_COARSE_PYR_LEVEL";
+    break;
+  case INF_DEPTH:
+    return "INF_DEPTH";
+    break;
+  case INF_ENERGY:
+    return "INF_ENERGY";
+    break;
+  case BIG_ENERGY:
+    return "BIG_ENERGY";
+    break;
+  case SMALL_ABS_SECOND_BEST:
+    return "SMALL_ABS_SECOND_BEST";
+    break;
+  case LOW_QUALITY:
+    return "LOW_QUALITY";
+    break;
+  case STATUS_COUNT:
+    return "STATUS_COUNT";
+    break;
+  }
+
+  CHECK(false);
+  return "Unexpected";
+}
+
+ImmaturePoint::ImmaturePoint(KeyFrameEntry *host, const Vec2 &p,
+                             const PointTracerSettings &settings)
     : p(p)
-    , baseDirections(_settings.residualPattern.pattern().size())
-    , baseIntencities(_settings.residualPattern.pattern().size())
-    , baseGrad(_settings.residualPattern.pattern().size())
-    , baseGradNorm(_settings.residualPattern.pattern().size())
     , minDepth(0)
     , maxDepth(INF)
     , bestQuality(-1)
     , lastEnergy(INF)
     , stddev(INF)
-    , cam(baseFrame->preKeyFrame->cam)
     , state(ACTIVE)
-    , settings(_settings)
+    , host(host)
+    , mIsReady(false)
     , lastTraced(false)
     , numTraced(0)
     , tracedPyrLevel(0) {
-  if (!cam->isOnImage(p, PH)) {
+  CHECK(host);
+  const PreKeyFrame &baseFrame = *host->host->preKeyFrame;
+
+  cam = baseFrame.cam;
+
+  camBase = &cam->bundle[host->ind].cam;
+  if (!camBase->isOnImage(p, PH)) {
     state = OOB;
     return;
   }
@@ -40,93 +83,59 @@ ImmaturePoint::ImmaturePoint(KeyFrame *baseFrame, const Vec2 &p,
   for (int i = 0; i < PS; ++i) {
     Vec2 curP = p + settings.residualPattern.pattern()[i];
     cv::Point curPCV = toCvPoint(curP);
-    baseDirections[i] = cam->unmap(curP).normalized();
-    baseIntencities[i] = baseFrame->preKeyFrame->frame()(curPCV);
+    baseDirections[i] = camBase->unmap(curP).normalized();
+    baseIntencities[i] = baseFrame.image(host->ind)(curPCV);
 
-    baseGrad[i] = Vec2(baseFrame->preKeyFrame->gradX(curPCV),
-                       baseFrame->preKeyFrame->gradY(curPCV));
+    baseGrad[i] = Vec2(baseFrame.frames[host->ind].gradX(curPCV),
+                       baseFrame.frames[host->ind].gradY(curPCV));
     baseGradNorm[i] = baseGrad[i].normalized();
   }
+
+  dir = baseDirections[0];
 }
 
-bool ImmaturePoint::isReady() {
-  return state == ACTIVE && stddev < settings.pointTracer.optimizedStddev;
-}
+bool ImmaturePoint::isReady() { return mIsReady; }
 
-bool ImmaturePoint::pointsToTrace(const SE3 &baseToRef, Vec3 &dirMinDepth,
-                                  Vec3 &dirMaxDepth, StdVector<Vec2> &points,
-                                  std::vector<Vec3> &directions) {
-  points.resize(0);
-  directions.resize(0);
+int ImmaturePoint::pointsToTrace(const CameraModel &camRef,
+                                 const SE3 &baseToRef, Vec3 &dirMinDepth,
+                                 Vec3 &dirMaxDepth, Vec2 points[],
+                                 Vec3 directions[],
+                                 const PointTracerSettings &settings) {
+  if (!camRef.isOnImage(camRef.map(dirMaxDepth), PH))
+    return 0;
 
-  if (M_PI - angle(dirMinDepth, dirMaxDepth) < 1e-3) {
-    LOG(INFO) << "ret by angle" << std::endl;
-    return false;
-  }
+  int maxSearchCount = std::min(int(settings.pointTracer.maxSearchRel *
+                                    (camRef.getWidth() + camRef.getHeight())),
+                                settings.pointTracer.maxSearchAbs());
+  int size = 0;
 
-  if (settings.pointTracer.performFullTracing) {
-    // While searching along epipolar curve, we will continously map rays on a
-    // diametrical segment of a sphere. Since our camera model remains valid
-    // only when angle between the mapped ray and Oz is smaller then certain
-    // maxAngle, we want to intersect the segment of search with the
-    // "well-mapped" part of the sphere, i.e. z > z0.
-    if (!intersectOnSphere(cam->getMaxAngle(), dirMinDepth, dirMaxDepth)) {
-      LOG(INFO) << "ret by no itersection" << std::endl;
-      return false;
-    }
-  }
+  double alpha = 0;
+  Vec2 point;
+  int pointCnt = 0;
+  do {
+    Vec3 curDir = (1 - alpha) * dirMaxDepth + alpha * dirMinDepth;
+    Mat23 mapJacobian;
+    std::tie(point, mapJacobian) = camRef.diffMap(curDir);
 
-  int maxSearchCount =
-      settings.pointTracer.maxSearchRel * (cam->getWidth() + cam->getHeight());
-  double alpha0 = 0;
-  double step = 1.0 / (settings.pointTracer.onImageTestCount - 1);
-  while (alpha0 <= 1) {
-    Vec3 curDir = (1 - alpha0) * dirMaxDepth + alpha0 * dirMinDepth;
-    Vec2 curP = cam->map(curDir);
-    if (!cam->isOnImage(curP, PH)) {
-      if (!settings.pointTracer.performFullTracing)
-        break;
-      alpha0 += step;
-      continue;
-    }
+    points[size] = point;
+    directions[size] = curDir;
+    size++;
 
-    double alpha;
-    for (int i = 0; i < 2; ++i) {
-      alpha = alpha0;
-      Vec2 point;
-      int pointCnt = 0;
-      do {
-        Vec3 curDir = (1 - alpha) * dirMaxDepth + alpha * dirMinDepth;
-        Mat23 mapJacobian;
-        std::tie(point, mapJacobian) = cam->diffMap(curDir);
+    double deltaAlpha = 1. / (mapJacobian * (dirMaxDepth - dirMinDepth)).norm();
+    alpha += deltaAlpha;
 
-        points.push_back(point);
-        directions.push_back(curDir);
+    pointCnt++;
+  } while (pointCnt < maxSearchCount && camRef.isOnImage(point, PH) &&
+           alpha <= 1);
 
-        double deltaAlpha =
-            1. / (mapJacobian * (dirMaxDepth - dirMinDepth)).norm();
-        alpha += deltaAlpha;
-
-        pointCnt++;
-        if (!settings.pointTracer.performFullTracing &&
-            pointCnt >= maxSearchCount)
-          break;
-      } while (alpha >= 0 && alpha <= 1 && cam->isOnImage(point, PH));
-    }
-
-    if (!settings.pointTracer.performFullTracing)
-      break;
-
-    alpha0 = alpha + step;
-  }
-
-  return points.size() > 1;
+  return size;
 }
 
 Vec2 ImmaturePoint::tracePrecise(
     const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> &refFrame,
-    const Vec2 &from, const Vec2 &to, const std::vector<double> &intencities,
-    const StdVector<Vec2> &pattern, double &bestDispl, double &bestEnergy) {
+    const Vec2 &from, const Vec2 &to, double intencities[], Vec2 pattern[],
+    double &bestDispl, double &bestEnergy,
+    const PointTracerSettings &settings) {
   Vec2 dir = to - from;
   dir.normalize();
   Vec2 bestPoint = (from + to) * 0.5;
@@ -171,57 +180,73 @@ Vec2 ImmaturePoint::tracePrecise(
   return bestPoint;
 }
 
-double ImmaturePoint::estVariance(const Vec2 &searchDirection) {
+double ImmaturePoint::estVariance(const Vec2 &searchDirection,
+                                  const PointTracerSettings &settings) {
   double sum1 = 0;
   for (const Vec2 &gN : baseGradNorm) {
     double s = gN.dot(searchDirection);
     sum1 += s * s;
   }
 
-  lastGeomVar = PS * settings.pointTracer.positionVariance / sum1;
-  lastFullVar = lastGeomVar;
-  return lastFullVar;
+  lastVar = PS * settings.pointTracer.positionVariance / sum1;
+  return lastVar;
 }
 
 ImmaturePoint::TracingStatus
-ImmaturePoint::traceOn(const KeyFrame &baseFrame, const PreKeyFrame &refFrame,
-                       TracingDebugType debugType) {
+ImmaturePoint::traceOn(const PreKeyFrame::FrameEntry &refFrameEntry,
+                       TracingDebugType debugType,
+                       const PointTracerSettings &settings) {
   if (state == OOB)
     return WAS_OOB;
 
-  AffineLightTransform<double> lightBaseToRef =
-      refFrame.lightBaseToThis * refFrame.baseKeyFrame->lightWorldToThis *
-      baseFrame.lightWorldToThis.inverse();
-  SE3 baseToRef = refFrame.baseToThis *
-                  refFrame.baseKeyFrame->thisToWorld.inverse() *
-                  baseFrame.thisToWorld;
+  KeyFrame &baseFrame = *host->host;
+  PreKeyFrame &refFrame = *refFrameEntry.host;
+  int indBase = host->ind;
+  int indRef = refFrameEntry.ind;
+  CameraModel &camRef = cam->bundle[indRef].cam;
+
+  AffLight lightBaseToRef =
+      refFrameEntry.lightBaseToThis *
+      refFrame.baseFrame->frames[indRef].lightWorldToThis *
+      host->lightWorldToThis.inverse();
+  SE3 baseToRef = cam->bundle[indRef].bodyToThis * refFrame.baseToThis *
+                  refFrame.baseFrame->thisToWorld.inverse() *
+                  baseFrame.thisToWorld *
+                  cam->bundle[indBase].bodyToThis.inverse();
 
   Vec3 dirMin = (baseToRef * (minDepth * baseDirections[0])).normalized();
   Vec3 dirMax = maxDepth == INF
                     ? baseToRef.so3() * baseDirections[0]
                     : (baseToRef * (maxDepth * baseDirections[0])).normalized();
-  Mat23 jacobian = cam->diffMap(dirMax).second;
+  Mat23 jacobian = cam->bundle[indRef].cam.diffMap(dirMax).second;
   Vec2 searchDirection = jacobian * (dirMin - dirMax);
   searchDirection.normalize();
 
-  double variance = estVariance(searchDirection);
+  double variance = estVariance(searchDirection, settings);
   double curDev = std::sqrt(variance);
 
-  if (!settings.pointTracer.performFullTracing && numTraced > 0)
+  if (numTraced > 0)
     if (curDev * settings.pointTracer.imprFactor > stddev)
       return BIG_PREDICTED_ERROR;
 
-  StdVector<Vec2> points;
-  std::vector<Vec3> directions;
-  if (!pointsToTrace(baseToRef, dirMin, dirMax, points, directions)) {
+  static_vector<Vec2, Settings::PointTracer::max_maxSearchAbs> points(
+      Settings::PointTracer::max_maxSearchAbs);
+  static_vector<Vec3, Settings::PointTracer::max_maxSearchAbs> directions(
+      Settings::PointTracer::max_maxSearchAbs);
+  int size = pointsToTrace(camRef, baseToRef, dirMin, dirMax, points.data(),
+                           directions.data(), settings);
+  if (size == 0)
     return EPIPOLAR_OOB;
-  }
+  points.resize(size);
+  directions.resize(size);
 
-  std::vector<double> intencities(PS);
+  static_vector<double, Settings::ResidualPattern::max_size> intencities(PS);
   for (int i = 0; i < PS; ++i)
     intencities[i] = lightBaseToRef(baseIntencities[i]);
 
-  StdVector<std::pair<Vec2, double>> energiesFound;
+  static_vector<std::pair<Vec2, double>,
+                Settings::PointTracer::max_maxSearchAbs>
+      energiesFound;
   double bestEnergy = INF;
   Vec2 bestPoint;
   double bestDepth;
@@ -234,17 +259,17 @@ ImmaturePoint::traceOn(const KeyFrame &baseFrame, const PreKeyFrame &refFrame,
     Vec3 curDir = directions[dirInd];
     Vec2 point = points[dirInd];
     curDir.normalize();
-    StdVector<Vec2> reproj(PS);
+    static_vector<Vec2, Settings::ResidualPattern::max_size> reproj(PS);
     reproj[0] = point;
     double curDepth = INF;
     if (maxDepth == INF && dirInd == 0) {
       for (int i = 1; i < PS; ++i)
-        reproj[i] = cam->map(baseToRef.so3() * baseDirections[i]);
+        reproj[i] = camRef.map(baseToRef.so3() * baseDirections[i]);
     } else {
       Vec2 curDepths = triangulate(baseToRef, baseDirections[0], curDir);
       curDepth = curDepths[0];
       for (int i = 1; i < PS; ++i)
-        reproj[i] = cam->map(baseToRef * (curDepths[0] * baseDirections[i]));
+        reproj[i] = camRef.map(baseToRef * (curDepths[0] * baseDirections[i]));
     }
 
     double maxReprojDist = -1;
@@ -253,7 +278,7 @@ ImmaturePoint::traceOn(const KeyFrame &baseFrame, const PreKeyFrame &refFrame,
       if (maxReprojDist < dist)
         maxReprojDist = dist;
     }
-    int pyrLevel = std::round(std::log2(maxReprojDist / PH));
+    int pyrLevel = std::lround(std::log2(maxReprojDist / PH));
     if (pyrLevel < 0)
       pyrLevel = 0;
     if (pyrLevel >= PL)
@@ -270,7 +295,7 @@ ImmaturePoint::traceOn(const KeyFrame &baseFrame, const PreKeyFrame &refFrame,
     double energy = 0;
     for (int i = 0; i < PS; ++i) {
       double refIntencity;
-      refFrame.internals->interpolator(pyrLevel).Evaluate(
+      refFrame.internals->frames[indRef].interpolator(pyrLevel).Evaluate(
           reproj[i][1], reproj[i][0], &refIntencity);
       double residual = std::abs(intencities[i] - refIntencity);
       energy += residual > TH ? TH * (2 * residual - TH) : residual * residual;
@@ -299,12 +324,11 @@ ImmaturePoint::traceOn(const KeyFrame &baseFrame, const PreKeyFrame &refFrame,
     return INF_DEPTH;
 
   double secondBestEnergy = INF;
-  for (const auto &p : energiesFound) {
-    if ((p.first - bestPoint).norm() <
-        settings.pointTracer.minSecondBestDistance)
+  for (const auto &[p, e] : energiesFound) {
+    if ((p - bestPoint).norm() < settings.pointTracer.minSecondBestDistance)
       continue;
-    if (p.second < secondBestEnergy)
-      secondBestEnergy = p.second;
+    if (e < secondBestEnergy)
+      secondBestEnergy = e;
   }
 
   if (bestEnergy == INF || secondBestEnergy == INF)
@@ -332,8 +356,7 @@ ImmaturePoint::traceOn(const KeyFrame &baseFrame, const PreKeyFrame &refFrame,
   numTraced++;
 
   eBeforeSubpixel = bestEnergy;
-  depthBeforeSubpixel =
-      triangulate(baseToRef, baseDirections[0], cam->unmap(bestPoint))[0];
+  depthBeforeSubpixel = bestDepth;
 
   // subpixel refinement
   double bestDispl = 0;
@@ -342,55 +365,61 @@ ImmaturePoint::traceOn(const KeyFrame &baseFrame, const PreKeyFrame &refFrame,
     int toInd = std::min(int(points.size()) - 1, bestInd + 1);
     Vec2 from = points[fromInd];
     Vec2 to = points[toInd];
-    StdVector<Vec2> pattern(PS);
+    static_vector<Vec2, Settings::ResidualPattern::max_size> pattern(PS);
     double scale = 1.0 / (1 << bestPyrLevel);
     pattern[0] = Vec2::Zero();
     for (int i = 1; i < PS; ++i) {
-      Vec2 reproj = cam->map(baseToRef * (bestDepth * baseDirections[i]));
+      Vec2 reproj = camRef.map(baseToRef * (bestDepth * baseDirections[i]));
       pattern[i] = scale * (reproj - points[bestInd]);
     }
-    bestPoint =
-        tracePrecise(refFrame.internals->interpolator(bestPyrLevel), from, to,
-                     intencities, pattern, bestDispl, bestEnergy);
+    bestPoint = tracePrecise(
+        refFrame.internals->frames[indRef].interpolator(bestPyrLevel), from, to,
+        intencities.data(), pattern.data(), bestDispl, bestEnergy, settings);
     depth = triangulate(baseToRef, baseDirections[0],
-                        cam->unmap(bestPoint / scale))[0];
+                        camRef.unmap(bestPoint / scale))[0];
   } else
     depth = bestDepth;
 
   eAfterSubpixel = bestEnergy;
 
-  double displ = 2 * curDev;
   // depth bounds
-  Vec2 minDepthPos = approxOnCurve(points, bestInd + displ);
+  double displ = 2 * curDev;
+  Vec2 minDepthPos =
+      approxOnCurve(points.data(), points.size(), bestInd + displ);
   minDepth =
-      triangulate(baseToRef, baseDirections[0], cam->unmap(minDepthPos))[0];
+      triangulate(baseToRef, baseDirections[0], camRef.unmap(minDepthPos))[0];
 
   double maxDepthDispl = bestInd - displ;
   if (maxDepthDispl <= 0)
     maxDepth = INF;
   else {
-    Vec2 maxDepthPos = approxOnCurve(points, maxDepthDispl);
+    Vec2 maxDepthPos =
+        approxOnCurve(points.data(), points.size(), maxDepthDispl);
     maxDepth =
-        triangulate(baseToRef, baseDirections[0], cam->unmap(maxDepthPos))[0];
+        triangulate(baseToRef, baseDirections[0], camRef.unmap(maxDepthPos))[0];
   }
 
   lastTraced = true;
   stddev = curDev;
+  if (stddev < settings.pointTracer.optimizedStddev)
+    mIsReady = true;
+
   tracedPyrLevel = bestPyrLevel;
 
   if (state == ACTIVE && debugType == DRAW_EPIPOLE) {
     cv::Mat base;
     cv::Mat curved;
-    base = baseFrame.preKeyFrame->frameColored.clone();
-    curved = refFrame.frameColored.clone();
+    base = baseFrame.preKeyFrame->frames[indBase].frameColored.clone();
+    curved = refFrame.frames[indRef].frameColored.clone();
 
     cv::circle(base, toCvPoint(p), 4, CV_GREEN, 1);
-    drawTracing(curved, energiesFound, 5);
+    drawTracing(curved, energiesFound.data(), energiesFound.size(), 5);
 
     int wantedHeight = 600;
-    int wantedWidth = double(cam->getWidth()) / cam->getHeight() * wantedHeight;
-    double fx = double(wantedWidth) / cam->getWidth();
-    double fy = double(wantedHeight) / cam->getHeight();
+    int wantedWidth =
+        double(camRef.getWidth()) / camRef.getHeight() * wantedHeight;
+    double fx = double(wantedWidth) / camRef.getWidth();
+    double fy = double(wantedHeight) / camRef.getHeight();
     cv::Mat curv2;
     cv::resize(curved, curv2, cv::Size(), fx, fy);
     cv::imshow("epipolar curve", curv2);
@@ -405,27 +434,25 @@ ImmaturePoint::traceOn(const KeyFrame &baseFrame, const PreKeyFrame &refFrame,
   return OK;
 }
 
-void ImmaturePoint::drawTracing(
-    cv::Mat &frame, const StdVector<std::pair<Vec2, double>> &energiesFound,
-    int lineWidth) {
+void ImmaturePoint::drawTracing(cv::Mat &frame,
+                                std::pair<Vec2, double> energiesFound[],
+                                int size, int lineWidth) {
   auto comp = [](const std::pair<Vec2, double> &a,
                  const std::pair<Vec2, double> &b) {
     return a.second < b.second;
   };
-  int minI =
-      std::min_element(energiesFound.begin(), energiesFound.end(), comp) -
-      energiesFound.begin();
+  int minI = std::min_element(energiesFound, energiesFound + size, comp) -
+             energiesFound;
   double minEnergy = energiesFound[minI].second;
 
   double maxEnergy =
-      std::max_element(energiesFound.begin(), energiesFound.end(), comp)
-          ->second;
+      std::max_element(energiesFound, energiesFound, comp)->second;
 
-  for (int i = 0; i < energiesFound.size(); ++i) {
-    double e = energiesFound[i].second;
+  for (int i = 0; i < size; ++i) {
     Vec2 p = energiesFound[i].first;
-    Vec2 dir = (i == energiesFound.size() - 1 ? p - energiesFound[i - 1].first
-                                              : energiesFound[i + 1].first - p);
+    double e = energiesFound[i].second;
+    Vec2 dir = i == size - 1 ? p - energiesFound[i - 1].first
+                             : energiesFound[i + 1].first - p;
     Vec2 ort(dir[1], -dir[0]);
     ort.normalize();
     if (i == minI)

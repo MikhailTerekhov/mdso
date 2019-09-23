@@ -7,18 +7,34 @@
 
 namespace fishdso {
 
-PreKeyFrame::PreKeyFrame(KeyFrame *baseKeyFrame, CameraModel *cam,
-                         const cv::Mat &frameColored, int globalFrameNum,
+PreKeyFrame::FrameEntry::FrameEntry(PreKeyFrame *host, int ind, const cv::Mat &_frameColored,
+                                    Timestamp timestamp,
+                                    const Settings::Pyramid &pyrSettings)
+    : host(host)
+    , ind(ind)
+    , frameColored(_frameColored.clone())
+    , framePyr(cvtBgrToGray(frameColored), pyrSettings.levelNum())
+    , timestamp(timestamp) {
+  grad(framePyr[0], gradX, gradY, gradNorm);
+}
+
+PreKeyFrame::PreKeyFrame(KeyFrame *baseFrame, CameraBundle *cam,
+                         const cv::Mat coloredFrames[], int globalFrameNum,
+                         Timestamp timestamps[],
                          const Settings::Pyramid &_pyrSettings)
-    : frameColored(frameColored)
-    , framePyr(cvtBgrToGray(frameColored), _pyrSettings.levelNum)
-    , baseKeyFrame(baseKeyFrame)
+    : baseFrame(baseFrame)
     , cam(cam)
     , globalFrameNum(globalFrameNum)
-    , pyrSettings(_pyrSettings)
-    , internals(std::unique_ptr<PreKeyFrameInternals>(
-          new PreKeyFrameInternals(framePyr, pyrSettings))) {
-  grad(frame(), gradX, gradY, gradNorm);
+    , pyrSettings(_pyrSettings) {
+  frames.reserve(cam->bundle.size());
+  for (int i = 0; i < cam->bundle.size(); ++i)
+    frames.emplace_back(this, i, coloredFrames[i], timestamps[i], pyrSettings);
+
+  std::vector<const ImagePyramid *> refs(cam->bundle.size());
+  for (int i = 0; i < frames.size(); ++i)
+    refs[i] = &frames[i].framePyr;
+  internals = std::unique_ptr<PreKeyFrameInternals>(
+      new PreKeyFrameInternals(refs.data(), frames.size(), pyrSettings));
 }
 
 PreKeyFrame::~PreKeyFrame() {}

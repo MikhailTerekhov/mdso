@@ -23,9 +23,10 @@ cv::Mat draw(const DepthedImagePyramid &pyr) {
                      FLAGS_pyr_image_width);
 }
 
-void DepthPyramidDrawer::newBaseFrame(const DepthedImagePyramid &pyr) {
+void DepthPyramidDrawer::newBaseFrame(
+    const FrameTracker::DepthedMultiFrame &pyr) {
   mPyrChanged = true;
-  lastPyr = draw(pyr);
+  lastPyr = draw(pyr[0]);
 }
 
 bool DepthPyramidDrawer::pyrChanged() { return mPyrChanged; }
