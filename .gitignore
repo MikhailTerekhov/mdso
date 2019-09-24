@@ -12,6 +12,7 @@ CMakeLists.txt.user
 bin/**
 thirdparty/Sophus/build/**
 **/__pycache__/**
+.idea/**
 
 ## LaTeX, latexmk
 *.aux
