@@ -30,14 +30,11 @@ DEFINE_bool(draw_interpolation, true,
 DEFINE_bool(use_DoG, false, "Do we need to apply DoG preprocessing first?");
 DEFINE_double(sigma1, 0, "Smaller sigma in the DoG filter.");
 DEFINE_double(sigma2, 2, "Bigger sigma in  the DoG filter.");
-DEFINE_double(DoG_multiplier, 6, "Multiplier after the DoG filter.");
-DEFINE_bool(decr_grad_on_DoG, false,
-            "Do we need to decrease gradient thresholds for PixelSelector, "
-            "when using DoG filter?");
+DEFINE_double(DoG_multiplier, 1, "Multiplier after the DoG filter.");
 
 DEFINE_bool(gen_gt_only, false, "Generate ground truth point cloud and exit.");
 
-DEFINE_string(debug_img_dir, "output/default/debug",
+DEFINE_string(debug_img_dir, "debug",
               "Directory for debug images to be put into.");
 DEFINE_string(trajectory_filename, "tracked_frame_to_world.txt",
               "Resulting trajectory filename (stored in 3x4 matrix form).");
@@ -54,7 +51,7 @@ DEFINE_bool(gen_pred_trajectory, true,
             "Do we need to generate predicted trajectory?");
 
 DEFINE_string(
-    track_img_dir, "output/default/track",
+    track_img_dir, "track",
     "Directory for tracking residuals on all pyr levels to be put into.");
 DEFINE_bool(show_track_res, false,
             "Show tracking residuals on all levels of the pyramind?");
@@ -70,7 +67,7 @@ A displays color-coded depths projected onto the base frame;
 B -- visible vs invizible OptimizedPoint-s projected onto the base frame;
 C -- color-coded predicted disparities;
 D -- color-coded tracking residuals on the finest pyramid level.)__");
-DEFINE_string(depth_pyramid_dir, "output/default/pyr",
+DEFINE_string(depth_pyramid_dir, "pyr",
               "Directory for depth pyramid images to be put into.");
 DEFINE_bool(draw_depth_pyramid, false,
             "Draw the depth pyramid, that is used for tracking? Will be "
@@ -124,17 +121,54 @@ It should contain "info" and "data" subdirectories.)abacaba";
     return 1;
   }
 
+  fs::path outDir(FLAGS_output_directory);
+  fs::path debugImgDir = outDir / fs::path(FLAGS_debug_img_dir);
+  fs::path trackImgDir = outDir / fs::path(FLAGS_track_img_dir);
+  fs::path pyrImgDir = outDir / fs::path(FLAGS_depth_pyramid_dir);
   if (FLAGS_write_files) {
-    mkdir(FLAGS_output_directory);
-    mkdir(FLAGS_debug_img_dir);
-    mkdir(FLAGS_track_img_dir);
+    mkdir(outDir);
+    mkdir(debugImgDir);
+    mkdir(trackImgDir);
     if (FLAGS_draw_depth_pyramid)
-      mkdir(FLAGS_depth_pyramid_dir);
+      mkdir(pyrImgDir);
   }
 
   MultiFovReader reader(argv[1]);
 
   Settings settings = getFlaggedSettings();
+
+  IdentityPreprocessor idPreprocessor;
+  DoGPreprocessor dogPreprocessor(FLAGS_sigma1, FLAGS_sigma2,
+                                  FLAGS_DoG_multiplier);
+  Preprocessor *preprocessor =
+      FLAGS_use_DoG ? static_cast<Preprocessor *>(&dogPreprocessor)
+                    : static_cast<Preprocessor *>(&idPreprocessor);
+
+  if (FLAGS_use_DoG) {
+    cv::Mat img = reader.getFrame(FLAGS_start);
+    cv::Mat1b imgGray = cvtBgrToGray(img);
+    cv::Mat1d gradX, gradY, gradNorm;
+    grad(imgGray, gradX, gradY, gradNorm);
+    cv::Mat1b imgDog;
+    preprocessor->process(&imgGray, &imgDog, 1);
+    cv::Mat1d gradDogX, gradDogY, gradDogNorm;
+    grad(imgDog, gradDogX, gradDogY, gradDogNorm);
+    uint8_t meanOrig = cv::mean(imgGray)[0];
+    uint8_t meanDog = cv::mean(imgDog)[0];
+    double meanGradOrig = cv::mean(gradNorm)[0];
+    double meanGradDog = cv::mean(gradDogNorm)[0];
+    settings = settings.getGradientAdjustedSettings(
+        double(meanDog) / meanOrig, double(meanGradDog) / meanGradOrig);
+    settings.pyramid.setLevelNum(4);
+
+    LOG(INFO) << "mean grad norm original = " << meanGradOrig
+              << ", DoG = " << meanGradDog
+              << "DoG / orig = " << double(meanGradDog) / meanGradOrig;
+    LOG(INFO) << "new outlier intencity diff = "
+              << settings.intencity.outlierDiff;
+    LOG(INFO) << "mean intencity after DoG = " << int(meanDog);
+    std::cout << "mean int = " << int(meanDog);
+  }
 
   SE3 identity;
   CameraBundle cam(&identity, reader.cam.get(), 1);
@@ -162,8 +196,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
   DebugImageDrawer debugImageDrawer;
   TrackingDebugImageDrawer trackingDebugImageDrawer(
       camPyr.data(), settings.frameTracker, settings.pyramid);
-  TrajectoryWriterDso trajectoryWriter(FLAGS_output_directory,
-                                       FLAGS_trajectory_filename);
+  TrajectoryWriterDso trajectoryWriter(outDir, FLAGS_trajectory_filename);
 
   StdVector<SE3> frameToWorldGT(reader.getFrameCount());
   std::vector<Timestamp> timestamps(reader.getFrameCount());
@@ -171,17 +204,17 @@ It should contain "info" and "data" subdirectories.)abacaba";
     timestamps[i] = i;
     frameToWorldGT[i] = reader.getWorldToFrameGT(i).inverse();
   }
-  TrajectoryWriterGT trajectoryWriterGT(
-      frameToWorldGT.data(), timestamps.data(), timestamps.size(),
-      FLAGS_output_directory, FLAGS_gt_trajectory_filename);
+  TrajectoryWriterGT trajectoryWriterGT(frameToWorldGT.data(),
+                                        timestamps.data(), timestamps.size(),
+                                        outDir, FLAGS_gt_trajectory_filename);
 
   TrajectoryWriterPredict trajectoryWriterPredict(
-      FLAGS_output_directory, FLAGS_pred_trajectory_filename);
+      outDir, FLAGS_pred_trajectory_filename);
 
   std::unique_ptr<CloudWriter> cloudWriter;
   if (FLAGS_gen_cloud)
-    cloudWriter = std::unique_ptr<CloudWriter>(new CloudWriter(
-        &cam, FLAGS_output_directory, FLAGS_resulting_cloud_filename));
+    cloudWriter = std::unique_ptr<CloudWriter>(
+        new CloudWriter(&cam, outDir, FLAGS_resulting_cloud_filename));
 
   std::unique_ptr<CloudWriterGT> cloudWriterGTPtr;
   if (FLAGS_gen_gt) {
@@ -190,7 +223,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
     readPointsInFrameGT(reader, pointsInFrameGT, colors, FLAGS_gt_points);
     cloudWriterGTPtr.reset(new CloudWriterGT(
         frameToWorldGT.data(), timestamps.data(), pointsInFrameGT.data(),
-        colors.data(), reader.getFrameCount(), FLAGS_output_directory,
+        colors.data(), reader.getFrameCount(), outDir,
         FLAGS_gt_cloud_filename));
   }
 
@@ -217,22 +250,11 @@ It should contain "info" and "data" subdirectories.)abacaba";
   if (FLAGS_draw_interpolation)
     observers.initializer.push_back(&interpolationDrawer);
 
-  IdentityPreprocessor idPreprocessor;
-  DoGPreprocessor dogPreprocessor(FLAGS_sigma1, FLAGS_sigma2,
-                                  FLAGS_DoG_multiplier);
-  Preprocessor *preprocessor =
-      FLAGS_use_DoG ? static_cast<Preprocessor *>(&dogPreprocessor)
-                    : static_cast<Preprocessor *>(&idPreprocessor);
-
-  if (FLAGS_use_DoG && FLAGS_decr_grad_on_DoG)
-    for (int i = 0; i < settings.pixelSelector.gradThesholdCount; ++i)
-      settings.pixelSelector.gradThresholds[i] *= 0.6;
-
   std::cout << "running DSO.." << std::endl;
 
-  LOG(INFO) << "Total DSO observers: " << observers.dso.size() <<
-                "\nTracker observers: " << observers.frameTracker.size() <<
-                "\nInit observers: " << observers.initializer.size();
+  LOG(INFO) << "Total DSO observers: " << observers.dso.size()
+            << "\nTracker observers: " << observers.frameTracker.size()
+            << "\nInit observers: " << observers.initializer.size();
 
   DsoSystem dso(&cam, preprocessor, observers, settings);
   for (int it = FLAGS_start; it < FLAGS_start + FLAGS_count; ++it) {
@@ -243,23 +265,22 @@ It should contain "info" and "data" subdirectories.)abacaba";
 
     if (FLAGS_draw_interpolation && interpolationDrawer.didInitialize()) {
       cv::Mat3b interpolation = interpolationDrawer.draw();
-      fs::path out =
-          fs::path(FLAGS_output_directory) / fs::path("interpolation.jpg");
+      fs::path out = outDir / fs::path("interpolation.jpg");
       cv::imwrite(out.native(), interpolation);
     }
 
     if (FLAGS_write_files) {
       cv::Mat3b debugImage = debugImageDrawer.draw();
-      fs::path outDeb = fs::path(FLAGS_debug_img_dir) /
-                        fs::path("frame#" + std::to_string(it) + ".jpg");
+      fs::path outDeb =
+          debugImgDir / fs::path("frame#" + std::to_string(it) + ".jpg");
       cv::imwrite(outDeb.native(), debugImage);
       cv::Mat3b trackImage = trackingDebugImageDrawer.drawAllLevels();
-      fs::path outTrack = fs::path(FLAGS_track_img_dir) /
-                          fs::path("frame#" + std::to_string(it) + ".jpg");
+      fs::path outTrack =
+          trackImgDir / fs::path("frame#" + std::to_string(it) + ".jpg");
       cv::imwrite(outTrack.native(), trackImage);
       if (FLAGS_draw_depth_pyramid && depthPyramidDrawer.pyrChanged()) {
         cv::Mat pyrImage = depthPyramidDrawer.getLastPyr();
-        fs::path outPyr = fs::path(FLAGS_depth_pyramid_dir) /
+        fs::path outPyr = fs::path(pyrImgDir) /
                           fs::path("frame#" + std::to_string(it) + ".jpg");
         cv::imwrite(outPyr.native(), pyrImage);
       }

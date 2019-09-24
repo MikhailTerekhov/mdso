@@ -9,6 +9,8 @@ namespace mdso {
 
 cv::Mat draw(const DepthedImagePyramid &pyr) {
   std::vector<cv::Mat3b> images(pyr.images.size());
+  VLOG(1) << "depth images in one pyr = " << pyr.depths.size();
+  VLOG(1) << "drawn pyr size = " << pyr.depths[0].size();
   for (int i = 0; i < pyr.images.size(); ++i) {
     int s = FLAGS_pyr_rel_point_size * (pyr[i].cols + pyr[i].rows) / 2;
     images[i] = cvtGrayToBgr(pyr[i]);

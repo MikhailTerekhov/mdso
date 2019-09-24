@@ -528,6 +528,11 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], Timestamp timestamps[]) {
                                   points[i].size());
       }
 
+      VLOG(1) << "baseForTrack size = " << baseForTrack.size()
+              << " imgages = " << baseForTrack[0].images.size()
+              << "Depths = " << baseForTrack[0].depths.size()
+              << "depths[0].size = " << baseForTrack[0].depths[0].size();
+
       frameTracker = std::unique_ptr<FrameTracker>(
           new FrameTracker(camPyr.data(), baseForTrack, observers.frameTracker,
                            settings.getFrameTrackerSettings()));

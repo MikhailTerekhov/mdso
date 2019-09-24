@@ -214,7 +214,7 @@ struct Settings {
 
     inline void setLevelNum(int newLevelNum) {
       CHECK(newLevelNum > 0 && newLevelNum <= max_levelNum);
-      mLevelNum = max_levelNum;
+      mLevelNum = newLevelNum;
     }
 
     inline int levelNum() const { return mLevelNum; }
@@ -335,6 +335,8 @@ struct Settings {
   PointTracerSettings getPointTracerSettings() const;
   FrameTrackerSettings getFrameTrackerSettings() const;
   BundleAdjusterSettings getBundleAdjusterSettings() const;
+
+  Settings getGradientAdjustedSettings(double intencityRequiredToThis, double gradNormRequiredToThis);
 
 private:
   int mKeyFrameDist = default_keyFrameDist;
