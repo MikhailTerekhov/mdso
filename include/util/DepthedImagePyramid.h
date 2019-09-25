@@ -8,10 +8,17 @@
 namespace mdso {
 
 struct DepthedImagePyramid : ImagePyramid {
+  struct Point {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    Vec2 p;
+    double depth;
+  };
+
   DepthedImagePyramid(const cv::Mat1b &baseImage, int levelNum, Vec2 points[],
                       double depthsArray[], double weightsArray[], int size);
 
-  static_vector<cv::Mat1d, Settings::Pyramid::max_levelNum> depths;
+  std::vector<StdVector<Point>> depths;
 };
 
 } // namespace mdso

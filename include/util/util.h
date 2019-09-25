@@ -47,7 +47,7 @@ void printInPly(std::ostream &out, const std::vector<Vec3> &points,
 
 void setDepthColBounds(const std::vector<double> &depths);
 
-cv::Mat drawLeveled(cv::Mat3b *images, int num, int w, int h, int resutW);
+cv::Mat3b drawLeveled(cv::Mat3b *images, int num, int w, int h, int resutW);
 
 void putMotion(std::ostream &out, const SE3 &motion);
 void putInMatrixForm(std::ostream &out, const SE3 &motion);

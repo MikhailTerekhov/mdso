@@ -11,66 +11,64 @@ DEFINE_double(debug_max_residual, 12.0,
 
 TrackingDebugImageDrawer::TrackingDebugImageDrawer(
     CameraBundle camPyr[], const Settings::FrameTracker &frameTrackerSettings,
-    const Settings::Pyramid &pyrSettings)
+    const Settings::Pyramid &pyrSettings, const std::vector<int> &drawingOrder)
     : frameTrackerSettings(frameTrackerSettings)
     , pyrSettings(pyrSettings)
     , camPyr(camPyr)
-    , residualsImg(pyrSettings.levelNum(),
-                   cv::Mat3b::zeros(camPyr[0].bundle[0].cam.getHeight(),
-                                    camPyr[0].bundle[0].cam.getWidth())) {
-  curFramePyr.reserve(pyrSettings.levelNum());
+    , curFramePyr(pyrSettings.levelNum())
+    , residualsImg(pyrSettings.levelNum())
+    , drawingOrder(drawingOrder) {
+  for (auto &r : residualsImg)
+    r.resize(camPyr[0].bundle.size());
+  for (auto &f : curFramePyr)
+    f.resize(camPyr[0].bundle.size());
 }
 
 void TrackingDebugImageDrawer::startTracking(const PreKeyFrame &frame) {
-  curFramePyr.resize(0);
-  for (const cv::Mat1b &img : frame.frames[0].framePyr.images)
-    curFramePyr.push_back(img.clone());
-  residualsImg.resize(0);
-  residualsImg.resize(pyrSettings.levelNum());
+  for (int camInd = 0; camInd < frame.frames.size(); ++camInd)
+    for (int lvl = 0; lvl < pyrSettings.levelNum(); ++lvl)
+      curFramePyr[lvl][camInd] = frame.frames[camInd].framePyr[lvl];
 }
 
 void TrackingDebugImageDrawer::levelTracked(
     int pyrLevel, const FrameTracker::TrackingResult &result,
-    std::pair<Vec2, double> pointResiduals[], int size) {
-  CHECK(camPyr[0].bundle.size() == 1) << "Multicamera case is NIY";
+    const std::vector<std::vector<std::pair<Vec2, double>>> &pointResiduals) {
+  CHECK(pointResiduals.size() == curFramePyr[0].size());
+  for (int camInd = 0; camInd < pointResiduals.size(); ++camInd) {
+    int w = camPyr[pyrLevel].bundle[camInd].cam.getWidth(),
+        h = camPyr[pyrLevel].bundle[camInd].cam.getHeight();
+    int s = FLAGS_tracking_rel_point_size * (w + h) / 2;
 
-  std::sort(pointResiduals, pointResiduals + size,
-            [](const auto &a, const auto &b) {
-              return a.first[0] == b.first[0] ? a.first[1] < b.first[1]
-                                              : a.first[0] < b.first[0];
-            });
-  std::stringstream vlogPnt;
-  vlogPnt << "Residual points: ";
-  for (int i = 0; i < size; ++i)
-    vlogPnt << "(" << pointResiduals[i].first.transpose() << ") ";
-  VLOG(2) << vlogPnt.str();
+    cv::cvtColor(curFramePyr[pyrLevel][camInd], residualsImg[pyrLevel][camInd],
+                 cv::COLOR_GRAY2BGR);
 
-  int w = camPyr[pyrLevel].bundle[0].cam.getWidth(),
-      h = camPyr[pyrLevel].bundle[0].cam.getHeight();
-  int s = FLAGS_tracking_rel_point_size * (w + h) / 2;
-
-  cv::cvtColor(curFramePyr[pyrLevel], residualsImg[pyrLevel],
-               cv::COLOR_GRAY2BGR);
-
-  for (int i = 0; i < size; ++i) {
-    const auto &[point, res] = pointResiduals[i];
-    if (camPyr[pyrLevel].bundle[0].cam.isOnImage(point, s)) {
-      putSquare(residualsImg[pyrLevel], toCvPoint(point), s,
-                depthCol(std::abs(res), 0, FLAGS_debug_max_residual),
-                cv::FILLED);
+    for (const auto &[point, res] : pointResiduals[camInd]) {
+      if (camPyr[pyrLevel].bundle[camInd].cam.isOnImage(point, s)) {
+        putSquare(residualsImg[pyrLevel][camInd], toCvPoint(point), s,
+                  depthCol(std::abs(res), 0, FLAGS_debug_max_residual),
+                  cv::FILLED);
+      }
     }
   }
 }
 
 cv::Mat3b TrackingDebugImageDrawer::drawAllLevels() {
-  return drawLeveled(residualsImg.data(), residualsImg.size(),
-                     camPyr[0].bundle[0].cam.getWidth(),
-                     camPyr[0].bundle[0].cam.getHeight(),
-                     FLAGS_tracking_res_image_width);
+  std::vector<cv::Mat3b> levels(pyrSettings.levelNum());
+  for (int lvl = 0; lvl < pyrSettings.levelNum(); ++lvl)
+    levels[lvl] = drawLevel(lvl);
+  return drawLeveled(
+      levels.data(), levels.size(), camPyr[0].bundle[0].cam.getWidth(),
+      camPyr[0].bundle[0].cam.getHeight(), FLAGS_tracking_res_image_width);
 }
 
-cv::Mat3b TrackingDebugImageDrawer::drawFinestLevel() {
-  return residualsImg[0];
+cv::Mat3b TrackingDebugImageDrawer::drawFinestLevel() { return drawLevel(0); }
+
+cv::Mat3b TrackingDebugImageDrawer::drawLevel(int pyrLevel) {
+  CHECK(pyrLevel >= 0 && pyrLevel < pyrSettings.levelNum());
+  return drawLeveled(
+      residualsImg[pyrLevel].data(), residualsImg[pyrLevel].size(),
+      camPyr[0].bundle[0].cam.getWidth(), camPyr[0].bundle[0].cam.getHeight(),
+      camPyr[0].bundle[0].cam.getWidth());
 }
 
 } // namespace mdso

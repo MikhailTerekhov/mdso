@@ -12,10 +12,10 @@ public:
 
   virtual void newBaseFrame(const FrameTracker::DepthedMultiFrame &frame) {}
   virtual void startTracking(const PreKeyFrame &frame) {}
-  virtual void levelTracked(int pyrLevel,
-                            const FrameTracker::TrackingResult &result,
-                            std::pair<Vec2, double> pointResiduals[],
-                            int size) {}
+  virtual void levelTracked(
+      int pyrLevel, const FrameTracker::TrackingResult &result,
+      const std::vector<std::vector<std::pair<Vec2, double>>> &pointResiduals) {
+  }
 };
 
 } // namespace mdso

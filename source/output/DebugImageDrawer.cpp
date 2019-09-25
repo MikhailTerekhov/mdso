@@ -20,8 +20,9 @@ void DebugImageDrawer::created(DsoSystem *newDso, CameraBundle *newCam,
   settings = newSettings;
   camPyr = cam->camPyr(settings.pyramid.levelNum());
   residualsDrawer =
-      std::unique_ptr<TrackingDebugImageDrawer>(new TrackingDebugImageDrawer(
-          camPyr.data(), settings.frameTracker, settings.pyramid));
+      std::unique_ptr<TrackingDebugImageDrawer>(
+      new TrackingDebugImageDrawer(camPyr.data(), settings.frameTracker,
+                                   settings.pyramid, <#initializer #>));
   dso->addFrameTrackerObserver(residualsDrawer.get());
 }
 

@@ -97,30 +97,30 @@ void setDepthColBounds(const std::vector<double> &depths) {
   maxDepthCol = sorted[blueInd];
 }
 
-cv::Mat drawLeveled(cv::Mat3b *images, int num, int w, int h, int resultW) {
+cv::Mat3b drawLeveled(cv::Mat3b *images, int num, int w, int h, int resultW) {
   int downCnt = num / 2;
   int upCnt = num - downCnt;
 
-  int upW = resultW / upCnt;
-  int upH = double(h) / w * upW;
-  int downW = resultW / downCnt;
-  int downH = double(h) / w * downW;
-  std::vector<cv::Mat> upRes(upCnt);
-  std::vector<cv::Mat> downRes(downCnt);
+  int singleW = resultW / upCnt;
+  int singleH = double(h) / w * singleW;
+  std::vector<cv::Mat3b> upRes(upCnt);
+  std::vector<cv::Mat3b> downRes(downCnt);
 
-  int pl = num - 1;
-  for (; pl >= upCnt; --pl)
-    cv::resize(images[pl], upRes[num - pl - 1], cv::Size(upW, upH), 0, 0,
+  for (int i = 0; i < upCnt; ++i)
+    cv::resize(images[i], upRes[i], cv::Size(singleW, singleH), 0, 0,
                cv::INTER_NEAREST);
-  for (; pl >= 0; --pl)
-    cv::resize(images[pl], downRes[downCnt - pl - 1], cv::Size(downW, downH), 0,
-               0, cv::INTER_NEAREST);
-  cv::Mat upImg;
+  for (int i = 0; i < downCnt; ++i)
+    cv::resize(images[i + upCnt], downRes[i], cv::Size(singleW, singleH), 0, 0,
+               cv::INTER_NEAREST);
+  cv::Mat3b upImg;
   cv::hconcat(upRes, upImg);
-  cv::Mat downImg;
+  cv::Mat3b downImg;
   cv::hconcat(downRes, downImg);
-  cv::Mat result;
-  cv::vconcat(upImg, downImg, result);
+  int blackWidth = (upImg.cols - downImg.cols) / 2;
+  cv::Mat3b downFinal(upImg.rows, upImg.cols, toCvVec3bDummy(CV_BLACK));
+  downFinal(cv::Rect(blackWidth, 0, downImg.cols, downImg.rows)) = downImg;
+  cv::Mat3b result;
+  cv::vconcat(upImg, downFinal, result);
   return result;
 }
 

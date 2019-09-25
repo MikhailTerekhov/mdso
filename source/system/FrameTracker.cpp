@@ -1,26 +1,24 @@
 #include "system/FrameTracker.h"
 #include "PreKeyFrameInternals.h"
 #include "output/FrameTrackerObserver.h"
-#include "util/defs.h"
 #include "util/util.h"
 #include <ceres/cubic_interpolation.h>
 #include <ceres/problem.h>
-#include <chrono>
 #include <cmath>
 
 namespace mdso {
 
 struct PointTrackingResidual {
   PointTrackingResidual(
-      Vec3 pos, double baseIntensity, const SE3 &baseToBody,
-      const SE3 &bodyToRef, const CameraModel *cam,
+      const Vec3 &pos, double baseIntensity, const SE3 &baseToBody,
+      const SE3 &bodyToRef, const CameraModel *camTracked,
       const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
           *trackedFrame)
       : pos(pos)
       , baseToBody(baseToBody)
       , bodyToRef(bodyToRef)
       , baseIntensity(baseIntensity)
-      , cam(cam)
+      , camTracked(camTracked)
       , trackedFrame(trackedFrame) {}
 
   template <typename T>
@@ -43,7 +41,7 @@ struct PointTrackingResidual {
     AffineLightTransform<T> affLight(affLightP[0], affLightP[1]);
 
     Vec3t newPos = bodyToRefT * motion * baseToBodyT * pos.cast<T>();
-    Vec2t newPosProj = cam->map(newPos.data());
+    Vec2t newPosProj = camTracked->map(newPos.data());
 
     T trackedIntensity;
     trackedFrame->Evaluate(newPosProj[1], newPosProj[0], &trackedIntensity);
@@ -55,7 +53,7 @@ struct PointTrackingResidual {
   Vec3 pos;
   SE3 baseToBody, bodyToRef;
   double baseIntensity;
-  const CameraModel *cam;
+  const CameraModel *camTracked;
   const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
       *trackedFrame;
 };
@@ -63,15 +61,65 @@ struct PointTrackingResidual {
 FrameTracker::TrackingResult::TrackingResult(int camNumber)
     : lightBaseToTracked(camNumber) {}
 
+FrameTracker::DepthPyramidSlice::Entry::Point::Point(
+    const DepthedImagePyramid::Point &p, const CameraModel &cam,
+    const cv::Mat1b &img)
+    : p(p.p)
+    , depth(p.depth)
+    , ray(cam.unmap(Point::p).normalized() * depth) {
+  cv::Point cvp = toCvPoint(Point::p);
+  CHECK(Eigen::AlignedBox2i(Vec2i(1, 1), Vec2i(img.cols - 2, img.rows - 2))
+            .contains(toVec2i(cvp)));
+  gradNorm = gradNormAt(img, cvp);
+  intencity = img(cvp);
+}
+
+FrameTracker::DepthPyramidSlice::Entry::Entry(const DepthedMultiFrame &frame,
+                                              const CameraModel &cam,
+                                              int levelNum, int cameraNum) {
+  const StdVector<DepthedImagePyramid::Point> &oldDepths =
+      frame[cameraNum].depths[levelNum];
+  points.reserve(oldDepths.size());
+  for (const auto &p : oldDepths)
+    points.emplace_back(p, cam, frame[cameraNum][levelNum]);
+}
+
+FrameTracker::DepthPyramidSlice::DepthPyramidSlice(
+    const DepthedMultiFrame &frame, const CameraBundle &cam, int levelNum)
+    : mTotalPoints(0) {
+  entries.reserve(frame.size());
+  for (int cameraNum = 0; cameraNum < frame.size(); ++cameraNum) {
+    entries.emplace_back(frame, levelNum, cameraNum);
+    mTotalPoints += entries.back().points.size();
+  }
+}
+
+FrameTracker::DepthPyramidSlice::Entry &
+    FrameTracker::DepthPyramidSlice::operator[](int ind) {
+  CHECK(ind >= 0 && ind < entries.size());
+  return entries[ind];
+}
+
+const FrameTracker::DepthPyramidSlice::Entry &
+    FrameTracker::DepthPyramidSlice::operator[](int ind) const {
+  CHECK(ind >= 0 && ind < entries.size());
+  return entries[ind];
+}
+int FrameTracker::DepthPyramidSlice::totalPoints() const {
+  return mTotalPoints;
+}
+
 FrameTracker::FrameTracker(CameraBundle camPyr[],
-                           const DepthedMultiFrame &_baseFrame,
+                           const DepthedMultiFrame &baseFrame,
                            std::vector<FrameTrackerObserver *> &observers,
                            const FrameTrackerSettings &_settings)
     : camPyr(camPyr)
-    , baseFrame(_baseFrame)
     , observers(observers)
     , settings(_settings) {
-  CHECK(camPyr[0].bundle.size() == 1) << "Multicamera case is NIY";
+  baseFrameSlices.reserve(camPyr[0].bundle.size());
+  for (int lvl = 0; lvl < settings.pyramid.levelNum(); ++lvl)
+    baseFrameSlices.emplace_back(baseFrame, lvl);
+
   for (FrameTrackerObserver *obs : observers)
     obs->newBaseFrame(baseFrame);
 }
@@ -89,34 +137,46 @@ FrameTracker::trackFrame(const PreKeyFrame &frame,
     result = trackPyrLevel(frame, result, i);
   }
 
-  // cv::waitKey();
-
   return result;
 }
 
-bool isPointTrackable(const CameraModel &cam, const Vec3 &basePos,
+bool isPointTrackable(const CameraModel &camTracked, const Vec3 &basePos,
                       const SE3 &coarseBaseToCur) {
   Vec3 coarseCurPos = coarseBaseToCur * basePos;
-  Vec2 coarseCurOnImg = cam.map(coarseCurPos);
-  return cam.isOnImage(coarseCurOnImg, 0);
+  Vec2 coarseCurOnImg = camTracked.map(coarseCurPos);
+  return camTracked.isOnImage(coarseCurOnImg, 0);
 }
 
 FrameTracker::TrackingResult
 FrameTracker::trackPyrLevel(const PreKeyFrame &frame,
                             const TrackingResult &coarseTrackingResult,
                             int pyrLevel) {
-  CameraBundle &cam = camPyr[pyrLevel];
 
-  CHECK(cam.bundle.size() == 1) << "Multicamera case is NIY";
+  CameraBundle &cam = camPyr[pyrLevel];
+  const DepthPyramidSlice &baseSlice = baseFrameSlices[pyrLevel];
+  std::vector<cv::Mat1b> trackedImages(cam.bundle.size());
+  std::vector<PreKeyFrameInternals::Interpolator_t *> interpolators;
+
+  for (int i = 0; i < cam.bundle.size(); ++i) {
+    trackedImages[i] = frame.frames[i].framePyr[pyrLevel];
+    interpolators[i] = &frame.internals->frames[i].interpolator(pyrLevel);
+  }
 
   TrackingResult result = coarseTrackingResult;
-  // const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
-  // &trackedFrame = internals.interpolator(pyrLevel);
 
-  ceres::Problem problem;
+  ceres::Problem::Options problemOptions;
+  problemOptions.loss_function_ownership =
+      ceres::Ownership::DO_NOT_TAKE_OWNERSHIP;
+  problemOptions.cost_function_ownership =
+      ceres::Ownership::DO_NOT_TAKE_OWNERSHIP;
+  problemOptions.local_parameterization_ownership =
+      ceres::Ownership::DO_NOT_TAKE_OWNERSHIP;
+  ceres::Problem problem(problemOptions);
+
+  ceres::EigenQuaternionParameterization quaternionParameterization;
 
   problem.AddParameterBlock(result.baseToTracked.so3().data(), 4,
-                            new ceres::EigenQuaternionParameterization());
+                            &quaternionParameterization);
   problem.AddParameterBlock(result.baseToTracked.translation().data(), 3);
 
   for (auto &affLight : result.lightBaseToTracked) {
@@ -133,52 +193,66 @@ FrameTracker::trackPyrLevel(const PreKeyFrame &frame,
       problem.SetParameterBlockConstant(affLight.data);
   }
 
-  std::vector<const PointTrackingResidual *> residuals;
-  StdVector<Vec2> gotOutside;
-
   int pntTotal = 0;
 
-  for (int y = 0; y < baseFrame[0].depths[pyrLevel].rows; ++y)
-    for (int x = 0; x < baseFrame[0].depths[pyrLevel].cols; ++x) {
-      double baseDepth = baseFrame[0].depths[pyrLevel](y, x);
-      if (baseDepth <= 0)
-        continue;
+  const int maxResiduals =
+      cam.bundle.size() * cam.bundle.size() * baseSlice.totalPoints();
 
-      ++pntTotal;
+  ceres::HuberLoss intencityHuberLoss(settings.intencity.outlierDiff);
+  std::vector<ceres::ScaledLoss> weightedLosses;
+  weightedLosses.reserve(maxResiduals);
 
-      Vec3 pos = cam.bundle[0].cam.unmap(Vec2(x, y)).normalized() * baseDepth;
-      if (!isPointTrackable(cam.bundle[0].cam, pos, result.baseToTracked)) {
-        gotOutside.push_back(Vec2(x, y));
-        continue;
+  std::vector<PointTrackingResidual *> residuals;
+  std::vector<ceres::AutoDiffCostFunction<PointTrackingResidual, 1, 4, 3, 2>>
+      costFunctions;
+  residuals.reserve(maxResiduals);
+  costFunctions.reserve(maxResiduals);
+
+  int oldWeightedLossesCapacity = weightedLosses.capacity();
+  int oldResidualsCapacity = residuals.capacity();
+  int oldCostFunctionsCapacity = costFunctions.capacity();
+
+  for (int baseCamNum = 0; baseCamNum < cam.bundle.size(); ++baseCamNum)
+    for (int trackedCamNum = 0; trackedCamNum < cam.bundle.size();
+         ++trackedCamNum) {
+      SE3 baseToBody = cam.bundle[baseCamNum].thisToBody;
+      SE3 bodyToTracked = cam.bundle[trackedCamNum].bodyToThis;
+      SE3 coarseBaseToTracked =
+          bodyToTracked * result.baseToTracked * baseToBody;
+      for (const auto &p : baseSlice[baseCamNum].points) {
+
+        ++pntTotal;
+
+        if (!isPointTrackable(cam.bundle[trackedCamNum].cam, p.ray,
+                              coarseBaseToTracked))
+          continue;
+
+        ceres::LossFunction *lossFunc;
+        if (settings.frameTracker.useGradWeighting) {
+          const double c = settings.gradWeighting.c;
+          double weight = c / std::hypot(c, p.gradNorm);
+          weightedLosses.emplace_back(&intencityHuberLoss, weight,
+                                      ceres::Ownership::DO_NOT_TAKE_OWNERSHIP);
+          lossFunc = &weightedLosses.back();
+        } else
+          lossFunc = &intencityHuberLoss;
+
+        // TODO inds in multicamera
+        residuals.push_back(new PointTrackingResidual(
+            p.ray, p.intencity, cam.bundle[baseCamNum].thisToBody,
+            cam.bundle[trackedCamNum].bodyToThis,
+            &cam.bundle[trackedCamNum].cam, interpolators[trackedCamNum]));
+        costFunctions.emplace_back(residuals.back());
+        problem.AddResidualBlock(&costFunctions.back(), lossFunc,
+                                 result.baseToTracked.so3().data(),
+                                 result.baseToTracked.translation().data(),
+                                 result.lightBaseToTracked[0].data);
       }
-
-      ceres::LossFunction *lossFunc = nullptr;
-      if (settings.frameTracker.useGradWeighting) {
-        double gradNorm = frame.frames[0].gradNorm(y, x);
-        double c = settings.gradWeighting.c;
-        double weight = c / std::hypot(c, gradNorm);
-        lossFunc = new ceres::ScaledLoss(
-            new ceres::HuberLoss(settings.intencity.outlierDiff), weight,
-            ceres::Ownership::TAKE_OWNERSHIP);
-      } else
-        lossFunc = new ceres::HuberLoss(settings.intencity.outlierDiff);
-
-      double intencity = baseFrame[0].images[pyrLevel](y, x);
-
-      // TODO inds in multicamera
-      auto newResidual = new PointTrackingResidual(
-          pos, intencity, cam.bundle[0].bodyToThis, cam.bundle[0].thisToBody,
-          &cam.bundle[0].cam,
-          &frame.internals->frames[0].interpolator(pyrLevel));
-      residuals.push_back(newResidual);
-      ceres::CostFunction *newCostFunc =
-          new ceres::AutoDiffCostFunction<PointTrackingResidual, 1, 4, 3, 2>(
-              newResidual);
-      problem.AddResidualBlock(newCostFunc, lossFunc,
-                               result.baseToTracked.so3().data(),
-                               result.baseToTracked.translation().data(),
-                               result.lightBaseToTracked[0].data);
     }
+
+  CHECK_EQ(oldWeightedLossesCapacity, weightedLosses.capacity());
+  CHECK_EQ(oldResidualsCapacity, residuals.capacity());
+  CHECK_EQ(oldCostFunctionsCapacity, costFunctions.capacity());
 
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_QR;

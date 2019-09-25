@@ -76,7 +76,15 @@ DEFINE_bool(draw_depth_pyramid, false,
 DEFINE_bool(write_files, true,
             "Do we need to write output files into output_directory?");
 DEFINE_string(output_directory, "output/default",
-              "CO: \"it's dso's output directory!\"");
+              "DSO's output directory. This flag is disabled, whenever "
+              "use_time_for_output is set to true.");
+DEFINE_bool(
+    use_time_for_output, false,
+    "If set to true, output directory is created according to the current "
+    "time, instead of using the output_directory flag. The precise format for "
+    "the name is output/YYYYMMDD_HHMMSS");
+
+constexpr int maxTimedOutputStringSize = 22;
 
 void readPointsInFrameGT(const MultiFovReader &reader,
                          std::vector<std::vector<Vec3>> &pointsInFrameGT,
@@ -121,7 +129,12 @@ It should contain "info" and "data" subdirectories.)abacaba";
     return 1;
   }
 
-  fs::path outDir(FLAGS_output_directory);
+  char curTime[maxTimedOutputStringSize + 2];
+  std::time_t t = std::time(nullptr);
+  std::strftime(curTime, maxTimedOutputStringSize + 1, "output/%Y%m%d_%H%M%S",
+                std::localtime(&t));
+  fs::path outDir(FLAGS_use_time_for_output ? std::string(curTime)
+                                            : FLAGS_output_directory);
   fs::path debugImgDir = outDir / fs::path(FLAGS_debug_img_dir);
   fs::path trackImgDir = outDir / fs::path(FLAGS_track_img_dir);
   fs::path pyrImgDir = outDir / fs::path(FLAGS_depth_pyramid_dir);
@@ -195,7 +208,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
 
   DebugImageDrawer debugImageDrawer;
   TrackingDebugImageDrawer trackingDebugImageDrawer(
-      camPyr.data(), settings.frameTracker, settings.pyramid);
+      camPyr.data(), settings.frameTracker, settings.pyramid, <#initializer #>);
   TrajectoryWriterDso trajectoryWriter(outDir, FLAGS_trajectory_filename);
 
   StdVector<SE3> frameToWorldGT(reader.getFrameCount());
