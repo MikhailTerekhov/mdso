@@ -17,8 +17,8 @@ public:
                            const std::vector<int> &drawingOrder);
 
   void startTracking(const PreKeyFrame &frame) override;
-  void levelTracked(int pyrLevel, const FrameTracker::TrackingResult &result,
-                    const std::vector<std::vector<std::pair<Vec2, double>>>
+  void levelTracked(int pyrLevel, const TrackingResult &result,
+                    const std::vector<StdVector<std::pair<Vec2, double>>>
                         &pointResiduals) override;
 
   cv::Mat3b drawAllLevels();

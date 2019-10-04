@@ -19,7 +19,7 @@ struct KeyFrame;
 
 struct KeyFrameEntry {
   KeyFrameEntry(const InitializedFrame::FrameEntry &entry, KeyFrame *host,
-                int ind);
+                int ind, const PointTracerSettings &tracingSettings);
   KeyFrameEntry(KeyFrame *host, int ind, Timestamp timestamp);
 
   StdVector<ImmaturePoint> immaturePoints;
@@ -53,10 +53,10 @@ struct KeyFrame {
   std::vector<std::unique_ptr<PreKeyFrame>> trackedFrames;
 
   Settings::KeyFrame kfSettings;
-  PointTracerSettings tracingSettings;
 
 private:
-  void addImmatures(const cv::Point points[], int size, int numInBundle);
+  void addImmatures(const cv::Point points[], int size, int numInBundle,
+                    const PointTracerSettings &tracingSettings);
 };
 
 } // namespace mdso

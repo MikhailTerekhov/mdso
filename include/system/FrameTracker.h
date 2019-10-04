@@ -10,20 +10,21 @@ namespace mdso {
 
 class FrameTrackerObserver;
 
+struct TrackingResult {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  TrackingResult(int camNumber);
+
+  SE3 baseToTracked;
+  std::vector<AffLight> lightBaseToTracked;
+};
+
 class FrameTracker {
 public:
   using DepthedMultiFrame = std::vector<DepthedImagePyramid>;
 
-  struct TrackingResult {
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
-    TrackingResult(int camNumber);
-
-    SE3 baseToTracked;
-    std::vector<AffLight> lightBaseToTracked;
-  };
-
   FrameTracker(CameraBundle camPyr[], const DepthedMultiFrame &baseFrame,
+               const KeyFrame &baseFrameAsKf,
                std::vector<FrameTrackerObserver *> &observers,
                const FrameTrackerSettings &_settings = {});
 
@@ -44,7 +45,7 @@ private:
         double depth;
         Vec3 ray;
         double gradNorm;
-        double intencity;
+        double intensity;
       };
 
       Entry(const DepthedMultiFrame &frame, const CameraModel &cam,
@@ -72,6 +73,7 @@ private:
   CameraBundle *camPyr;
   std::vector<DepthPyramidSlice> baseFrameSlices;
   std::vector<FrameTrackerObserver *> &observers;
+  std::vector<std::vector<AffLight>> baseAffLightFromTo;
   FrameTrackerSettings settings;
 };
 

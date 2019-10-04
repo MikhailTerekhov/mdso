@@ -1,12 +1,12 @@
 #include "util/Triangulation.h"
 #include "util/defs.h"
+#include "util/flags.h"
 #include "util/geometry.h"
 #include "util/types.h"
 #include "util/util.h"
 #include <glog/logging.h>
 #include <opencv2/opencv.hpp>
 #include <queue>
-#include "util/flags.h"
 #include <random>
 
 namespace mdso {
@@ -362,7 +362,7 @@ Triangulation::Triangle *Triangulation::enclosingTriangle(const Vec2 &point) {
   return curTri;
 }
 
-bool Triangulation::isIncidentToBoundary(Triangle *tri) const {
+bool Triangulation::isIncidentToBoundary(const Triangle *tri) const {
   return isFromBoundingTri(tri->vert[0]) || isFromBoundingTri(tri->vert[1]) ||
          isFromBoundingTri(tri->vert[2]);
 }
@@ -608,9 +608,14 @@ void Triangulation::draw(cv::Mat &img, cv::Scalar edgeCol) const {
   drawScaled(img, 1.0, 1.0, toCvPoint(upperLeft), edgeCol);
 }
 
+void Triangulation::draw(cv::Mat &img, cv::Scalar edgeCol,
+                         int thickness) const {
+  drawScaled(img, 1.0, 1.0, toCvPoint(upperLeft), edgeCol, thickness);
+}
+
 void Triangulation::drawScaled(cv::Mat &img, double scaleX, double scaleY,
-                               cv::Point upperLeftPoint,
-                               cv::Scalar edgeCol) const {
+                               cv::Point upperLeftPoint, cv::Scalar edgeCol,
+                               int thickness) const {
   std::set<Edge *> edgesDrawn;
   std::set<Triangle *> trianglesDrawn;
 
@@ -625,8 +630,14 @@ void Triangulation::drawScaled(cv::Mat &img, double scaleX, double scaleY,
                                  upperLeftPoint),
                        toCvPoint(e->vert[1]->pos - upperLeft, scaleX, scaleY,
                                  upperLeftPoint)};
-      cv::line(img, v[0], v[1], edgeCol, 2);
+      cv::line(img, v[0], v[1], edgeCol, thickness);
     }
+}
+
+void Triangulation::drawScaled(cv::Mat &img, double scaleX, double scaleY,
+                               cv::Point upperLeftPoint,
+                               cv::Scalar edgeCol) const {
+  drawScaled(img, scaleX, scaleY, upperLeftPoint, edgeCol, 2);
 }
 
 void drawCurvedInternal(CameraModel *cam, Vec2 ptFrom, Vec2 ptTo, cv::Mat &img,

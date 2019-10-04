@@ -118,7 +118,8 @@ cv::Mat3b drawLeveled(cv::Mat3b *images, int num, int w, int h, int resultW) {
   cv::hconcat(downRes, downImg);
   int blackWidth = (upImg.cols - downImg.cols) / 2;
   cv::Mat3b downFinal(upImg.rows, upImg.cols, toCvVec3bDummy(CV_BLACK));
-  downFinal(cv::Rect(blackWidth, 0, downImg.cols, downImg.rows)) = downImg;
+  downImg.copyTo(
+      downFinal(cv::Rect(blackWidth, 0, downImg.cols, downImg.rows)));
   cv::Mat3b result;
   cv::vconcat(upImg, downFinal, result);
   return result;
@@ -228,6 +229,8 @@ cv::Vec3b toCvVec3bDummy(cv::Scalar scalar) {
 
 cv::Point toCvPoint(Vec2 vec) { return cv::Point(int(vec[0]), int(vec[1])); }
 
+cv::Point toCvPoint(Vec2i vec) { return cv::Point(vec[0], vec[1]); }
+
 cv::Point toCvPoint(const Vec2 &vec, double scaleX, double scaleY,
                     cv::Point shift) {
   return cv::Point(int(vec[0] * scaleX) + shift.x,
@@ -304,6 +307,15 @@ std::vector<double> readBin(const fs::path &filename) {
   ifs.read(reinterpret_cast<char *>(result.data()),
            result.size() * sizeof(double));
   return result;
+}
+
+std::string curTimeBrief() {
+  constexpr int maxTimedOutputStringSize = 22;
+  char curTime[maxTimedOutputStringSize + 2];
+  std::time_t t = std::time(nullptr);
+  std::strftime(curTime, maxTimedOutputStringSize + 1, "%Y%m%d_%H%M%S",
+                std::localtime(&t));
+  return std::string(curTime);
 }
 
 } // namespace mdso

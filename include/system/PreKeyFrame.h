@@ -13,6 +13,7 @@
 namespace mdso {
 
 struct KeyFrame;
+struct TrackingResult;
 class PreKeyFrameInternals;
 
 struct PreKeyFrame {
@@ -50,17 +51,29 @@ struct PreKeyFrame {
     return frames[num].framePyr[0];
   }
 
+  inline const SE3 &baseToThis() const {
+    CHECK(wasTracked());
+    return mBaseToThis;
+  }
+
+  inline bool wasTracked() const { return mWasTracked; }
+
+  void setTracked(const TrackingResult &trackingResult);
+
   std::vector<FrameEntry> frames;
 
   KeyFrame *baseFrame;
   CameraBundle *cam;
-  SE3 baseToThis;
   SE3 baseToThisPredicted;
   int globalFrameNum;
 
   Settings::Pyramid pyrSettings;
 
   std::unique_ptr<PreKeyFrameInternals> internals;
+
+private:
+  bool mWasTracked;
+  SE3 mBaseToThis;
 };
 
 } // namespace mdso

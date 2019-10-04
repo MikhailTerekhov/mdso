@@ -20,17 +20,14 @@ PixelSelector::PointVector PixelSelector::select(const cv::Mat &frame,
   int newBlockSize =
       lastBlockSize * std::sqrt(static_cast<double>(lastPointsFound) /
                                 (pointsNeeded * settings.adaptToFactor));
+  LOG(INFO) << "new block size is " << newBlockSize;
   return selectInternal(frame, gradNorm, pointsNeeded, newBlockSize, debugOut);
 }
 
 void selectLayer(const cv::Mat &gradNorm, int selBlockSize, double threshold,
                  PixelSelector::PointVector &res) {
-  for (int i = 0;
-       i + selBlockSize < gradNorm.rows && res.size() < res.capacity();
-       i += selBlockSize)
-    for (int j = 0;
-         j + selBlockSize < gradNorm.cols && res.size() < res.capacity();
-         j += selBlockSize) {
+  for (int i = 0; i + selBlockSize < gradNorm.rows; i += selBlockSize)
+    for (int j = 0; j + selBlockSize < gradNorm.cols; j += selBlockSize) {
       cv::Mat block = gradNorm(cv::Range(i, i + selBlockSize),
                                cv::Range(j, j + selBlockSize));
       double avg = cv::sum(block)[0] / (selBlockSize * selBlockSize);
@@ -68,8 +65,8 @@ PixelSelector::selectInternal(const cv::Mat &frame, const cv::Mat1d &gradNorm,
   for (int i = 0; i < LI - 1; ++i)
     levLog << pointsOverThres[i].size() << " + ";
   levLog << pointsOverThres[LI - 1].size();
-  LOG(INFO) << "selector: found " << foundTotal << " (= " << levLog.str() << ")"
-            << std::endl;
+  LOG(INFO) << "selector: found " << foundTotal << " (= " << levLog.str()
+            << "), goal was " << pointsNeeded;
 
   if (foundTotal > pointsNeeded) {
     int sz = 0;

@@ -104,7 +104,7 @@ DsoInitializer::InitializedVector DelaunayDsoInitializer::initialize() {
       for (int ir = 0; ir < reselectCount + 1; ++ir) {
         PixelSelector::PointVector points =
             pixelSelectors[0].select(frames[kfInd], gradNorm[kfInd],
-                                         settings.keyFrame.immaturePointsNum());
+                                     settings.keyFrame.immaturePointsNum());
         for (const cv::Point &cvp : points) {
           Vec2 p = toVec2(cvp);
           double depth;
@@ -122,7 +122,8 @@ DsoInitializer::InitializedVector DelaunayDsoInitializer::initialize() {
     double *depthsData[] = {depths[0].data(), depths[1].data()};
     int sizes[] = {int(keyPoints[0].size()), int(keyPoints[1].size())};
     for (DelaunayInitializerObserver *obs : observers)
-      obs->initialized(initFrames.data(), kpTerrains, keyPointsData, depthsData, sizes);
+      obs->initialized(initFrames.data(), kpTerrains, keyPointsData, depthsData,
+                       sizes);
   }
 
   return initFrames;

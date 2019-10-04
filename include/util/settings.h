@@ -189,6 +189,9 @@ struct Settings {
 
     static constexpr bool default_useGradWeighting = false;
     bool useGradWeighting = default_useGradWeighting;
+
+    static constexpr bool default_doIntercameraReprojection = true;
+    bool doIntercameraReprojection = default_doIntercameraReprojection;
   } frameTracker;
 
   struct BundleAdjuster {
@@ -336,7 +339,8 @@ struct Settings {
   FrameTrackerSettings getFrameTrackerSettings() const;
   BundleAdjusterSettings getBundleAdjusterSettings() const;
 
-  Settings getGradientAdjustedSettings(double intencityRequiredToThis, double gradNormRequiredToThis);
+  Settings getGradientAdjustedSettings(double intencityRequiredToThis,
+                                       double gradNormRequiredToThis);
 
 private:
   int mKeyFrameDist = default_keyFrameDist;

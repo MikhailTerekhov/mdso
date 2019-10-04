@@ -20,11 +20,24 @@ Terrain::Terrain(CameraModel *cam, const StdVector<Vec2> &points,
   debugOut = false;
 }
 
-bool Terrain::hasInterpolatedDepth(Vec2 p) {
+bool Terrain::hasInterpolatedDepth(const Vec2 &p) {
   return !triang.isIncidentToBoundary(triang.enclosingTriangle(p));
 }
 
-bool Terrain::operator()(Vec2 p, double &resDepth) {
+bool Terrain::hasInterpolatedDepth(const Vec2 &p, double &nodeProximity) {
+  auto tri = triang.enclosingTriangle(p);
+  nodeProximity = INF;
+  if (triang.isIncidentToBoundary(tri))
+    return false;
+
+  for (int i = 0; i < 3; ++i) {
+    double dist = (tri->vert[i]->pos - p).norm();
+    nodeProximity = std::min(nodeProximity, dist);
+  }
+  return true;
+}
+
+bool Terrain::operator()(const Vec2 &p, double &resDepth) {
   auto tri = triang.enclosingTriangle(p);
   if (tri == nullptr || triang.isIncidentToBoundary(tri))
     return false;
@@ -46,6 +59,10 @@ bool Terrain::operator()(Vec2 p, double &resDepth) {
 
 void Terrain::draw(cv::Mat &img, cv::Scalar edgeCol) {
   triang.draw(img, edgeCol);
+}
+
+void Terrain::draw(cv::Mat &img, cv::Scalar edgeCol, int thickness) {
+  triang.draw(img, edgeCol, thickness);
 }
 
 void Terrain::drawDensePlainDepths(cv::Mat &img, double minDepth,

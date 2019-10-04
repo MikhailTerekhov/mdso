@@ -15,7 +15,7 @@ struct ReaderSettings {
 class RobotcarReader {
 public:
   struct FrameEntry {
-    cv::Mat frame;
+    cv::Mat3b frame;
     Timestamp timestamp;
   };
 
@@ -24,7 +24,9 @@ public:
 
   RobotcarReader(const fs::path &_chunkDir, const fs::path &modelsDir,
                  const fs::path &extrinsicsDir,
-                 const ReaderSettings &_settings);
+                 const ReaderSettings &_settings = {});
+
+  void provideMasks(const fs::path &masksDir);
 
   int numFrames() const;
   std::array<FrameEntry, numCams> frame(int idx) const;
@@ -38,6 +40,12 @@ public:
   std::vector<Vec3> getLdmrsCloud(Timestamp from, Timestamp to,
                                   Timestamp base) const;
 
+  std::array<StdVector<std::pair<Vec2, double>>, numCams>
+  project(Timestamp from, Timestamp to, Timestamp base, bool useLmsFront = true,
+          bool useLmsRear = true, bool useLdmrs = true);
+  std::array<StdVector<std::pair<Vec2, double>>, numCams>
+  project(const std::vector<Vec3> &cloud);
+
   inline CameraBundle &cam() { return mCam; }
   inline const CameraBundle &cam() const { return mCam; }
   inline const std::vector<Timestamp> &leftTs() const { return mLeftTs; }
@@ -50,11 +58,21 @@ public:
   inline const std::vector<Timestamp> &ldmrsTs() const { return mLdmrsTs; }
   inline const std::vector<Timestamp> &voTs() const { return mVoTs; }
 
-  inline const StdVector<SE3> &getVoBodyToFirst() const { return voBodyToFirst; }
+  inline const StdVector<SE3> &getVoBodyToFirst() const {
+    return voBodyToFirst;
+  }
+  inline bool masksProvided() const { return mMasksProvided; }
 
-// private:
+private:
   static const SE3 camToImage;
 
+  static CameraBundle createFromData(const fs::path &modelsDir,
+                                     const SE3 &bodyToLeft,
+                                     const SE3 &bodyToRear,
+                                     const SE3 &bodyToRight, int w, int h,
+                                     const Settings::CameraModel &camSettings);
+
+  void syncTimestamps();
   SE3 tsToFirst(Timestamp ts) const;
   void getPointCloudHelper(std::vector<Vec3> &cloud, const fs::path &scanDir,
                            const SE3 &sensorToBody, Timestamp base,
@@ -74,6 +92,7 @@ public:
   std::vector<Timestamp> mLmsFrontTs, mLmsRearTs;
   std::vector<Timestamp> mLdmrsTs;
   std::vector<Timestamp> mVoTs;
+  bool mMasksProvided;
   ReaderSettings settings;
 };
 

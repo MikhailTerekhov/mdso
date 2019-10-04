@@ -33,7 +33,7 @@ public:
     typedef Eigen::Matrix<T, Eigen::Dynamic, 1> VecXt;
     Eigen::Map<const Vec2t> pt_(point);
     Vec2t pt = pt_;
-    
+
     pt[1] = (pt[1] - principalPoint[1]) / fy;
     pt[0] = (pt[0] - skew * pt[1] - principalPoint[0]) / fx;
 
@@ -110,6 +110,9 @@ public:
   inline double getMinZ() const { return minZ; }
   inline double getMaxAngle() const { return maxAngle; }
 
+  void setMask(const cv::Mat1b mask);
+  const cv::Mat1b &mask() const { return mMask; };
+
   bool isOnImage(const Vec2 &p, int border) const;
 
   double getImgRadiusByAngle(double observeAngle) const;
@@ -159,10 +162,9 @@ private:
   double maxRadius;
   double minZ;
   double maxAngle;
-
   VecX mapPolyCoeffs;
-
   Settings::CameraModel settings;
+  cv::Mat1b mMask;
 };
 
 } // namespace mdso

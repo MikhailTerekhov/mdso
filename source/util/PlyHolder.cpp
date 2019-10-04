@@ -11,7 +11,8 @@ PlyHolder::PlyHolder(const fs::path &fname)
   std::ofstream fs(fname);
 
   if (!fs.good())
-    throw std::runtime_error("File \"" + fname.native() + "\" could not be created.");
+    throw std::runtime_error("File \"" + fname.native() +
+                             "\" could not be created.");
 
   fs << R"__(ply
 format ascii 1.0

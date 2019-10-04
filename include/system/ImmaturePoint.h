@@ -35,7 +35,6 @@ struct ImmaturePoint {
 
   static std::string statusName(ImmaturePoint::TracingStatus status);
 
-  // TODO create PointTracer!!!
   ImmaturePoint(KeyFrameEntry *host, const Vec2 &p,
                 const PointTracerSettings &settings = {});
 
@@ -79,7 +78,8 @@ private:
   int pointsToTrace(const CameraModel &camRef, const SE3 &baseToRef,
                     Vec3 &dirMinDepth, Vec3 &dirMaxDepth, Vec2 points[],
                     Vec3 directions[], const PointTracerSettings &settings);
-  double estVariance(const Vec2 &searchDirection, const PointTracerSettings &settings);
+  double estVariance(const Vec2 &searchDirection,
+                     const PointTracerSettings &settings);
   Vec2
   tracePrecise(const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
                    &refFrame,

@@ -71,6 +71,7 @@ void insertDepths(cv::Mat &img, const Vec2 points[], const double depths[],
 Vec2 toVec2(cv::Point p);
 Vec2i toVec2i(cv::Point p);
 cv::Point toCvPoint(Vec2 vec);
+cv::Point toCvPoint(Vec2i vec);
 cv::Point toCvPoint(const Vec2 &vec, double scaleX, double scaleY,
                     cv::Point shift);
 
@@ -111,6 +112,8 @@ cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
                            double minDepth, double maxDepth);
 
 std::vector<double> readBin(const fs::path &filename);
+
+std::string curTimeBrief();
 
 } // namespace mdso
 

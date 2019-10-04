@@ -19,7 +19,8 @@ void DoGPreprocessor::process(cv::Mat1b multiFrame[], cv::Mat1b output[],
         for (int x = 0; x < blurred.cols; ++x)
           output[i](y, x) = 128u + multiFrame[i](y, x) - blurred(y, x);
 
-      //      cv::addWeighted(multiFrame[i], multiplier, blurred, -multiplier, 0,
+      //      cv::addWeighted(multiFrame[i], multiplier, blurred, -multiplier,
+      //      0,
       //                      output[i]);
     } else {
       cv::Mat1b blurred1, blurred2;
@@ -28,7 +29,8 @@ void DoGPreprocessor::process(cv::Mat1b multiFrame[], cv::Mat1b output[],
       for (int y = 0; y < blurred1.rows; ++y)
         for (int x = 0; x < blurred1.cols; ++x)
           output[i](y, x) = 128u + blurred1(y, x) - blurred2(y, x);
-      //      cv::addWeighted(blurred1, multiplier, blurred2, -multiplier, uint8_t(128),
+      //      cv::addWeighted(blurred1, multiplier, blurred2, -multiplier,
+      //      uint8_t(128),
       //                      output[i]);
     }
   }

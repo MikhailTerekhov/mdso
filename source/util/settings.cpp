@@ -15,7 +15,8 @@ const static_vector<Vec2, Settings::ResidualPattern::max_size>
         Vec2(0, 0), Vec2(0, -2), Vec2(-1, -1), Vec2(1, -1), Vec2(-2, 0),
         Vec2(2, 0), Vec2(-1, 1), Vec2(1, 1),   Vec2(0, 2)};
 
-Settings Settings::getGradientAdjustedSettings(double inencityRequiredToThis, double gradNormRequiredToThis) {
+Settings Settings::getGradientAdjustedSettings(double inencityRequiredToThis,
+                                               double gradNormRequiredToThis) {
   Settings result = *this;
 
   for (int i = 0; i < Settings::PixelSelector::gradThesholdCount; ++i) {

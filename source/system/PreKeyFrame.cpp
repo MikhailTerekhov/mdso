@@ -1,5 +1,6 @@
 #include "system/PreKeyFrame.h"
 #include "PreKeyFrameInternals.h"
+#include "system/FrameTracker.h"
 #include "system/KeyFrame.h"
 #include "util/util.h"
 #include <ceres/cubic_interpolation.h>
@@ -28,7 +29,8 @@ PreKeyFrame::PreKeyFrame(KeyFrame *baseFrame, CameraBundle *cam,
     : baseFrame(baseFrame)
     , cam(cam)
     , globalFrameNum(globalFrameNum)
-    , pyrSettings(_pyrSettings) {
+    , pyrSettings(_pyrSettings)
+    , mWasTracked(false) {
   frames.reserve(cam->bundle.size());
   std::vector<cv::Mat1b> framesGray(cam->bundle.size()),
       framesProcessed(cam->bundle.size());
@@ -50,5 +52,13 @@ PreKeyFrame::PreKeyFrame(KeyFrame *baseFrame, CameraBundle *cam,
 }
 
 PreKeyFrame::~PreKeyFrame() {}
+
+void PreKeyFrame::setTracked(const TrackingResult &trackingResult) {
+  CHECK(!wasTracked());
+  mBaseToThis = trackingResult.baseToTracked;
+  for (int i = 0; i < cam->bundle.size(); ++i)
+    frames[i].lightBaseToThis = trackingResult.lightBaseToTracked[i];
+  mWasTracked = true;
+}
 
 }; // namespace mdso

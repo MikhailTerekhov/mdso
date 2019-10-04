@@ -36,14 +36,15 @@ DEFINE_bool(fill_vo_gaps, false,
 DEFINE_string(
     out_project, "projected.png",
     "Name of the file to output the image with the projected cloud into.");
-DEFINE_int32(project_idx, 1, "Index of the frame to project point cloud onto.");
+DEFINE_int32(project_idx, 750,
+             "Index of the frame to project point cloud onto.");
 DEFINE_double(
     time_win, 5,
     "Lidar scans from the time window [ts - time_win, ts + time_win] will be "
     "used to draw the projected cloud. Here ts is the time, corresponding to "
     "project_idx frame. time_win is measured in seconds.");
 DEFINE_double(
-    rel_point_size, 0.004,
+    rel_point_size, 0.001,
     "Relative to w+h point size on the images with projected points.");
 
 template <typename T>
@@ -138,26 +139,7 @@ void genClouds(const RobotcarReader &reader, Timestamp minTs, Timestamp maxTs,
              std::vector<cv::Vec3b>(ldmrsCloud.size(), gray));
 }
 
-DEFINE_string(out_all_sens, "sens.txt", "File to output all SE3 sensor->vehicle into.");
-void allSensorPoses(const RobotcarReader &reader) {
-  std::ofstream ofs(FLAGS_out_all_sens);
-  putInMatrixForm(ofs, SE3());
-  ofs << '\n';
-  putInMatrixForm(ofs, reader.bodyToLeft.inverse());
-  ofs << '\n';
-  putInMatrixForm(ofs, reader.bodyToRear.inverse());
-  ofs << '\n';
-  putInMatrixForm(ofs, reader.bodyToRight.inverse());
-  ofs << '\n';
-  putInMatrixForm(ofs, reader.bodyToLmsRear.inverse());
-  ofs << '\n';
-  putInMatrixForm(ofs, reader.bodyToLmsFront.inverse());
-  ofs << '\n';
-  putInMatrixForm(ofs, reader.bodyToLdmrs.inverse());
-  ofs << '\n';
-}
-
-int main(int argc, char **argv) {
+int main(int argc, char *argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   // gflags::SetUsageMessage(usage);
   google::InitGoogleLogging(argv[0]);
@@ -194,8 +176,6 @@ int main(int argc, char **argv) {
 
   cv::Mat3b proj = project(reader, FLAGS_project_idx);
   cv::imwrite(FLAGS_out_project, proj);
-
-  allSensorPoses(reader);
 
   return 0;
 }

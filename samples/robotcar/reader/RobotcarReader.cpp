@@ -41,10 +41,11 @@ SE3 readBodyToLidar(const fs::path &extrinsicsFile) {
   return lidarToBody.inverse();
 }
 
-CameraBundle createFromData(const fs::path &modelsDir, const SE3 &bodyToLeft,
-                            const SE3 &bodyToRear, const SE3 &bodyToRight,
-                            int w, int h,
-                            const Settings::CameraModel &camSettings) {
+CameraBundle
+RobotcarReader::createFromData(const fs::path &modelsDir, const SE3 &bodyToLeft,
+                               const SE3 &bodyToRear, const SE3 &bodyToRight,
+                               int w, int h,
+                               const Settings::CameraModel &camSettings) {
   fs::path leftModel = modelsDir / "mono_left.txt";
   fs::path rearModel = modelsDir / "mono_rear.txt";
   fs::path rightModel = modelsDir / "mono_right.txt";
@@ -136,6 +137,7 @@ RobotcarReader::RobotcarReader(const fs::path &_chunkDir,
     , lmsFrontDir(chunkDir / fs::path("lms_front"))
     , lmsRearDir(chunkDir / fs::path("lms_rear"))
     , ldmrsDir(chunkDir / fs::path("ldmrs"))
+    , mMasksProvided(false)
     , settings(_settings) {
   CHECK(fs::is_directory(leftDir));
   CHECK(fs::is_directory(rearDir));
@@ -154,9 +156,24 @@ RobotcarReader::RobotcarReader(const fs::path &_chunkDir,
   readVo(chunkDir / fs::path("vo") / fs::path("vo.csv"), mVoTs, voBodyToFirst,
          settings.fillVoGaps);
 
-  CHECK(mLeftTs.size() == mRearTs.size() && mLeftTs.size() == mRightTs.size())
-      << "Different counts of images in directories: " << mLeftTs.size() << " "
-      << mRearTs.size() << " " << mRightTs.size();
+  syncTimestamps();
+}
+
+void RobotcarReader::provideMasks(const fs::path &masksDir) {
+  CHECK(fs::is_directory(masksDir));
+  fs::path leftMaskPath = masksDir / "mono_left.png";
+  fs::path rearMaskPath = masksDir / "mono_rear.png";
+  fs::path rightMaskPath = masksDir / "mono_right.png";
+  CHECK(fs::is_regular_file(leftMaskPath));
+  CHECK(fs::is_regular_file(rearMaskPath));
+  CHECK(fs::is_regular_file(rightMaskPath));
+  cv::Mat3b leftMask = cv::imread(std::string(leftMaskPath));
+  cv::Mat3b rearMask = cv::imread(std::string(rearMaskPath));
+  cv::Mat3b rightMask = cv::imread(std::string(rightMaskPath));
+  cam().bundle[0].cam.setMask(cvtBgrToGray(leftMask));
+  cam().bundle[1].cam.setMask(cvtBgrToGray(rearMask));
+  cam().bundle[2].cam.setMask(cvtBgrToGray(rightMask));
+  mMasksProvided = true;
 }
 
 int RobotcarReader::numFrames() const { return leftTs().size(); }
@@ -175,9 +192,9 @@ RobotcarReader::frame(int idx) const {
   CHECK(fs::is_regular_file(rearPath));
   CHECK(fs::is_regular_file(rightPath));
 
-  cv::Mat leftOrig = cv::imread(leftPath.native(), cv::IMREAD_GRAYSCALE);
-  cv::Mat rearOrig = cv::imread(rearPath.native(), cv::IMREAD_GRAYSCALE);
-  cv::Mat rightOrig = cv::imread(rightPath.native(), cv::IMREAD_GRAYSCALE);
+  cv::Mat1b leftOrig = cv::imread(leftPath.native(), cv::IMREAD_GRAYSCALE);
+  cv::Mat1b rearOrig = cv::imread(rearPath.native(), cv::IMREAD_GRAYSCALE);
+  cv::Mat1b rightOrig = cv::imread(rightPath.native(), cv::IMREAD_GRAYSCALE);
 
   std::array<FrameEntry, numCams> result;
   cv::cvtColor(leftOrig, result[0].frame, cv::COLOR_BayerBG2BGR);
@@ -196,7 +213,9 @@ SE3 RobotcarReader::tsToTs(Timestamp src, Timestamp dst) const {
 
 SE3 RobotcarReader::tsToFirst(Timestamp ts) const {
   CHECK(ts >= voTs()[0] && ts <= voTs().back())
-      << "Interpolating outside of VO!";
+      << "Interpolating outside of VO! "
+      << "ts = " << ts << ", bounds = [" << voTs()[0] << ", " << voTs().back()
+      << "]";
   CHECK(voTs().size() >= 2);
   if (ts == voTs()[0])
     return voBodyToFirst[0];
@@ -204,7 +223,8 @@ SE3 RobotcarReader::tsToFirst(Timestamp ts) const {
   int ind = std::lower_bound(voTs().begin(), voTs().end(), ts) - voTs().begin();
   CHECK(ind > 0 && ind < voBodyToFirst.size());
   SE3 highToLow = voBodyToFirst[ind - 1].inverse() * voBodyToFirst[ind];
-  double tsFrac = (ts - voTs()[ind - 1]) / (voTs()[ind] - voTs()[ind - 1]);
+  double tsFrac =
+      double(ts - voTs()[ind - 1]) / (voTs()[ind] - voTs()[ind - 1]);
   SE3 tsToLow = SE3::exp(tsFrac * highToLow.log());
   return voBodyToFirst[ind - 1] * tsToLow;
 }
@@ -277,4 +297,218 @@ std::vector<Vec3> RobotcarReader::getLdmrsCloud(Timestamp from, Timestamp to,
   getPointCloudHelper(cloud, ldmrsDir, bodyToLdmrs.inverse(), base, ldmrsTs(),
                       from, to, true);
   return cloud;
+}
+
+std::array<StdVector<std::pair<Vec2, double>>, RobotcarReader::numCams>
+RobotcarReader::project(Timestamp from, Timestamp to, Timestamp base,
+                        bool useLmsFront, bool useLmsRear, bool useLdmrs) {
+  std::vector<Vec3> lmsFrontCloud;
+  if (useLmsFront)
+    lmsFrontCloud = getLmsFrontCloud(from, to, base);
+  std::vector<Vec3> lmsRearCloud;
+  if (useLmsRear)
+    lmsRearCloud = getLmsRearCloud(from, to, base);
+  std::vector<Vec3> ldmrsCloud;
+  if (useLdmrs)
+    ldmrsCloud = getLdmrsCloud(from, to, base);
+  std::vector<Vec3> cloud;
+  cloud.reserve(lmsFrontCloud.size() + lmsRearCloud.size() + ldmrsCloud.size());
+  cloud.insert(cloud.end(), lmsFrontCloud.begin(), lmsFrontCloud.end());
+  cloud.insert(cloud.end(), lmsRearCloud.begin(), lmsRearCloud.end());
+  cloud.insert(cloud.end(), ldmrsCloud.begin(), ldmrsCloud.end());
+  return project(cloud);
+}
+
+std::array<StdVector<std::pair<Vec2, double>>, RobotcarReader::numCams>
+RobotcarReader::project(const std::vector<Vec3> &cloud) {
+  std::array<StdVector<std::pair<Vec2, double>>, RobotcarReader::numCams>
+      result;
+  for (int camInd = 0; camInd < RobotcarReader::numCams; ++camInd) {
+    SE3 bodyToCam = cam().bundle[camInd].bodyToThis;
+    for (const Vec3 &p : cloud) {
+      Vec3 moved = bodyToCam * p;
+      if (!cam().bundle[camInd].cam.isMappable(moved))
+        continue;
+      double depth = moved.norm();
+      Vec2 projected = cam().bundle[camInd].cam.map(moved);
+      result[camInd].push_back({projected, depth});
+    }
+  }
+  return result;
+}
+
+constexpr int npos = -1;
+
+template <typename T>
+std::vector<int> closestNotHigherInds(const std::vector<T> &a,
+                                      const std::vector<T> &b) {
+  CHECK(!b.empty());
+  std::vector<int> inds(a.size(), npos);
+  int indB = 0, indA = 0;
+  while (indB < b.size() && b[indB] > a[indA])
+    indA++;
+  for (; indA < a.size(); ++indA) {
+    if (indB + 1 == b.size() && a[indA] < b[indB])
+      break;
+    while (indB + 1 < b.size() && b[indB + 1] <= a[indA])
+      ++indB;
+    inds[indA] = indB;
+  }
+  return inds;
+}
+
+template <typename T>
+std::vector<int> closestNotLowerInds(const std::vector<T> &a,
+                                     const std::vector<T> &b) {
+  CHECK(!b.empty());
+  std::vector<int> inds(a.size(), npos);
+  int indA = 0, indB = 0;
+  while (indB < b.size() && b[indB] < a[indA])
+    indB++;
+  for (; indA < a.size(); ++indA) {
+    while (indB < b.size() && b[indB] < a[indA])
+      ++indB;
+    if (indB == b.size())
+      break;
+    inds[indA] = indB;
+  }
+  return inds;
+}
+
+template <typename T>
+std::vector<int> closestIndsInB(const std::vector<T> &a,
+                                const std::vector<T> &b) {
+  CHECK(!b.empty());
+  std::vector<int> closestToB(a.size());
+  int indB = 0;
+  for (int indA = 0; indA < a.size(); ++indA) {
+    while (indB + 1 < b.size() && b[indB + 1] < a[indA])
+      ++indB;
+    if (indB + 1 == b.size()) {
+      closestToB[indA] = indB;
+      continue;
+    }
+    if (std::abs(a[indA] - b[indB]) < std::abs(a[indA] - b[indB + 1]))
+      closestToB[indA] = indB;
+    else
+      closestToB[indA] = ++indB;
+  }
+  return closestToB;
+}
+
+template <typename T> T triDist(T x1, T x2, T x3) {
+  return abs(x1 - x2) + abs(x1 - x3) + abs(x2 - x3);
+}
+
+template <typename T>
+void filterBest(std::vector<T> &a, const std::vector<T> &b,
+                const std::vector<T> &c, std::vector<int> &aToB,
+                std::vector<int> &aToC) {
+  constexpr int npos = -1;
+  std::vector<int> bestIndAInB(b.size(), npos);
+  std::vector<T> bestAInB(b.size());
+  for (int indA = 0; indA < a.size(); ++indA) {
+    T closeB = b[aToB[indA]], closeC = c[aToC[indA]];
+    T curDist = triDist(a[indA], closeB, closeC);
+    if (bestIndAInB[aToB[indA]] == npos || curDist < bestAInB[aToB[indA]]) {
+      bestAInB[aToB[indA]] = curDist;
+      bestIndAInB[aToB[indA]] = indA;
+    }
+  }
+
+  std::vector<char> removed(a.size(), false);
+  for (int indA = 0; indA < a.size(); ++indA) {
+    if (bestIndAInB[aToB[indA]] != indA)
+      removed[indA] = true;
+  }
+  int newIndA = 0;
+  for (int oldIndA = 0; oldIndA < a.size(); ++oldIndA)
+    if (!removed[oldIndA]) {
+      a[newIndA] = a[oldIndA];
+      aToB[newIndA] = aToB[oldIndA];
+      aToC[newIndA] = aToC[oldIndA];
+      ++newIndA;
+    }
+  a.resize(newIndA);
+  aToB.resize(newIndA);
+  aToC.resize(newIndA);
+}
+
+template <typename T>
+void filterOutNoRef(std::vector<T> &v, std::vector<int> &inds) {
+  auto newIndsEnd = std::unique(inds.begin(), inds.end());
+  CHECK_EQ(newIndsEnd - inds.begin(), inds.end() - inds.begin());
+  int newInd = 0;
+  for (int i : inds)
+    v[newInd++] = v[i];
+  v.resize(newInd);
+}
+
+template <typename T>
+void checkInds(const std::vector<T> &a, const std::vector<T> &b,
+               const std::vector<T> &c, int indA, int indB, int indC,
+               T &bestDist, int &bestIndB, int &bestIndC) {
+  if (indB == npos || indC == npos)
+    return;
+  T dist = triDist(a[indA], b[indB], c[indC]);
+  if (dist < bestDist) {
+    bestDist = dist;
+    bestIndB = indB;
+    bestIndC = indC;
+  }
+}
+
+template <typename T>
+void mostConsistentTriples(std::vector<T> &a, std::vector<T> &b,
+                           std::vector<T> &c) {
+  std::vector<int> lowerInB = closestNotHigherInds(a, b);
+  std::vector<int> higherInB = closestNotLowerInds(a, b);
+  std::vector<int> lowerInC = closestNotHigherInds(a, c);
+  std::vector<int> higherInC = closestNotLowerInds(a, c);
+
+  std::vector<int> aToB(a.size()), aToC(a.size());
+  for (int indA = 0; indA < a.size(); ++indA) {
+    T bestDist = std::numeric_limits<T>::max();
+    int bestInB = npos, bestInC = npos;
+    checkInds(a, b, c, indA, lowerInB[indA], lowerInC[indA], bestDist, bestInB,
+              bestInC);
+    checkInds(a, b, c, indA, lowerInB[indA], higherInC[indA], bestDist, bestInB,
+              bestInC);
+    checkInds(a, b, c, indA, higherInB[indA], lowerInC[indA], bestDist, bestInB,
+              bestInC);
+    checkInds(a, b, c, indA, higherInB[indA], higherInC[indA], bestDist,
+              bestInB, bestInC);
+    aToB[indA] = bestInB;
+    aToC[indA] = bestInC;
+  }
+
+  filterBest(a, b, c, aToB, aToC);
+  filterBest(a, c, b, aToC, aToB);
+  filterOutNoRef(b, aToB);
+  filterOutNoRef(c, aToC);
+  CHECK_EQ(a.size(), b.size());
+  CHECK_EQ(a.size(), c.size());
+}
+
+template <typename T>
+double avgTriDist(const std::vector<T> &a, const std::vector<T> &b,
+                  const std::vector<T> &c) {
+  double sum = 0;
+  for (int i = 0; i < a.size(); ++i)
+    sum += triDist(a[i], b[i], c[i]);
+  return sum / a.size();
+}
+
+void RobotcarReader::syncTimestamps() {
+  int oldSize = mLeftTs.size();
+  double oldAvgTriDist = avgTriDist(mLeftTs, mRearTs, mRightTs);
+  mostConsistentTriples(mLeftTs, mRearTs, mRightTs);
+  CHECK_EQ(mLeftTs.size(), mRightTs.size());
+  CHECK_EQ(mLeftTs.size(), mRearTs.size());
+  int newSize = mLeftTs.size();
+  double newAvgTriDist = avgTriDist(mLeftTs, mRearTs, mRightTs);
+  LOG(INFO) << "triples filtered out for syncing timestamps: "
+            << oldSize - newSize;
+  LOG(INFO) << "old avg tridist (s) = " << oldAvgTriDist / 1e6;
+  LOG(INFO) << "new avg tridist (s) = " << newAvgTriDist / 1e6;
 }

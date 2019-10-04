@@ -4,6 +4,8 @@
 #include "system/AffineLightTransform.h"
 #include "system/DelaunayDsoInitializer.h"
 #include "system/StereoMatcher.h"
+#include "system/TrackingPredictorRot.h"
+#include "system/TrackingPredictorScrew.h"
 #include "util/defs.h"
 #include "util/flags.h"
 #include "util/geometry.h"
@@ -24,7 +26,12 @@ DsoSystem::DsoSystem(CameraBundle *cam, Preprocessor *preprocessor,
     , settings(_settings)
     , pointTracerSettings(_settings.getPointTracerSettings())
     , observers(observers)
-    , preprocessor(preprocessor) {
+    , preprocessor(preprocessor)
+    , trackingPredictor(settings.predictUsingScrew
+                            ? std::unique_ptr<TrackingPredictor>(
+                                  new TrackingPredictorScrew(this))
+                            : std::unique_ptr<TrackingPredictor>(
+                                  new TrackingPredictorRot(this))) {
   LOG(INFO) << "create DsoSystem" << std::endl;
 
   marginalizedFrames.reserve(settings.expectedFramesCount);
@@ -86,7 +93,7 @@ void DsoSystem::projectOntoFrame(int globalFrameNum, Vec2 *points[],
                                  int sizes[]) {
   CHECK(globalFrameNum >= 0 && globalFrameNum < allFrames.size());
 
-  SE3 worldToFrame = getFrameToWorld(globalFrameNum).inverse();
+  SE3 worldToFrame = bodyToWorld(globalFrameNum).inverse();
 
   for (int i = 0; i < cam->bundle.size(); ++i)
     sizes[i] = 0;
@@ -126,6 +133,17 @@ void DsoSystem::projectOntoFrame(int globalFrameNum, Vec2 *points[],
   }
 }
 
+int DsoSystem::trajectorySize() const {
+  if (allFrames.size() > 0 &&
+      std::holds_alternative<PreKeyFrame *>(allFrames.back())) {
+    PreKeyFrame *last = std::get<PreKeyFrame *>(allFrames.back());
+    return last->wasTracked() ? allFrames.size() : int(allFrames.size()) - 1;
+  }
+  return allFrames.size() - 1;
+}
+
+int DsoSystem::camNumber() const { return cam->bundle.size(); }
+
 class TimestampExtractor {
 public:
   TimestampExtractor(int numCams)
@@ -151,10 +169,9 @@ private:
   int numCams;
 };
 
-Timestamp DsoSystem::getTimestamp(int frameNumber) {
-  CHECK(frameNumber >= 0 && frameNumber < allFrames.size());
-  return std::visit(TimestampExtractor(cam->bundle.size()),
-                    allFrames[frameNumber]);
+Timestamp DsoSystem::timestamp(int ind) const {
+  CHECK(ind >= 0 && ind < allFrames.size());
+  return std::visit(TimestampExtractor(cam->bundle.size()), allFrames[ind]);
 }
 
 class FrameToWorldExtractor {
@@ -165,13 +182,13 @@ public:
   }
   SE3 operator()(KeyFrame *f) { return f->thisToWorld; }
   SE3 operator()(PreKeyFrame *f) {
-    return f->baseFrame->thisToWorld * f->baseToThis.inverse();
+    return f->baseFrame->thisToWorld * f->baseToThis().inverse();
   }
 };
 
-SE3 DsoSystem::getFrameToWorld(int frameNumber) {
-  CHECK(frameNumber >= 0 && frameNumber < allFrames.size());
-  return std::visit(FrameToWorldExtractor(), allFrames[frameNumber]);
+SE3 DsoSystem::bodyToWorld(int ind) const {
+  CHECK(ind >= 0 && ind < trajectorySize());
+  return std::visit(FrameToWorldExtractor(), allFrames[ind]);
 }
 
 class LightWorldToFrameExtractor {
@@ -196,65 +213,9 @@ private:
   int ind;
 };
 
-AffLight DsoSystem::getLightWorldToFrame(int frameNumber, int ind) {
-  CHECK(frameNumber >= 0 && frameNumber < allFrames.size());
-  return std::visit(LightWorldToFrameExtractor(ind), allFrames[frameNumber]);
-}
-
-double DsoSystem::getTimeLastByLbo() {
-  CHECK(allFrames.size() >= 3);
-
-  Timestamp lboTime =
-      getTimestamp(allFrames.size() - 2) - getTimestamp(allFrames.size() - 3);
-  Timestamp lastTime =
-      getTimestamp(allFrames.size() - 1) - getTimestamp(allFrames.size() - 2);
-  return double(lastTime) / lboTime;
-}
-
-SE3 predictScrewInternal(double timeLastByLbo, const SE3 &baseToLBTwo,
-                         const SE3 &baseToLBOne) {
-  SE3 lbtToLbo = baseToLBOne * baseToLBTwo.inverse();
-  return SE3::exp(timeLastByLbo * lbtToLbo.log()) * baseToLBOne;
-}
-
-SE3 predictSimpleInternal(double timeLastByLbo, const SE3 &baseToLBTwo,
-                          const SE3 &baseToLBOne) {
-  SE3 lbtToLbo = baseToLBOne * baseToLBTwo.inverse();
-  SO3 lboToLastRot = SO3::exp(timeLastByLbo * lbtToLbo.so3().log());
-  Vec3 lboToLastTrans =
-      timeLastByLbo *
-      (lboToLastRot * lbtToLbo.so3().inverse() * lbtToLbo.translation());
-
-  return SE3(lboToLastRot, lboToLastTrans) * baseToLBOne;
-}
-
-SE3 DsoSystem::predictInternal(double timeLastByLbo, const SE3 &baseToLBTwo,
-                               const SE3 &baseToLBOne) {
-  return settings.predictUsingScrew
-             ? predictScrewInternal(timeLastByLbo, baseToLBTwo, baseToLBOne)
-             : predictSimpleInternal(timeLastByLbo, baseToLBTwo, baseToLBOne);
-}
-
-SE3 DsoSystem::predictBaseKfToCur() {
-  double timeLastByLbo = getTimeLastByLbo();
-
-  SE3 baseToLBTwo =
-      getFrameToWorld(allFrames.size() - 3).inverse() * baseFrame().thisToWorld;
-  SE3 baseToLBOne =
-      getFrameToWorld(allFrames.size() - 2).inverse() * baseFrame().thisToWorld;
-
-  return predictInternal(timeLastByLbo, baseToLBTwo, baseToLBOne);
-}
-
-FrameTracker::TrackingResult DsoSystem::predictTracking() {
-  FrameTracker::TrackingResult result(cam->bundle.size());
-  result.baseToTracked = predictBaseKfToCur();
-  for (int i = 0; i < cam->bundle.size(); ++i)
-    result.lightBaseToTracked[i] =
-        getLightWorldToFrame(allFrames.size() - 1, i) *
-        baseFrame().frames[i].lightWorldToThis.inverse();
-
-  return result;
+AffLight DsoSystem::affLightWorldToBody(int ind, int camInd) const {
+  CHECK(ind >= 0 && ind < allFrames.size());
+  return std::visit(LightWorldToFrameExtractor(camInd), allFrames[ind]);
 }
 
 int DsoSystem::totalOptimized() const {
@@ -476,9 +437,9 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], Timestamp timestamps[]) {
 
       for (int i = 0; i < init.size(); ++i) {
         const InitializedFrame &f = init[i];
-        keyFrames.emplace_back(new KeyFrame(
-            f, cam, preprocessor, i, pixelSelector.data(), settings.keyFrame,
-            settings.pyramid, settings.getPointTracerSettings()));
+        keyFrames.emplace_back(
+            new KeyFrame(f, cam, preprocessor, i, pixelSelector.data(),
+                         settings.keyFrame, settings.pyramid));
         allFrames.push_back(keyFrames.back().get());
       }
 
@@ -533,9 +494,9 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], Timestamp timestamps[]) {
               << "Depths = " << baseForTrack[0].depths.size()
               << "depths[0].size = " << baseForTrack[0].depths[0].size();
 
-      frameTracker = std::unique_ptr<FrameTracker>(
-          new FrameTracker(camPyr.data(), baseForTrack, observers.frameTracker,
-                           settings.getFrameTrackerSettings()));
+      frameTracker = std::unique_ptr<FrameTracker>(new FrameTracker(
+          camPyr.data(), baseForTrack, baseFrame(), observers.frameTracker,
+          settings.getFrameTrackerSettings()));
 
       for (DsoObserver *obs : observers.dso)
         obs->newBaseFrame(baseFrame());
@@ -555,19 +516,17 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], Timestamp timestamps[]) {
 
   allFrames.push_back(preKeyFrame.get());
 
-  FrameTracker::TrackingResult predicted = predictTracking();
+  TrackingResult predicted = trackingPredictor->predictAt(
+      timestamp(globalFrameNum), baseFrame().preKeyFrame->globalFrameNum);
 
   preKeyFrame->baseToThisPredicted = predicted.baseToTracked;
 
   for (DsoObserver *obs : observers.dso)
     obs->newFrame(*preKeyFrame);
 
-  FrameTracker::TrackingResult tracked =
-      frameTracker->trackFrame(*preKeyFrame, predicted);
+  TrackingResult tracked = frameTracker->trackFrame(*preKeyFrame, predicted);
 
-  preKeyFrame->baseToThis = tracked.baseToTracked;
-  for (int i = 0; i < cam->bundle.size(); ++i)
-    preKeyFrame->frames[i].lightBaseToThis = tracked.lightBaseToTracked[i];
+  preKeyFrame->setTracked(tracked);
 
   SE3 diffPos = predicted.baseToTracked * tracked.baseToTracked.inverse();
   LOG(INFO) << "\ndiff to predicted:\n"
@@ -590,9 +549,8 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], Timestamp timestamps[]) {
 
     SE3 preToWorld = FrameToWorldExtractor()(preKeyFrame.get());
 
-    keyFrames.push_back(std::unique_ptr<KeyFrame>(
-        new KeyFrame(std::move(preKeyFrame), pixelSelector.data(),
-                     settings.keyFrame, settings.getPointTracerSettings())));
+    keyFrames.push_back(std::unique_ptr<KeyFrame>(new KeyFrame(
+        std::move(preKeyFrame), pixelSelector.data(), settings.keyFrame)));
     allFrames.back() = keyFrames.back().get();
 
     SE3 keyToWorld = FrameToWorldExtractor()(keyFrames.back().get());
@@ -653,9 +611,9 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], Timestamp timestamps[]) {
           points[i].data(), depths[i].data(), weights.data(), points[i].size());
     }
 
-    frameTracker = std::unique_ptr<FrameTracker>(
-        new FrameTracker(camPyr.data(), baseForTrack, observers.frameTracker,
-                         settings.getFrameTrackerSettings()));
+    frameTracker = std::unique_ptr<FrameTracker>(new FrameTracker(
+        camPyr.data(), baseForTrack, baseFrame(), observers.frameTracker,
+        settings.getFrameTrackerSettings()));
   }
 }
 

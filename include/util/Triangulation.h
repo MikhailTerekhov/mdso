@@ -50,11 +50,12 @@ public:
   const std::vector<const Triangle *> &triangles() const;
 
   Triangle *enclosingTriangle(const Vec2 &point);
-  bool isIncidentToBoundary(Triangle *tri) const;
+  bool isIncidentToBoundary(const Triangle *tri) const;
 
   cv::Mat draw(int imgWidth, int imgHeight, cv::Scalar bgCol,
                cv::Scalar edgeCol) const;
   void draw(cv::Mat &img, cv::Scalar edgeCol) const;
+  void draw(cv::Mat &img, cv::Scalar edgeCol, int thickness) const;
 
   void drawCurved(CameraModel *cam, cv::Mat &img, cv::Scalar edgeCol) const;
 
@@ -91,6 +92,9 @@ private:
 
   void drawScaled(cv::Mat &img, double scaleX, double scaleY,
                   cv::Point upperLeftPoint, cv::Scalar edgeCol) const;
+  void drawScaled(cv::Mat &img, double scaleX, double scaleY,
+                  cv::Point upperLeftPoint, cv::Scalar edgeCol,
+                  int thickness) const;
 
   double maxDim;
   Vec2 upperLeft, bottomRight;

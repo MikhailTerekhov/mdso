@@ -7,18 +7,20 @@
 namespace mdso {
 
 KeyFrameEntry::KeyFrameEntry(const InitializedFrame::FrameEntry &entry,
-                             KeyFrame *host, int ind)
+                             KeyFrame *host, int ind,
+                             const PointTracerSettings &tracingSettings)
     : host(host)
     , ind(ind)
     , timestamp(entry.timestamp) {
   immaturePoints.reserve(entry.depthedPoints.size());
   for (const auto &[p, d] : entry.depthedPoints) {
-    immaturePoints.emplace_back(this, p, host->tracingSettings);
+    immaturePoints.emplace_back(this, p, tracingSettings);
     immaturePoints.back().depth = d;
   }
 }
 
 KeyFrameEntry::KeyFrameEntry(KeyFrame *host, int ind, Timestamp timestamp)
+
     : host(host)
     , ind(ind)
     , timestamp(timestamp) {}
@@ -30,8 +32,7 @@ KeyFrame::KeyFrame(const InitializedFrame &initializedFrame, CameraBundle *cam,
                    const Settings::Pyramid &pyrSettings,
                    const PointTracerSettings &tracingSettings)
     : thisToWorld(initializedFrame.thisToWorld)
-    , kfSettings(_kfSettings)
-    , tracingSettings(tracingSettings) {
+    , kfSettings(_kfSettings) {
   std::vector<cv::Mat> images(cam->bundle.size());
   std::vector<Timestamp> timestamps(cam->bundle.size());
   for (int i = 0; i < cam->bundle.size(); ++i) {
@@ -44,7 +45,7 @@ KeyFrame::KeyFrame(const InitializedFrame &initializedFrame, CameraBundle *cam,
                       timestamps.data(), pyrSettings));
 
   for (int i = 0; i < cam->bundle.size(); ++i)
-    frames.emplace_back(initializedFrame.frames[i], this, i);
+    frames.emplace_back(initializedFrame.frames[i], this, i, tracingSettings);
 }
 
 KeyFrame::KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame,
@@ -52,17 +53,18 @@ KeyFrame::KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame,
                    const Settings::KeyFrame &_kfSettings,
                    const PointTracerSettings &tracingSettings)
     : preKeyFrame(std::move(newPreKeyFrame))
-    , thisToWorld(preKeyFrame->baseFrame ? preKeyFrame->baseFrame->thisToWorld *
-                                               preKeyFrame->baseToThis.inverse()
-                                         : preKeyFrame->baseToThis.inverse())
-    , kfSettings(_kfSettings)
-    , tracingSettings(tracingSettings) {
-  for (int i = 0; i < preKeyFrame->cam->bundle.size(); ++i) {
+    , thisToWorld(preKeyFrame->baseFrame
+                      ? preKeyFrame->baseFrame->thisToWorld *
+                            preKeyFrame->baseToThis().inverse()
+                      : preKeyFrame->baseToThis().inverse())
+    , kfSettings(_kfSettings) {
+  int camNum = preKeyFrame->cam->bundle.size();
+  for (int i = 0; i < camNum; ++i) {
     PixelSelector::PointVector selected = pixelSelector[i].select(
         preKeyFrame->image(i), preKeyFrame->frames[i].gradNorm,
-        kfSettings.immaturePointsNum(), nullptr);
+        kfSettings.immaturePointsNum() / camNum, nullptr);
     frames.emplace_back(this, i, preKeyFrame->frames[i].timestamp);
-    addImmatures(selected.data(), selected.size(), i);
+    addImmatures(selected.data(), selected.size(), i, tracingSettings);
     frames[i].lightWorldToThis =
         preKeyFrame->baseFrame
             ? preKeyFrame->frames[i].lightBaseToThis *
@@ -71,8 +73,8 @@ KeyFrame::KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame,
   }
 }
 
-void KeyFrame::addImmatures(const cv::Point points[], int size,
-                            int numInBundle) {
+void KeyFrame::addImmatures(const cv::Point points[], int size, int numInBundle,
+                            const PointTracerSettings &tracingSettings) {
   for (int i = 0; i < size; ++i)
     frames[numInBundle].immaturePoints.emplace_back(
         &frames[numInBundle], toVec2(points[i]), tracingSettings);

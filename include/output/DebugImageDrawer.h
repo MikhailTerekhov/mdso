@@ -13,7 +13,7 @@ namespace mdso {
 
 class DebugImageDrawer : public DsoObserver {
 public:
-  DebugImageDrawer();
+  DebugImageDrawer(const std::vector<int> &drawingOrder);
 
   void created(DsoSystem *newDso, CameraBundle *newCam,
                const Settings &newSettings) override;
@@ -23,7 +23,7 @@ public:
   cv::Mat3b draw();
 
 private:
-  cv::Mat3b drawProjDepths(const StdVector<Vec2> &optProj,
+  cv::Mat3b drawProjDepths(int camInd, const StdVector<Vec2> &optProj,
                            const std::vector<double> &optDepths,
                            const StdVector<Vec2> &immProj,
                            const std::vector<ImmaturePoint *> &immRefs,
@@ -42,6 +42,7 @@ private:
   const KeyFrame *baseFrame;
   const PreKeyFrame *lastFrame;
   std::unique_ptr<TrackingDebugImageDrawer> residualsDrawer;
+  std::vector<int> drawingOrder;
 };
 
 } // namespace mdso

@@ -39,6 +39,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/util/PlyHolder.h
     ${PROJECT_SOURCE_DIR}/include/util/Sim3Aligner.h
     ${PROJECT_SOURCE_DIR}/include/util/flags.h
+    ${PROJECT_SOURCE_DIR}/include/util/TrajectoryHolder.h
 
     ${PROJECT_SOURCE_DIR}/include/output/Observers.h
     ${PROJECT_SOURCE_DIR}/include/output/DsoObserver.h
@@ -75,6 +76,9 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/system/Preprocessor.h
     ${PROJECT_SOURCE_DIR}/include/system/IdentityPreprocessor.h
     ${PROJECT_SOURCE_DIR}/include/system/DoGPreprocessor.h
+    ${PROJECT_SOURCE_DIR}/include/system/TrackingPredictor.h
+    ${PROJECT_SOURCE_DIR}/include/system/TrackingPredictorRot.h
+    ${PROJECT_SOURCE_DIR}/include/system/TrackingPredictorScrew.h
 )
 
 set(dso_SOURCE_FILES
@@ -92,6 +96,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/util/PlyHolder.cpp
     ${PROJECT_SOURCE_DIR}/source/util/Sim3Aligner.cpp
     ${PROJECT_SOURCE_DIR}/source/util/flags.cpp
+    ${PROJECT_SOURCE_DIR}/source/util/TrajectoryHolder.cpp
 
     ${PROJECT_SOURCE_DIR}/source/output/DsoObserver.cpp
     ${PROJECT_SOURCE_DIR}/source/output/DebugImageDrawer.cpp
@@ -122,8 +127,12 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/system/StereoGeometryEstimator.cpp
     ${PROJECT_SOURCE_DIR}/source/system/FrameTracker.cpp
     ${PROJECT_SOURCE_DIR}/source/system/BundleAdjuster.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/Preprocessor.cpp
     ${PROJECT_SOURCE_DIR}/source/system/IdentityPreprocessor.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DoGPreprocessor.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/TrackingPredictor.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/TrackingPredictorRot.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/TrackingPredictorScrew.cpp
 )
 
 set(dso_internal_HEADER_FILES

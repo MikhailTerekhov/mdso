@@ -14,10 +14,10 @@ void TrajectoryWriterPredict::addToPool(const KeyFrame &keyFrame) {
   } else {
     // TODO base frame may not exist -- use std::weak_ptr
     // SE3 frameToWorldPredicted =
-        // keyFrame.preKeyFrame->baseFrame->thisToWorld *
-        // keyFrame.preKeyFrame->baseToThisPredicted.inverse();
+    // keyFrame.preKeyFrame->baseFrame->thisToWorld *
+    // keyFrame.preKeyFrame->baseToThisPredicted.inverse();
     // mFrameToWorldPool.push(
-        // {keyFrame.frames[0].timestamp, frameToWorldPredicted});
+    // {keyFrame.frames[0].timestamp, frameToWorldPredicted});
     mFrameToWorldPool.push(
         {keyFrame.frames[0].timestamp, keyFrame.thisToWorld});
   }

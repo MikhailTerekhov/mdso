@@ -14,10 +14,10 @@ public:
   void newBaseFrame(const FrameTracker::DepthedMultiFrame &pyr) override;
 
   bool pyrChanged();
-  cv::Mat getLastPyr();
+  cv::Mat3b getLastPyr();
 
 private:
-  cv::Mat lastPyr;
+  cv::Mat3b lastPyr;
   bool mPyrChanged = false;
 };
 

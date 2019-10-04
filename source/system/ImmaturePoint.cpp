@@ -209,7 +209,7 @@ ImmaturePoint::traceOn(const PreKeyFrame::FrameEntry &refFrameEntry,
       refFrameEntry.lightBaseToThis *
       refFrame.baseFrame->frames[indRef].lightWorldToThis *
       host->lightWorldToThis.inverse();
-  SE3 baseToRef = cam->bundle[indRef].bodyToThis * refFrame.baseToThis *
+  SE3 baseToRef = cam->bundle[indRef].bodyToThis * refFrame.baseToThis() *
                   refFrame.baseFrame->thisToWorld.inverse() *
                   baseFrame.thisToWorld *
                   cam->bundle[indBase].bodyToThis.inverse();

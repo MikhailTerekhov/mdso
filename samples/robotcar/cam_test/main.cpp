@@ -113,11 +113,11 @@ public:
       // std::cout << total_cnt << '\n'; cc
 
       if (errs_out)
-          // clang-format off
+        // clang-format off
           std::cout << "Lut comparison:\n"
                        "avg err = " << errs[i] << "\n"
                        "max err = " << maxErr << "\n";
-          // clang-format on
+      // clang-format on
     }
   }
 

@@ -12,7 +12,7 @@ std::string ext[extSize] = {".jpg", ".png"};
 
 bool isImage(const fs::path &fname) {
   std::string extension = fname.extension();
-  return std::find(ext, ext + extSize, extension) != ext + extSize; 
+  return std::find(ext, ext + extSize, extension) != ext + extSize;
 }
 
 int main(int argc, const char **argv) {

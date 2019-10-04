@@ -37,6 +37,10 @@ template <typename T> struct AffineLightTransform {
     toNormalize.data[0] = T(0);
   }
 
+  template <typename U> AffineLightTransform<U> cast() const {
+    return AffineLightTransform<U>(U(data[0]), U(data[1]));
+  }
+
   friend std::ostream &operator<<(std::ostream &os,
                                   AffineLightTransform<T> affLight) {
     os << "raw     = " << affLight.data[0] << ' ' << affLight.data[1]

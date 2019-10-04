@@ -9,9 +9,11 @@
 #include "system/KeyFrame.h"
 #include "system/MarginalizedKeyFrame.h"
 #include "system/Preprocessor.h"
+#include "system/TrackingPredictor.h"
 #include "util/DepthedImagePyramid.h"
 #include "util/DistanceMap.h"
 #include "util/PlyHolder.h"
+#include "util/TrajectoryHolder.h"
 #include "util/settings.h"
 #include <map>
 #include <memory>
@@ -20,7 +22,7 @@
 
 namespace mdso {
 
-class DsoSystem {
+class DsoSystem : public TrajectoryHolder {
 public:
   DsoSystem(CameraBundle *cam, Preprocessor *preprocessor,
             const Observers &observers = {}, const Settings &settings = {});
@@ -36,6 +38,12 @@ public:
                         const std::optional<int **> &pointIndices,
                         const std::optional<double **> &depths, int sizes[]);
 
+  int trajectorySize() const override;
+  int camNumber() const override;
+  Timestamp timestamp(int ind) const override;
+  SE3 bodyToWorld(int ind) const override;
+  AffLight affLightWorldToBody(int ind, int camInd) const override;
+
 private:
   inline KeyFrame &lastKeyFrame() { return *keyFrames.back(); }
   inline KeyFrame &lboKeyFrame() { return **(++keyFrames.rbegin()); }
@@ -43,22 +51,11 @@ private:
     return settings.trackFromLastKf ? lastKeyFrame() : lboKeyFrame();
   }
 
-  Timestamp getTimestamp(int frameNumber);
-  SE3 getFrameToWorld(int frameNumber);
-  AffLight getLightWorldToFrame(int frameNumber, int ind);
-
-  double getTimeLastByLbo();
-  SE3 predictInternal(double timeLastByLbo, const SE3 &baseToLBTwo,
-                      const SE3 &baseToLBOne);
-  SE3 predictBaseKfToCur();
-
-  FrameTracker::TrackingResult predictTracking();
-
   int totalOptimized() const;
 
   bool doNeedKf(PreKeyFrame *lastFrame);
   void marginalizeFrames();
-  
+
   void activateOptimizedRandom();
   void activateOptimizedDist();
   void activateNewOptimizedPoints();
@@ -88,6 +85,8 @@ private:
   Observers observers;
 
   Preprocessor *preprocessor;
+
+  std::unique_ptr<TrackingPredictor> trackingPredictor;
 };
 
 } // namespace mdso

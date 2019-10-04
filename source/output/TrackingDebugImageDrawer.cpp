@@ -31,8 +31,8 @@ void TrackingDebugImageDrawer::startTracking(const PreKeyFrame &frame) {
 }
 
 void TrackingDebugImageDrawer::levelTracked(
-    int pyrLevel, const FrameTracker::TrackingResult &result,
-    const std::vector<std::vector<std::pair<Vec2, double>>> &pointResiduals) {
+    int pyrLevel, const TrackingResult &result,
+    const std::vector<StdVector<std::pair<Vec2, double>>> &pointResiduals) {
   CHECK(pointResiduals.size() == curFramePyr[0].size());
   for (int camInd = 0; camInd < pointResiduals.size(); ++camInd) {
     int w = camPyr[pyrLevel].bundle[camInd].cam.getWidth(),
@@ -54,21 +54,27 @@ void TrackingDebugImageDrawer::levelTracked(
 
 cv::Mat3b TrackingDebugImageDrawer::drawAllLevels() {
   std::vector<cv::Mat3b> levels(pyrSettings.levelNum());
-  for (int lvl = 0; lvl < pyrSettings.levelNum(); ++lvl)
-    levels[lvl] = drawLevel(lvl);
-  return drawLeveled(
-      levels.data(), levels.size(), camPyr[0].bundle[0].cam.getWidth(),
-      camPyr[0].bundle[0].cam.getHeight(), FLAGS_tracking_res_image_width);
+  for (int lvl = 0; lvl < levels.size(); ++lvl) {
+    std::vector<cv::Mat3b> resized(residualsImg[lvl].size());
+    for (int camInd = 0; camInd < resized.size(); ++camInd)
+      cv::resize(residualsImg[lvl][camInd], resized[camInd],
+                 residualsImg[0][0].size(), 0, 0, cv::INTER_NEAREST);
+    cv::vconcat(resized.data(), residualsImg[lvl].size(), levels[lvl]);
+  }
+  cv::Mat3b result;
+  cv::hconcat(levels.data(), levels.size(), result);
+  return result;
 }
 
 cv::Mat3b TrackingDebugImageDrawer::drawFinestLevel() { return drawLevel(0); }
 
 cv::Mat3b TrackingDebugImageDrawer::drawLevel(int pyrLevel) {
   CHECK(pyrLevel >= 0 && pyrLevel < pyrSettings.levelNum());
-  return drawLeveled(
+  cv::Mat3b result = drawLeveled(
       residualsImg[pyrLevel].data(), residualsImg[pyrLevel].size(),
       camPyr[0].bundle[0].cam.getWidth(), camPyr[0].bundle[0].cam.getHeight(),
       camPyr[0].bundle[0].cam.getWidth());
+  return result;
 }
 
 } // namespace mdso

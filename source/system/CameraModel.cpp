@@ -24,7 +24,8 @@ CameraModel::CameraModel(int width, int height, double scale,
     , fy(scale)
     , principalPoint(fx * center[0], fy * center[1])
     , skew(0)
-    , settings(settings) {
+    , settings(settings)
+    , mMask(height, width, 1) {
   recalcBoundaries();
   setMapPolyCoeffs();
 }
@@ -94,9 +95,10 @@ std::pair<Vec2, Mat23> CameraModel::diffMap(const Vec3 &ray) const {
 }
 
 bool CameraModel::isOnImage(const Vec2 &p, int border) const {
-  return Eigen::AlignedBox2d(Vec2(border, border),
-                             Vec2(width - border, height - border))
-      .contains(p);
+  bool inBorder = Eigen::AlignedBox2d(Vec2(border, border),
+                                      Vec2(width - border, height - border))
+                      .contains(p);
+  return inBorder && mMask(toCvPoint(p));
 }
 
 double CameraModel::getImgRadiusByAngle(double observeAngle) const {
@@ -219,6 +221,16 @@ void CameraModel::setUnmapPolyCoeffs() {
   std::cout << "coeffs: " << unmapPolyCoeffs.transpose() << '\n';
 }
 
+cv::Mat1b downsampleMask(const cv::Mat1b &mask, int lvl) {
+  int scale = (1 << lvl);
+  cv::Mat1b result(mask.rows / scale, mask.cols / scale, 1);
+  for (int y = 0; y < mask.rows; ++y)
+    for (int x = 0; x < mask.cols; ++x)
+      if (mask(y, x) == 0)
+        result(y / scale, x / scale) = false;
+  return result;
+}
+
 CameraModel::CamPyr CameraModel::camPyr(int pyrLevels) {
   CHECK(pyrLevels > 0 && pyrLevels <= Settings::Pyramid::max_levelNum);
   CamPyr result;
@@ -229,6 +241,7 @@ CameraModel::CamPyr CameraModel::camPyr(int pyrLevels) {
     result.back().principalPoint /= (1 << i);
     result.back().fx /= (1 << i);
     result.back().fy /= (1 << i);
+    result.back().setMask(downsampleMask(mMask, i));
   }
 
   return result;
@@ -249,5 +262,7 @@ void CameraModel::recalcBoundaries() {
   minZ = minZUnnorm / std::hypot(minZUnnorm, maxRadius);
   maxAngle = std::atan2(maxRadius, minZUnnorm);
 }
+
+void CameraModel::setMask(const cv::Mat1b mask) { this->mMask = mask; }
 
 } // namespace mdso

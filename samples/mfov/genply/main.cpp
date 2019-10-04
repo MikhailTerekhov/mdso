@@ -84,8 +84,6 @@ DEFINE_bool(
     "time, instead of using the output_directory flag. The precise format for "
     "the name is output/YYYYMMDD_HHMMSS");
 
-constexpr int maxTimedOutputStringSize = 22;
-
 void readPointsInFrameGT(const MultiFovReader &reader,
                          std::vector<std::vector<Vec3>> &pointsInFrameGT,
                          std::vector<std::vector<cv::Vec3b>> &colors,
@@ -129,11 +127,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
     return 1;
   }
 
-  char curTime[maxTimedOutputStringSize + 2];
-  std::time_t t = std::time(nullptr);
-  std::strftime(curTime, maxTimedOutputStringSize + 1, "output/%Y%m%d_%H%M%S",
-                std::localtime(&t));
-  fs::path outDir(FLAGS_use_time_for_output ? std::string(curTime)
+  fs::path outDir(FLAGS_use_time_for_output ? "output/" + curTimeBrief()
                                             : FLAGS_output_directory);
   fs::path debugImgDir = outDir / fs::path(FLAGS_debug_img_dir);
   fs::path trackImgDir = outDir / fs::path(FLAGS_track_img_dir);
@@ -177,9 +171,9 @@ It should contain "info" and "data" subdirectories.)abacaba";
     LOG(INFO) << "mean grad norm original = " << meanGradOrig
               << ", DoG = " << meanGradDog
               << "DoG / orig = " << double(meanGradDog) / meanGradOrig;
-    LOG(INFO) << "new outlier intencity diff = "
+    LOG(INFO) << "new outlier intensity diff = "
               << settings.intencity.outlierDiff;
-    LOG(INFO) << "mean intencity after DoG = " << int(meanDog);
+    LOG(INFO) << "mean intensity after DoG = " << int(meanDog);
     std::cout << "mean int = " << int(meanDog);
   }
 
@@ -206,7 +200,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
     return 0;
   }
 
-  DebugImageDrawer debugImageDrawer;
+  DebugImageDrawer debugImageDrawer(<#initializer #>);
   TrackingDebugImageDrawer trackingDebugImageDrawer(
       camPyr.data(), settings.frameTracker, settings.pyramid, <#initializer #>);
   TrajectoryWriterDso trajectoryWriter(outDir, FLAGS_trajectory_filename);

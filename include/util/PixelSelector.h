@@ -9,8 +9,7 @@ namespace mdso {
 
 class PixelSelector {
 public:
-  using PointVector =
-      static_vector<cv::Point, Settings::PixelSelector::max_points>;
+  using PointVector = std::vector<cv::Point>;
 
   PixelSelector(const Settings::PixelSelector &settings = {});
 
