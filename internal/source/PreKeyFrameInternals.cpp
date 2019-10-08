@@ -5,8 +5,12 @@ namespace mdso {
 PreKeyFrameInternals::PreKeyFrameInternals(
     const ImagePyramid *pyrRefs[], int size,
     const Settings::Pyramid &pyrSettings) {
+  frames.reserve(size);
+  auto oldBeg = frames.begin();
   for (int i = 0; i < size; ++i)
     frames.emplace_back(*pyrRefs[i], pyrSettings);
+  auto newBeg = frames.begin();
+  CHECK(oldBeg == newBeg);
 }
 
 PreKeyFrameInternals::FrameEntry::FrameEntry(
