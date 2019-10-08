@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from mpl_toolkits.mplot3d import Axes3D
 from traj import *
+from itertools import cycle
 
 
 alpha = 0.5
@@ -63,18 +64,6 @@ def set_axes_equal(ax):
     radius = 0.5 * np.max(np.abs(limits[:, 1] - limits[:, 0]))
     set_axes_radius(ax, origin, radius)
 
-fig = plt.figure(figsize=(img_w, img_h))
-ax = Axes3D(fig)
-ax.set_aspect('equal')
-
-ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
-ax.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
-ax.zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
-
-ax.yaxis._axinfo["grid"]['color'] =  (1,1,1,0)
-ax.set_yticks([])
-ax.view_init(azim=-90, elev=0)
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--gt", help="file with ground truth trajectory")
@@ -91,14 +80,43 @@ parser.add_argument("-f", "--first", help="truncate frames with nums less than t
                     type=int)
 parser.add_argument("-l", "--last", help="truncate frames with nums bigger than this", 
                     type=int)
+parser.add_argument("-p", "--shown_plane", help="The plain that is shown in the "
+                    "default orientation. Could be xy, xz or yz.", default="xz")
 parser.add_argument("traj", help="one or more files with trajectories "
                     "(expects them to reside in one directory)", nargs='+')
+parser.add_argument("--labels", help="labels for trajectories, excluding"
+                    "ground truth", nargs='+')
 args = parser.parse_args()
+
+if args.labels and len(args.traj) != len(args.labels):
+    print('number of labels must be equal to the number of trajectories')
+    exit(0)
+
+fig = plt.figure(figsize=(img_w, img_h))
+ax = Axes3D(fig)
+ax.set_aspect('equal')
+
+ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+ax.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+ax.zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+
+#  ax.yaxis._axinfo["grid"]['color'] =  (1,1,1,0)
+if args.shown_plane == "xy":
+    ax.view_init(azim=-90, elev=-90)
+    ax.set_zticks([])
+elif args.shown_plane == "xz":
+    ax.set_yticks([])
+    ax.view_init(azim=-90, elev=0)
+elif args.shown_plane == "yz":
+    ax.set_xticks([])
+    ax.view_init(azim=180, elev=0)
+else:
+    print(f'unsupported value {args.shown_plane} for shown_pane')
 
 
 draw_proc = draw_arrowed if args.quiver else draw_track
-label_ours = 'полученная оценка' if args.russian else 'dso'
-label_prec = 'точная траектория' if args.russian else 'ground_truth'
+label_ours = 'полученная оценка' if args.russian else 'resultimg trajectory'
+label_prec = 'точная траектория' if args.russian else 'ground truth'
 
 
 if args.gt:
@@ -117,7 +135,9 @@ else:
 
 artists = []
 
-for fname in args.traj:
+cycol = cycle(['blue', 'red', 'orange'])
+
+for ind, fname in enumerate(args.traj):
     print(f'processing {fname}...')
     traj = extract_motions(fname)
     if len(traj) < 2:
@@ -131,17 +151,23 @@ for fname in args.traj:
     if has_gt and args.align:
         print(f'align, len={len(traj)} {len(ground_truth)}')
         traj = align(traj, ground_truth)
-    artists.append(draw_proc(ax, traj, mpl.colors.to_rgba('orange', alpha=alpha),
+    if args.labels:
+        label_ours = args.labels[ind]
+        col = next(cycol)
+    else:
+        col = 'orange'
+    artists.append(draw_proc(ax, traj, mpl.colors.to_rgba(col, alpha=alpha),
                             label_ours))
 
 set_axes_equal(ax)
+
+ax.legend(loc='upper center', bbox_to_anchor=(0.5, 0.3), fontsize='large')
 
 if args.video_dir:
     os.makedirs(args.video_dir, exist_ok=True)
     for a in artists[min(win_size,len(artists)):]:
         set_invis(a)
     #  plt.show()
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 0.3), fontsize='large')
     fig.savefig(os.path.join(args.video_dir, '0.png'))
     for i in range(len(artists) - win_size):
         set_invis(artists[i])
