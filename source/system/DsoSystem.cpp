@@ -195,7 +195,7 @@ SE3 DsoSystem::purePredictBaseKfToCur() {
 
 bool DsoSystem::doNeedKf(PreKeyFrame *lastFrame) {
   int shift = lastFrame->globalFrameNum - firstFrameNum;
-  return shift > 0 && shift % 10 == 0;
+  return shift > 0 && shift % settings.shiftBetweenKeyFrames == 0;
 }
 
 void DsoSystem::addFrameTrackerObserver(FrameTrackerObserver *observer) {

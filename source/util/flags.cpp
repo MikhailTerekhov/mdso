@@ -67,6 +67,9 @@ DEFINE_bool(fixed_motion_on_first_ba,
 DEFINE_double(optimized_stddev, Settings::PointTracer::default_optimizedStddev,
               "Max disparity error for a point to become optimized.");
 
+DEFINE_int32(shift_between_keyframes, Settings::default_shiftBetweenKeyFrames,
+             "Difference in frame numbers between chosen keyFrames.");
+
 namespace fishdso {
 
 Settings getFlaggedSettings() {
@@ -93,6 +96,7 @@ Settings getFlaggedSettings() {
   settings.bundleAdjuster.fixedMotionOnFirstAdjustent =
       FLAGS_fixed_motion_on_first_ba;
   settings.pointTracer.optimizedStddev = FLAGS_optimized_stddev;
+  settings.shiftBetweenKeyFrames = FLAGS_shift_between_keyframes;
 
   return settings;
 }

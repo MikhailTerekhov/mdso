@@ -36,6 +36,8 @@ DECLARE_bool(run_ba);
 DECLARE_bool(fixed_motion_on_first_ba);
 DECLARE_double(optimized_stddev);
 
+DECLARE_int32(shift_between_keyframes);
+
 namespace fishdso {
 
 Settings getFlaggedSettings();

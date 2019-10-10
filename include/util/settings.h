@@ -251,6 +251,10 @@ struct Settings {
   static constexpr int default_initialMaxFrame = 2500;
   int initialMaxFrame = default_initialMaxFrame;
 
+  static constexpr int default_shiftBetweenKeyFrames = 10;
+  int shiftBetweenKeyFrames = default_shiftBetweenKeyFrames;
+  
+
   InitializerSettings getInitializerSettings() const;
   PointTracerSettings getPointTracerSettings() const;
   FrameTrackerSettings getFrameTrackerSettings() const;
