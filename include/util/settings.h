@@ -334,6 +334,7 @@ struct Settings {
   static constexpr bool default_disableMarginalization = false;
   int disableMarginalization = default_disableMarginalization;
 
+
   InitializerSettings getInitializerSettings() const;
   PointTracerSettings getPointTracerSettings() const;
   FrameTrackerSettings getFrameTrackerSettings() const;

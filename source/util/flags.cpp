@@ -80,6 +80,9 @@ DEFINE_bool(disable_marginalization, Settings::default_disableMarginalization,
 DEFINE_bool(deterministic, true,
             "Do we need deterministic random number generation?");
 
+DEFINE_int32(shift_between_keyframes, Settings::default_keyFrameDist,
+             "Difference in frame numbers between chosen keyFrames.");
+
 namespace mdso {
 
 Settings getFlaggedSettings() {
@@ -108,6 +111,7 @@ Settings getFlaggedSettings() {
   settings.pointTracer.optimizedStddev = FLAGS_optimized_stddev;
   settings.useRandomOptimizedChoice = FLAGS_use_random_optimized_choice;
   settings.disableMarginalization = FLAGS_disable_marginalization;
+  settings.setKeyFrameDist(FLAGS_shift_between_keyframes);
 
   return settings;
 }
