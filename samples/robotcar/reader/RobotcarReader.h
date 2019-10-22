@@ -14,6 +14,8 @@ struct ReaderSettings {
 
 class RobotcarReader {
 public:
+  enum CamName { CAM_LEFT, CAM_REAR, CAM_RIGHT };
+
   struct FrameEntry {
     cv::Mat3b frame;
     Timestamp timestamp;
@@ -51,6 +53,10 @@ public:
   inline const std::vector<Timestamp> &leftTs() const { return mLeftTs; }
   inline const std::vector<Timestamp> &rearTs() const { return mRearTs; }
   inline const std::vector<Timestamp> &rightTs() const { return mRightTs; }
+  inline const std::vector<Timestamp> &camTs(CamName camName) const {
+    return camName == CAM_LEFT ? leftTs()
+                               : camName == CAM_REAR ? rearTs() : rightTs();
+  }
   inline const std::vector<Timestamp> &lmsFrontTs() const {
     return mLmsFrontTs;
   }

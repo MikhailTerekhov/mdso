@@ -139,7 +139,7 @@ int DsoSystem::trajectorySize() const {
     PreKeyFrame *last = std::get<PreKeyFrame *>(allFrames.back());
     return last->wasTracked() ? allFrames.size() : int(allFrames.size()) - 1;
   }
-  return allFrames.size() - 1;
+  return allFrames.size();
 }
 
 int DsoSystem::camNumber() const { return cam->bundle.size(); }
