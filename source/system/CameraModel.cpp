@@ -25,7 +25,7 @@ CameraModel::CameraModel(int width, int height, double scale,
     , principalPoint(fx * center[0], fy * center[1])
     , skew(0)
     , settings(settings)
-    , mMask(height, width, 1) {
+    , mMask(height, width, CV_WHITE_BYTE) {
   recalcBoundaries();
   setMapPolyCoeffs();
 }
@@ -36,8 +36,9 @@ CameraModel::CameraModel(int width, int height,
     : width(width)
     , height(height)
     , skew(0)
-    , settings(settings) {
-  std::ifstream ifs(calibFileName, std::ifstream::in);
+    , settings(settings)
+    , mMask(height, width, CV_WHITE_BYTE) {
+    std::ifstream ifs(calibFileName, std::ifstream::in);
   if (!ifs.is_open())
     throw std::runtime_error("camera model file could not be open!");
 
@@ -64,8 +65,9 @@ CameraModel::CameraModel(int width, int height, double f, double cx, double cy,
     , fx(f)
     , fy(f)
     , principalPoint(f * cx, f * cy)
-    , settings(settings) {
-  unmapPolyCoeffs.resize(1, 1);
+    , settings(settings)
+    , mMask(height, width, CV_WHITE_BYTE) {
+    unmapPolyCoeffs.resize(1, 1);
   unmapPolyCoeffs[0] = f;
   recalcBoundaries();
 
