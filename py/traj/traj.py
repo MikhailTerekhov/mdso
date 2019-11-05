@@ -36,7 +36,7 @@ def align(traj, gt):
     g01 = gt[1].inverse() * gt[0]
     scale_fix = norm(g01.t) / norm(t01.t)
     res = [se3(m.R, scale_fix * m.t) for m in traj]
-    tg = gt[0] * traj[0].inverse()
+    tg = gt[0] * res[0].inverse()
     res = [tg * m for m in res]
     print(f'sf={scale_fix}\ntg=\n{tg}')
     return res
