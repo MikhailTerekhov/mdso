@@ -21,6 +21,10 @@ public:
   std::unique_ptr<CameraModel> cam;
 
 private:
+  static constexpr double defaultWidth = 640, defaultHeight = 480;
+  static constexpr double pinholeCx = 320, pinholeCy = 240;
+  static constexpr double pinholeF = 329.115520046;
+
   std::string datasetDir;
   StdVector<SE3> worldToFrameGT;
 };

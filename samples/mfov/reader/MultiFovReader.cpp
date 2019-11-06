@@ -13,23 +13,37 @@ MultiFovReader::MultiFovReader(const std::string &newMultiFovDir)
   // one.
   char camFName[256];
   sprintf(camFName, "%s/info/intrinsics.txt", datasetDir.c_str());
-  int width, height;
-  double unmapPolyCoeffs[5];
-  Vec2 center;
   std::ifstream camIfs(camFName);
   if (!camIfs.is_open())
     throw std::runtime_error("could not open camera intrinsics file \"" +
                              std::string(camFName) + "\"");
-  camIfs >> width >> height;
-  for (int i = 0; i < 5; ++i)
-    camIfs >> unmapPolyCoeffs[i];
-  VecX ourCoeffs(4);
-  ourCoeffs << unmapPolyCoeffs[0], unmapPolyCoeffs[2], unmapPolyCoeffs[3],
-      unmapPolyCoeffs[4];
-  ourCoeffs *= -1;
-  camIfs >> center[0] >> center[1];
-  cam = std::unique_ptr<CameraModel>(
-      new CameraModel(width, height, 1.0, center, ourCoeffs));
+
+  std::string camIfsLine;
+  if (!std::getline(camIfs, camIfsLine))
+    throw std::runtime_error(
+        "could not read the first line frim camera intrinsics file \"" +
+        std::string(camFName) + "\"");
+  if (camIfsLine.size() < 3)
+    throw std::runtime_error("inappropriate intrinsics format");
+  if (camIfsLine.substr(0, 3) == "K =") {
+    cam = std::unique_ptr<CameraModel>(new CameraModel(
+        defaultWidth, defaultHeight, pinholeF, pinholeCx, pinholeCy));
+  } else {
+    std::stringstream strIfs(camIfsLine);
+    int width, height;
+    double unmapPolyCoeffs[5];
+    Vec2 center;
+    strIfs >> width >> height;
+    for (int i = 0; i < 5; ++i)
+      strIfs >> unmapPolyCoeffs[i];
+    VecX ourCoeffs(4);
+    ourCoeffs << unmapPolyCoeffs[0], unmapPolyCoeffs[2], unmapPolyCoeffs[3],
+        unmapPolyCoeffs[4];
+    ourCoeffs *= -1;
+    strIfs >> center[0] >> center[1];
+    cam = std::unique_ptr<CameraModel>(
+        new CameraModel(width, height, 1.0, center, ourCoeffs));
+  }
 
   char posesFName[256];
   sprintf(posesFName, "%s/info/groundtruth.txt", datasetDir.c_str());
