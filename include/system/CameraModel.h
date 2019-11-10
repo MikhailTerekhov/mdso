@@ -28,9 +28,9 @@ public:
               const Settings::CameraModel &settings = {});
 
   template <typename T> Eigen::Matrix<T, 3, 1> unmap(const T *point) const {
-    typedef Eigen::Matrix<T, 3, 1> Vec3t;
-    typedef Eigen::Matrix<T, 2, 1> Vec2t;
-    typedef Eigen::Matrix<T, Eigen::Dynamic, 1> VecXt;
+    using Vec3t = Eigen::Matrix<T, 3, 1>;
+    using Vec2t = Eigen::Matrix<T, 2, 1>;
+    using VecXt = Eigen::Matrix<T, Eigen::Dynamic, 1>;
     Eigen::Map<const Vec2t> pt_(point);
     Vec2t pt = pt_;
 

@@ -17,36 +17,37 @@
 
 namespace mdso {
 
-typedef Eigen::Matrix<double, 2, 1> Vec2;
-typedef Eigen::Matrix<double, 3, 1> Vec3;
-typedef Eigen::Matrix<double, 4, 1> Vec4;
-typedef Eigen::Matrix<double, 5, 1> Vec5;
-typedef Eigen::Matrix<double, 9, 1> Vec9;
-typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VecX;
+using Vec2 = Eigen::Matrix<double, 2, 1>;
+using Vec3 = Eigen::Matrix<double, 3, 1>;
+using Vec4 = Eigen::Matrix<double, 4, 1>;
+using Vec5 = Eigen::Matrix<double, 5, 1>;
+using Vec8 = Eigen::Matrix<double, 8, 1>;
+using Vec9 = Eigen::Matrix<double, 9, 1>;
+using VecX = Eigen::Matrix<double, Eigen::Dynamic, 1>;
 
-typedef Eigen::Matrix<int, 2, 1> Vec2i;
+using Vec2i = Eigen::Matrix<int, 2, 1>;
 
-typedef Eigen::Matrix<double, 2, 2> Mat22;
-typedef Eigen::Matrix<double, 2, 3> Mat23;
-typedef Eigen::Matrix<double, 3, 2> Mat32;
-typedef Eigen::Matrix<double, 3, 3> Mat33;
-typedef Eigen::Matrix<double, 3, 4> Mat34;
-typedef Eigen::Matrix<double, 4, 3> Mat43;
-typedef Eigen::Matrix<double, 4, 4> Mat44;
-typedef Eigen::Matrix<double, 5, 5> Mat55;
-typedef Eigen::Matrix<double, Eigen::Dynamic, 5> MatX5;
-typedef Eigen::Matrix<double, Eigen::Dynamic, 9> MatX9;
-typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatXX;
+using Mat22 = Eigen::Matrix<double, 2, 2>;
+using Mat23 = Eigen::Matrix<double, 2, 3>;
+using Mat32 = Eigen::Matrix<double, 3, 2>;
+using Mat33 = Eigen::Matrix<double, 3, 3>;
+using Mat34 = Eigen::Matrix<double, 3, 4>;
+using Mat43 = Eigen::Matrix<double, 4, 3>;
+using Mat44 = Eigen::Matrix<double, 4, 4>;
+using Mat55 = Eigen::Matrix<double, 5, 5>;
+using MatX5 = Eigen::Matrix<double, Eigen::Dynamic, 5>;
+using MatX9 = Eigen::Matrix<double, Eigen::Dynamic, 9>;
+using MatXX = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
 
-typedef Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic> MatXXi;
+using MatXXi = Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic>;
 
-typedef Eigen::Quaterniond Quaternion;
+using Quaternion = Eigen::Quaterniond;
 
-typedef Sophus::Sim3d Sim3;
-typedef Sophus::SE3d SE3;
-typedef Sophus::SO3d SO3;
+using Sim3 = Sophus::Sim3d;
+using SE3 = Sophus::SE3d;
+using SO3 = Sophus::SO3d;
 
-typedef AffineLightTransform<double> AffLight;
+using AffLight = AffineLightTransform<double>;
 
 namespace fs = std::filesystem;
 

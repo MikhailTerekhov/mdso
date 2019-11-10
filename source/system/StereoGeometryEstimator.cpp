@@ -261,11 +261,11 @@ struct ReprojectionResidual {
 
   template <typename T>
   bool operator()(const T *const rotP, const T *const transP, T *res) const {
-    typedef Eigen::Matrix<T, 2, 1> Vec2t;
-    typedef Eigen::Matrix<T, 3, 1> Vec3t;
-    typedef Eigen::Matrix<T, 3, 3> Mat33t;
-    typedef Eigen::Quaternion<T> Quatt;
-    typedef Sophus::SO3<T> SO3t;
+    using Vec2t = Eigen::Matrix<T, 2, 1>;
+    using Vec3t = Eigen::Matrix<T, 3, 1>;
+    using Mat33t = Eigen::Matrix<T, 3, 3>;
+    using Quatt = Eigen::Quaternion<T>;
+    using SO3t = Sophus::SO3<T>;
 
     Eigen::Map<const Vec3t> transM(transP);
     Vec3t trans(transM);

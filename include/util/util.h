@@ -77,11 +77,11 @@ cv::Point toCvPoint(const Vec2 &vec, double scaleX, double scaleY,
 
 cv::Vec3b toCvVec3bDummy(cv::Scalar scalar);
 
-template <typename TT> struct accum_type { typedef TT type; };
-template <> struct accum_type<unsigned char> { typedef int type; };
-template <> struct accum_type<signed char> { typedef int type; };
-template <> struct accum_type<char> { typedef int type; };
-template <> struct accum_type<cv::Vec3b> { typedef cv::Vec3i type; };
+template <typename TT> struct accum_type { using type = TT; };
+template <> struct accum_type<unsigned char> { using type = int; };
+template <> struct accum_type<signed char> { using type = int; };
+template <> struct accum_type<char> { using type = int; };
+template <> struct accum_type<cv::Vec3b> { using type = cv::Vec3i; };
 
 template <typename T> cv::Mat boxFilterPyrDown(const cv::Mat &img) {
   constexpr int d = 2;
