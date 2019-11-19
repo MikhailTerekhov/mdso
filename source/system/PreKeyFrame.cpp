@@ -1,5 +1,5 @@
 #include "system/PreKeyFrame.h"
-#include "PreKeyFrameInternals.h"
+#include "PreKeyFrameEntryInternals.h"
 #include "system/FrameTracker.h"
 #include "system/KeyFrame.h"
 #include "util/util.h"
@@ -17,7 +17,8 @@ PreKeyFrame::FrameEntry::FrameEntry(PreKeyFrame *host, int ind,
     , ind(ind)
     , frameColored(_frameColored.clone())
     , framePyr(frameProcessed, pyrSettings.levelNum())
-    , timestamp(timestamp) {
+    , timestamp(timestamp)
+    , internals(new PreKeyFrameEntryInternals(framePyr, pyrSettings)) {
   grad(framePyr[0], gradX, gradY, gradNorm);
 }
 
@@ -43,12 +44,6 @@ PreKeyFrame::PreKeyFrame(KeyFrame *baseFrame, CameraBundle *cam,
   for (int i = 0; i < cam->bundle.size(); ++i)
     frames.emplace_back(this, i, coloredFrames[i], framesProcessed[i],
                         timestamps[i], pyrSettings);
-
-  std::vector<const ImagePyramid *> refs(cam->bundle.size());
-  for (int i = 0; i < frames.size(); ++i)
-    refs[i] = &frames[i].framePyr;
-  internals = std::unique_ptr<PreKeyFrameInternals>(
-      new PreKeyFrameInternals(refs.data(), frames.size(), pyrSettings));
 }
 
 PreKeyFrame::~PreKeyFrame() {}

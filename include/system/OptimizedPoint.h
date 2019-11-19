@@ -26,14 +26,14 @@ struct OptimizedPoint {
 
   inline void activate(double depth) {
     state = ACTIVE;
-    logInvDepth = -std::log(depth);
+    logDepth = std::log(depth);
   }
 
-  inline double depth() const { return std::exp(-logInvDepth); }
+  inline double depth() const { return std::exp(logDepth); }
 
   Vec2 p;
   Vec3 dir;
-  double logInvDepth;
+  double logDepth;
   double stddev;
   double minDepth, maxDepth;
   State state;

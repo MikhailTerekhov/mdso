@@ -14,7 +14,7 @@ namespace mdso {
 
 struct KeyFrame;
 struct TrackingResult;
-class PreKeyFrameInternals;
+class PreKeyFrameEntryInternals;
 
 struct PreKeyFrame {
 
@@ -28,9 +28,9 @@ struct PreKeyFrame {
     cv::Mat frameColored;
     cv::Mat1d gradX, gradY, gradNorm;
     ImagePyramid framePyr;
-
     Timestamp timestamp;
     AffLight lightBaseToThis;
+    std::unique_ptr<PreKeyFrameEntryInternals> internals;
   };
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -68,8 +68,6 @@ struct PreKeyFrame {
   int globalFrameNum;
 
   Settings::Pyramid pyrSettings;
-
-  std::unique_ptr<PreKeyFrameInternals> internals;
 
 private:
   bool mWasTracked;

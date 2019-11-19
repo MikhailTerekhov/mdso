@@ -24,8 +24,8 @@ int CloudWriterGT::findInd(Timestamp timestamp) {
 void CloudWriterGT::initialized(const KeyFrame *initializedKFs[], int size) {
   CHECK(size > 1);
 
-  SE3 worldToFirst = initializedKFs[0]->thisToWorld.inverse();
-  SE3 worldToLast = initializedKFs[size - 1]->thisToWorld.inverse();
+  SE3 worldToFirst = initializedKFs[0]->thisToWorld().inverse();
+  SE3 worldToLast = initializedKFs[size - 1]->thisToWorld().inverse();
   Timestamp firstTs = initializedKFs[0]->preKeyFrame->frames[0].timestamp;
   Timestamp lastTs = initializedKFs[size - 1]->preKeyFrame->frames[0].timestamp;
 
@@ -50,7 +50,7 @@ void CloudWriterGT::keyFramesMarginalized(const KeyFrame *marginalized[],
     std::vector<Vec3> points;
     points.reserve(pointsInFrameGT[ind].size());
     for (const Vec3 &p : pointsInFrameGT[ind])
-      points.push_back(kf->thisToWorld * sim3Aligner->alignScale(p));
+      points.push_back(kf->thisToWorld() * sim3Aligner->alignScale(p));
     cloudHolder.putPoints(points, colors[ind]);
 
     for (const auto &preKeyFrame : kf->trackedFrames) {
@@ -58,7 +58,7 @@ void CloudWriterGT::keyFramesMarginalized(const KeyFrame *marginalized[],
       int pkfInd = findInd(pkfTs);
       std::vector<Vec3> points;
       points.reserve(pointsInFrameGT[pkfInd].size());
-      SE3 frameToWorld = kf->thisToWorld * preKeyFrame->baseToThis().inverse();
+      SE3 frameToWorld = kf->thisToWorld() * preKeyFrame->baseToThis().inverse();
       for (const Vec3 &p : pointsInFrameGT[pkfInd])
         points.push_back(frameToWorld * sim3Aligner->alignScale(p));
       cloudHolder.putPoints(points, colors[pkfInd]);

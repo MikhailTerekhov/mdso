@@ -1,11 +1,12 @@
 #include "system/BundleAdjuster.h"
-#include "PreKeyFrameInternals.h"
+#include "PreKeyFrameEntryInternals.h"
 #include "system/AffineLightTransform.h"
 #include "system/SphericalPlus.h"
 #include "util/defs.h"
 #include "util/geometry.h"
 #include "util/util.h"
 #include <ceres/ceres.h>
+#include <ceres/local_parameterization.h>
 #include <ceres/cubic_interpolation.h>
 #include <ceres/local_parameterization.h>
 
@@ -29,10 +30,11 @@ struct DirectResidual {
   DirectResidual(
       ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> *baseFrame,
       ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> *refFrame,
-      const CameraModel *cam, OptimizedPoint *optimizedPoint, const Vec2 &pos,
-      const SE3 &baseToBody, const SE3 &bodyToRef, KeyFrame *baseKf,
-      KeyFrame *refKf)
+      const CameraModel *cam, const Vec2 &reprojPattern,
+      OptimizedPoint *optimizedPoint, const Vec2 &pos, const SE3 &baseToBody,
+      const SE3 &bodyToRef, KeyFrame *baseKf, KeyFrame *refKf)
       : cam(cam)
+      , reprojPattern(reprojPattern)
       , baseDirection(cam->unmap(pos).normalized())
       , baseToBody(baseToBody)
       , bodyToRef(bodyToRef)
@@ -44,15 +46,15 @@ struct DirectResidual {
   }
 
   template <typename T>
-  bool operator()(const T *const logInvDepthP, const T *const baseTransP,
+  bool operator()(const T *const logDepthP, const T *const baseTransP,
                   const T *const baseRotP, const T *const refTransP,
                   const T *const refRotP, const T *const baseAffP,
                   const T *const refAffP, T *res) const {
-    typedef Eigen::Matrix<T, 2, 1> Vec2t;
-    typedef Eigen::Matrix<T, 3, 1> Vec3t;
-    typedef Eigen::Matrix<T, 3, 3> Mat33t;
-    typedef Eigen::Quaternion<T> Quatt;
-    typedef Sophus::SE3<T> SE3t;
+    using Vec2t = Eigen::Matrix<T, 2, 1>;
+    using Vec3t = Eigen::Matrix<T, 3, 1>;
+    using Mat33t = Eigen::Matrix<T, 3, 3>;
+    using Quatt = Eigen::Quaternion<T>;
+    using SE3t = Sophus::SE3<T>;
 
     Eigen::Map<const Vec3t> baseTransM(baseTransP);
     Vec3t baseTrans(baseTransM);
@@ -74,10 +76,11 @@ struct DirectResidual {
 
     AffineLightTransform<T>::normalizeMultiplier(refAffLight, baseAffLight);
 
-    T depth = ceres::exp(-(*logInvDepthP));
+    T depth = ceres::exp((*logDepthP));
     Vec3t refPos = (refToWorld.inverse() * baseToWorld) *
                    (baseDirection.cast<T>() * depth);
     Vec2t refPosMapped = cam->map(refPos.data()).template cast<T>();
+    refPosMapped += reprojPattern.template cast<T>();
     T trackedIntensity;
     refFrame->Evaluate(refPosMapped[1], refPosMapped[0], &trackedIntensity);
     *res = refAffLight(trackedIntensity) - baseAffLight(T(baseIntencity));
@@ -86,6 +89,7 @@ struct DirectResidual {
   }
 
   const CameraModel *cam;
+  Vec2 reprojPattern;
   Vec3 baseDirection;
   double baseIntencity;
   SE3 baseToBody, bodyToRef;
@@ -164,13 +168,13 @@ void BundleAdjuster::adjust(int maxNumIterations) {
   for (int indBase = 0; indBase < size; ++indBase) {
     KeyFrame *baseFrame = keyFrames[indBase];
     for (auto &op : baseFrame->frames[0].optimizedPoints) {
-      problem.AddParameterBlock(&op.logInvDepth, 1);
-      problem.SetParameterLowerBound(&op.logInvDepth, 0,
-                                     -std::log(settings.depth.max));
-      problem.SetParameterUpperBound(&op.logInvDepth, 0,
-                                     -std::log(settings.depth.min));
+      problem.AddParameterBlock(&op.logDepth, 1);
+      problem.SetParameterLowerBound(&op.logDepth, 0,
+                                     std::log(settings.depth.max));
+      problem.SetParameterUpperBound(&op.logDepth, 0,
+                                     std::log(settings.depth.min));
 
-      ordering->AddElementToGroup(&op.logInvDepth, 0);
+      ordering->AddElementToGroup(&op.logDepth, 0);
 
       for (int indRef = 0; indRef < size; ++indRef) {
         KeyFrame *refFrame = keyFrames[indRef];
@@ -183,19 +187,33 @@ void BundleAdjuster::adjust(int maxNumIterations) {
         SE3 baseToRef = bodyToRef * refFrame->thisToWorld.inverse() *
                         baseFrame->thisToWorld * baseToBody;
         pointsTotal++;
-        if (!camera.isOnImage(camera.map(baseToRef * (op.depth() * op.dir)),
-                              PH)) {
+        Vec2 curReproj = camera.map(baseToRef * (op.depth() * op.dir));
+        if (!camera.isOnImage(curReproj, PH)) {
           pointsOOB++;
           continue;
         }
 
+        static_vector<Vec2, Settings::ResidualPattern::max_size> reprojPattern(
+            PS);
+
+        for (int i = 0; i < PS; ++i) {
+          Vec2 r = camera.map(
+              baseToRef *
+              (op.depth() *
+               camera.unmap(op.p + settings.residualPattern.pattern()[i])
+                   .normalized()));
+          reprojPattern[i] = r - curReproj;
+        }
+
         for (int i = 0; i < PS; ++i) {
           const Vec2 &pos = op.p + settings.residualPattern.pattern()[i];
+
           // TODO inds in multicamera
           DirectResidual *newResidual = new DirectResidual(
-              &baseFrame->preKeyFrame->internals->frames[0].interpolator(0),
-              &refFrame->preKeyFrame->internals->frames[0].interpolator(0),
-              &camera, &op, pos, baseToBody, bodyToRef, baseFrame, refFrame);
+              &baseFrame->preKeyFrame->frames[0].internals->interpolator(0),
+              &refFrame->preKeyFrame->frames[0].internals->interpolator(0),
+              &camera, reprojPattern[i], &op, pos, baseToBody, bodyToRef,
+              baseFrame, refFrame);
 
           // TODO inds in multicamera
           double gradNorm =
@@ -203,14 +221,14 @@ void BundleAdjuster::adjust(int maxNumIterations) {
           const double c = settings.gradWeighting.c;
           double weight = c / std::hypot(c, gradNorm);
           ceres::LossFunction *lossFunc = new ceres::ScaledLoss(
-              new ceres::HuberLoss(settings.intencity.outlierDiff), weight,
+              new ceres::HuberLoss(settings.intensity.outlierDiff), weight,
               ceres::Ownership::TAKE_OWNERSHIP);
 
           // TODO inds in multicamera
           problem.AddResidualBlock(
               new ceres::AutoDiffCostFunction<DirectResidual, 1, 1, 3, 4, 3, 4,
                                               2, 2>(newResidual),
-              lossFunc, &op.logInvDepth,
+              lossFunc, &op.logDepth,
               baseFrame->thisToWorld.translation().data(),
               baseFrame->thisToWorld.so3().data(),
               refFrame->thisToWorld.translation().data(),

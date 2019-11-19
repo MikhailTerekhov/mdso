@@ -2,7 +2,7 @@
 #define INCLUDE_DSOSYSTEM
 
 #include "output/Observers.h"
-#include "system/BundleAdjuster.h"
+//#include "system/BundleAdjuster.h"
 #include "system/CameraModel.h"
 #include "system/DsoInitializer.h"
 #include "system/FrameTracker.h"

@@ -25,7 +25,7 @@ KeyFrame kfFromEpipolar(CameraModel *cam, const cv::Mat &baseFrame,
                         PixelSelector &pixelSelector,
                         const Settings &settings) {
   KeyFrame result(cam, baseFrame, 0, pixelSelector, settings.keyFrame,
-                  settings.pointTracer, settings.intencity,
+                  settings.pointTracer, settings.intensity,
                   settings.residualPattern, settings.pyramid);
   PreKeyFrame toTraceOn(cam, frameToTraceOn, 1, settings.pyramid);
   toTraceOn.worldToThis = firstToSecond;

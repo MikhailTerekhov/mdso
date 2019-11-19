@@ -17,7 +17,7 @@ void CloudWriter::keyFramesMarginalized(const KeyFrame *marginalized[],
 
     for (int j = 0; j < kf->frames.size(); ++j) {
       const KeyFrameEntry &e = kf->frames[j];
-      SE3 thisToWorld = kf->thisToWorld * cam->bundle[j].thisToBody;
+      SE3 thisToWorld = kf->thisToWorld() * cam->bundle[j].thisToBody;
       for (const auto &op : e.optimizedPoints) {
         points.push_back(
             thisToWorld *
@@ -28,7 +28,7 @@ void CloudWriter::keyFramesMarginalized(const KeyFrame *marginalized[],
       for (const auto &ip : e.immaturePoints) {
         if (ip.numTraced > 0) {
           points.push_back(
-              kf->thisToWorld *
+              kf->thisToWorld() *
               (ip.depth * cam->bundle[j].cam.unmap(ip.p).normalized()));
           colors.push_back(
               kf->preKeyFrame->frames[j].frameColored.at<cv::Vec3b>(

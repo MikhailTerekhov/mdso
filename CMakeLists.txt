@@ -56,6 +56,10 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/output/TrackingDebugImageDrawer.h
     ${PROJECT_SOURCE_DIR}/include/output/DepthPyramidDrawer.h
 
+    ${PROJECT_SOURCE_DIR}/include/optimize/EnergyFunction.h
+    ${PROJECT_SOURCE_DIR}/include/optimize/Parametrization.h
+    ${PROJECT_SOURCE_DIR}/include/optimize/Residual.h
+
     ${PROJECT_SOURCE_DIR}/include/system/AffineLightTransform.h
     ${PROJECT_SOURCE_DIR}/include/system/SphericalPlus.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoSystem.h
@@ -72,7 +76,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/system/StereoMatcher.h
     ${PROJECT_SOURCE_DIR}/include/system/StereoGeometryEstimator.h
     ${PROJECT_SOURCE_DIR}/include/system/FrameTracker.h
-    ${PROJECT_SOURCE_DIR}/include/system/BundleAdjuster.h
+#    ${PROJECT_SOURCE_DIR}/include/system/BundleAdjuster.h
     ${PROJECT_SOURCE_DIR}/include/system/Preprocessor.h
     ${PROJECT_SOURCE_DIR}/include/system/IdentityPreprocessor.h
     ${PROJECT_SOURCE_DIR}/include/system/DoGPreprocessor.h
@@ -112,6 +116,9 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/output/TrackingDebugImageDrawer.cpp
     ${PROJECT_SOURCE_DIR}/source/output/DepthPyramidDrawer.cpp
 
+    ${PROJECT_SOURCE_DIR}/source/optimize/EnergyFunction.cpp
+    ${PROJECT_SOURCE_DIR}/source/optimize/Residual.cpp
+
     ${PROJECT_SOURCE_DIR}/source/system/SphericalPlus.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoSystem.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoInitializer.cpp
@@ -126,7 +133,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/system/StereoMatcher.cpp
     ${PROJECT_SOURCE_DIR}/source/system/StereoGeometryEstimator.cpp
     ${PROJECT_SOURCE_DIR}/source/system/FrameTracker.cpp
-    ${PROJECT_SOURCE_DIR}/source/system/BundleAdjuster.cpp
+#    ${PROJECT_SOURCE_DIR}/source/system/BundleAdjuster.cpp
     ${PROJECT_SOURCE_DIR}/source/system/Preprocessor.cpp
     ${PROJECT_SOURCE_DIR}/source/system/IdentityPreprocessor.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DoGPreprocessor.cpp
@@ -136,11 +143,11 @@ set(dso_SOURCE_FILES
 )
 
 set(dso_internal_HEADER_FILES
-    ${PROJECT_SOURCE_DIR}/internal/include/PreKeyFrameInternals.h
+        ${PROJECT_SOURCE_DIR}/internal/include/PreKeyFrameEntryInternals.h
 )
 
 set(dso_internal_SOURCE_FILES
-    ${PROJECT_SOURCE_DIR}/internal/source/PreKeyFrameInternals.cpp
+        ${PROJECT_SOURCE_DIR}/internal/source/PreKeyFrameEntryInternals.cpp
 )
 
 
@@ -159,7 +166,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -march=native")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g3 -DNDEBUG -march=native")
 
-add_library(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES} 
+add_library(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES}
     ${dso_internal_SOURCE_FILES} ${dso_internal_HEADER_FILES}
     ${essietial_5pt_estimator_SOURCE_FILES}
 )
@@ -179,7 +186,7 @@ target_include_directories(dso
 )
 
 
-target_link_libraries(dso 
+target_link_libraries(dso
   PUBLIC
     stdc++fs
     ${OpenCV_LIBS}

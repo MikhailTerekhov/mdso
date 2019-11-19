@@ -8,6 +8,8 @@
 namespace mdso {
 
 template <typename T> struct AffineLightTransform {
+  static constexpr int DoF = 2;
+
   AffineLightTransform()
       : data{T(0.0), T(0.0)} {}
   AffineLightTransform(const T &a, const T &b)
@@ -18,7 +20,7 @@ template <typename T> struct AffineLightTransform {
     return *this;
   }
 
-  inline T operator()(const T &x) { return exp(data[0]) * (x + data[1]); }
+  inline T operator()(const T &x) const { return exp(data[0]) * (x + data[1]); }
 
   inline friend AffineLightTransform<T>
   operator*(AffineLightTransform<T> first, AffineLightTransform<T> second) {
@@ -49,7 +51,7 @@ template <typename T> struct AffineLightTransform {
     return os;
   }
 
-  T data[2];
+  T data[DoF];
 };
 
 } // namespace mdso

@@ -1,5 +1,5 @@
 #include "system/FrameTracker.h"
-#include "PreKeyFrameInternals.h"
+#include "PreKeyFrameEntryInternals.h"
 #include "output/FrameTrackerObserver.h"
 #include "util/util.h"
 #include <ceres/cubic_interpolation.h>
@@ -173,12 +173,12 @@ FrameTracker::trackPyrLevel(const PreKeyFrame &frame,
   CameraBundle &cam = camPyr[pyrLevel];
   const DepthPyramidSlice &baseSlice = baseFrameSlices[pyrLevel];
   std::vector<cv::Mat1b> trackedImages(cam.bundle.size());
-  std::vector<PreKeyFrameInternals::Interpolator_t *> interpolators(
+  std::vector<PreKeyFrameEntryInternals::Interpolator_t *> interpolators(
       cam.bundle.size());
 
   for (int i = 0; i < cam.bundle.size(); ++i) {
     trackedImages[i] = frame.frames[i].framePyr[pyrLevel];
-    interpolators[i] = &frame.internals->frames[i].interpolator(pyrLevel);
+    interpolators[i] = &frame.frames[i].internals->interpolator(pyrLevel);
   }
 
   TrackingResult result = coarseTrackingResult;
@@ -239,10 +239,10 @@ FrameTracker::trackPyrLevel(const PreKeyFrame &frame,
           const double c = settings.gradWeighting.c;
           double weight = c / std::hypot(c, p.gradNorm);
           lossFunc = new ceres::ScaledLoss(
-              new ceres::HuberLoss(settings.intencity.outlierDiff), weight,
+              new ceres::HuberLoss(settings.intensity.outlierDiff), weight,
               ceres::Ownership::TAKE_OWNERSHIP);
         } else
-          lossFunc = new ceres::HuberLoss(settings.intencity.outlierDiff);
+          lossFunc = new ceres::HuberLoss(settings.intensity.outlierDiff);
 
         residuals[trackedCamNum].push_back(new PointTrackingResidual(
             p.ray, p.intensity, cam.bundle[baseCamNum].thisToBody,

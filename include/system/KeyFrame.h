@@ -5,6 +5,7 @@
 #include "system/ImmaturePoint.h"
 #include "system/OptimizedPoint.h"
 #include "system/PreKeyFrame.h"
+#include "util/BaseAndTangent.h"
 #include "util/DepthedImagePyramid.h"
 #include "util/PixelSelector.h"
 #include "util/settings.h"
@@ -29,6 +30,7 @@ struct KeyFrameEntry {
   int ind;
   Timestamp timestamp;
   AffLight lightWorldToThis;
+  PreKeyFrame::FrameEntry *preKeyFrameEntry;
 };
 
 struct KeyFrame {
@@ -48,7 +50,7 @@ struct KeyFrame {
            const PointTracerSettings &tracingSettings = {});
 
   std::unique_ptr<PreKeyFrame> preKeyFrame;
-  SE3 thisToWorld;
+  BaseAndTangent<SE3> thisToWorld;
   std::vector<KeyFrameEntry> frames;
   std::vector<std::unique_ptr<PreKeyFrame>> trackedFrames;
 

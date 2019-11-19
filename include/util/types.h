@@ -5,6 +5,7 @@
 #include <Eigen/Core>
 #include <Eigen/StdVector>
 #include <boost/container/static_vector.hpp>
+#include <boost/multi_array.hpp>
 #include <filesystem>
 #include <map>
 #include <memory>
@@ -16,6 +17,28 @@
 #include <vector>
 
 namespace mdso {
+
+namespace optimize {
+using T = double;
+using Vec2t = Eigen::Matrix<T, 2, 1>;
+using Vec3t = Eigen::Matrix<T, 3, 1>;
+using Vec5t = Eigen::Matrix<T, 5, 1>;
+using Vec8t = Eigen::Matrix<T, 8, 1>;
+
+using Mat22t = Eigen::Matrix<T, 2, 2>;
+using Mat26t = Eigen::Matrix<T, 2, 6>;
+using Mat27t = Eigen::Matrix<T, 2, 7>;
+using Mat33t = Eigen::Matrix<T, 3, 3>;
+using Mat36t = Eigen::Matrix<T, 3, 6>;
+using Mat37t = Eigen::Matrix<T, 3, 7>;
+using Mat62t = Eigen::Matrix<T, 6, 2>;
+using Mat88t = Eigen::Matrix<T, 8, 8>;
+
+using SE3t = Sophus::SE3<T>;
+using SO3t = Sophus::SO3<T>;
+
+using AffLightT = AffineLightTransform<T>;
+} // namespace optimize
 
 using Vec2 = Eigen::Matrix<double, 2, 1>;
 using Vec3 = Eigen::Matrix<double, 3, 1>;
@@ -32,6 +55,7 @@ using Mat23 = Eigen::Matrix<double, 2, 3>;
 using Mat32 = Eigen::Matrix<double, 3, 2>;
 using Mat33 = Eigen::Matrix<double, 3, 3>;
 using Mat34 = Eigen::Matrix<double, 3, 4>;
+using Mat37 = Eigen::Matrix<double, 3, 7>;
 using Mat43 = Eigen::Matrix<double, 4, 3>;
 using Mat44 = Eigen::Matrix<double, 4, 4>;
 using Mat55 = Eigen::Matrix<double, 5, 5>;
@@ -52,6 +76,8 @@ using AffLight = AffineLightTransform<double>;
 namespace fs = std::filesystem;
 
 using boost::container::static_vector;
+template <typename T>
+using Array2d = boost::multi_array<T, 2>;
 
 template <typename T>
 using StdVector = std::vector<T, Eigen::aligned_allocator<T>>;
@@ -96,7 +122,7 @@ public:
 
 // used to store poses in trajectory writers
 using PosesPool = std::priority_queue<std::pair<Timestamp, SE3>,
-                                      std::vector<std::pair<Timestamp, SE3>>,
+                                      StdVector<std::pair<Timestamp, SE3>>,
                                       TimestampPoseComp>;
 
 } // namespace mdso

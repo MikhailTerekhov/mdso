@@ -99,7 +99,7 @@ void DsoSystem::projectOntoFrame(int globalFrameNum, Vec2 *points[],
     sizes[i] = 0;
 
   for (const auto &kf : keyFrames) {
-    SE3 refToFrameBody = worldToFrame * kf->thisToWorld;
+    SE3 refToFrameBody = worldToFrame * kf->thisToWorld();
     for (int ri = 0; ri < cam->bundle.size(); ++ri) {
       const CameraBundle::CameraEntry &refCam = cam->bundle[ri];
       SE3 temp = refToFrameBody * refCam.thisToBody;
@@ -180,9 +180,9 @@ public:
   SE3 operator()(MarginalizedPreKeyFrame *f) {
     return f->baseFrame->thisToWorld * f->baseToThis.inverse();
   }
-  SE3 operator()(KeyFrame *f) { return f->thisToWorld; }
+  SE3 operator()(KeyFrame *f) { return f->thisToWorld(); }
   SE3 operator()(PreKeyFrame *f) {
-    return f->baseFrame->thisToWorld * f->baseToThis().inverse();
+    return f->baseFrame->thisToWorld() * f->baseToThis().inverse();
   }
 };
 
@@ -451,7 +451,7 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], Timestamp timestamps[]) {
         obs->initialized(initializedKFs.data(), keyFrames.size());
 
       // BundleAdjuster bundleAdjuster(cam, settings.bundleAdjuster,
-      // settings.residualPattern, settings.gradWeighting, settings.intencity,
+      // settings.residualPattern, settings.gradWeighting, settings.intensity,
       // settings.affineLight, settings.threading, settings.depth);
       // for (auto &p : keyFrames)
       // bundleAdjuster.addKeyFrame(&p.second);
@@ -567,14 +567,14 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], Timestamp timestamps[]) {
     for (DsoObserver *obs : observers.dso)
       obs->newBaseFrame(baseFrame());
 
-    if (settings.bundleAdjuster.runBA) {
-      std::vector<KeyFrame *> kfPtrs(keyFrames.size());
-      for (int i = 0; i < keyFrames.size(); ++i)
-        kfPtrs[i] = keyFrames[i].get();
-      BundleAdjuster bundleAdjuster(cam, kfPtrs.data(), keyFrames.size(),
-                                    settings.getBundleAdjusterSettings());
-      bundleAdjuster.adjust(settings.bundleAdjuster.maxIterations);
-    }
+//    if (settings.bundleAdjuster.runBA) {
+//      std::vector<KeyFrame *> kfPtrs(keyFrames.size());
+//      for (int i = 0; i < keyFrames.size(); ++i)
+//        kfPtrs[i] = keyFrames[i].get();
+//      BundleAdjuster bundleAdjuster(cam, kfPtrs.data(), keyFrames.size(),
+//                                    settings.getBundleAdjusterSettings());
+//      bundleAdjuster.adjust(settings.bundleAdjuster.maxIterations);
+//    }
 
     std::vector<StdVector<Vec2>> points(cam->bundle.size());
     std::vector<std::vector<double>> depths(cam->bundle.size());

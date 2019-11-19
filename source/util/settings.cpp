@@ -23,7 +23,7 @@ Settings Settings::getGradientAdjustedSettings(double inencityRequiredToThis,
     result.pixelSelector.gradThresholds[i] *= gradNormRequiredToThis;
   }
   result.gradWeighting.c *= gradNormRequiredToThis;
-  result.intencity.outlierDiff *= gradNormRequiredToThis;
+  result.intensity.outlierDiff *= gradNormRequiredToThis;
 
   return result;
 }
@@ -34,21 +34,25 @@ InitializerSettings Settings::getInitializerSettings() const {
           threading,
           triangulation,
           keyFrame,
-          {pointTracer, intencity, residualPattern, pyramid}};
+          {pointTracer, intensity, residualPattern, pyramid}};
 }
 
 PointTracerSettings Settings::getPointTracerSettings() const {
-  return {pointTracer, intencity, residualPattern, pyramid};
+  return {pointTracer, intensity, residualPattern, pyramid};
 }
 
 FrameTrackerSettings Settings::getFrameTrackerSettings() const {
   return {frameTracker, pyramid,       affineLight,
-          intencity,    gradWeighting, threading};
+          intensity,    gradWeighting, threading};
 }
 
 BundleAdjusterSettings Settings::getBundleAdjusterSettings() const {
-  return {bundleAdjuster, residualPattern, gradWeighting, intencity,
+  return {bundleAdjuster, residualPattern, gradWeighting, intensity,
           affineLight,    threading,       depth};
+}
+
+ResidualSettings Settings::getResidualSettings() const {
+  return {residualPattern, gradWeighting, intensity};
 }
 
 } // namespace mdso

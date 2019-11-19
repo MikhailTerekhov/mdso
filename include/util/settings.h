@@ -17,6 +17,8 @@ struct FrameTrackerSettings;
 
 struct BundleAdjusterSettings;
 
+struct ResidualSettings;
+
 struct Settings {
   struct CameraModel {
     static constexpr int default_mapPolyDegree = 10;
@@ -281,10 +283,10 @@ struct Settings {
     static const static_vector<Vec2, max_size> default_pattern;
   } residualPattern;
 
-  struct Intencity {
+  struct Intensity {
     static constexpr double default_outlierDiff = 12.0;
     double outlierDiff = default_outlierDiff;
-  } intencity;
+  } intensity;
 
   struct Threading {
     static constexpr int default_numThreads = 4;
@@ -339,6 +341,8 @@ struct Settings {
   PointTracerSettings getPointTracerSettings() const;
   FrameTrackerSettings getFrameTrackerSettings() const;
   BundleAdjusterSettings getBundleAdjusterSettings() const;
+  ResidualSettings getResidualSettings() const;
+
 
   Settings getGradientAdjustedSettings(double intencityRequiredToThis,
                                        double gradNormRequiredToThis);
@@ -350,7 +354,7 @@ private:
 
 struct PointTracerSettings {
   Settings::PointTracer pointTracer = {};
-  Settings::Intencity intencity = {};
+  Settings::Intensity intensity = {};
   Settings::ResidualPattern residualPattern = {};
   Settings::Pyramid pyramid = {};
 };
@@ -368,7 +372,7 @@ struct FrameTrackerSettings {
   Settings::FrameTracker frameTracker = {};
   Settings::Pyramid pyramid = {};
   Settings::AffineLight affineLight = {};
-  Settings::Intencity intencity = {};
+  Settings::Intensity intensity = {};
   Settings::GradWeighting gradWeighting = {};
   Settings::Threading threading = {};
 };
@@ -377,10 +381,16 @@ struct BundleAdjusterSettings {
   Settings::BundleAdjuster bundleAdjuster = {};
   Settings::ResidualPattern residualPattern = {};
   Settings::GradWeighting gradWeighting = {};
-  Settings::Intencity intencity = {};
+  Settings::Intensity intensity = {};
   Settings::AffineLight affineLight = {};
   Settings::Threading threading = {};
   Settings::Depth depth = {};
+};
+
+struct ResidualSettings {
+  Settings::ResidualPattern residualPattern = {};
+  Settings::GradWeighting gradWeighting = {};
+  Settings::Intensity intensity = {};
 };
 
 } // namespace mdso

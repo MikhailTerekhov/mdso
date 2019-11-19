@@ -11,7 +11,8 @@ KeyFrameEntry::KeyFrameEntry(const InitializedFrame::FrameEntry &entry,
                              const PointTracerSettings &tracingSettings)
     : host(host)
     , ind(ind)
-    , timestamp(entry.timestamp) {
+    , timestamp(entry.timestamp)
+    , preKeyFrameEntry(&host->preKeyFrame->frames[ind]) {
   immaturePoints.reserve(entry.depthedPoints.size());
   for (const auto &[p, d] : entry.depthedPoints) {
     immaturePoints.emplace_back(this, p, tracingSettings);
@@ -54,7 +55,7 @@ KeyFrame::KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame,
                    const PointTracerSettings &tracingSettings)
     : preKeyFrame(std::move(newPreKeyFrame))
     , thisToWorld(preKeyFrame->baseFrame
-                      ? preKeyFrame->baseFrame->thisToWorld *
+                      ? preKeyFrame->baseFrame->thisToWorld() *
                             preKeyFrame->baseToThis().inverse()
                       : preKeyFrame->baseToThis().inverse())
     , kfSettings(_kfSettings) {

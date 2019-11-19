@@ -94,7 +94,6 @@ if args.labels and len(args.traj) != len(args.labels):
 
 fig = plt.figure(figsize=(img_w, img_h))
 ax = Axes3D(fig)
-ax.set_aspect('equal')
 
 ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
 ax.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
@@ -159,9 +158,10 @@ for ind, fname in enumerate(args.traj):
     artists.append(draw_proc(ax, traj, mpl.colors.to_rgba(col, alpha=alpha),
                             label_ours))
 
-set_axes_equal(ax)
 
 ax.legend(loc='upper center', bbox_to_anchor=(0.5, 0.3), fontsize='large')
+
+set_axes_equal(ax)
 
 if args.video_dir:
     os.makedirs(args.video_dir, exist_ok=True)

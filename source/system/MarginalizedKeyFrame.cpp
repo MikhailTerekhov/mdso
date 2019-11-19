@@ -22,7 +22,7 @@ MarginalizedKeyFrame::FrameEntry::FrameEntry(const KeyFrameEntry &entry)
 }
 
 MarginalizedKeyFrame::MarginalizedKeyFrame(const KeyFrame &keyFrame)
-    : thisToWorld(keyFrame.thisToWorld) {
+    : thisToWorld(keyFrame.thisToWorld()) {
   frames.reserve(keyFrame.preKeyFrame->cam->bundle.size());
   for (int i = 0; i < keyFrame.preKeyFrame->cam->bundle.size(); ++i)
     frames.emplace_back(keyFrame.frames[i]);

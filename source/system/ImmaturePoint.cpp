@@ -1,5 +1,5 @@
 #include "system/ImmaturePoint.h"
-#include "PreKeyFrameInternals.h"
+#include "PreKeyFrameEntryInternals.h"
 #include "system/KeyFrame.h"
 #include "util/defs.h"
 #include "util/geometry.h"
@@ -12,7 +12,7 @@ namespace mdso {
 #define PL (settings.pyramid.levelNum())
 #define PS (settings.residualPattern.pattern().size())
 #define PH (settings.residualPattern.height)
-#define TH (settings.intencity.outlierDiff)
+#define TH (settings.intensity.outlierDiff)
 
 std::string ImmaturePoint::statusName(ImmaturePoint::TracingStatus status) {
   switch (status) {
@@ -210,8 +210,8 @@ ImmaturePoint::traceOn(const PreKeyFrame::FrameEntry &refFrameEntry,
       refFrame.baseFrame->frames[indRef].lightWorldToThis *
       host->lightWorldToThis.inverse();
   SE3 baseToRef = cam->bundle[indRef].bodyToThis * refFrame.baseToThis() *
-                  refFrame.baseFrame->thisToWorld.inverse() *
-                  baseFrame.thisToWorld *
+                  refFrame.baseFrame->thisToWorld().inverse() *
+                  baseFrame.thisToWorld() *
                   cam->bundle[indBase].bodyToThis.inverse();
 
   Vec3 dirMin = (baseToRef * (minDepth * baseDirections[0])).normalized();
@@ -295,7 +295,7 @@ ImmaturePoint::traceOn(const PreKeyFrame::FrameEntry &refFrameEntry,
     double energy = 0;
     for (int i = 0; i < PS; ++i) {
       double refIntencity;
-      refFrame.internals->frames[indRef].interpolator(pyrLevel).Evaluate(
+      refFrame.frames[indRef].internals->interpolator(pyrLevel).Evaluate(
           reproj[i][1], reproj[i][0], &refIntencity);
       double residual = std::abs(intencities[i] - refIntencity);
       energy += residual > TH ? TH * (2 * residual - TH) : residual * residual;
@@ -373,7 +373,7 @@ ImmaturePoint::traceOn(const PreKeyFrame::FrameEntry &refFrameEntry,
       pattern[i] = scale * (reproj - points[bestInd]);
     }
     bestPoint = tracePrecise(
-        refFrame.internals->frames[indRef].interpolator(bestPyrLevel), from, to,
+        refFrame.frames[indRef].internals->interpolator(bestPyrLevel), from, to,
         intencities.data(), pattern.data(), bestDispl, bestEnergy, settings);
     depth = triangulate(baseToRef, baseDirections[0],
                         camRef.unmap(bestPoint / scale))[0];
