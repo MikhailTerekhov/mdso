@@ -59,6 +59,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/optimize/EnergyFunction.h
     ${PROJECT_SOURCE_DIR}/include/optimize/Parametrization.h
     ${PROJECT_SOURCE_DIR}/include/optimize/Residual.h
+    ${PROJECT_SOURCE_DIR}/include/optimize/MotionDerivatives.h
 
     ${PROJECT_SOURCE_DIR}/include/system/AffineLightTransform.h
     ${PROJECT_SOURCE_DIR}/include/system/SphericalPlus.h
@@ -118,6 +119,7 @@ set(dso_SOURCE_FILES
 
     ${PROJECT_SOURCE_DIR}/source/optimize/EnergyFunction.cpp
     ${PROJECT_SOURCE_DIR}/source/optimize/Residual.cpp
+    ${PROJECT_SOURCE_DIR}/source/optimize/MotionDerivatives.cpp
 
     ${PROJECT_SOURCE_DIR}/source/system/SphericalPlus.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoSystem.cpp

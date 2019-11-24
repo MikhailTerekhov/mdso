@@ -162,7 +162,6 @@ int main(int argc, char *argv[]) {
   std::ofstream ofsTrajOrig(FLAGS_out_traj_orig);
   for (const SE3 &bodyToFirst : reader.getVoBodyToFirst()) {
     putInMatrixForm(ofsTrajOrig, bodyToFirst);
-    ofsTrajOrig << '\n';
   }
 
   std::ofstream ofsTrajInterp(FLAGS_out_traj_interp);
@@ -171,7 +170,6 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < FLAGS_interp_gran; ++i) {
     Timestamp ts = minTs + step * i;
     putInMatrixForm(ofsTrajInterp, reader.tsToTs(ts, reader.voTs()[0]));
-    ofsTrajInterp << '\n';
   }
 
   cv::Mat3b proj = project(reader, FLAGS_project_idx);

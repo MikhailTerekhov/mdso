@@ -389,11 +389,8 @@ TEST_P(FrameTrackerTest, doesTracking) {
   std::ofstream voOfs(voFile);
 
   putInMatrixForm(trackedOfs, SE3());
-  trackedOfs << std::endl;
   putInMatrixForm(predictedOfs, SE3());
-  predictedOfs << std::endl;
   putInMatrixForm(voOfs, SE3());
-  voOfs << std::endl;
 
   DummyTrajectoryHolder<RobotcarReader::numCams> trajectoryHolder;
   AffLight defaultAffLight[RobotcarReader::numCams];
@@ -472,11 +469,8 @@ TEST_P(FrameTrackerTest, doesTracking) {
     }
 
     putInMatrixForm(predictedOfs, oldPredictedBaseToThis.inverse());
-    predictedOfs << std::endl;
     putInMatrixForm(trackedOfs, trackingResult.baseToTracked.inverse());
-    trackedOfs << std::endl;
     putInMatrixForm(voOfs, voBaseToTracked.inverse());
-    voOfs << std::endl;
   }
 
   LOG(INFO) << "avg |right - left| (s) = "

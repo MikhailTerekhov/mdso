@@ -36,7 +36,6 @@ void TrajectoryWriter::keyFramesMarginalized(const KeyFrame *marginalized[],
   PosesPool &pool = frameToWorldPool();
   while (!pool.empty() && pool.top().first < minKfTs) {
     putInMatrixForm(ofs, pool.top().second);
-    ofs << '\n';
     pool.pop();
   }
 }

@@ -1,5 +1,5 @@
-#ifndef INCLUDE_RESIDUALFUNCTION
-#define INCLUDE_RESIDUALFUNCTION
+#ifndef INCLUDE_ENERGYFUNCTION
+#define INCLUDE_ENERGYFUNCTION
 
 #include "Residual.h"
 #include "optimize/Parametrization.h"

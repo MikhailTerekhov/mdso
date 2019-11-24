@@ -134,6 +134,7 @@ void putInMatrixForm(std::ostream &out, const SE3 &motion) {
   Eigen::Matrix<double, 3, 4, Eigen::RowMajor> pose = motion.matrix3x4();
   for (int i = 0; i < 12; ++i)
     out << pose.data()[i] << ' ';
+  out << '\n';
 }
 
 void putDot(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col) {
