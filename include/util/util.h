@@ -75,6 +75,14 @@ cv::Point toCvPoint(Vec2i vec);
 cv::Point toCvPoint(const Vec2 &vec, double scaleX, double scaleY,
                     cv::Point shift);
 
+template <typename T>
+Eigen::Matrix<T, 4, 1> makeHomogeneous(const Eigen::Matrix<T, 3, 1> &v) {
+  optimize::Vec4t vH;
+  vH.head<3>() = v;
+  vH[3] = T(1);
+  return vH;
+}
+
 cv::Vec3b toCvVec3bDummy(cv::Scalar scalar);
 
 template <typename TT> struct accum_type { using type = TT; };

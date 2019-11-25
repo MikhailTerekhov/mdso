@@ -22,10 +22,12 @@ namespace optimize {
 using T = double;
 using Vec2t = Eigen::Matrix<T, 2, 1>;
 using Vec3t = Eigen::Matrix<T, 3, 1>;
+using Vec4t = Eigen::Matrix<T, 4, 1>;
 using Vec5t = Eigen::Matrix<T, 5, 1>;
 using Vec8t = Eigen::Matrix<T, 8, 1>;
 
 using Mat22t = Eigen::Matrix<T, 2, 2>;
+using Mat23t = Eigen::Matrix<T, 2, 3>;
 using Mat26t = Eigen::Matrix<T, 2, 6>;
 using Mat27t = Eigen::Matrix<T, 2, 7>;
 using Mat33t = Eigen::Matrix<T, 3, 3>;

@@ -13,22 +13,27 @@ using SE3J = Sophus::SE3<JetSE3, Eigen::DontAlign>;
 using SO3J = Sophus::SO3<JetSE3, Eigen::DontAlign>;
 using ArrayDQ = std::array<Mat34t, SO3::num_parameters>;
 
-double tangentErr(const ArrayDQ &expected, const ArrayDQ &actual,
-                  const SO3t &diffRotation, Mat12x3t &expectedTang,
-                  Mat12x3t &actualTang) {
-  Mat12x4t em, am;
+std::mt19937 mt;
+
+Mat12x4t toJacobian(const ArrayDQ &dq) {
+  Mat12x4t jacobian;
   for (int qi = 0; qi < SO3t::num_parameters; ++qi)
     for (int r = 0; r < 3; ++r)
-      for (int c = 0; c < 4; ++c) {
-        em(r * 4 + c, qi) = expected[qi](r, c);
-        am(r * 4 + c, qi) = actual[qi](r, c);
-      }
+      for (int c = 0; c < 4; ++c)
+        jacobian(r * 4 + c, qi) = dq[qi](r, c);
+  return jacobian;
+}
+
+template <int nret>
+T tangentErr(const Eigen::Matrix<T, nret, 4> &expected,
+             const Eigen::Matrix<T, nret, 4> &actual, const SO3t &diffRotation,
+             Eigen::Matrix<T, nret, 3> &expectedTang,
+             Eigen::Matrix<T, nret, 3> &actualTang) {
   Mat43t dParam = diffRotation.Dx_this_mul_exp_x_at_0();
-  expectedTang = em * dParam;
-  actualTang = am * dParam;
+  expectedTang = expected * dParam;
+  actualTang = actual * dParam;
   return (expectedTang - actualTang).norm();
 }
-std::mt19937 mt;
 
 SE3J compose(const SE3J &hostFrameToBody, const SE3J &hostBodyToWorld,
              const SE3J &targetBodyToWorld, const SE3J &targetBodyToFrame) {
@@ -75,13 +80,27 @@ struct MotionDerivativesInp {
 
   friend std::ostream &operator<<(std::ostream &out,
                                   const MotionDerivativesInp &data) {
-    putInMatrixForm(out, data.hostFrameToBody);
-    putInMatrixForm(out, data.hostBodyToWorld);
-    putInMatrixForm(out, data.targetBodyToWorld);
-    putInMatrixForm(out, data.targetBodyToFrame);
+    putInMatrixForm(out, data.hostFrameToBody.cast<double>());
+    putInMatrixForm(out, data.hostBodyToWorld.cast<double>());
+    putInMatrixForm(out, data.targetBodyToWorld.cast<double>());
+    putInMatrixForm(out, data.targetBodyToFrame.cast<double>());
 
     return out;
   }
+};
+
+template <typename T> struct ErrorBounds;
+
+template <> struct ErrorBounds<float> {
+  static constexpr float dq = 5e-6;
+  static constexpr float dt = 5e-6;
+  static constexpr float dAction = 5e-6;
+};
+
+template <> struct ErrorBounds<double> {
+  static constexpr float dq = 1e-10;
+  static constexpr float dt = 1e-10;
+  static constexpr float dAction = 1e-10;
 };
 
 class MotionDerivativesTest
@@ -105,8 +124,9 @@ protected:
         GetParam().targetBodyToWorld, GetParam().targetBodyToFrame));
   }
 
-  static constexpr T dqErr = 1e-8;
-  static constexpr T dtErr = 1e-8;
+  static constexpr T dqErr = ErrorBounds<T>::dq;
+  static constexpr T dtErr = ErrorBounds<T>::dt;
+  static constexpr T dActionErr = ErrorBounds<T>::dAction;
 
   SE3J hostFrameToBody;
   SE3J targetBodyToFrame;
@@ -156,9 +176,9 @@ TEST_P(MotionDerivativesTest, CorrectDDqHost) {
   ArrayDQ actual;
   std::copy(derivatives->dmatrix_dqi_host, derivatives->dmatrix_dqi_host + 4,
             actual.begin());
-  double err =
-      tangentErr(dmatrix_dq_host, actual, GetParam().hostBodyToWorld.so3(),
-                 d_dq_tangent_expected, d_dq_tangent_actual);
+  T err = tangentErr(toJacobian(dmatrix_dq_host), toJacobian(actual),
+                     GetParam().hostBodyToWorld.so3(), d_dq_tangent_expected,
+                     d_dq_tangent_actual);
   ASSERT_LE(err, dqErr) << "d_dq_host big error (=" << err << ")\n"
                         << "actual =\n"
                         << d_dq_tangent_actual << "\nexpected =\n"
@@ -172,14 +192,60 @@ TEST_P(MotionDerivativesTest, CorrectDDqTarget) {
   ArrayDQ actual;
   std::copy(derivatives->dmatrix_dqi_target,
             derivatives->dmatrix_dqi_target + 4, actual.begin());
-  double err =
-      tangentErr(dmatrix_dq_target, actual, GetParam().targetBodyToWorld.so3(),
-                 d_dq_tangent_expected, d_dq_tangent_actual);
+  T err = tangentErr(toJacobian(dmatrix_dq_target), toJacobian(actual),
+                     GetParam().targetBodyToWorld.so3(), d_dq_tangent_expected,
+                     d_dq_tangent_actual);
   ASSERT_LE(err, dqErr) << "d_dq_target big error (=" << err << ")\n"
                         << "actual =\n"
                         << d_dq_tangent_actual << "\nexpected =\n"
                         << d_dq_tangent_expected << "\nparams:\n"
                         << GetParam();
+}
+
+TEST_P(MotionDerivativesTest, CorrectDiffActionHost) {
+  constexpr int testCount = 10;
+  std::uniform_real_distribution<double> d(-1, 1);
+  for (int it = 0; it < testCount; ++it) {
+    Vec3t v(d(mt), d(mt), d(mt));
+    Vec4t vH = makeHomogeneous(v);
+    Vec3J moved = composeHost * v.cast<JetSE3>();
+    Mat34t expected;
+    for (int r = 0; r < 3; ++r)
+      for (int c = 0; c < 4; ++c)
+        expected(r, c) = moved[r].v[c];
+    Mat34t actual = derivatives->diffActionHostQ(vH);
+    Mat33t expectedTang, actualTang;
+    T err = tangentErr(expected, actual, GetParam().hostBodyToWorld.so3(),
+                       expectedTang, actualTang);
+    ASSERT_LE(err, dActionErr) << "d_dq_host big error (=" << err << ")\n"
+                          << "actual =\n"
+                          << actualTang << "\nexpected =\n"
+                          << expectedTang << "\nparams:\n"
+                          << GetParam();
+  }
+}
+
+TEST_P(MotionDerivativesTest, CorrectDiffActionTarget) {
+  constexpr int testCount = 10;
+  std::uniform_real_distribution<double> d(-1, 1);
+  for (int it = 0; it < testCount; ++it) {
+    Vec3t v(d(mt), d(mt), d(mt));
+    Vec4t vH = makeHomogeneous(v);
+    Vec3J moved = composeTarget * v.cast<JetSE3>();
+    Mat34t expected;
+    for (int r = 0; r < 3; ++r)
+      for (int c = 0; c < 4; ++c)
+        expected(r, c) = moved[r].v[c];
+    Mat34t actual = derivatives->diffActionTargetQ(vH);
+    Mat33t expectedTang, actualTang;
+    T err = tangentErr(expected, actual, GetParam().targetBodyToWorld.so3(),
+                       expectedTang, actualTang);
+    ASSERT_LE(err, dActionErr) << "d_dq_host big error (=" << err << ")\n"
+                               << "actual =\n"
+                               << actualTang << "\nexpected =\n"
+                               << expectedTang << "\nparams:\n"
+                               << GetParam();
+  }
 }
 
 StdVector<MotionDerivativesInp> hostNId() {

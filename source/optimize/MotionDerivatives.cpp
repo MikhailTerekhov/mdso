@@ -61,4 +61,11 @@ MotionDerivatives::MotionDerivatives(const SE3t &hostFrameToBody,
   }
 }
 
+Mat34t MotionDerivatives::diffActionQ(const Mat34t dmatrix_dq[], const Vec4t &vH) {
+  Mat34t result;
+  for (int i = 0; i < 4; ++i)
+    result.col(i) = dmatrix_dq[i] * vH;
+  return result;
+}
+
 } // namespace mdso::optimize

@@ -60,9 +60,9 @@ struct SO3xS2Parametrization {
   using Tangent = Vec5t;
 
   SO3xS2Parametrization(const BaseAndTangent<SE3> &baseAndTangent)
-      : so3(BaseAndTangent<SO3t>(baseAndTangent().so3(),
-                                 baseAndTangent.delta().tail<3>()))
-      , s2(SE3t::exp(baseAndTangent.delta())) {}
+      : so3(BaseAndTangent<SO3t>(baseAndTangent().so3().cast<T>(),
+                                 baseAndTangent.delta().tail<3>().cast<T>()))
+      , s2(SE3t::exp(baseAndTangent.delta().cast<T>())) {}
 
   static MatDiff diffPlus(const SE3t &base, const Tangent &delta) {
     // TODO

@@ -51,10 +51,10 @@ Residual::getValues(const SE3t &hostToTarget,
   T depth = optimizedPoint->depth();
   PreKeyFrameEntryInternals::Interpolator_t *targetInterp =
       &target->preKeyFrameEntry->internals->interpolator(0);
-  Vec2t reproj =
-      camTarget->cam.map(hostToTarget * (depth * optimizedPoint->dir));
+  Vec2 reproj = camTarget->cam.map(hostToTarget.cast<double>() *
+                                   (depth * optimizedPoint->dir));
   for (int i = 0; i < result.size(); ++i) {
-    Vec2t p = reproj + reprojPattern[i];
+    Vec2 p = reproj + reprojPattern[i];
     double targetIntencity = INF;
     targetInterp->Evaluate(p[1], p[0], &targetIntencity);
     T hostIntencity = lightHostToTarget(hostIntencities[i]);
@@ -98,35 +98,35 @@ Mat37 dinvv_dqt(const SE3 &Rt, const Vec3 &v) {
   return d_dqt;
 }
 
-Residual::Jacobian Residual::getJacobian(const SE3 &hostToTarget,
+Residual::Jacobian Residual::getJacobian(const SE3t &hostToTarget,
+                                         const MotionDerivatives &dHostToTarget,
                                          const AffLightT &lightHostToTarget,
                                          const Mat33t &worldToTargetRot) {
-  const SE3 &hostToWorld = host->host->thisToWorld();
-  const SE3 &targetToWorld = target->host->thisToWorld();
   Jacobian jacobian;
   PreKeyFrameEntryInternals::Interpolator_t *targetInterp =
       &target->preKeyFrameEntry->internals->interpolator(0);
 
   T depth = optimizedPoint->depth();
-  Vec3t hostVec = depth * optimizedPoint->dir;
+  Vec3t hostVec = (depth * optimizedPoint->dir).cast<T>();
+  Vec4t hostVecH = makeHomogeneous(hostVec);
   Vec3t targetVec = hostToTarget * hostVec;
-  auto [reproj, piJacobian] = camTarget->cam.diffMap(targetVec);
+  Vec4t targetVecH = makeHomogeneous(targetVec);
+  auto [reproj, piJacobian] = camTarget->cam.diffMap(targetVec.cast<double>());
+  jacobian.dpi = piJacobian.cast<T>();
 
   for (int i = 0; i < settings.residualPattern.pattern().size(); ++i) {
-    Vec2t p = reproj + reprojPattern[i];
+    Vec2 p = reproj + reprojPattern[i];
+    Vec2 gradItarget;
     double intensity = INF;
-    targetInterp->Evaluate(p[1], p[0], &intensity, &jacobian.gradItarget[i][1],
-                           &jacobian.gradItarget[i][0]);
+    targetInterp->Evaluate(p[1], p[0], &intensity, &gradItarget[1],
+                           &gradItarget[0]);
+    jacobian.gradItarget[i] = gradItarget.cast<T>();
   }
 
-  jacobian.dp_dlogd = piJacobian * (hostToTarget.so3() * hostVec);
-
-  Mat23 tmp1 = piJacobian * worldToTargetRot;
-  jacobian.dhost.dp_dqt.leftCols<4>() =
-      tmp1 * dRv_dq(hostToWorld.so3(), hostVec);
-  jacobian.dhost.dp_dqt.rightCols<3>() = tmp1;
-
-  jacobian.dtarget.dp_dqt = piJacobian * dinvv_dqt(targetToWorld, targetVec);
+  jacobian.dp_dlogd = jacobian.dpi * (hostToTarget.so3() * hostVec);
+  jacobian.dhost.dp_dq = jacobian.dpi * dHostToTarget.diffActionHostQ(hostVecH);
+  jacobian.dtarget.dp_dq =
+      jacobian.dpi * dHostToTarget.diffActionTargetQ(targetVecH);
 
   for (int i = 0; i < settings.residualPattern.pattern().size(); ++i) {
     double d_da = lightHostToTarget.data[0] * hostIntencities[i];
@@ -140,7 +140,7 @@ Residual::Jacobian Residual::getJacobian(const SE3 &hostToTarget,
 }
 
 Mat22t sum_gradab(const static_vector<T, Residual::MPS> &weights,
-                  const Vec2 gradItarget[], const Vec2 dr_dab[]) {
+                  const Vec2t gradItarget[], const Vec2t dr_dab[]) {
   Mat22t sum = Mat22t::Zero();
   for (int i = 0; i < weights.size(); ++i)
     sum += weights[i] * gradItarget[i] * dr_dab[i].transpose();
@@ -148,18 +148,18 @@ Mat22t sum_gradab(const static_vector<T, Residual::MPS> &weights,
 }
 
 Residual::DeltaHessian::FrameFrame
-H_frameframe(const Residual::Jacobian::DiffFrameParams &df1,
-             const Residual::Jacobian::DiffFrameParams &df2,
+H_frameframe(const Mat27t &df1_dp_dqt, const Mat27t &df2_dp_dqt,
+             const Vec2t df1_dr_dab[], const Vec2t df2_dr_dab[],
              const static_vector<T, Residual::MPS> &weights,
              const Mat22t &sum_wgradgradT, const Mat22t &sum_gradab) {
   Residual::DeltaHessian::FrameFrame H;
-  H.qtqt = df1.dp_dqt.transpose() * sum_wgradgradT * df2.dp_dqt;
+  H.qtqt = df1_dp_dqt.transpose() * sum_wgradgradT * df2_dp_dqt;
 
-  H.qtab = df1.dp_dqt.transpose() * sum_gradab;
+  H.qtab = df1_dp_dqt.transpose() * sum_gradab;
 
   Mat22t sum_abab = Mat22t::Zero();
   for (int i = 0; i < weights.size(); ++i)
-    sum_abab += weights[i] * df1.dr_dab[i] * df2.dr_dab[i].transpose();
+    sum_abab += weights[i] * df1_dr_dab[i] * df2_dr_dab[i].transpose();
   H.abab = sum_abab;
 
   return H;
@@ -175,14 +175,20 @@ Residual::DeltaHessian::FramePoint H_framepoint(const Mat27t &dp_dqt,
   return H;
 }
 
-Residual::DeltaHessian
-Residual::getDeltaHessian(const Residual::Jacobian &jacobian,
-                          const SE3t &hostToTarget,
-                          const AffLightT &lightWorldToTarget) {
+Residual::DeltaHessian Residual::getDeltaHessian(
+    const Residual::Jacobian &jacobian, const MotionDerivatives &dHostToTarget,
+    const SE3t &hostToTarget, const AffLightT &lightWorldToTarget) {
   static_vector<T, MPS> values = getValues(hostToTarget, lightWorldToTarget);
   static_vector<T, MPS> weights = getWeights(values);
 
   DeltaHessian deltaHessian;
+
+  Mat27t dhost_dp_dqt;
+  dhost_dp_dqt << jacobian.dhost.dp_dq, jacobian.dpi * dHostToTarget.d_dt_host;
+  Mat27t dtarget_dp_dqt;
+  dtarget_dp_dqt << jacobian.dtarget.dp_dq,
+      jacobian.dpi * dHostToTarget.d_dt_target;
+
   Mat22t sum_wgradgradT;
   for (int i = 0; i < values.size(); ++i)
     sum_wgradgradT += weights[i] * jacobian.gradItarget[i] *
@@ -191,21 +197,21 @@ Residual::getDeltaHessian(const Residual::Jacobian &jacobian,
       sum_gradab(weights, jacobian.gradItarget, jacobian.dhost.dr_dab);
   Mat22t sum_gradab_target =
       sum_gradab(weights, jacobian.gradItarget, jacobian.dtarget.dr_dab);
-  deltaHessian.hostHost = H_frameframe(jacobian.dhost, jacobian.dhost, weights,
-                                       sum_wgradgradT, sum_gradab_host);
-  deltaHessian.hostTarget =
-      H_frameframe(jacobian.dhost, jacobian.dtarget, weights, sum_wgradgradT,
-                   sum_gradab_target);
-  deltaHessian.targetTarget =
-      H_frameframe(jacobian.dtarget, jacobian.dtarget, weights, sum_wgradgradT,
-                   sum_gradab_target);
 
-  deltaHessian.hostPoint =
-      H_framepoint(jacobian.dhost.dp_dqt, jacobian.dp_dlogd, sum_wgradgradT,
-                   sum_gradab_host);
-  deltaHessian.targetPoint =
-      H_framepoint(jacobian.dtarget.dp_dqt, jacobian.dp_dlogd, sum_wgradgradT,
-                   sum_gradab_target);
+  deltaHessian.hostHost = H_frameframe(
+      dhost_dp_dqt, dhost_dp_dqt, jacobian.dhost.dr_dab, jacobian.dhost.dr_dab,
+      weights, sum_wgradgradT, sum_gradab_host);
+  deltaHessian.hostTarget = H_frameframe(
+      dhost_dp_dqt, dtarget_dp_dqt, jacobian.dhost.dr_dab,
+      jacobian.dtarget.dr_dab, weights, sum_wgradgradT, sum_gradab_target);
+  deltaHessian.targetTarget = H_frameframe(
+      dtarget_dp_dqt, dtarget_dp_dqt, jacobian.dtarget.dr_dab,
+      jacobian.dtarget.dr_dab, weights, sum_wgradgradT, sum_gradab_target);
+
+  deltaHessian.hostPoint = H_framepoint(dhost_dp_dqt, jacobian.dp_dlogd,
+                                        sum_wgradgradT, sum_gradab_host);
+  deltaHessian.targetPoint = H_framepoint(dtarget_dp_dqt, jacobian.dp_dlogd,
+                                          sum_wgradgradT, sum_gradab_target);
 
   deltaHessian.pointPoint =
       jacobian.dp_dlogd.dot(sum_wgradgradT * jacobian.dp_dlogd);

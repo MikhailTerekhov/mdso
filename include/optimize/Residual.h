@@ -3,6 +3,7 @@
 
 #include "system/CameraBundle.h"
 #include "system/KeyFrame.h"
+#include "optimize/MotionDerivatives.h"
 #include <ceres/loss_function.h>
 
 namespace mdso::optimize {
@@ -25,9 +26,11 @@ public:
     struct DiffFrameParams {
       EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-      Eigen::Matrix<T, 2, SE3t::num_parameters> dp_dqt;
+      Eigen::Matrix<T, 2, SO3t::num_parameters> dp_dq;
       Vec2t dr_dab[MPS];
     };
+
+    Mat23t dpi;
 
     DiffFrameParams dhost;
     DiffFrameParams dtarget;
@@ -37,13 +40,19 @@ public:
   };
 
   struct DeltaHessian {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
     struct FrameFrame {
+      EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
       Eigen::Matrix<T, SE3t::num_parameters, SE3t::num_parameters> qtqt;
       Eigen::Matrix<T, SE3t::num_parameters, AffLightT::DoF> qtab;
       Eigen::Matrix<T, AffLightT::DoF, AffLightT::DoF> abab;
     };
 
     struct FramePoint {
+      EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
       Eigen::Matrix<T, SE3t::num_parameters, 1> qtd;
       Eigen::Matrix<T, AffLightT::DoF, 1> abd;
     };
@@ -61,10 +70,12 @@ public:
   static_vector<T, MPS> getValues(const SE3t &hostToTarget,
                                   const AffLightT &lightHostToTarget);
   static_vector<T, MPS> getWeights(const static_vector<T, MPS> &values);
-  Jacobian getJacobian(const SE3 &hostToTarget,
+  Jacobian getJacobian(const SE3t &hostToTarget,
+                       const MotionDerivatives &dHostToTarget,
                        const AffLightT &lightHostToTarget,
                        const Mat33t &worldToTargetRot);
   DeltaHessian getDeltaHessian(const Residual::Jacobian &jacobian,
+                               const MotionDerivatives &dHostToTarget,
                                const SE3t &hostToTarget,
                                const AffLightT &lightWorldToTarget);
 
@@ -76,7 +87,7 @@ private:
   KeyFrameEntry *target;
   OptimizedPoint *optimizedPoint;
   const ResidualSettings &settings;
-  static_vector<Vec2t, MPS> reprojPattern;
+  static_vector<Vec2, MPS> reprojPattern;
   static_vector<double, MPS> hostIntencities;
   static_vector<double, MPS> gradWeights;
 };
