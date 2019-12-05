@@ -24,17 +24,6 @@ Mat12x4t toJacobian(const ArrayDQ &dq) {
   return jacobian;
 }
 
-template <int nret>
-T tangentErr(const Eigen::Matrix<T, nret, 4> &expected,
-             const Eigen::Matrix<T, nret, 4> &actual, const SO3t &diffRotation,
-             Eigen::Matrix<T, nret, 3> &expectedTang,
-             Eigen::Matrix<T, nret, 3> &actualTang) {
-  Mat43t dParam = diffRotation.Dx_this_mul_exp_x_at_0();
-  expectedTang = expected * dParam;
-  actualTang = actual * dParam;
-  return (expectedTang - actualTang).norm();
-}
-
 SE3J compose(const SE3J &hostFrameToBody, const SE3J &hostBodyToWorld,
              const SE3J &targetBodyToWorld, const SE3J &targetBodyToFrame) {
   return targetBodyToFrame * targetBodyToWorld.inverse() * hostBodyToWorld *
@@ -98,15 +87,15 @@ template <> struct ErrorBounds<float> {
 };
 
 template <> struct ErrorBounds<double> {
-  static constexpr float dq = 1e-10;
-  static constexpr float dt = 1e-10;
-  static constexpr float dAction = 1e-10;
+  static constexpr double dq = 1e-10;
+  static constexpr double dt = 1e-10;
+  static constexpr double dAction = 1e-10;
 };
 
 class MotionDerivativesTest
     : public ::testing::TestWithParam<MotionDerivativesInp> {
 protected:
-  void SetUp() {
+  void SetUp() override {
     hostFrameToBody = GetParam().hostFrameToBody.cast<JetSE3>();
     targetBodyToFrame = GetParam().targetBodyToFrame.cast<JetSE3>();
     hostBodyToWorld = GetParam().hostBodyToWorld.cast<JetSE3>();
@@ -145,10 +134,10 @@ TEST_P(MotionDerivativesTest, CorrectDDtHost) {
   std::uniform_real_distribution<double> d(-1, 1);
   Vec3t v = Vec3t(d(mt), d(mt), d(mt));
   Mat33t d_dt_host = d_dt(composeHost, v);
-  double err = (d_dt_host - derivatives->d_dt_host).norm();
-  ASSERT_LE(err, dtErr) << "d_dt_host big error (=" << err << ")\n"
+  double err = (d_dt_host - derivatives->daction_dt_host).norm();
+  ASSERT_LE(err, dtErr) << "daction_dt_host big error (=" << err << ")\n"
                         << "actual =\n"
-                        << derivatives->d_dt_host << "\nexpected =\n"
+                        << derivatives->daction_dt_host << "\nexpected =\n"
                         << d_dt_host << "\nparams:\n"
                         << GetParam();
 }
@@ -157,10 +146,10 @@ TEST_P(MotionDerivativesTest, CorrectDDtTarget) {
   std::uniform_real_distribution<double> d(-1, 1);
   Vec3t v = Vec3t(d(mt), d(mt), d(mt));
   Mat33t d_dt_target = d_dt(composeTarget, v);
-  T err = (d_dt_target - derivatives->d_dt_target).norm();
-  ASSERT_LE(err, dtErr) << "d_dt_host big error (=" << err << ")\n"
+  T err = (d_dt_target - derivatives->daction_dt_target).norm();
+  ASSERT_LE(err, dtErr) << "daction_dt_host big error (=" << err << ")\n"
                         << "actual =\n"
-                        << derivatives->d_dt_host << "\nexpected =\n"
+                        << derivatives->daction_dt_target << "\nexpected =\n"
                         << d_dt_target << "\nparams:\n"
                         << GetParam();
 }
@@ -213,7 +202,7 @@ TEST_P(MotionDerivativesTest, CorrectDiffActionHost) {
     for (int r = 0; r < 3; ++r)
       for (int c = 0; c < 4; ++c)
         expected(r, c) = moved[r].v[c];
-    Mat34t actual = derivatives->diffActionHostQ(vH);
+    Mat34t actual = derivatives->daction_dq_host(vH);
     Mat33t expectedTang, actualTang;
     T err = tangentErr(expected, actual, GetParam().hostBodyToWorld.so3(),
                        expectedTang, actualTang);
@@ -236,7 +225,7 @@ TEST_P(MotionDerivativesTest, CorrectDiffActionTarget) {
     for (int r = 0; r < 3; ++r)
       for (int c = 0; c < 4; ++c)
         expected(r, c) = moved[r].v[c];
-    Mat34t actual = derivatives->diffActionTargetQ(vH);
+    Mat34t actual = derivatives->daction_dq_target(vH);
     Mat33t expectedTang, actualTang;
     T err = tangentErr(expected, actual, GetParam().targetBodyToWorld.so3(),
                        expectedTang, actualTang);

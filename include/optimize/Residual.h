@@ -1,9 +1,9 @@
 #ifndef INCLUDE_RESIDUAL
 #define INCLUDE_RESIDUAL
 
+#include "optimize/MotionDerivatives.h"
 #include "system/CameraBundle.h"
 #include "system/KeyFrame.h"
-#include "optimize/MotionDerivatives.h"
 #include <ceres/loss_function.h>
 
 namespace mdso::optimize {
@@ -14,8 +14,8 @@ public:
 
   Residual(CameraBundle::CameraEntry *camHost,
            CameraBundle::CameraEntry *camTarget, KeyFrameEntry *host,
-           KeyFrameEntry *target, OptimizedPoint *optimizedPoint,
-           const SE3 &hostToTarget, ceres::LossFunction *lossFunction,
+           KeyFrameEntry *targetFrame, OptimizedPoint *optimizedPoint,
+           const SE3 &hostToTargetImage, ceres::LossFunction *lossFunction,
            const ResidualSettings &settings);
 
   struct Jacobian {
@@ -27,6 +27,7 @@ public:
       EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
       Eigen::Matrix<T, 2, SO3t::num_parameters> dp_dq;
+      Eigen::Matrix<T, 2, 3> dp_dt;
       Vec2t dr_dab[MPS];
     };
 
@@ -67,17 +68,30 @@ public:
     T pointPoint;
   };
 
-  static_vector<T, MPS> getValues(const SE3t &hostToTarget,
-                                  const AffLightT &lightHostToTarget);
-  static_vector<T, MPS> getWeights(const static_vector<T, MPS> &values);
+  inline static_vector<Vec2, MPS> getReprojPattern() const {
+    return reprojPattern;
+  }
+  inline static_vector<double, MPS> getHostIntensities() const {
+    return hostIntensities;
+  }
+
+  inline static_vector<T, MPS>
+  getValues(const SE3 &hostToTargetImage,
+            const AffLightT &lightHostToTarget) const {
+    return getValues(hostToTargetImage, lightHostToTarget, nullptr);
+  }
+  static_vector<T, MPS> getValues(const SE3 &hostToTargetImage,
+                                  const AffLightT &lightHostToTarget,
+                                  Vec2 *reprojOut) const;
+  static_vector<T, MPS> getWeights(const static_vector<T, MPS> &values) const;
   Jacobian getJacobian(const SE3t &hostToTarget,
                        const MotionDerivatives &dHostToTarget,
-                       const AffLightT &lightHostToTarget,
-                       const Mat33t &worldToTargetRot);
+                       const AffLightT &lightWorldToHost,
+                       const AffLightT &lightHostToTarget) const;
   DeltaHessian getDeltaHessian(const Residual::Jacobian &jacobian,
                                const MotionDerivatives &dHostToTarget,
-                               const SE3t &hostToTarget,
-                               const AffLightT &lightWorldToTarget);
+                               const SE3 &hostToTarget,
+                               const AffLightT &lightWorldToTarget) const;
 
 private:
   ceres::LossFunction *lossFunction;
@@ -86,9 +100,10 @@ private:
   KeyFrameEntry *host;
   KeyFrameEntry *target;
   OptimizedPoint *optimizedPoint;
+  KeyFrameEntry *targetFrame;
   const ResidualSettings &settings;
   static_vector<Vec2, MPS> reprojPattern;
-  static_vector<double, MPS> hostIntencities;
+  static_vector<double, MPS> hostIntensities;
   static_vector<double, MPS> gradWeights;
 };
 

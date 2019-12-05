@@ -5,21 +5,22 @@ namespace mdso::optimize {
 
 std::array<Mat33t, SO3t::num_parameters> diffQToMatrix(const SO3t &rot) {
   auto &q = rot.unit_quaternion();
-  auto &u = q.vec();
   // clang-format off
-  return {2 * (Mat33t() << 0   , u[1]     , u[2]     ,
-                           u[1], -2 * u[0], -q.w()   ,
-                           u[2], q.w()    , -2 * u[0]
+  return
+  {
+          2 * (Mat33t() <<      0    ,      q.y(),      q.z(),
+                                q.y(), -2 * q.x(),     -q.w(),
+                                q.z(),      q.w(), -2 * q.x()
               ).finished(),
-          2 * (Mat33t() << -2 * u[1], u[0], q.w()    ,
-                           u[0]     , 0   , u[2]     ,
-                           -q.w()   , u[2], -2 * u[1]
+          2 * (Mat33t() << -2 * q.y(),      q.x(),      q.w(),
+                                q.x(),      0    ,      q.z(),
+                               -q.w(),      q.z(), -2 * q.y()
               ).finished(),
-          2 * (Mat33t() << -2 * u[2], -q.w()   , u[0],
-                           q.w()    , -2 * u[2], u[1],
-                           u[0]     , u[1]     , 0
+          2 * (Mat33t() << -2 * q.z(),     -q.w(),      q.x(),
+                                q.w(), -2 * q.z(),      q.y(),
+                                q.x(),      q.y(),      0
               ).finished(),
-          2 * SO3t::hat(u)
+          2 * SO3t::hat(q.vec())
   };
   // clang-format on
 }
@@ -30,8 +31,8 @@ MotionDerivatives::MotionDerivatives(const SE3t &hostFrameToBody,
                                      const SE3t &targetBodyToFrame) {
   SE3t targetWorldToBody = targetBodyToWorld.inverse();
 
-  d_dt_host = (targetBodyToFrame.so3() * targetWorldToBody.so3()).matrix();
-  d_dt_target = -d_dt_host;
+  daction_dt_host = (targetBodyToFrame.so3() * targetWorldToBody.so3()).matrix();
+  daction_dt_target = -daction_dt_host;
 
   Mat44t hostLeft = (targetBodyToFrame * targetWorldToBody).matrix();
   Mat44t hostRight = hostFrameToBody.matrix();
@@ -61,7 +62,8 @@ MotionDerivatives::MotionDerivatives(const SE3t &hostFrameToBody,
   }
 }
 
-Mat34t MotionDerivatives::diffActionQ(const Mat34t dmatrix_dq[], const Vec4t &vH) {
+Mat34t MotionDerivatives::daction_dq(const Mat34t *dmatrix_dq,
+                                      const Vec4t &vH) {
   Mat34t result;
   for (int i = 0; i < 4; ++i)
     result.col(i) = dmatrix_dq[i] * vH;

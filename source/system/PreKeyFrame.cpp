@@ -44,6 +44,11 @@ PreKeyFrame::PreKeyFrame(KeyFrame *baseFrame, CameraBundle *cam,
   for (int i = 0; i < cam->bundle.size(); ++i)
     frames.emplace_back(this, i, coloredFrames[i], framesProcessed[i],
                         timestamps[i], pyrSettings);
+
+  if (!baseFrame) {
+    TrackingResult result(cam->bundle.size());
+    setTracked(result);
+  }
 }
 
 PreKeyFrame::~PreKeyFrame() {}

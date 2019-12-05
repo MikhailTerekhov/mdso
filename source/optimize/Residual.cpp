@@ -5,24 +5,28 @@ namespace mdso::optimize {
 
 Residual::Residual(CameraBundle::CameraEntry *camHost,
                    CameraBundle::CameraEntry *camTarget, KeyFrameEntry *host,
-                   KeyFrameEntry *target, OptimizedPoint *optimizedPoint,
-                   const SE3 &hostToTarget, ceres::LossFunction *lossFunction,
+                   KeyFrameEntry *targetFrame, OptimizedPoint *optimizedPoint,
+                   const SE3 &hostToTargetImage,
+                   ceres::LossFunction *lossFunction,
                    const ResidualSettings &settings)
-    : camHost(camHost)
+    : lossFunction(lossFunction)
+    , camHost(camHost)
     , camTarget(camTarget)
     , host(host)
-    , target(target)
+    , target(targetFrame)
     , optimizedPoint(optimizedPoint)
+    , targetFrame(targetFrame)
     , settings(settings)
     , reprojPattern(settings.residualPattern.pattern().size())
-    , hostIntencities(settings.residualPattern.pattern().size()) {
+    , hostIntensities(settings.residualPattern.pattern().size())
+    , gradWeights(settings.residualPattern.pattern().size()) {
   double depth = optimizedPoint->depth();
   Vec2 reproj = camTarget->cam.map(
-      hostToTarget *
+      hostToTargetImage *
       (depth * camHost->cam.unmap(optimizedPoint->p).normalized()));
   for (int i = 0; i < reprojPattern.size(); ++i) {
     Vec2 r = camTarget->cam.map(
-        hostToTarget *
+        hostToTargetImage *
         (depth *
          camHost->cam
              .unmap(optimizedPoint->p + settings.residualPattern.pattern()[i])
@@ -32,10 +36,10 @@ Residual::Residual(CameraBundle::CameraEntry *camHost,
 
   PreKeyFrameEntryInternals::Interpolator_t *hostInterp =
       &host->preKeyFrameEntry->internals->interpolator(0);
-  for (int i = 0; i < hostIntencities.size(); ++i) {
+  for (int i = 0; i < hostIntensities.size(); ++i) {
     Vec2 p = optimizedPoint->p + settings.residualPattern.pattern()[i];
     Vec2 gradIhost;
-    hostInterp->Evaluate(p[1], p[0], &hostIntencities[i], &gradIhost[1],
+    hostInterp->Evaluate(p[1], p[0], &hostIntensities[i], &gradIhost[1],
                          &gradIhost[0]);
     double normSq = gradIhost.squaredNorm();
     double c = settings.gradWeighting.c;
@@ -44,28 +48,31 @@ Residual::Residual(CameraBundle::CameraEntry *camHost,
 }
 
 static_vector<T, Residual::MPS>
-Residual::getValues(const SE3t &hostToTarget,
-                    const AffLightT &lightHostToTarget) {
+Residual::getValues(const SE3 &hostToTargetImage,
+                    const AffLightT &lightHostToTarget, Vec2 *reprojOut) const {
+  auto &targetInterp =
+      targetFrame->preKeyFrameEntry->internals->interpolator(0);
   static_vector<T, Residual::MPS> result(
       settings.residualPattern.pattern().size());
   T depth = optimizedPoint->depth();
-  PreKeyFrameEntryInternals::Interpolator_t *targetInterp =
-      &target->preKeyFrameEntry->internals->interpolator(0);
-  Vec2 reproj = camTarget->cam.map(hostToTarget.cast<double>() *
-                                   (depth * optimizedPoint->dir));
+  Vec2 reproj =
+      camTarget->cam.map(hostToTargetImage * (depth * optimizedPoint->dir));
   for (int i = 0; i < result.size(); ++i) {
     Vec2 p = reproj + reprojPattern[i];
-    double targetIntencity = INF;
-    targetInterp->Evaluate(p[1], p[0], &targetIntencity);
-    T hostIntencity = lightHostToTarget(hostIntencities[i]);
-    result[i] = T(targetIntencity) - hostIntencity;
+    double targetIntensity = INF;
+    targetInterp.Evaluate(p[1], p[0], &targetIntensity);
+    T hostIntensity = lightHostToTarget(hostIntensities[i]);
+    result[i] = T(targetIntensity) - hostIntensity;
   }
+
+  if (reprojOut)
+    *reprojOut = reproj;
 
   return result;
 }
 
 static_vector<T, Residual::MPS>
-Residual::getWeights(const static_vector<T, MPS> &values) {
+Residual::getWeights(const static_vector<T, MPS> &values) const {
   static_vector<T, MPS> weights(settings.residualPattern.pattern().size());
   for (int i = 0; i < weights.size(); ++i) {
     double v = values[i];
@@ -98,10 +105,11 @@ Mat37 dinvv_dqt(const SE3 &Rt, const Vec3 &v) {
   return d_dqt;
 }
 
-Residual::Jacobian Residual::getJacobian(const SE3t &hostToTarget,
-                                         const MotionDerivatives &dHostToTarget,
-                                         const AffLightT &lightHostToTarget,
-                                         const Mat33t &worldToTargetRot) {
+Residual::Jacobian
+Residual::getJacobian(const SE3t &hostToTarget,
+                      const MotionDerivatives &dHostToTarget,
+                      const AffLightT &lightWorldToHost,
+                      const AffLightT &lightHostToTarget) const {
   Jacobian jacobian;
   PreKeyFrameEntryInternals::Interpolator_t *targetInterp =
       &target->preKeyFrameEntry->internals->interpolator(0);
@@ -110,7 +118,6 @@ Residual::Jacobian Residual::getJacobian(const SE3t &hostToTarget,
   Vec3t hostVec = (depth * optimizedPoint->dir).cast<T>();
   Vec4t hostVecH = makeHomogeneous(hostVec);
   Vec3t targetVec = hostToTarget * hostVec;
-  Vec4t targetVecH = makeHomogeneous(targetVec);
   auto [reproj, piJacobian] = camTarget->cam.diffMap(targetVec.cast<double>());
   jacobian.dpi = piJacobian.cast<T>();
 
@@ -124,14 +131,17 @@ Residual::Jacobian Residual::getJacobian(const SE3t &hostToTarget,
   }
 
   jacobian.dp_dlogd = jacobian.dpi * (hostToTarget.so3() * hostVec);
-  jacobian.dhost.dp_dq = jacobian.dpi * dHostToTarget.diffActionHostQ(hostVecH);
+  jacobian.dhost.dp_dq = jacobian.dpi * dHostToTarget.daction_dq_host(hostVecH);
+  jacobian.dhost.dp_dt = jacobian.dpi * dHostToTarget.daction_dt_host;
   jacobian.dtarget.dp_dq =
-      jacobian.dpi * dHostToTarget.diffActionTargetQ(targetVecH);
+      jacobian.dpi * dHostToTarget.daction_dq_target(hostVecH);
+  jacobian.dtarget.dp_dt = jacobian.dpi * dHostToTarget.daction_dt_target;
 
   for (int i = 0; i < settings.residualPattern.pattern().size(); ++i) {
-    double d_da = lightHostToTarget.data[0] * hostIntencities[i];
+    double d_da =
+        lightHostToTarget.ea() * (hostIntensities[i] - lightWorldToHost.b());
     jacobian.dhost.dr_dab[i][0] = d_da;
-    jacobian.dhost.dr_dab[i][1] = lightHostToTarget.data[0];
+    jacobian.dhost.dr_dab[i][1] = lightHostToTarget.ea();
     jacobian.dtarget.dr_dab[i][0] = -d_da;
     jacobian.dtarget.dr_dab[i][1] = -1;
   }
@@ -139,15 +149,15 @@ Residual::Jacobian Residual::getJacobian(const SE3t &hostToTarget,
   return jacobian;
 }
 
-Mat22t sum_gradab(const static_vector<T, Residual::MPS> &weights,
-                  const Vec2t gradItarget[], const Vec2t dr_dab[]) {
+inline Mat22t sum_gradab(const static_vector<T, Residual::MPS> &weights,
+                         const Vec2t gradItarget[], const Vec2t dr_dab[]) {
   Mat22t sum = Mat22t::Zero();
   for (int i = 0; i < weights.size(); ++i)
     sum += weights[i] * gradItarget[i] * dr_dab[i].transpose();
   return sum;
 }
 
-Residual::DeltaHessian::FrameFrame
+inline Residual::DeltaHessian::FrameFrame
 H_frameframe(const Mat27t &df1_dp_dqt, const Mat27t &df2_dp_dqt,
              const Vec2t df1_dr_dab[], const Vec2t df2_dr_dab[],
              const static_vector<T, Residual::MPS> &weights,
@@ -165,10 +175,9 @@ H_frameframe(const Mat27t &df1_dp_dqt, const Mat27t &df2_dp_dqt,
   return H;
 }
 
-Residual::DeltaHessian::FramePoint H_framepoint(const Mat27t &dp_dqt,
-                                                const Vec2t &dp_dlogd,
-                                                const Mat22t &sum_wgradgradT,
-                                                const Mat22t &sum_gradab) {
+inline Residual::DeltaHessian::FramePoint
+H_framepoint(const Mat27t &dp_dqt, const Vec2t &dp_dlogd,
+             const Mat22t &sum_wgradgradT, const Mat22t &sum_gradab) {
   Residual::DeltaHessian::FramePoint H;
   H.abd = sum_gradab.transpose() * dp_dlogd;
   H.qtd = dp_dqt.transpose() * sum_wgradgradT * dp_dlogd;
@@ -177,17 +186,16 @@ Residual::DeltaHessian::FramePoint H_framepoint(const Mat27t &dp_dqt,
 
 Residual::DeltaHessian Residual::getDeltaHessian(
     const Residual::Jacobian &jacobian, const MotionDerivatives &dHostToTarget,
-    const SE3t &hostToTarget, const AffLightT &lightWorldToTarget) {
+    const SE3 &hostToTarget, const AffLightT &lightWorldToTarget) const {
   static_vector<T, MPS> values = getValues(hostToTarget, lightWorldToTarget);
   static_vector<T, MPS> weights = getWeights(values);
 
   DeltaHessian deltaHessian;
 
   Mat27t dhost_dp_dqt;
-  dhost_dp_dqt << jacobian.dhost.dp_dq, jacobian.dpi * dHostToTarget.d_dt_host;
+  dhost_dp_dqt << jacobian.dhost.dp_dq, jacobian.dhost.dp_dt;
   Mat27t dtarget_dp_dqt;
-  dtarget_dp_dqt << jacobian.dtarget.dp_dq,
-      jacobian.dpi * dHostToTarget.d_dt_target;
+  dtarget_dp_dqt << jacobian.dtarget.dp_dq, jacobian.dtarget.dp_dt;
 
   Mat22t sum_wgradgradT;
   for (int i = 0; i < values.size(); ++i)

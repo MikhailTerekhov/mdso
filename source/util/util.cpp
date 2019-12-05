@@ -143,7 +143,7 @@ void putDot(cv::Mat &img, const cv::Point &pos, const cv::Scalar &col) {
   if (!(bounds.contains(toVec2i(pos - cv::Point(r, r))) &&
         bounds.contains(toVec2i(pos + cv::Point(r, r)))))
     return;
-  cv::circle(img, pos, 4, col, cv::FILLED);
+  cv::circle(img, pos, 2, col, cv::FILLED);
 }
 
 void putCross(cv::Mat &img, const cv::Point &pos, int size,
@@ -172,7 +172,7 @@ void putSquare(cv::Mat &img, const cv::Point &pos, int size,
     img.at<cv::Vec3b>(from) = toCvVec3bDummy(col);
 }
 
-void grad(const cv::Mat &img, cv::Mat1d &gradX, cv::Mat1d &gradY,
+void grad(const cv::Mat1b &img, cv::Mat1d &gradX, cv::Mat1d &gradY,
           cv::Mat1d &gradNorm) {
   static double filter[] = {-0.5, 0.0, 0.5};
   static cv::Mat1d gradXKer(1, 3, filter);

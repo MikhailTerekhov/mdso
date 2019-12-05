@@ -40,6 +40,9 @@ using Mat62t = Eigen::Matrix<T, 6, 2>;
 using Mat88t = Eigen::Matrix<T, 8, 8>;
 using Mat12x3t = Eigen::Matrix<T, 12, 3>;
 using Mat12x4t = Eigen::Matrix<T, 12, 4>;
+using MatX2t = Eigen::Matrix<T, Eigen::Dynamic, 2>;
+using MatX3t = Eigen::Matrix<T, Eigen::Dynamic, 3>;
+using MatX4t = Eigen::Matrix<T, Eigen::Dynamic, 4>;
 
 using SE3t = Sophus::SE3<T>;
 using SO3t = Sophus::SO3<T>;
@@ -51,6 +54,7 @@ using Vec2 = Eigen::Matrix<double, 2, 1>;
 using Vec3 = Eigen::Matrix<double, 3, 1>;
 using Vec4 = Eigen::Matrix<double, 4, 1>;
 using Vec5 = Eigen::Matrix<double, 5, 1>;
+using Vec6 = Eigen::Matrix<double, 6, 1>;
 using Vec8 = Eigen::Matrix<double, 8, 1>;
 using Vec9 = Eigen::Matrix<double, 9, 1>;
 using VecX = Eigen::Matrix<double, Eigen::Dynamic, 1>;

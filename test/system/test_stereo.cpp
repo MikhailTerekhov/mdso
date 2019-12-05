@@ -9,7 +9,7 @@ using namespace mdso;
 
 class StereoPositioningTest : public ::testing::Test {
 protected:
-  virtual void SetUp() {
+  virtual void SetUp() override {
     double scale = 604.0;
     Vec2 center(1.58492, 1.07424);
     int unmapPolyDeg = 5;

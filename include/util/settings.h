@@ -181,6 +181,9 @@ struct Settings {
     static constexpr bool default_useAltHWeighting = true;
     bool useAltHWeighting = default_useAltHWeighting;
 
+    static constexpr double default_relTrueDepthDelta = 0.01;
+    double relTrueDepthDelta = default_relTrueDepthDelta;
+
   private:
     int mMaxSearchAbs = default_maxSearchAbs;
   } pointTracer;

@@ -20,21 +20,25 @@ template <typename T> struct AffineLightTransform {
     return *this;
   }
 
-  inline T operator()(const T &x) const { return exp(data[0]) * (x + data[1]); }
+  inline T operator()(const T &x) const { return ea() * x + b(); }
 
-  inline friend AffineLightTransform<T>
-  operator*(AffineLightTransform<T> first, AffineLightTransform<T> second) {
-    return AffineLightTransform<T>(first.data[0] + second.data[0],
-                                   exp(second.data[0]) * second.data[1] +
-                                       first.data[1]);
+  inline T a() const { return data[0]; }
+  inline T ea() const { return exp(data[0]); }
+  inline T b() const { return data[1]; }
+
+  friend AffineLightTransform<T>
+  operator*(const AffineLightTransform<T> &first,
+            const AffineLightTransform<T> &second) {
+    return AffineLightTransform<T>(first.a() + second.a(),
+                                   first.ea() * second.b() + first.b());
   }
 
-  inline AffineLightTransform<T> inverse() const {
-    return AffineLightTransform<T>(-data[0], -data[1] * exp(-data[0]));
+  AffineLightTransform<T> inverse() const {
+    return AffineLightTransform<T>(-a(), -b() * exp(-a()));
   }
 
-  inline static void normalizeMultiplier(AffineLightTransform<T> &toNormalize,
-                                         AffineLightTransform<T> &relative) {
+  static void normalizeMultiplier(AffineLightTransform<T> &toNormalize,
+                                  AffineLightTransform<T> &relative) {
     relative.data[0] -= toNormalize.data[0];
     toNormalize.data[0] = T(0);
   }
@@ -44,10 +48,9 @@ template <typename T> struct AffineLightTransform {
   }
 
   friend std::ostream &operator<<(std::ostream &os,
-                                  AffineLightTransform<T> affLight) {
+                                  const AffineLightTransform<T> &affLight) {
     os << "raw     = " << affLight.data[0] << ' ' << affLight.data[1]
-       << "\nas ax+b = " << exp(affLight.data[0]) << ' '
-       << exp(affLight.data[0]) * affLight.data[1] << '\n';
+       << "\nas ax+b = " << affLight.ea() << ' ' << affLight.b() << '\n';
     return os;
   }
 

@@ -1,4 +1,4 @@
-set(TESTS test_motionderivatives)
+set(TESTS test_motionderivatives test_residual)
 
 foreach(CUR_TEST ${TESTS})
     add_executable(${CUR_TEST} ${CUR_TEST}.cpp)
@@ -8,3 +8,5 @@ endforeach(CUR_TEST)
 foreach(CUR_TEST ${TESTS})
     add_test(${CUR_TEST} ${CUR_TEST})
 endforeach(CUR_TEST)
+
+target_link_libraries(test_residual mfov_reader)

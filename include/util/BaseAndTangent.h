@@ -1,6 +1,8 @@
 #ifndef INCLUDE_SE3BASEANDTANGENT
 #define INCLUDE_SE3BASEANDTANGENT
 
+#include "util/types.h"
+
 namespace mdso {
 
 template <typename LieGroup>
@@ -22,6 +24,12 @@ public:
 
   inline const LieGroup &operator()() const { return combined; }
 
+  inline void setValue(const LieGroup &newValue) {
+    base = newValue;
+    combined = newValue;
+    mDelta = LieGroup::Tangent::Zero();
+  }
+
   inline const Tangent &delta() const { return mDelta; }
   inline void setDelta(const Tangent &newDelta) {
     mDelta = newDelta;
@@ -34,7 +42,7 @@ public:
   void updateTangent() {
     CHECK(!isTangentFixed());
     base = combined;
-    mDelta = SE3::Tangent::Zero();
+    mDelta = LieGroup::Tangent::Zero();
   }
 
 private:

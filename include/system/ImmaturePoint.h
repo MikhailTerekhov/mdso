@@ -48,6 +48,8 @@ struct ImmaturePoint {
 
   bool isReady() const; // checks if the point is good enough to be optimized
 
+  void setTrueDepth(double trueDepth, const Settings::PointTracer &ptSettings);
+
   Vec2 p;
   Vec3 baseDirections[MS];
   Vec3 dir;

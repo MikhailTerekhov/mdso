@@ -58,7 +58,7 @@ void putCross(cv::Mat &img, const cv::Point &pos, int size,
 void putSquare(cv::Mat &img, const cv::Point &pos, int size,
                const cv::Scalar &col, int thickness);
 
-void grad(const cv::Mat &img, cv::Mat1d &gradX, cv::Mat1d &gradY,
+void grad(const cv::Mat1b &img, cv::Mat1d &gradX, cv::Mat1d &gradY,
           cv::Mat1d &gradNorm);
 double gradNormAt(const cv::Mat1b &img, const cv::Point &p);
 
@@ -122,6 +122,22 @@ cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
 std::vector<double> readBin(const fs::path &filename);
 
 std::string curTimeBrief();
+
+namespace optimize {
+
+template <int nret, int Options1, int Options2, int Options3, int Options4>
+T tangentErr(const Eigen::Matrix<T, nret, 4, Options1> &expected,
+             const Eigen::Matrix<T, nret, 4, Options2> &actual,
+             const SO3t &diffRotation,
+             Eigen::Matrix<T, nret, 3, Options3> &expectedTang,
+             Eigen::Matrix<T, nret, 3, Options4> &actualTang) {
+  Mat43t dParam = diffRotation.Dx_this_mul_exp_x_at_0();
+  expectedTang = expected * dParam;
+  actualTang = actual * dParam;
+  return (expectedTang - actualTang).norm();
+}
+
+} // namespace optimize
 
 } // namespace mdso
 

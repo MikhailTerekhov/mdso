@@ -10,21 +10,21 @@ struct MotionDerivatives {
                     const SE3t &targetBodyToWorld,
                     const SE3t &targetBodyToFrame);
 
-  inline Mat34t diffActionHostQ(const Vec4t &vH) const {
-    return diffActionQ(dmatrix_dqi_host, vH);
+  inline Mat34t daction_dq_host(const Vec4t &vH) const {
+    return daction_dq(dmatrix_dqi_host, vH);
   }
 
-  inline Mat34t diffActionTargetQ(const Vec4t &vH) const {
-    return diffActionQ(dmatrix_dqi_target, vH);
+  inline Mat34t daction_dq_target(const Vec4t &vH) const {
+    return daction_dq(dmatrix_dqi_target, vH);
   }
 
   Mat34t dmatrix_dqi_host[SO3t::num_parameters];
-  Mat33t d_dt_host;
+  Mat33t daction_dt_host;
   Mat34t dmatrix_dqi_target[SO3t::num_parameters];
-  Mat33t d_dt_target;
+  Mat33t daction_dt_target;
 
 private:
-  static Mat34t diffActionQ(const Mat34t dmatrix_dq[], const Vec4t &vH);
+  static Mat34t daction_dq(const Mat34t *dmatrix_dq, const Vec4t &vH);
 };
 
 } // namespace mdso::optimize

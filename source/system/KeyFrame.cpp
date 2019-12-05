@@ -24,7 +24,8 @@ KeyFrameEntry::KeyFrameEntry(KeyFrame *host, int ind, Timestamp timestamp)
 
     : host(host)
     , ind(ind)
-    , timestamp(timestamp) {}
+    , timestamp(timestamp)
+    , preKeyFrameEntry(&host->preKeyFrame->frames[ind]) {}
 
 KeyFrame::KeyFrame(const InitializedFrame &initializedFrame, CameraBundle *cam,
                    Preprocessor *preprocessor, int globalFrameNum,

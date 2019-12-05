@@ -96,6 +96,18 @@ ImmaturePoint::ImmaturePoint(KeyFrameEntry *host, const Vec2 &p,
 
 bool ImmaturePoint::isReady() const { return mIsReady; }
 
+void ImmaturePoint::setTrueDepth(double trueDepth,
+                                 const Settings::PointTracer &ptSettings) {
+  depth = trueDepth;
+  stddev = ptSettings.optimizedStddev / 2;
+  double delta = depth * ptSettings.relTrueDepthDelta;
+  minDepth = depth - delta;
+  maxDepth = depth + delta;
+  bestQuality = INF;
+  lastEnergy = 0;
+  state = ACTIVE;
+}
+
 int ImmaturePoint::pointsToTrace(const CameraModel &camRef,
                                  const SE3 &baseToRef, Vec3 &dirMinDepth,
                                  Vec3 &dirMaxDepth, Vec2 points[],
