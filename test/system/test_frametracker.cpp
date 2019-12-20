@@ -1,3 +1,4 @@
+#include "../../samples/mfov/reader/MultiFovReader.h"
 #include "../../samples/robotcar/reader/RobotcarReader.h"
 #include "output/TrackingDebugImageDrawer.h"
 #include "system/FrameTracker.h"
@@ -9,6 +10,9 @@ using namespace mdso;
 
 DEFINE_string(dataset_dir, "/shared/datasets/oxford-robotcar",
               "Path to the  Oxford Robotcar dataset.");
+
+DEFINE_string(mfov_dir, "/shared/datasets/mfov",
+              "Path to the MultiFoV dataset.");
 
 DEFINE_string(
     models_dir, "data/models/robotcar",
@@ -47,7 +51,7 @@ DEFINE_bool(
 
 DEFINE_int32(
     filter_box_size, 3,
-    "We leave only one lidar point in a box on the image of this size.");
+    "We leave only one lidar point in a box of this size on the image.");
 
 DEFINE_double(rel_expected_proximity, 0.003,
               "Relative to w+h proximity to lidar point for a contrast point "
@@ -130,7 +134,7 @@ void filterOutRepeatedPixels(StdVector<std::pair<Vec2, double>> &depthedPoints,
   depthedPoints.erase(newEnd, depthedPoints.end());
 }
 
-class FrameTrackerTest : public ::testing::TestWithParam<TestParams> {
+class FrameTrackerRobotcarTest : public ::testing::TestWithParam<TestParams> {
 protected:
   void SetUp() override {
     LOG(INFO) << "settings up another test";
@@ -142,8 +146,10 @@ protected:
                     2;
 
     outDir = FLAGS_output_directory;
-    outDir /= fs::path(
-        ::testing::UnitTest::GetInstance()->current_test_info()->name());
+    outDir /=
+        fs::path("robotcar") /
+        fs::path(
+            ::testing::UnitTest::GetInstance()->current_test_info()->name());
     trackDir = outDir / fs::path("track");
     fs::create_directories(outDir);
     fs::create_directories(trackDir);
@@ -308,8 +314,6 @@ protected:
     std::unique_ptr<PreKeyFrame> preKeyFrame(
         new PreKeyFrame(nullptr, &camPyr[0], preprocessor.get(), coloredFrames,
                         0, timestamps, settings.pyramid));
-    TrackingResult defaultTracking(RobotcarReader::numCams);
-    preKeyFrame->setTracked(defaultTracking);
     baseFrame = std::unique_ptr<KeyFrame>(
         new KeyFrame(std::move(preKeyFrame), pixelSelectors.data(),
                      settings.keyFrame, settings.getPointTracerSettings()));
@@ -380,7 +384,7 @@ private:
   StdVector<Elem> elems;
 };
 
-TEST_P(FrameTrackerTest, doesTracking) {
+TEST_P(FrameTrackerRobotcarTest, doesTracking) {
   fs::path trackedFile = outDir / fs::path("tracked.txt");
   fs::path predictedFile = outDir / fs::path("predicted.txt");
   fs::path voFile = outDir / fs::path("vo.txt");
@@ -481,7 +485,7 @@ TEST_P(FrameTrackerTest, doesTracking) {
   EXPECT_LE(rotDrift, FLAGS_rot_drift);
 }
 
-std::vector<TestParams> getParams() {
+std::vector<TestParams> getParamsRobotcar() {
   Timestamp baseTimestamps[] = {1447410513767257ll};
   fs::path chunkDir("2015-11-13-10-28-08");
   //  Timestamp baseTimestamps[] = {1399381498321897ll, 1399381506388605ll,
@@ -498,8 +502,200 @@ std::vector<TestParams> getParams() {
   return params;
 }
 
-INSTANTIATE_TEST_CASE_P(Instantiation, FrameTrackerTest,
-                        ::testing::ValuesIn(getParams()));
+INSTANTIATE_TEST_CASE_P(InstantiationRobotcar, FrameTrackerRobotcarTest,
+                        ::testing::ValuesIn(getParamsRobotcar()));
+
+class FrameTrackerMfovTest : public ::testing::TestWithParam<TestParams> {
+protected:
+  void SetUp() override {
+    LOG(INFO) << "settings up another test";
+
+    int contrastS = FLAGS_rel_point_size_contr *
+                    (RobotcarReader::imageWidth + RobotcarReader::imageHeight) /
+                    2;
+
+    outDir = FLAGS_output_directory;
+    outDir /=
+        fs::path("mfov") /
+        fs::path(
+            ::testing::UnitTest::GetInstance()->current_test_info()->name());
+    trackDir = outDir / fs::path("track");
+    fs::create_directories(outDir);
+    fs::create_directories(trackDir);
+
+    fs::path mfovDir(FLAGS_mfov_dir);
+    baseTs = GetParam().baseTs;
+    int levelNum = GetParam().levelNum;
+    int pointsUsed = GetParam().pointsUsed;
+    framesTracked = GetParam().framesTracked;
+
+    ASSERT_GT(levelNum, 0);
+    ASSERT_LT(levelNum, Settings::Pyramid::max_levelNum);
+    reader = std::unique_ptr<MultiFovReader>(new MultiFovReader(mfovDir));
+
+    settings.pyramid.setLevelNum(levelNum);
+    settings.affineLight.optimizeAffineLight = GetParam().optimizeAffineLight;
+    settings.frameTracker.doIntercameraReprojection = FLAGS_reproj_intercam;
+
+    baseInd = int(baseTs);
+    ASSERT_LT(baseInd + framesTracked, reader->getFrameCount());
+
+    cv::Mat3b baseImgCol = reader->getFrame(baseInd);
+    cv::Mat1b baseImgGray = cvtBgrToGray(baseImgCol);
+    cv::Mat1d gradX, gradY, gradNorm;
+    grad(baseImgGray, gradX, gradY, gradNorm);
+
+    pixelSelector.select(baseImgCol, gradNorm, GetParam().pointsUsed);
+    PixelSelector::PointVector contrastPoints =
+        pixelSelector.select(baseImgCol, gradNorm, GetParam().pointsUsed);
+    StdVector<Vec2> contrastPointsV;
+    contrastPointsV.reserve(contrastPoints.size());
+    for (const cv::Point &p : contrastPoints)
+      contrastPointsV.push_back(toVec2(p));
+    std::vector<double> depths(contrastPoints.size());
+    cv::Mat1d imgDepth = reader->getDepths(baseInd);
+    for (int i = 0; i < depths.size(); ++i)
+      depths[i] = imgDepth(contrastPoints[i]);
+    std::vector<double> weights(depths.size(), 1);
+
+    FrameTracker::DepthedMultiFrame baseForTracker;
+    baseForTracker.emplace_back(baseImgGray, settings.pyramid.levelNum(),
+                                contrastPointsV.data(), depths.data(),
+                                weights.data(), contrastPointsV.size());
+
+    std::mt19937 mt;
+    bodyToCam = SE3::sampleUniform(mt);
+    CameraBundle cameraBundle(&bodyToCam, reader->cam.get(), 1);
+    camPyr = cameraBundle.camPyr(levelNum);
+    preprocessor = std::unique_ptr<Preprocessor>(new IdentityPreprocessor);
+
+    std::vector<int> drawingOrder = {0};
+    debugImageDrawer.reset(new TrackingDebugImageDrawer(
+        camPyr.data(), settings.frameTracker, settings.pyramid, drawingOrder));
+    observers.push_back(debugImageDrawer.get());
+
+    std::unique_ptr<PreKeyFrame> preKeyFrame(
+        new PreKeyFrame(nullptr, &camPyr[0], preprocessor.get(), &baseImgCol, 0,
+                        &baseTs, settings.pyramid));
+    baseFrame.reset(new KeyFrame(std::move(preKeyFrame), &pixelSelector,
+                                 settings.keyFrame,
+                                 settings.getPointTracerSettings()));
+    frameTracker.reset(new FrameTracker(camPyr.data(), baseForTracker,
+                                        *baseFrame, observers,
+                                        settings.getFrameTrackerSettings()));
+  }
+
+  fs::path outDir;
+  fs::path trackDir;
+  Settings settings;
+  CameraBundle::CamPyr camPyr;
+  SE3 bodyToCam;
+  std::unique_ptr<MultiFovReader> reader;
+  std::unique_ptr<KeyFrame> baseFrame;
+  std::unique_ptr<FrameTracker> frameTracker;
+  std::unique_ptr<Preprocessor> preprocessor;
+  std::unique_ptr<TrackingDebugImageDrawer> debugImageDrawer;
+  PixelSelector pixelSelector;
+  std::vector<FrameTrackerObserver *> observers;
+  Timestamp baseTs;
+  int baseInd;
+  int framesTracked;
+};
+
+TEST_P(FrameTrackerMfovTest, doesTracking) {
+  fs::path trackedFile = outDir / fs::path("tracked.txt");
+  fs::path predictedFile = outDir / fs::path("predicted.txt");
+  fs::path gtFile = outDir / fs::path("gt.txt");
+  std::ofstream trackedOfs(trackedFile);
+  std::ofstream predictedOfs(predictedFile);
+  std::ofstream gtOfs(gtFile);
+
+  putInMatrixForm(trackedOfs, SE3());
+  putInMatrixForm(predictedOfs, SE3());
+  putInMatrixForm(gtOfs, SE3());
+
+  DummyTrajectoryHolder<1> trajectoryHolder;
+  AffLight idAffLight;
+  SE3 idSe3;
+  trajectoryHolder.pushBack(idSe3, &idAffLight, &baseTs);
+  std::unique_ptr<TrackingPredictor> trackingPredictor(
+      new TrackingPredictorScrew(&trajectoryHolder));
+
+  double totalPath = 0;
+  double transDrift = INF, rotDrift = INF;
+  for (int relInd = 1; relInd < framesTracked - 1; ++relInd) {
+    int frameInd = baseInd + relInd;
+    cv::Mat3b frameCol = reader->getFrame(frameInd);
+    Timestamp timestamp = frameInd;
+    std::unique_ptr<PreKeyFrame> preKeyFrame(
+        new PreKeyFrame(baseFrame.get(), &camPyr[0], preprocessor.get(),
+                        &frameCol, relInd, &timestamp, settings.pyramid));
+    TrackingResult coarse = trackingPredictor->predictAt(timestamp, 0);
+    SE3 oldPredictedBaseToThis = coarse.baseToTracked;
+    SE3 gtBaseToTracked = reader->getWorldToFrameGT(frameInd) *
+                          reader->getWorldToFrameGT(baseInd).inverse();
+    TrackingResult trackingResult =
+        frameTracker->trackFrame(*preKeyFrame, coarse);
+
+    trajectoryHolder.pushBack(trackingResult.baseToTracked.inverse(),
+                              trackingResult.lightBaseToTracked.data(),
+                              &timestamp);
+
+    SE3 baseToTrackedCam =
+        bodyToCam * trackingResult.baseToTracked * bodyToCam.inverse();
+    SE3 err = baseToTrackedCam * gtBaseToTracked.inverse();
+    SE3 gtCurToPrev = reader->getWorldToFrameGT(frameInd - 1) *
+                      reader->getWorldToFrameGT(frameInd).inverse();
+    LOG(INFO) << "vo cur to prev trans norm = "
+              << gtCurToPrev.translation().norm() << ", ts diff = "
+              << trajectoryHolder.timestamp(relInd) -
+                     trajectoryHolder.timestamp(relInd - 1);
+    totalPath += gtCurToPrev.translation().norm();
+    double transErr = err.translation().norm();
+    double rotErr = err.so3().log().norm();
+    transDrift = transErr / totalPath;
+    rotDrift = rotErr / totalPath;
+    LOG(INFO) << "for frame #" << relInd
+              << " trans drift = " << transDrift * 100 << "%";
+    LOG(INFO) << "for frame #" << relInd << " rot drift = " << rotDrift
+              << "deg/m";
+    cv::Mat3b debugImage = debugImageDrawer->drawAllLevels();
+    fs::path debugImagePath = trackDir / (std::to_string(timestamp) + ".jpg");
+    cv::imwrite(std::string(debugImagePath), debugImage);
+    if (FLAGS_show_track_res) {
+      cv::Mat3b resized;
+      int height =
+          double(debugImage.rows) / debugImage.cols * FLAGS_debug_image_w;
+      cv::Size size(FLAGS_debug_image_w, height);
+      cv::resize(debugImage, resized, size);
+      cv::imshow("tracking residuals", resized);
+      cv::waitKey(1);
+    }
+
+    putInMatrixForm(predictedOfs, oldPredictedBaseToThis.inverse());
+    putInMatrixForm(trackedOfs, baseToTrackedCam.inverse());
+    putInMatrixForm(gtOfs, gtBaseToTracked.inverse());
+  }
+
+  EXPECT_LE(transDrift, FLAGS_trans_drift);
+  EXPECT_LE(rotDrift, FLAGS_rot_drift);
+}
+
+std::vector<TestParams> getParamsMfov() {
+  const int levelNum = 4;
+  const int pointsNum = 3000;
+  const int framesToTrack = 30;
+  const Timestamp ts = 375;
+  bool useAffLight = true;
+
+  std::vector<TestParams> params;
+  params.push_back(TestParams(fs::path("~"), ts, levelNum, pointsNum,
+                              framesToTrack, useAffLight));
+  return params;
+}
+
+INSTANTIATE_TEST_CASE_P(InstantiationMfov, FrameTrackerMfovTest,
+                        ::testing::ValuesIn(getParamsMfov()));
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
