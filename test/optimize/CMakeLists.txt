@@ -1,4 +1,4 @@
-set(TESTS test_motionderivatives test_residual)
+set(TESTS test_motionderivatives test_residual test_parametrizations)
 
 foreach(CUR_TEST ${TESTS})
     add_executable(${CUR_TEST} ${CUR_TEST}.cpp)

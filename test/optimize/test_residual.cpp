@@ -5,6 +5,7 @@
 #include "system/IdentityPreprocessor.h"
 #include "util/util.h"
 #include <ceres/ceres.h>
+#include <chrono>
 #include <gtest/gtest.h>
 #include <system/FrameTracker.h>
 
@@ -32,8 +33,8 @@ template <> struct ErrorBounds<float> {
 template <> struct ErrorBounds<double> {
   static constexpr double resEps = 2;
   static constexpr double valueEps = 5e-10;
-  static constexpr double diffRotEps = 5e-6;
-  static constexpr double diffTransEps = 5e-6;
+  static constexpr double diffRotEps = 1e-4;
+  static constexpr double diffTransEps = 1e-5;
   static constexpr double diffAffEps = 5e-10;
   static constexpr double diffDepthEps = 1e-9;
 };
@@ -68,6 +69,8 @@ AffLight sampleAffLight(const Settings::AffineLight &affSettings,
 class ResidualTest : public ::testing::Test {
 protected:
   void SetUp() override {
+    residualSettings = settings.getResidualSettings();
+
     MultiFovReader reader(FLAGS_mfov_dir);
     PixelSelector pixelSelector;
 
@@ -139,6 +142,7 @@ protected:
   std::unique_ptr<CameraBundle> cam1, cam2;
   std::unique_ptr<KeyFrame> kf1, kf2;
   Settings settings;
+  ResidualSettings residualSettings;
 };
 
 TEST_F(ResidualTest, IsSmallOnGT) {
@@ -156,7 +160,7 @@ TEST_F(ResidualTest, IsSmallOnGT) {
   for (OptimizedPoint &op : kf1->frames[0].optimizedPoints)
     residuals.emplace_back(&cam1->bundle[0], &cam2->bundle[0], &kf1->frames[0],
                            &kf2->frames[0], &op, hostToTarget, &loss,
-                           settings.getResidualSettings());
+                           residualSettings);
 
   std::vector<static_vector<T, Residual::MPS>> resValues;
 
@@ -296,10 +300,14 @@ TEST_F(ResidualTest, ValuesAndJacobian) {
 
   ceres::TrivialLoss loss;
   std::vector<EvalError> errors;
+  double timeEvalMy = 0, timeEvalAuto = 0;
   for (OptimizedPoint &op : kf1->frames[0].optimizedPoints) {
+    std::chrono::time_point<std::chrono::system_clock> start, end;
+    start = std::chrono::system_clock::now();
+
     Residual residual(&cam1->bundle[0], &cam2->bundle[0], &kf1->frames[0],
                       &kf2->frames[0], &op, hostToTarget, &loss,
-                      settings.getResidualSettings());
+                      residualSettings);
     auto actualValuesStatic =
         residual.getValues(hostToTarget, lightHostToTarget);
     VecX actualValues(patternSize);
@@ -308,6 +316,12 @@ TEST_F(ResidualTest, ValuesAndJacobian) {
     Residual::Jacobian jacobian =
         residual.getJacobian(hostToTarget.cast<T>(), dHostToTarget,
                              lightWorldToHost, lightHostToTarget);
+
+    end = std::chrono::system_clock::now();
+    timeEvalMy +=
+        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+            .count() *
+        1e-9;
 
     MatX4t actual_dr_dq_host(patternSize, 4);
     MatX3t actual_dr_dq_host_tang(patternSize, 3);
@@ -333,15 +347,15 @@ TEST_F(ResidualTest, ValuesAndJacobian) {
           jacobian.gradItarget[i].transpose() * jacobian.dp_dlogd;
     }
 
-    std::unique_ptr<ceres::CostFunction> residualCF(
-        new ceres::AutoDiffCostFunction<ResidualCostFunctor, ceres::DYNAMIC, 4,
-                                        3, 4, 3, 2, 2, 1>(
-            new ResidualCostFunctor(
-                &kf2->preKeyFrame->frames[0].internals->interpolator(0),
-                hostFrameToBody, targetBodyToFrame, op.dir,
-                residual.getReprojPattern(), residual.getHostIntensities(),
-                cam2->bundle[0].cam, settings.getResidualSettings()),
-            patternSize));
+    ceres::AutoDiffCostFunction<ResidualCostFunctor, ceres::DYNAMIC, 4, 3, 4, 3,
+                                2, 2, 1>
+        residualCF(new ResidualCostFunctor(
+                       &kf2->preKeyFrame->frames[0].internals->interpolator(0),
+                       hostFrameToBody, targetBodyToFrame, op.dir,
+                       residual.getReprojPattern(),
+                       residual.getHostIntensities(), cam2->bundle[0].cam,
+                       residualSettings),
+                   patternSize);
 
     const double *parameters[7] = {hostToWorld.so3().data(),
                                    hostToWorld.translation().data(),
@@ -366,7 +380,16 @@ TEST_F(ResidualTest, ValuesAndJacobian) {
         expected_dr_daff_host.data(), expected_dr_daff_target.data(),
         expected_dr_dlogd.data()};
 
-    residualCF->Evaluate(parameters, expectedValues.data(), expectedJacobians);
+    start = std::chrono::system_clock::now();
+
+    residualCF.Evaluate(parameters, expectedValues.data(), expectedJacobians);
+
+    end = std::chrono::system_clock::now();
+
+    timeEvalAuto +=
+        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+            .count() *
+        1e-9;
 
     EvalError error;
     error.valueErr = (actualValues - expectedValues).norm();
@@ -422,6 +445,10 @@ TEST_F(ResidualTest, ValuesAndJacobian) {
 
     errors.push_back(error);
   }
+
+  LOG(INFO) << "total time on smart jacobian eval: " << timeEvalMy << std::endl;
+  LOG(INFO) << "total time on auto  jacobian eval: " << timeEvalAuto
+            << std::endl;
 }
 
 int main(int argc, char **argv) {

@@ -84,27 +84,6 @@ Residual::getWeights(const static_vector<T, MPS> &values) const {
   return weights;
 }
 
-// differentiate rotation action w.r.t. quaternion
-Mat34 dRv_dq(const SO3 &R, const Vec3 &v) {
-  const SO3::QuaternionType &q = R.unit_quaternion();
-  Mat34 d_dq;
-  d_dq.col(3) = 2 * (q.w() * v + q.vec().cross(v));
-  Mat33 vq = v * q.vec().transpose();
-  Mat33 M = vq.transpose();
-  M.diagonal() *= 2;
-  d_dq.leftCols<3>() = 2 * (M - q.w() * SO3::hat(q.vec()) - 2 * vq);
-  return d_dq;
-}
-
-// differentiate inverse SE3 action w.r.t. quaternion and translation
-Mat37 dinvv_dqt(const SE3 &Rt, const Vec3 &v) {
-  Mat37 d_dqt;
-  d_dqt.leftCols<4>() = dRv_dq(Rt.so3(), v - Rt.translation());
-  d_dqt.leftCols<3>() *= -1;
-  d_dqt.rightCols<3>() = -Rt.rotationMatrix().transpose();
-  return d_dqt;
-}
-
 Residual::Jacobian
 Residual::getJacobian(const SE3t &hostToTarget,
                       const MotionDerivatives &dHostToTarget,

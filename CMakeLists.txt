@@ -57,7 +57,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/output/DepthPyramidDrawer.h
 
     ${PROJECT_SOURCE_DIR}/include/optimize/EnergyFunction.h
-    ${PROJECT_SOURCE_DIR}/include/optimize/Parametrization.h
+        ${PROJECT_SOURCE_DIR}/include/optimize/parametrizations.h
     ${PROJECT_SOURCE_DIR}/include/optimize/Residual.h
     ${PROJECT_SOURCE_DIR}/include/optimize/MotionDerivatives.h
 
@@ -120,6 +120,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/optimize/EnergyFunction.cpp
     ${PROJECT_SOURCE_DIR}/source/optimize/Residual.cpp
     ${PROJECT_SOURCE_DIR}/source/optimize/MotionDerivatives.cpp
+    ${PROJECT_SOURCE_DIR}/source/optimize/parametrizations.cpp
 
     ${PROJECT_SOURCE_DIR}/source/system/SphericalPlus.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoSystem.cpp
@@ -161,7 +162,7 @@ set_source_files_properties(essietial_5pt_estimator_SOURCE_FILES
                            PROPERTIES COMPILE_FLAGS -O3
 )
 
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native ")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -march=native")
 
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -march=native")

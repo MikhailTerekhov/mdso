@@ -2,7 +2,7 @@
 #define INCLUDE_ENERGYFUNCTION
 
 #include "Residual.h"
-#include "optimize/Parametrization.h"
+#include "optimize/parametrizations.h"
 #include "util/types.h"
 
 namespace mdso::optimize {
@@ -29,7 +29,7 @@ private:
   KeyFrame *firstFrame;
   KeyFrame *secondFrame;
   SO3xS2Parametrization secondFrameParametrization;
-  StdVector<std::pair<LeftExpParametrization<SE3t>, KeyFrame *>> frames;
+  StdVector<std::pair<RightExpParametrization<SE3t>, KeyFrame *>> frames;
 
   std::vector<std::pair<double, OptimizedPoint *>> points;
 
