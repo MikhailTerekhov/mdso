@@ -14,11 +14,30 @@ template <typename T> struct ErrorBounds;
 template <> struct ErrorBounds<float> {
   static constexpr float zeroAddRelDelta = 1e-7;
   static constexpr float jacobianRelDelta = 1e-7;
+
+  template <typename Parametrization> struct OnManifold;
+};
+
+template <>
+struct ErrorBounds<float>::OnManifold<RightExpParametrization<SO3t>> {
+  static constexpr float value = 1e-8;
+};
+template <>
+struct ErrorBounds<float>::OnManifold<RightExpParametrization<SE3t>> {
+  static constexpr float value = 1e-8;
+};
+template <> struct ErrorBounds<float>::OnManifold<S2Parametrization> {
+  static constexpr float value = 1e-8;
+};
+template <> struct ErrorBounds<float>::OnManifold<SO3xS2Parametrization> {
+  static constexpr float value = 1e-8;
 };
 
 template <> struct ErrorBounds<double> {
   static constexpr double zeroAddRelDelta = 1e-14;
   static constexpr float jacobianRelDelta = 1e-13;
+
+  template <typename Parametrization> struct OnManifold;
 };
 
 template <typename UniformBitGenerator>
@@ -31,6 +50,21 @@ std::pair<Vec3t, Vec3t> sampleSphere(UniformBitGenerator &g) {
   } while ((init - center).norm() < 1e-2);
   return {center, init};
 }
+
+template <>
+struct ErrorBounds<double>::OnManifold<RightExpParametrization<SO3t>> {
+  static constexpr float value = 1e-14;
+};
+template <>
+struct ErrorBounds<double>::OnManifold<RightExpParametrization<SE3t>> {
+  static constexpr float value = 1e-14;
+};
+template <> struct ErrorBounds<double>::OnManifold<S2Parametrization> {
+  static constexpr float value = 1e-14;
+};
+template <> struct ErrorBounds<double>::OnManifold<SO3xS2Parametrization> {
+  static constexpr float value = 1e-14;
+};
 
 template <typename Parametrization, typename UniformBitGenerator>
 Parametrization sample(UniformBitGenerator &g) {
@@ -51,7 +85,9 @@ sample<RightExpParametrization<SE3t>, std::mt19937>(std::mt19937 &g) {
 
 template <>
 S2Parametrization sample<S2Parametrization, std::mt19937>(std::mt19937 &g) {
-  auto [center, init] = sampleSphere(g);
+    auto [center, init] = sampleSphere(g);
+//  Vec3 center(0, 0, 0);
+//  Vec3 init(0, 0, 1);
   return S2Parametrization(center, init);
 }
 
@@ -60,6 +96,29 @@ SO3xS2Parametrization
 sample<SO3xS2Parametrization, std::mt19937>(std::mt19937 &g) {
   auto [center, init] = sampleSphere(g);
   return SO3xS2Parametrization(SO3t::sampleUniform(g), center, init);
+}
+
+template <typename Parametrization> T errOnManifold(const Parametrization &p);
+template <>
+T errOnManifold<RightExpParametrization<SO3t>>(
+    const RightExpParametrization<SO3t> &p) {
+  return std::abs(p.value().unit_quaternion().coeffs().norm() - 1);
+}
+
+template <>
+T errOnManifold<RightExpParametrization<SE3t>>(
+    const RightExpParametrization<SE3t> &p) {
+  return std::abs(p.value().unit_quaternion().coeffs().norm() - 1);
+}
+
+template <> T errOnManifold<S2Parametrization>(const S2Parametrization &p) {
+  return std::abs((p.value() - p.center()).norm() - p.radius());
+}
+
+template <>
+T errOnManifold<SO3xS2Parametrization>(const SO3xS2Parametrization &p) {
+  return std::hypot(errOnManifold<RightExpParametrization<SO3t>>(p.so3()),
+                    errOnManifold<S2Parametrization>(p.s2()));
 }
 
 template <typename TypeParam>
@@ -83,25 +142,6 @@ using Parametrizations =
                      RightExpParametrization<SE3t>, S2Parametrization,
                      SO3xS2Parametrization>;
 TYPED_TEST_CASE(ParametrizationTest, Parametrizations);
-
-//TYPED_TEST(ParametrizationTest, AddZeroIsId) {
-//  using Parametrization = typename TestFixture::Parametrization;
-//  using Tangent = typename Parametrization::Tangent;
-//  using VecNPt = typename TestFixture::VecNPt;
-//  for (const Parametrization &p : this->samples) {
-//    Parametrization pNew = p;
-//    Tangent delta = Parametrization::Tangent::Zero();
-//    pNew.addDelta(delta);
-//    auto valueOld = p.value();
-//    auto valueNew = pNew.value();
-//    Eigen::Map<VecNPt> rawOld(valueOld.data()), rawNew(valueNew.data());
-//    T err = (rawOld - rawNew).norm();
-//    ASSERT_LE(err, ErrorBounds<T>::zeroAddDelta)
-//        << "p = \n"
-//        << rawOld.transpose() << "\np + 0 =\n"
-//        << rawNew.transpose();
-//  }
-//}
 
 template <typename Parametrization> class PlusFunctor {
 public:
@@ -153,12 +193,33 @@ TYPED_TEST(ParametrizationTest, diffPlus) {
         << expectedJacobian << "\nactual =\n"
         << actualJacobian;
 
-    T errZeroAdd =
-        (pPlus0 - pRaw).norm() / pRaw.norm();
+    T errZeroAdd = (pPlus0 - pRaw).norm() / pRaw.norm();
     ASSERT_LE(errZeroAdd, ErrorBounds<T>::zeroAddRelDelta)
-                << "expected =\n"
-                << pRaw.transpose() << "\nactual =\n"
-                << pPlus0.transpose();
+        << "expected =\n"
+        << pRaw.transpose() << "\nactual =\n"
+        << pPlus0.transpose();
+  }
+}
+
+TYPED_TEST(ParametrizationTest, remainsOnManifold) {
+  using Parametrization = typename TestFixture::Parametrization;
+  constexpr int DoF = Parametrization::DoF;
+  constexpr T minDelta = -1, maxDelta = 1;
+  constexpr int numAdditions = 10;
+  using VecDoFt = Eigen::Matrix<T, DoF, 1>;
+
+  std::mt19937 mt;
+  std::uniform_real_distribution<T> deltaCoord(minDelta, maxDelta);
+  for (const Parametrization &p : this->samples) {
+    Parametrization newP = p;
+    for (int it = 0; it < numAdditions; ++it) {
+      VecDoFt delta;
+      for (int j = 0; j < DoF; ++j)
+        delta[j] = deltaCoord(mt);
+      newP.addDelta(delta);
+    }
+    double err = errOnManifold<Parametrization>(newP);
+    ASSERT_LE(err, ErrorBounds<T>::OnManifold<Parametrization>::value);
   }
 }
 

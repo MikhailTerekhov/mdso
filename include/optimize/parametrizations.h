@@ -44,13 +44,15 @@ public:
   void addDelta(const Tangent &delta);
 
   inline Vec3t value() const { return mValue; }
+  inline Vec3t center() const { return mCenter; }
+  inline T radius() const { return mRadius; }
 
 private:
   void recalcOrts();
 
   Vec3t mValue;
-  Vec3t center;
-  T radius;
+  Vec3t mCenter;
+  T mRadius;
   Mat33t localToWorldRot;
 };
 
@@ -71,11 +73,13 @@ public:
 
   void addDelta(const Tangent &delta);
 
-  inline SE3t value() const { return SE3t(so3.value(), s2.value()); }
+  inline SE3t value() const { return SE3t(mSo3.value(), mS2.value()); }
+  inline RightExpParametrization<SO3t> so3() const { return mSo3; }
+  inline S2Parametrization s2() const { return mS2; }
 
 private:
-  RightExpParametrization<SO3t> so3;
-  S2Parametrization s2;
+  RightExpParametrization<SO3t> mSo3;
+  S2Parametrization mS2;
 };
 
 } // namespace mdso::optimize

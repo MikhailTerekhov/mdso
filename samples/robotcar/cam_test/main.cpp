@@ -201,7 +201,7 @@ intr names the file with camera matrix intrinsics from the same SDK;
     double best = errs[best_ind];
 
     std::cout << "best error is on ind " << best_ind
-              << "\nwith center = " << centers[best_ind].transpose()
+              << "\nwith mCenter = " << centers[best_ind].transpose()
               << "\nand is " << best << std::endl;
 
     double sumErr = std::accumulate(errs, errs + cnt, 0.0);

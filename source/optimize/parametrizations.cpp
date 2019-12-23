@@ -5,31 +5,31 @@ namespace mdso::optimize {
 
 S2Parametrization::S2Parametrization(const Vec3t &center,
                                      const Vec3t &initialValue)
-    : center(center)
-    , radius((initialValue - center).norm())
-    , mValue(initialValue) {
-  CHECK_GE(radius, 1e-4) << "Zero radius for S2 parametrization";
+    : mValue(initialValue)
+    , mCenter(center)
+    , mRadius((initialValue - center).norm()) {
+  CHECK_GE(mRadius, 1e-4) << "Zero radius for S2 parametrization";
   recalcOrts();
 }
 
 S2Parametrization::MatDiff S2Parametrization::diffPlus() const {
-  return localToWorldRot.leftCols<2>();
+  return 0.5 * localToWorldRot.leftCols<2>();
 }
 
 void S2Parametrization::addDelta(const Tangent &delta) {
   using boost::math::sinc_pi;
   Vec3t shift;
-  Vec2t deltaN = delta / radius;
+  Vec2t deltaN = delta / mRadius;
   const T deltaNormBy2r = deltaN.norm() / 2;
-  shift.head<2>() = deltaN * sinc_pi(deltaNormBy2r);
+  shift.head<2>() = deltaN * (0.5 * sinc_pi(deltaNormBy2r));
   shift[2] = cos(deltaNormBy2r);
   Vec3t shiftRot = localToWorldRot * shift;
-  mValue = shiftRot * radius + center;
+  mValue = shiftRot * mRadius + mCenter;
   recalcOrts();
 }
 
 void S2Parametrization::recalcOrts() {
-  Vec3t v = (mValue - center).normalized();
+  Vec3t v = (mValue - mCenter).normalized();
   int minI = std::min_element(
                  v.data(), v.data() + 3,
                  [](double a, double b) { return std::abs(a) < std::abs(b); }) -
@@ -48,20 +48,20 @@ void S2Parametrization::recalcOrts() {
 SO3xS2Parametrization::SO3xS2Parametrization(const SO3t &baseRot,
                                              const Vec3t &centerTrans,
                                              const Vec3t &initialTrans)
-    : so3(baseRot)
-    , s2(centerTrans, initialTrans) {}
+    : mSo3(baseRot)
+    , mS2(centerTrans, initialTrans) {}
 
 SO3xS2Parametrization::MatDiff SO3xS2Parametrization::diffPlus() const {
   MatDiff result = MatDiff::Zero();
-  result.topLeftCorner<4, 3>() = so3.diffPlus();
-  result.bottomRightCorner<3, 2>() = s2.diffPlus();
+  result.topLeftCorner<4, 3>() = mSo3.diffPlus();
+  result.bottomRightCorner<3, 2>() = mS2.diffPlus();
   return result;
 }
 
 void SO3xS2Parametrization::addDelta(
     const SO3xS2Parametrization::Tangent &delta) {
-  so3.addDelta(delta.head<3>());
-  s2.addDelta(delta.tail<2>());
+  mSo3.addDelta(delta.head<3>());
+  mS2.addDelta(delta.tail<2>());
 }
 
 }
