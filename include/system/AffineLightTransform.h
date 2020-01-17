@@ -4,6 +4,8 @@
 #include <Eigen/Core>
 #include <cstring>
 #include <ostream>
+#include <random>
+#include <opencv2/opencv.hpp>
 
 namespace mdso {
 
@@ -21,6 +23,11 @@ template <typename T> struct AffineLightTransform {
   }
 
   inline T operator()(const T &x) const { return ea() * x + b(); }
+  template <typename U> cv::Mat_<U> operator()(const cv::Mat_<U> &mat) const {
+    cv::Mat_<U> result;
+    cv::convertScaleAbs(mat, result, ea(), b());
+    return result;
+  }
 
   inline T a() const { return data[0]; }
   inline T ea() const { return exp(data[0]); }

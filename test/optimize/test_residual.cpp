@@ -1,5 +1,5 @@
 #include "../../internal/include/PreKeyFrameEntryInternals.h"
-#include "../../samples/mfov/reader/MultiFovReader.h"
+#include "MultiFovReader.h"
 #include "optimize/Residual.h"
 #include "system/CameraBundle.h"
 #include "system/IdentityPreprocessor.h"
@@ -16,6 +16,10 @@ using MatX2RM = Eigen::Matrix<double, Eigen::Dynamic, 2, Eigen::RowMajor>;
 using MatX3RM = Eigen::Matrix<double, Eigen::Dynamic, 3, Eigen::RowMajor>;
 using MatX4RM = Eigen::Matrix<double, Eigen::Dynamic, 4, Eigen::RowMajor>;
 
+using MatX3RMt = Eigen::Matrix<T, Eigen::Dynamic, 3, Eigen::RowMajor>;
+
+using WeightsVector = static_vector<T, Residual::MPS>;
+
 DEFINE_string(mfov_dir, "/shared/datasets/mfov",
               "Root folder of the MultiFoV dataset.");
 
@@ -23,21 +27,44 @@ template <typename T> struct ErrorBounds;
 
 template <> struct ErrorBounds<float> {
   static constexpr float resEps = 2;
-  static constexpr float valueEps = 5e-4;
-  static constexpr float diffRotEps = 5;
-  static constexpr float diffTransEps = 1;
-  static constexpr float diffAffEps = 1;
+  static constexpr float valueEps = 1e-7;
+  static constexpr float diffRotEps = 1e-7;
+  static constexpr float diffTransEps = 1e-7;
+  static constexpr float diffAffEps = 1e-7;
   static constexpr float diffDepthEps = 1e-7;
+
+  static constexpr float qtqtEps = 1e-7;
+  static constexpr float qtabEps = 1e-7;
+  static constexpr float ababEps = 1e-7;
+  static constexpr float qtdEps = 1e-7;
+  static constexpr float abdEps = 1e-7;
+  static constexpr float ddEps = 1e-7;
 };
 
 template <> struct ErrorBounds<double> {
   static constexpr double resEps = 2;
-  static constexpr double valueEps = 5e-10;
-  static constexpr double diffRotEps = 1e-4;
-  static constexpr double diffTransEps = 1e-5;
-  static constexpr double diffAffEps = 5e-10;
-  static constexpr double diffDepthEps = 1e-9;
+  static constexpr double valueEps = 1e-10;
+  static constexpr double diffRotEps = 1e-10;
+  static constexpr double diffTransEps = 1e-10;
+  static constexpr double diffAffEps = 1e-14;
+  static constexpr double diffDepthEps = 1e-14;
+
+  static constexpr double qtqtEps = 1e-10;
+  static constexpr double qtabEps = 1e-10;
+  static constexpr double ababEps = 1e-10;
+  static constexpr double qtdEps = 1e-10;
+  static constexpr double abdEps = 1e-10;
+  static constexpr double ddEps = 1e-10;
 };
+
+template <typename T> T relOrAbs(T err, T nrm, T eps) {
+  return abs(nrm) < eps ? err : err / nrm;
+}
+
+template <typename T, typename MatrixT>
+T relMatrixErr(const MatrixT &actual, const MatrixT &expected, T eps) {
+  return relOrAbs((actual - expected).norm(), expected.norm(), eps);
+}
 
 cv::Mat3b cvtAff(const cv::Mat3b &mat, const AffLight &aff) {
   cv::Mat3b result;
@@ -56,72 +83,62 @@ SE3 sampleSe3(double rotDelta, double transDelta, UniformBitGenerator &gen) {
   return SE3(SO3::exp(rot), trans);
 }
 
-template <typename UniformBitGenerator>
-AffLight sampleAffLight(const Settings::AffineLight &affSettings,
-                        UniformBitGenerator &gen) {
-  std::uniform_real_distribution<double> da(affSettings.minAffineLightA,
-                                            affSettings.maxAffineLightA);
-  std::uniform_real_distribution<double> db(affSettings.minAffineLightB,
-                                            affSettings.maxAffineLightB);
-  return AffLight(da(gen), db(gen));
-}
-
 class ResidualTest : public ::testing::Test {
 protected:
   void SetUp() override {
     residualSettings = settings.getResidualSettings();
 
     MultiFovReader reader(FLAGS_mfov_dir);
-    PixelSelector pixelSelector;
+    PixelSelector pixelSelectors[2];
 
     constexpr int fnum1 = 375, fnum2 = 385;
-    Timestamp ts1 = fnum1, ts2 = fnum2;
+    Timestamp ts1[] = {fnum1, fnum1};
+    Timestamp ts2[] = {fnum2, fnum2};
 
     SE3 f1ToF2GT = reader.getWorldToFrameGT(fnum2) *
                    reader.getWorldToFrameGT(fnum1).inverse();
-    SE3 bodyToCam1 = SE3::sampleUniform(mt);
-    SE3 bodyToCam2 = SE3::sampleUniform(mt);
-    bodyToCam1.translation() *= f1ToF2GT.translation().norm();
-    bodyToCam2.translation() *= f1ToF2GT.translation().norm();
-    //  SE3 bodyToCam1;
-    //  SE3 bodyToCam2;
-    SE3 f1ToF2 = bodyToCam2.inverse() * f1ToF2GT * bodyToCam1;
-    cam1.reset(new CameraBundle(&bodyToCam1, reader.cam.get(), 1));
-    cam2.reset(new CameraBundle(&bodyToCam2, reader.cam.get(), 1));
+    SE3 bodyToCam[] = {SE3::sampleUniform(mt), SE3::sampleUniform(mt)};
+    //    SE3 bodyToCam[] = {SE3(), SE3()};
+    bodyToCam[0].translation() *= f1ToF2GT.translation().norm();
+    bodyToCam[1].translation() *= f1ToF2GT.translation().norm();
+    CameraModel cams[] = {*reader.cam, *reader.cam};
+    cam.reset(new CameraBundle(bodyToCam, cams, 2));
+
+    SE3 f1ToF2 = bodyToCam[1].inverse() * f1ToF2GT * bodyToCam[0];
 
     IdentityPreprocessor idPrep;
 
     cv::Mat3b frame1 = reader.getFrame(fnum1), frame2 = reader.getFrame(fnum2);
-    AffLight lightWorldToF1 = sampleAffLight(settings.affineLight, mt);
-    AffLight lightWorldToF2 = sampleAffLight(settings.affineLight, mt);
-    //    AffLight lightWorldToF1;
-    //    AffLight lightWorldToF2;
-    frame1 = cvtAff(frame1, lightWorldToF1);
-    frame2 = cvtAff(frame2, lightWorldToF2);
-    {
-      // discard one pixel selection such that the adaptive algorithm will
-      // choose the right amount of points for kf1 and kf2
-      cv::Mat1d gradX, gradY, gradNorm;
-      grad(cvtBgrToGray(frame1), gradX, gradY, gradNorm);
-      pixelSelector.select(frame1, gradNorm,
-                           settings.keyFrame.immaturePointsNum());
-    }
+    AffLight lightWorldToF1 = sampleAffLight<double>(settings.affineLight, mt);
+    AffLight lightWorldToF2 = sampleAffLight<double>(settings.affineLight, mt);
+    //        AffLight lightWorldToF1;
+    //        AffLight lightWorldToF2;
+    frame1 = lightWorldToF1(frame1);
+    frame2 = lightWorldToF2(frame2);
+
+    cv::Mat3b frames1Stub[] = {frame1.clone(), frame1.clone()};
+    cv::Mat3b frames2Stub[] = {frame2.clone(), frame2.clone()};
+
+    pixelSelectors[0].initialize(frame1, settings.keyFrame.immaturePointsNum());
+    pixelSelectors[1].initialize(frame1, settings.keyFrame.immaturePointsNum());
 
     cv::Mat1d depths1 = reader.getDepths(fnum1),
               depths2 = reader.getDepths(fnum2);
     std::unique_ptr<PreKeyFrame> pkf1(new PreKeyFrame(
-        nullptr, cam1.get(), &idPrep, &frame1, 1, &ts1, settings.pyramid));
-    kf1.reset(new KeyFrame(std::move(pkf1), &pixelSelector, settings.keyFrame,
+        nullptr, cam.get(), &idPrep, frames1Stub, 1, ts1, settings.pyramid));
+    kf1.reset(new KeyFrame(std::move(pkf1), pixelSelectors, settings.keyFrame,
                            settings.getPointTracerSettings()));
     kf1->frames[0].lightWorldToThis = lightWorldToF1;
+    kf1->frames[1].lightWorldToThis = lightWorldToF1;
     std::unique_ptr<PreKeyFrame> pkf2(new PreKeyFrame(
-        kf1.get(), cam2.get(), &idPrep, &frame2, 2, &ts2, settings.pyramid));
-    TrackingResult trackingResult(1);
+        kf1.get(), cam.get(), &idPrep, frames2Stub, 2, ts2, settings.pyramid));
+    TrackingResult trackingResult(2);
     trackingResult.baseToTracked = f1ToF2;
     trackingResult.lightBaseToTracked[0] =
-        lightWorldToF2 * lightWorldToF1.inverse();
+        trackingResult.lightBaseToTracked[1] =
+            lightWorldToF2 * lightWorldToF1.inverse();
     pkf2->setTracked(trackingResult);
-    kf2.reset(new KeyFrame(std::move(pkf2), &pixelSelector, settings.keyFrame,
+    kf2.reset(new KeyFrame(std::move(pkf2), pixelSelectors, settings.keyFrame,
                            settings.getPointTracerSettings()));
 
     for (ImmaturePoint &ip : kf1->frames[0].immaturePoints) {
@@ -138,8 +155,15 @@ protected:
   static constexpr T diffAffEps = ErrorBounds<T>::diffAffEps;
   static constexpr T diffDepthEps = ErrorBounds<T>::diffDepthEps;
 
+  static constexpr T qtqtEps = ErrorBounds<T>::qtqtEps;
+  static constexpr T qtabEps = ErrorBounds<T>::qtabEps;
+  static constexpr T ababEps = ErrorBounds<T>::ababEps;
+  static constexpr T qtdEps = ErrorBounds<T>::qtdEps;
+  static constexpr T abdEps = ErrorBounds<T>::abdEps;
+  static constexpr T ddEps = ErrorBounds<T>::ddEps;
+
   std::mt19937 mt;
-  std::unique_ptr<CameraBundle> cam1, cam2;
+  std::unique_ptr<CameraBundle> cam;
   std::unique_ptr<KeyFrame> kf1, kf2;
   Settings settings;
   ResidualSettings residualSettings;
@@ -148,27 +172,39 @@ protected:
 TEST_F(ResidualTest, IsSmallOnGT) {
   static constexpr double expectedPercentileOfSmall = 0.1;
 
-  SE3 hostToTarget = cam2->bundle[0].bodyToThis * kf2->thisToWorld().inverse() *
-                     kf1->thisToWorld() * cam1->bundle[0].thisToBody;
+  SE3 hostToTarget = cam->bundle[1].bodyToThis * kf2->thisToWorld().inverse() *
+                     kf1->thisToWorld() * cam->bundle[0].thisToBody;
   AffineLightTransform<T> lightHostToTarget =
-      (kf2->frames[0].lightWorldToThis *
+      (kf2->frames[1].lightWorldToThis *
        kf1->frames[0].lightWorldToThis.inverse())
           .cast<T>();
 
   StdVector<Residual> residuals;
   ceres::TrivialLoss loss;
+  int pointInd = 0;
   for (OptimizedPoint &op : kf1->frames[0].optimizedPoints)
-    residuals.emplace_back(&cam1->bundle[0], &cam2->bundle[0], &kf1->frames[0],
-                           &kf2->frames[0], &op, hostToTarget, &loss,
-                           residualSettings);
+    residuals.emplace_back(0, 0, 1, 1, pointInd++, &op.logDepth, cam.get(),
+                           &kf1->frames[0], &kf2->frames[1], &op, hostToTarget,
+                           &loss, residualSettings);
 
   std::vector<static_vector<T, Residual::MPS>> resValues;
 
-  int RS = settings.residualPattern.pattern().size();
+  //  cv::Mat3b f1 = kf1->frames[0].preKeyFrameEntry->frameColored.clone();
+  //  cv::Mat3b f2 = kf2->frames[1].preKeyFrameEntry->frameColored.clone();
 
-  for (const Residual &res : residuals) {
-    resValues.push_back(res.getValues(hostToTarget, lightHostToTarget));
+  for (int i = 0; i < residuals.size(); ++i) {
+    OptimizedPoint &op = kf1->frames[0].optimizedPoints[i];
+    Vec2 reproj;
+    resValues.push_back(
+        residuals[i].getValues(hostToTarget, lightHostToTarget, &reproj));
+    //    putDot(f1, toCvPoint(op.p), CV_GREEN);
+    //    putDot(f2, toCvPoint(reproj), CV_GREEN);
   }
+
+  //  cv::Mat3b hc;
+  //  cv::hconcat(f1, f2, hc);
+  //  cv::imshow("reproj", hc);
+  //  cv::waitKey();
 
   int PS = settings.residualPattern.pattern().size();
   static_vector<std::vector<double>, Residual::MPS> values(PS);
@@ -269,7 +305,7 @@ struct EvalError {
   T diffLogDepthErr;
 };
 
-TEST_F(ResidualTest, ValuesAndJacobian) {
+TEST_F(ResidualTest, AreValuesAndJacobianCorrect) {
   constexpr double transDrift = 0.02;
   constexpr double rotDrift = (M_PI / 180.0) * 0.004;
   const int patternSize = settings.residualPattern.pattern().size();
@@ -283,33 +319,35 @@ TEST_F(ResidualTest, ValuesAndJacobian) {
   kf2->thisToWorld.setValue(kf2->thisToWorld() *
                             sampleSe3(rotErr, transErr, mt));
 
-  SE3 hostFrameToBody = cam1->bundle[0].thisToBody;
-  SE3 targetBodyToFrame = cam2->bundle[0].bodyToThis;
+  SE3 hostFrameToBody = cam->bundle[0].thisToBody;
+  SE3 targetBodyToFrame = cam->bundle[1].bodyToThis;
   SE3 hostToWorld = kf1->thisToWorld();
   SE3 targetToWorld = kf2->thisToWorld();
   SE3 hostToTarget = targetBodyToFrame * targetToWorld.inverse() * hostToWorld *
                      hostFrameToBody;
   AffLightT lightWorldToHost = kf1->frames[0].lightWorldToThis.cast<T>();
-  AffLightT lightWorldToTarget = kf2->frames[0].lightWorldToThis.cast<T>();
+  AffLightT lightWorldToTarget = kf2->frames[1].lightWorldToThis.cast<T>();
   AffLightT lightHostToTarget =
       (lightWorldToTarget * lightWorldToHost.inverse()).cast<T>();
 
   MotionDerivatives dHostToTarget(
-      cam1->bundle[0].thisToBody.cast<T>(), kf1->thisToWorld().cast<T>(),
-      kf2->thisToWorld().cast<T>(), cam2->bundle[0].bodyToThis.cast<T>());
+      cam->bundle[0].thisToBody.cast<T>(), kf1->thisToWorld().cast<T>(),
+      kf2->thisToWorld().cast<T>(), cam->bundle[1].bodyToThis.cast<T>());
 
   ceres::TrivialLoss loss;
   std::vector<EvalError> errors;
   double timeEvalMy = 0, timeEvalAuto = 0;
+  int pointInd = 0;
   for (OptimizedPoint &op : kf1->frames[0].optimizedPoints) {
     std::chrono::time_point<std::chrono::system_clock> start, end;
     start = std::chrono::system_clock::now();
 
-    Residual residual(&cam1->bundle[0], &cam2->bundle[0], &kf1->frames[0],
-                      &kf2->frames[0], &op, hostToTarget, &loss,
-                      residualSettings);
+    Residual residual(0, 0, 1, 1, pointInd++, &op.logDepth, cam.get(),
+                      &kf1->frames[0], &kf2->frames[1], &op, hostToTarget,
+                      &loss, residualSettings);
+    Vec2 reproj;
     auto actualValuesStatic =
-        residual.getValues(hostToTarget, lightHostToTarget);
+        residual.getValues(hostToTarget, lightHostToTarget, &reproj);
     VecX actualValues(patternSize);
     for (int i = 0; i < patternSize; ++i)
       actualValues[i] = actualValuesStatic[i];
@@ -323,37 +361,38 @@ TEST_F(ResidualTest, ValuesAndJacobian) {
             .count() *
         1e-9;
 
-    MatX4t actual_dr_dq_host(patternSize, 4);
-    MatX3t actual_dr_dq_host_tang(patternSize, 3);
-    MatX3t actual_dr_dt_host(patternSize, 3);
-    MatX4t actual_dr_dq_target(patternSize, 4);
-    MatX3t actual_dr_dq_target_tang(patternSize, 3);
-    MatX3t actual_dr_dt_target(patternSize, 3);
-    MatX2t actual_dr_daff_host(patternSize, 2);
-    MatX2t actual_dr_daff_target(patternSize, 2);
-    VecX actual_dr_dlogd(patternSize);
-    for (int i = 0; i < patternSize; ++i) {
-      actual_dr_dq_host.row(i) =
-          jacobian.gradItarget[i].transpose() * jacobian.dhost.dp_dq;
-      actual_dr_dt_host.row(i) =
-          jacobian.gradItarget[i].transpose() * jacobian.dhost.dp_dt;
-      actual_dr_dq_target.row(i) =
-          jacobian.gradItarget[i].transpose() * jacobian.dtarget.dp_dq;
-      actual_dr_dt_target.row(i) =
-          jacobian.gradItarget[i].transpose() * jacobian.dtarget.dp_dt;
-      actual_dr_daff_host.row(i) = jacobian.dhost.dr_dab[i].transpose();
-      actual_dr_daff_target.row(i) = jacobian.dtarget.dr_dab[i].transpose();
-      actual_dr_dlogd[i] =
-          jacobian.gradItarget[i].transpose() * jacobian.dp_dlogd;
-    }
+    auto actual_dr_dq_host = jacobian.dr_dq_host(patternSize);
+    MatR3t actual_dr_dq_host_tang(patternSize, 3);
+    auto actual_dr_dt_host = jacobian.dr_dt_host(patternSize);
+    auto actual_dr_dq_target = jacobian.dr_dq_target(patternSize);
+    MatR3t actual_dr_dq_target_tang(patternSize, 3);
+    auto actual_dr_dt_target = jacobian.dr_dt_target(patternSize);
+    auto actual_dr_daff_host = jacobian.dr_daff_host(patternSize);
+    auto actual_dr_daff_target = jacobian.dr_daff_target(patternSize);
+    auto actual_dr_dlogd = jacobian.dr_dlogd(patternSize);
+
+    //    for (int i = 0; i < patternSize; ++i) {
+    //      actual_dr_dq_host.row(i) =
+    //          jacobian.gradItarget[i].transpose() * jacobian.dhost.dp_dq;
+    //      actual_dr_dt_host.row(i) =
+    //          jacobian.gradItarget[i].transpose() * jacobian.dhost.dp_dt;
+    //      actual_dr_dq_target.row(i) =
+    //          jacobian.gradItarget[i].transpose() * jacobian.dtarget.dp_dq;
+    //      actual_dr_dt_target.row(i) =
+    //          jacobian.gradItarget[i].transpose() * jacobian.dtarget.dp_dt;
+    //      actual_dr_daff_host.row(i) = jacobian.dhost.dr_dab[i].transpose();
+    //      actual_dr_daff_target.row(i) =
+    //      jacobian.dtarget.dr_dab[i].transpose(); actual_dr_dlogd[i] =
+    //          jacobian.gradItarget[i].transpose() * jacobian.dp_dlogd;
+    //    }
 
     ceres::AutoDiffCostFunction<ResidualCostFunctor, ceres::DYNAMIC, 4, 3, 4, 3,
                                 2, 2, 1>
         residualCF(new ResidualCostFunctor(
-                       &kf2->preKeyFrame->frames[0].internals->interpolator(0),
+                       &kf2->preKeyFrame->frames[1].internals->interpolator(0),
                        hostFrameToBody, targetBodyToFrame, op.dir,
                        residual.getReprojPattern(),
-                       residual.getHostIntensities(), cam2->bundle[0].cam,
+                       residual.getHostIntensities(), cam->bundle[1].cam,
                        residualSettings),
                    patternSize);
 
@@ -362,14 +401,14 @@ TEST_F(ResidualTest, ValuesAndJacobian) {
                                    targetToWorld.so3().data(),
                                    targetToWorld.translation().data(),
                                    kf1->frames[0].lightWorldToThis.data,
-                                   kf2->frames[0].lightWorldToThis.data,
+                                   kf2->frames[1].lightWorldToThis.data,
                                    &op.logDepth};
     VecX expectedValues(patternSize);
     MatX4RM expected_dr_dq_host(patternSize, 4);
-    MatX3t expected_dr_dq_host_tang(patternSize, 3);
+    MatX3RMt expected_dr_dq_host_tang(patternSize, 3);
     MatX3RM expected_dr_dt_host(patternSize, 3);
     MatX4RM expected_dr_dq_target(patternSize, 4);
-    MatX3t expected_dr_dq_target_tang(patternSize, 3);
+    MatX3RMt expected_dr_dq_target_tang(patternSize, 3);
     MatX3RM expected_dr_dt_target(patternSize, 3);
     MatX2RM expected_dr_daff_host(patternSize, 2);
     MatX2RM expected_dr_daff_target(patternSize, 2);
@@ -410,35 +449,50 @@ TEST_F(ResidualTest, ValuesAndJacobian) {
     error.lightWorldToTargetErr =
         (actual_dr_daff_target - expected_dr_daff_target.cast<T>()).norm();
 
-    ASSERT_LE(error.valueErr, valueEps)
+    EXPECT_LE(relOrAbs(error.valueErr, expectedValues.norm(), valueEps),
+              valueEps)
         << "actual:\n"
         << actualValues.transpose() << "\nexpected:\n"
         << expectedValues.transpose() << "\n";
-    ASSERT_LE(error.hostToWorldRotErr, diffRotEps)
+    EXPECT_LE(relOrAbs(error.hostToWorldRotErr, expected_dr_dq_host_tang.norm(),
+                       diffRotEps),
+              diffRotEps)
         << "actual:\n"
         << actual_dr_dq_host_tang << "\nexpected:\n"
         << expected_dr_dq_host_tang << "\n";
-    ASSERT_LE(error.hostToWorldTransErr, diffTransEps)
+    EXPECT_LE(relOrAbs(error.hostToWorldTransErr, expected_dr_dt_host.norm(),
+                       diffTransEps),
+              diffTransEps)
         << "actual:\n"
         << actual_dr_dt_host << "\nexpected:\n"
         << expected_dr_dt_host << "\n";
-    ASSERT_LE(error.targetToWorldRotErr, diffRotEps)
+    EXPECT_LE(relOrAbs(error.targetToWorldRotErr,
+                       expected_dr_dq_target_tang.norm(), diffRotEps),
+              diffRotEps)
         << "actual:\n"
         << actual_dr_dq_target_tang << "\nexpected:\n"
         << expected_dr_dq_target_tang << "\n";
-    ASSERT_LE(error.targetToWorldTransErr, diffTransEps)
+    EXPECT_LE(relOrAbs(error.targetToWorldTransErr,
+                       expected_dr_dt_target.norm(), diffTransEps),
+              diffTransEps)
         << "actual:\n"
         << actual_dr_dt_target << "\nexpected:\n"
         << expected_dr_dt_target << "\n";
-    ASSERT_LE(error.lightWorldToHostErr, diffAffEps)
+    EXPECT_LE(relOrAbs(error.lightWorldToHostErr, expected_dr_daff_host.norm(),
+                       diffAffEps),
+              diffAffEps)
         << "actual:\n"
         << actual_dr_daff_host << "\nexpected:\n"
         << expected_dr_daff_host << "\n";
-    ASSERT_LE(error.lightWorldToTargetErr, diffAffEps)
+    EXPECT_LE(relOrAbs(error.lightWorldToTargetErr,
+                       expected_dr_daff_target.norm(), diffAffEps),
+              diffAffEps)
         << "actual:\n"
         << actual_dr_daff_target << "\nexpected:\n"
         << expected_dr_daff_target << "\n";
-    ASSERT_LE(error.diffLogDepthErr, diffDepthEps)
+    EXPECT_LE(
+        relOrAbs(error.diffLogDepthErr, expected_dr_dlogd.norm(), diffDepthEps),
+        diffDepthEps)
         << "actual:\n"
         << actual_dr_dlogd << "\nexpected:\n"
         << expected_dr_dlogd << "\n";
@@ -449,6 +503,192 @@ TEST_F(ResidualTest, ValuesAndJacobian) {
   LOG(INFO) << "total time on smart jacobian eval: " << timeEvalMy << std::endl;
   LOG(INFO) << "total time on auto  jacobian eval: " << timeEvalAuto
             << std::endl;
+}
+
+Residual::FrameFrameHessian
+getFrameFrameHessian(const MatR4t &dr_dq_frame1, const MatR3t &dr_dt_frame1,
+                     const MatR2t &dr_daff_frame1, const MatR4t &dr_dq_frame2,
+                     const MatR3t &dr_dt_frame2, const MatR2t &dr_daff_frame2,
+                     const WeightsVector &weights) {
+  Residual::FrameFrameHessian result;
+
+  MatR7t dr_dqt_frame1(dr_dq_frame1.rows(), 7);
+  dr_dqt_frame1 << dr_dq_frame1, dr_dt_frame1;
+  MatR7t dr_dqt_frame2(dr_dq_frame2.rows(), 7);
+  dr_dqt_frame2 << dr_dq_frame2, dr_dt_frame2;
+  Eigen::Map<const VecRt> wMap(weights.data(), weights.size());
+  Eigen::DiagonalMatrix<T, Eigen::Dynamic, Residual::MPS> w = wMap.asDiagonal();
+
+  result.qtqt = dr_dqt_frame1.transpose() * w * dr_dqt_frame2;
+  result.qtab = dr_dqt_frame1.transpose() * w * dr_daff_frame2;
+  result.abqt = dr_daff_frame1.transpose() * w * dr_dqt_frame2;
+  result.abab = dr_daff_frame1.transpose() * w * dr_daff_frame2;
+
+  return result;
+}
+
+Residual::FramePointHessian getFramePointHessian(const MatR4t &dr_dq,
+                                                 const MatR3t &dr_dt,
+                                                 const MatR2t &dr_daff,
+                                                 const VecRt &dr_dlogd,
+                                                 const WeightsVector &weights) {
+  Residual::FramePointHessian result;
+  MatR7t dr_dqt(dr_dq.rows(), 7);
+  dr_dqt << dr_dq, dr_dt;
+  Eigen::Map<const VecRt> wMap(weights.data(), weights.size());
+  Eigen::DiagonalMatrix<T, Eigen::Dynamic, Residual::MPS> w = wMap.asDiagonal();
+  result.qtd = dr_dqt.transpose() * w * dr_dlogd;
+  result.abd = dr_daff.transpose() * w * dr_dlogd;
+
+  return result;
+}
+
+T getPointPointHessian(const VecRt &dr_dlogd, const WeightsVector &weights) {
+  CHECK_EQ(dr_dlogd.size(), weights.size());
+
+  T result = 0;
+  for (int i = 0; i < weights.size(); ++i)
+    result += weights[i] * dr_dlogd[i] * dr_dlogd[i];
+  return result;
+}
+
+Residual::DeltaHessian
+getExpectedDeltaHessian(const Residual::Jacobian &jacobian,
+                        const WeightsVector &weights) {
+  int PS = weights.size();
+  Residual::DeltaHessian deltaHessian;
+  MatR4t dr_dq_host = jacobian.dr_dq_host(PS);
+  MatR3t dr_dt_host = jacobian.dr_dt_host(PS);
+  MatR2t dr_daff_host = jacobian.dr_daff_host(PS);
+  MatR4t dr_dq_target = jacobian.dr_dq_target(PS);
+  MatR3t dr_dt_target = jacobian.dr_dt_target(PS);
+  MatR2t dr_daff_target = jacobian.dr_daff_target(PS);
+  VecRt dr_dlogd = jacobian.dr_dlogd(PS);
+
+  deltaHessian.hostHost =
+      getFrameFrameHessian(dr_dq_host, dr_dt_host, dr_daff_host, dr_dq_host,
+                           dr_dt_host, dr_daff_host, weights);
+  deltaHessian.hostTarget =
+      getFrameFrameHessian(dr_dq_host, dr_dt_host, dr_daff_host, dr_dq_target,
+                           dr_dt_target, dr_daff_target, weights);
+  deltaHessian.targetTarget =
+      getFrameFrameHessian(dr_dq_target, dr_dt_target, dr_daff_target,
+                           dr_dq_target, dr_dt_target, dr_daff_target, weights);
+  deltaHessian.hostPoint = getFramePointHessian(
+      dr_dq_host, dr_dt_host, dr_daff_host, dr_dlogd, weights);
+  deltaHessian.targetPoint = getFramePointHessian(
+      dr_dq_target, dr_dt_target, dr_daff_target, dr_dlogd, weights);
+  deltaHessian.pointPoint = getPointPointHessian(dr_dlogd, weights);
+
+  return deltaHessian;
+}
+
+TEST_F(ResidualTest, IsDeltaHessianCorrect) {
+  constexpr double transDrift = 0.02;
+  constexpr double rotDrift = (M_PI / 180.0) * 0.004;
+  const int patternSize = settings.residualPattern.pattern().size();
+
+  SE3 f1ToF2GT = kf2->thisToWorld().inverse() * kf1->thisToWorld();
+  double trans = f1ToF2GT.translation().norm();
+  double transErr = trans * transDrift;
+  double rotErr = trans * rotDrift;
+  kf1->thisToWorld.setValue(kf1->thisToWorld() *
+                            sampleSe3(rotErr, transErr, mt));
+  kf2->thisToWorld.setValue(kf2->thisToWorld() *
+                            sampleSe3(rotErr, transErr, mt));
+
+  SE3 hostFrameToBody = cam->bundle[0].thisToBody;
+  SE3 targetBodyToFrame = cam->bundle[1].bodyToThis;
+  SE3 hostToWorld = kf1->thisToWorld();
+  SE3 targetToWorld = kf2->thisToWorld();
+  SE3 hostToTarget = targetBodyToFrame * targetToWorld.inverse() * hostToWorld *
+                     hostFrameToBody;
+  AffLightT lightWorldToHost = kf1->frames[0].lightWorldToThis.cast<T>();
+  AffLightT lightWorldToTarget = kf2->frames[1].lightWorldToThis.cast<T>();
+  AffLightT lightHostToTarget =
+      (lightWorldToTarget * lightWorldToHost.inverse()).cast<T>();
+
+  MotionDerivatives dHostToTarget(
+      cam->bundle[0].thisToBody.cast<T>(), kf1->thisToWorld().cast<T>(),
+      kf2->thisToWorld().cast<T>(), cam->bundle[1].bodyToThis.cast<T>());
+
+  ceres::TrivialLoss loss;
+  std::vector<EvalError> errors;
+  double timeEvalMy = 0, timeEvalAuto = 0;
+  int pointInd = 0;
+  for (OptimizedPoint &op : kf1->frames[0].optimizedPoints) {
+    std::chrono::time_point<std::chrono::system_clock> start, end;
+    start = std::chrono::system_clock::now();
+
+    Residual residual(0, 0, 1, 1, pointInd++, &op.logDepth, cam.get(),
+                      &kf1->frames[0], &kf2->frames[1], &op, hostToTarget,
+                      &loss, residualSettings);
+    Vec2 reproj;
+    auto values = residual.getValues(hostToTarget, lightHostToTarget, &reproj);
+    Residual::Jacobian jacobian =
+        residual.getJacobian(hostToTarget.cast<T>(), dHostToTarget,
+                             lightWorldToHost, lightHostToTarget);
+    auto weights = residual.getWeights(values);
+    Residual::DeltaHessian actual =
+        Residual::getDeltaHessian(values, weights, jacobian);
+    Residual::DeltaHessian expected =
+        getExpectedDeltaHessian(jacobian, weights);
+
+    CHECK_LE(
+        relMatrixErr(actual.hostHost.qtqt, expected.hostHost.qtqt, qtqtEps),
+        qtqtEps);
+    CHECK_LE(
+        relMatrixErr(actual.hostHost.qtab, expected.hostHost.qtab, qtqtEps),
+        qtabEps);
+    CHECK_LE(
+        relMatrixErr(actual.hostHost.abqt, expected.hostHost.abqt, qtabEps),
+        qtabEps);
+    CHECK_LE(
+        relMatrixErr(actual.hostHost.abab, expected.hostHost.abab, ababEps),
+        ababEps);
+
+    CHECK_LE(
+        relMatrixErr(actual.hostTarget.qtqt, expected.hostTarget.qtqt, qtqtEps),
+        qtqtEps);
+    CHECK_LE(
+        relMatrixErr(actual.hostTarget.qtab, expected.hostTarget.qtab, qtqtEps),
+        qtabEps);
+    CHECK_LE(
+        relMatrixErr(actual.hostTarget.abqt, expected.hostTarget.abqt, qtabEps),
+        qtabEps);
+    CHECK_LE(
+        relMatrixErr(actual.hostTarget.abab, expected.hostTarget.abab, ababEps),
+        ababEps);
+
+    CHECK_LE(relMatrixErr(actual.targetTarget.qtqt, expected.targetTarget.qtqt,
+                          qtqtEps),
+             qtqtEps);
+    CHECK_LE(relMatrixErr(actual.targetTarget.qtab, expected.targetTarget.qtab,
+                          qtqtEps),
+             qtabEps);
+    CHECK_LE(relMatrixErr(actual.targetTarget.abqt, expected.targetTarget.abqt,
+                          qtabEps),
+             qtabEps);
+    CHECK_LE(relMatrixErr(actual.targetTarget.qtqt, expected.targetTarget.qtqt,
+                          qtqtEps),
+             qtqtEps);
+
+    CHECK_LE(relMatrixErr(actual.hostPoint.qtd, expected.hostPoint.qtd, qtdEps),
+             qtdEps);
+    CHECK_LE(relMatrixErr(actual.hostPoint.abd, expected.hostPoint.abd, abdEps),
+             abdEps);
+
+    CHECK_LE(
+        relMatrixErr(actual.targetPoint.qtd, expected.targetPoint.qtd, qtdEps),
+        qtdEps);
+    CHECK_LE(
+        relMatrixErr(actual.targetPoint.abd, expected.targetPoint.abd, abdEps),
+        abdEps);
+
+    CHECK_LE(relOrAbs(actual.pointPoint - expected.pointPoint,
+                      expected.pointPoint, ddEps),
+             ddEps);
+  }
 }
 
 int main(int argc, char **argv) {

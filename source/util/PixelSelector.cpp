@@ -1,6 +1,7 @@
 #include "util/PixelSelector.h"
 #include "util/defs.h"
 #include "util/flags.h"
+#include "util/util.h"
 #include <glog/logging.h>
 #include <random>
 
@@ -13,10 +14,18 @@ PixelSelector::PixelSelector(const Settings::PixelSelector &_settings)
     , lastPointsFound(_settings.initialPointsFound)
     , settings(_settings) {}
 
-PixelSelector::PointVector PixelSelector::select(const cv::Mat &frame,
+void PixelSelector::initialize(const cv::Mat3b &frame, int pointsNeeded) {
+  // discard one pixel selection such that the adaptive algorithm will
+  // choose the right amount of points next time
+  cv::Mat1d gradX, gradY, gradNorm;
+  grad(cvtBgrToGray(frame), gradX, gradY, gradNorm);
+  select(frame, gradNorm, pointsNeeded);
+}
+
+PixelSelector::PointVector PixelSelector::select(const cv::Mat3b &frame,
                                                  const cv::Mat1d &gradNorm,
                                                  int pointsNeeded,
-                                                 cv::Mat *debugOut) {
+                                                 cv::Mat3b *debugOut) {
   int newBlockSize =
       lastBlockSize * std::sqrt(static_cast<double>(lastPointsFound) /
                                 (pointsNeeded * settings.adaptToFactor));
@@ -40,9 +49,9 @@ void selectLayer(const cv::Mat &gradNorm, int selBlockSize, double threshold,
 }
 
 PixelSelector::PointVector
-PixelSelector::selectInternal(const cv::Mat &frame, const cv::Mat1d &gradNorm,
+PixelSelector::selectInternal(const cv::Mat3b &frame, const cv::Mat1d &gradNorm,
                               int pointsNeeded, int blockSize,
-                              cv::Mat *debugOut) {
+                              cv::Mat3b *debugOut) {
   PointVector pointsOverThres[LI];
   PointVector pointsAll;
 

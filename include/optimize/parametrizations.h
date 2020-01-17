@@ -66,6 +66,7 @@ public:
   using MatDiff = Eigen::Matrix<T, num_parameters, DoF>;
   using Tangent = Vec5t;
 
+  SO3xS2Parametrization(const SE3 &f1ToWorld, const SE3 &f2ToWorld);
   SO3xS2Parametrization(const SO3t &baseRot, const Vec3t &centerTrans,
                         const Vec3t &initialTrans);
 

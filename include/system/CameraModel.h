@@ -79,9 +79,16 @@ public:
     return res;
   }
 
-  inline Vec3 unmap(const Vec2 &point) const { return unmap(point.data()); }
+  template <typename T>
+  inline Eigen::Matrix<T, 3, 1>
+  unmap(const Eigen::Matrix<T, 2, 1> &point) const {
+    return unmap(point.data());
+  }
 
-  inline Vec2 map(const Vec3 &ray) const { return map(ray.data()); }
+  template <typename T>
+  inline Eigen::Matrix<T, 2, 1> map(const Eigen::Matrix<T, 3, 1> &ray) const {
+    return map(ray.data());
+  }
 
   bool isMappable(const Vec3 &point) const;
 
@@ -93,7 +100,7 @@ public:
     for (int y = 0; y < result.rows; ++y)
       for (int x = 0; x < result.cols; ++x) {
         Vec3 pnt(double(x), double(y), 1.);
-        Vec2 origPix = map(Kinv * pnt);
+        Vec2 origPix = map((Kinv * pnt).eval());
         int origX = origPix[0], origY = origPix[1];
         if (origX >= 0 && origX < result.cols && origY >= 0 &&
             origY < result.rows)
@@ -103,6 +110,7 @@ public:
   }
 
   std::pair<Vec2, Mat23> diffMap(const Vec3 &ray) const;
+  std::pair<Vec2f, Mat23f> diffMap(const Vec3f &ray) const;
 
   inline int getWidth() const { return width; }
   inline int getHeight() const { return height; }
@@ -110,7 +118,7 @@ public:
   inline double getMinZ() const { return minZ; }
   inline double getMaxAngle() const { return maxAngle; }
 
-  void setMask(const cv::Mat1b mask);
+  void setMask(const cv::Mat1b &mask);
   const cv::Mat1b &mask() const { return mMask; };
 
   bool isOnImage(const Vec2 &p, int border) const;

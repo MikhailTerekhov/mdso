@@ -9,7 +9,7 @@
 namespace mdso {
 
 PreKeyFrame::FrameEntry::FrameEntry(PreKeyFrame *host, int ind,
-                                    const cv::Mat &_frameColored,
+                                    const cv::Mat3b &_frameColored,
                                     const cv::Mat1b &frameProcessed,
                                     Timestamp timestamp,
                                     const Settings::Pyramid &pyrSettings)
@@ -24,7 +24,7 @@ PreKeyFrame::FrameEntry::FrameEntry(PreKeyFrame *host, int ind,
 
 PreKeyFrame::PreKeyFrame(KeyFrame *baseFrame, CameraBundle *cam,
                          Preprocessor *preprocessor,
-                         const cv::Mat coloredFrames[], int globalFrameNum,
+                         const cv::Mat3b coloredFrames[], int globalFrameNum,
                          Timestamp timestamps[],
                          const Settings::Pyramid &_pyrSettings)
     : baseFrame(baseFrame)

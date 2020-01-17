@@ -19,7 +19,7 @@ class PreKeyFrameEntryInternals;
 struct PreKeyFrame {
 
   struct FrameEntry {
-    FrameEntry(PreKeyFrame *host, int ind, const cv::Mat &_frameColored,
+    FrameEntry(PreKeyFrame *host, int ind, const cv::Mat3b &_frameColored,
                const cv::Mat1b &frameProcessed, Timestamp timestamp,
                const Settings::Pyramid &pyrSettings);
 
@@ -36,7 +36,7 @@ struct PreKeyFrame {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   PreKeyFrame(KeyFrame *baseFrame, CameraBundle *cam,
-              Preprocessor *preprocessor, const cv::Mat coloredFrames[],
+              Preprocessor *preprocessor, const cv::Mat3b coloredFrames[],
               int globalFrameNum, Timestamp timestamps[],
               const Settings::Pyramid &_pyrSettings = {});
   ~PreKeyFrame();

@@ -29,7 +29,7 @@ void outputArrayUndivided(std::ostream &os, const T array[], int size) {
 }
 
 template <typename T>
-void outputArray(const std::string &fname, const T array[], int size) {
+void outputArray(const fs::path &fname, const T array[], int size) {
   std::ofstream ofs(fname);
   for (int i = 0; i < size; ++i)
     ofs << array[i] << ' ';
@@ -38,8 +38,18 @@ void outputArray(const std::string &fname, const T array[], int size) {
 }
 
 template <typename T>
-void outputArray(const std::string &fname, const std::vector<T> &array) {
+void outputArray(const fs::path &fname, const std::vector<T> &array) {
   outputArray(fname, array.data(), array.size());
+}
+
+template <typename MatrixT>
+void outputMatrix(const fs::path &fname, const MatrixT &mat) {
+  std::ofstream ofs(fname);
+  for (int r = 0; r < mat.rows(); ++r) {
+    for (int c = 0; c < mat.cols(); ++c)
+      ofs << mat(r, c) << ' ';
+    ofs << '\n';
+  }
 }
 
 void printInPly(std::ostream &out, const std::vector<Vec3> &points,
@@ -123,14 +133,32 @@ std::vector<double> readBin(const fs::path &filename);
 
 std::string curTimeBrief();
 
+template <typename T>
+inline void checkBounds(const cv::Mat_<T> &mat, const cv::Point &p) {
+  cv::Rect rect(cv::Point(), mat.size());
+  CHECK(rect.contains(p)) << "Point (" << p.x << ' ' << p.y
+                          << ") out of cv::Mat " << mat.rows << "x" << mat.cols;
+}
+
+template <typename T, typename UniformBitGenerator,
+          typename = std::enable_if_t<std::is_floating_point_v<T>>>
+AffineLightTransform<T> sampleAffLight(const Settings::AffineLight &affSettings,
+                                       UniformBitGenerator &gen) {
+  std::uniform_real_distribution<T> da(affSettings.minAffineLightA,
+                                       affSettings.maxAffineLightA);
+  std::uniform_real_distribution<T> db(affSettings.minAffineLightB,
+                                       affSettings.maxAffineLightB);
+  return AffineLightTransform<T>(da(gen), db(gen));
+}
+
 namespace optimize {
 
-template <int nret, int Options1, int Options2, int Options3, int Options4>
-T tangentErr(const Eigen::Matrix<T, nret, 4, Options1> &expected,
-             const Eigen::Matrix<T, nret, 4, Options2> &actual,
+template <int nret, int Options1, int Options2, int MaxRows1, int MaxRows2>
+T tangentErr(const Eigen::Matrix<T, nret, 4, Options1, MaxRows1> &expected,
+             const Eigen::Matrix<T, nret, 4, Options2, MaxRows2> &actual,
              const SO3t &diffRotation,
-             Eigen::Matrix<T, nret, 3, Options3> &expectedTang,
-             Eigen::Matrix<T, nret, 3, Options4> &actualTang) {
+             Eigen::Matrix<T, nret, 3, Options1, MaxRows1> &expectedTang,
+             Eigen::Matrix<T, nret, 3, Options2, MaxRows2> &actualTang) {
   Mat43t dParam = diffRotation.Dx_this_mul_exp_x_at_0();
   expectedTang = expected * dParam;
   actualTang = actual * dParam;

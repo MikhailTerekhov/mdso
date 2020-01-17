@@ -256,10 +256,13 @@ struct Settings {
     double max = default_max;
   } depth;
 
-  struct GradWeighting {
+  struct ResidualWeighting {
     static constexpr double default_c = 50.0;
     double c = default_c;
-  } gradWeighting;
+
+    static constexpr double default_lossEps = 1e-8;
+    double lossEps = default_lossEps;
+  } residualWeighting;
 
   struct ResidualPattern {
     static constexpr int max_size = 9;
@@ -376,14 +379,14 @@ struct FrameTrackerSettings {
   Settings::Pyramid pyramid = {};
   Settings::AffineLight affineLight = {};
   Settings::Intensity intensity = {};
-  Settings::GradWeighting gradWeighting = {};
+  Settings::ResidualWeighting residualWeighting = {};
   Settings::Threading threading = {};
 };
 
 struct BundleAdjusterSettings {
   Settings::BundleAdjuster bundleAdjuster = {};
   Settings::ResidualPattern residualPattern = {};
-  Settings::GradWeighting gradWeighting = {};
+  Settings::ResidualWeighting residualWeighting = {};
   Settings::Intensity intensity = {};
   Settings::AffineLight affineLight = {};
   Settings::Threading threading = {};
@@ -392,8 +395,9 @@ struct BundleAdjusterSettings {
 
 struct ResidualSettings {
   Settings::ResidualPattern residualPattern = {};
-  Settings::GradWeighting gradWeighting = {};
+  Settings::ResidualWeighting residualWeighting = {};
   Settings::Intensity intensity = {};
+  Settings::Depth depth;
 };
 
 } // namespace mdso

@@ -35,7 +35,7 @@ KeyFrame::KeyFrame(const InitializedFrame &initializedFrame, CameraBundle *cam,
                    const PointTracerSettings &tracingSettings)
     : thisToWorld(initializedFrame.thisToWorld)
     , kfSettings(_kfSettings) {
-  std::vector<cv::Mat> images(cam->bundle.size());
+  std::vector<cv::Mat3b> images(cam->bundle.size());
   std::vector<Timestamp> timestamps(cam->bundle.size());
   for (int i = 0; i < cam->bundle.size(); ++i) {
     images[i] = initializedFrame.frames[i].frame;

@@ -45,6 +45,11 @@ void S2Parametrization::recalcOrts() {
   localToWorldRot << v1, v2, v;
 }
 
+SO3xS2Parametrization::SO3xS2Parametrization(const SE3t &f1ToWorld,
+                                             const SE3t &f2ToWorld)
+    : mSo3(f2ToWorld.so3())
+    , mS2(f1ToWorld.translation(), f2ToWorld.translation()) {}
+
 SO3xS2Parametrization::SO3xS2Parametrization(const SO3t &baseRot,
                                              const Vec3t &centerTrans,
                                              const Vec3t &initialTrans)
@@ -64,4 +69,4 @@ void SO3xS2Parametrization::addDelta(
   mS2.addDelta(delta.tail<2>());
 }
 
-}
+} // namespace mdso::optimize

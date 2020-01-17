@@ -24,7 +24,9 @@ using Vec2t = Eigen::Matrix<T, 2, 1>;
 using Vec3t = Eigen::Matrix<T, 3, 1>;
 using Vec4t = Eigen::Matrix<T, 4, 1>;
 using Vec5t = Eigen::Matrix<T, 5, 1>;
+using Vec7t = Eigen::Matrix<T, 7, 1>;
 using Vec8t = Eigen::Matrix<T, 8, 1>;
+using Vec9t = Eigen::Matrix<T, 9, 1>;
 
 using Mat22t = Eigen::Matrix<T, 2, 2>;
 using Mat23t = Eigen::Matrix<T, 2, 3>;
@@ -37,7 +39,12 @@ using Mat37t = Eigen::Matrix<T, 3, 7>;
 using Mat43t = Eigen::Matrix<T, 4, 3>;
 using Mat44t = Eigen::Matrix<T, 4, 4>;
 using Mat62t = Eigen::Matrix<T, 6, 2>;
+using Mat72t = Eigen::Matrix<T, 7, 2>;
+using Mat75t = Eigen::Matrix<T, 7, 5>;
+using Mat76t = Eigen::Matrix<T, 7, 6>;
+using Mat77t = Eigen::Matrix<T, 7, 7>;
 using Mat88t = Eigen::Matrix<T, 8, 8>;
+using Mat99t = Eigen::Matrix<T, 9, 9>;
 using Mat12x3t = Eigen::Matrix<T, 12, 3>;
 using Mat12x4t = Eigen::Matrix<T, 12, 4>;
 using MatX2t = Eigen::Matrix<T, Eigen::Dynamic, 2>;
@@ -85,11 +92,17 @@ using SO3 = Sophus::SO3d;
 
 using AffLight = AffineLightTransform<double>;
 
+using Vec2f = Eigen::Matrix<float, 2, 1>;
+using Vec3f = Eigen::Matrix<float, 3, 1>;
+using Mat23f = Eigen::Matrix<float, 2, 3>;
+
 namespace fs = std::filesystem;
 
 using boost::container::static_vector;
 template <typename T>
 using Array2d = boost::multi_array<T, 2>;
+template <typename T>
+using Array4d = boost::multi_array<T, 4>;
 
 template <typename T>
 using StdVector = std::vector<T, Eigen::aligned_allocator<T>>;

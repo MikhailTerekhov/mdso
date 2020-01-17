@@ -388,7 +388,7 @@ ImmaturePoint::traceOn(const PreKeyFrame::FrameEntry &refFrameEntry,
         refFrame.frames[indRef].internals->interpolator(bestPyrLevel), from, to,
         intencities.data(), pattern.data(), bestDispl, bestEnergy, settings);
     depth = triangulate(baseToRef, baseDirections[0],
-                        camRef.unmap(bestPoint / scale))[0];
+                        camRef.unmap((bestPoint / scale).eval()))[0];
   } else
     depth = bestDepth;
 

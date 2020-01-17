@@ -28,7 +28,7 @@ public:
             const Observers &observers = {}, const Settings &settings = {});
   ~DsoSystem();
 
-  void addMultiFrame(const cv::Mat frames[], Timestamp timestamps[]);
+  void addMultiFrame(const cv::Mat3b frames[], Timestamp timestamps[]);
 
   void addFrameTrackerObserver(FrameTrackerObserver *observer);
 

@@ -38,7 +38,7 @@ CameraModel::CameraModel(int width, int height,
     , skew(0)
     , settings(settings)
     , mMask(height, width, CV_WHITE_BYTE) {
-    std::ifstream ifs(calibFileName, std::ifstream::in);
+  std::ifstream ifs(calibFileName, std::ifstream::in);
   if (!ifs.is_open())
     throw std::runtime_error("camera model file could not be open!");
 
@@ -67,7 +67,7 @@ CameraModel::CameraModel(int width, int height, double f, double cx, double cy,
     , principalPoint(f * cx, f * cy)
     , settings(settings)
     , mMask(height, width, CV_WHITE_BYTE) {
-    unmapPolyCoeffs.resize(1, 1);
+  unmapPolyCoeffs.resize(1, 1);
   unmapPolyCoeffs[0] = f;
   recalcBoundaries();
 
@@ -83,17 +83,29 @@ bool CameraModel::isMappable(const Vec3 &point) const {
   return angle < maxAngle;
 }
 
-std::pair<Vec2, Mat23> CameraModel::diffMap(const Vec3 &ray) const {
-  ceres::Jet<double, 3> rayJet[3];
+template <typename T>
+std::pair<Eigen::Matrix<T, 2, 1>, Eigen::Matrix<T, 2, 3>>
+diffMapHelper(const CameraModel *cam, const Eigen::Matrix<T, 3, 1> &ray) {
+  using Vec2t = Eigen::Matrix<T, 2, 1>;
+  using Mat23t = Eigen::Matrix<T, 2, 3>;
+  ceres::Jet<T, 3> rayJet[3];
   for (int i = 0; i < 3; ++i) {
     rayJet[i].a = ray[i];
     rayJet[i].v.setZero();
     rayJet[i].v[i] = 1;
   }
-  Eigen::Matrix<ceres::Jet<double, 3>, 2, 1> pointJet = map(rayJet);
-  Mat23 mapJacobian;
+  Eigen::Matrix<ceres::Jet<T, 3>, 2, 1> pointJet = cam->map(rayJet);
+  Mat23t mapJacobian;
   mapJacobian << pointJet[0].v.transpose(), pointJet[1].v.transpose();
-  return {Vec2(pointJet[0].a, pointJet[1].a), mapJacobian};
+  return {Vec2t(pointJet[0].a, pointJet[1].a), mapJacobian};
+}
+
+std::pair<Vec2, Mat23> CameraModel::diffMap(const Vec3 &ray) const {
+  return diffMapHelper(this, ray);
+}
+
+std::pair<Vec2f, Mat23f> CameraModel::diffMap(const Vec3f &ray) const {
+  return diffMapHelper(this, ray);
 }
 
 bool CameraModel::isOnImage(const Vec2 &p, int border) const {
@@ -265,6 +277,6 @@ void CameraModel::recalcBoundaries() {
   maxAngle = std::atan2(maxRadius, minZUnnorm);
 }
 
-void CameraModel::setMask(const cv::Mat1b mask) { this->mMask = mask; }
+void CameraModel::setMask(const cv::Mat1b &mask) { this->mMask = mask; }
 
 } // namespace mdso

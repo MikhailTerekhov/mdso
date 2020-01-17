@@ -13,13 +13,14 @@ public:
 
   PixelSelector(const Settings::PixelSelector &settings = {});
 
-  PointVector select(const cv::Mat &frame, const cv::Mat1d &gradNorm,
-                     int pointsNeeded, cv::Mat *debugOut = nullptr);
+  void initialize(const cv::Mat3b &frame, int pointsNeeded);
+  PointVector select(const cv::Mat3b &frame, const cv::Mat1d &gradNorm,
+                     int pointsNeeded, cv::Mat3b *debugOut = nullptr);
 
 private:
-  PointVector selectInternal(const cv::Mat &frame, const cv::Mat1d &gradNorm,
+  PointVector selectInternal(const cv::Mat3b &frame, const cv::Mat1d &gradNorm,
                              int pointsNeeded, int blockSize,
-                             cv::Mat *debugOut);
+                             cv::Mat3b *debugOut);
 
   int lastBlockSize;
   int lastPointsFound;

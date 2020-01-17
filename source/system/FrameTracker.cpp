@@ -236,7 +236,7 @@ FrameTracker::trackPyrLevel(const PreKeyFrame &frame,
 
         ceres::LossFunction *lossFunc;
         if (settings.frameTracker.useGradWeighting) {
-          const double c = settings.gradWeighting.c;
+          const double c = settings.residualWeighting.c;
           double weight = c / std::hypot(c, p.gradNorm);
           lossFunc = new ceres::ScaledLoss(
               new ceres::HuberLoss(settings.intensity.outlierDiff), weight,

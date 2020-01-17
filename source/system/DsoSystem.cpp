@@ -425,7 +425,7 @@ void DsoSystem::traceOn(const PreKeyFrame &frame) {
               << ": " << retByStatus[s];
 }
 
-void DsoSystem::addMultiFrame(const cv::Mat frames[], Timestamp timestamps[]) {
+void DsoSystem::addMultiFrame(const cv::Mat3b frames[], Timestamp timestamps[]) {
   if (!isInitialized) {
     LOG(INFO) << "put into initializer" << std::endl;
 
@@ -451,7 +451,7 @@ void DsoSystem::addMultiFrame(const cv::Mat frames[], Timestamp timestamps[]) {
         obs->initialized(initializedKFs.data(), keyFrames.size());
 
       // BundleAdjuster bundleAdjuster(cam, settings.bundleAdjuster,
-      // settings.residualPattern, settings.gradWeighting, settings.intensity,
+      // settings.residualPattern, settings.residualWeighting, settings.intensity,
       // settings.affineLight, settings.threading, settings.depth);
       // for (auto &p : keyFrames)
       // bundleAdjuster.addKeyFrame(&p.second);
