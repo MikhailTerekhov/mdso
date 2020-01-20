@@ -201,9 +201,9 @@ It should contain "info" and "data" subdirectories.)abacaba";
   }
 
   std::vector<int> drawindOrder(1, 0);
-//  DebugImageDrawer debugImageDrawer(drawindOrder);
-//  TrackingDebugImageDrawer trackingDebugImageDrawer(
-//      camPyr.data(), settings.frameTracker, settings.pyramid, drawindOrder);
+  //  DebugImageDrawer debugImageDrawer(drawindOrder);
+  //  TrackingDebugImageDrawer trackingDebugImageDrawer(
+  //      camPyr.data(), settings.frameTracker, settings.pyramid, drawindOrder);
   TrajectoryWriterDso trajectoryWriter(outDir, FLAGS_trajectory_filename);
 
   StdVector<SE3> frameToWorldGT(reader.getFrameCount());
@@ -240,8 +240,8 @@ It should contain "info" and "data" subdirectories.)abacaba";
   DepthPyramidDrawer depthPyramidDrawer;
 
   Observers observers;
-//  if (FLAGS_write_files || FLAGS_show_debug_image)
-//    observers.dso.push_back(&debugImageDrawer);
+  //  if (FLAGS_write_files || FLAGS_show_debug_image)
+  //    observers.dso.push_back(&debugImageDrawer);
   observers.dso.push_back(&trajectoryWriter);
   if (FLAGS_gen_gt_trajectory)
     observers.dso.push_back(&trajectoryWriterGT);
@@ -253,8 +253,8 @@ It should contain "info" and "data" subdirectories.)abacaba";
     observers.frameTracker.push_back(&depthPyramidDrawer);
   if (cloudWriterGTPtr)
     observers.dso.push_back(cloudWriterGTPtr.get());
-//  if (FLAGS_write_files || FLAGS_show_track_res)
-//    observers.frameTracker.push_back(&trackingDebugImageDrawer);
+  //  if (FLAGS_write_files || FLAGS_show_track_res)
+  //    observers.frameTracker.push_back(&trackingDebugImageDrawer);
   if (FLAGS_draw_interpolation)
     observers.initializer.push_back(&interpolationDrawer);
 
@@ -278,14 +278,14 @@ It should contain "info" and "data" subdirectories.)abacaba";
     }
 
     if (FLAGS_write_files) {
-//      cv::Mat3b debugImage = debugImageDrawer.draw();
+      //      cv::Mat3b debugImage = debugImageDrawer.draw();
       fs::path outDeb =
           debugImgDir / fs::path("frame#" + std::to_string(it) + ".jpg");
-//      cv::imwrite(outDeb.native(), debugImage);
-//      cv::Mat3b trackImage = trackingDebugImageDrawer.drawAllLevels();
+      //      cv::imwrite(outDeb.native(), debugImage);
+      //      cv::Mat3b trackImage = trackingDebugImageDrawer.drawAllLevels();
       fs::path outTrack =
           trackImgDir / fs::path("frame#" + std::to_string(it) + ".jpg");
-//      cv::imwrite(outTrack.native(), trackImage);
+      //      cv::imwrite(outTrack.native(), trackImage);
       if (FLAGS_draw_depth_pyramid && depthPyramidDrawer.pyrChanged()) {
         cv::Mat pyrImage = depthPyramidDrawer.getLastPyr();
         fs::path outPyr = fs::path(pyrImgDir) /
@@ -293,10 +293,10 @@ It should contain "info" and "data" subdirectories.)abacaba";
         cv::imwrite(outPyr.native(), pyrImage);
       }
     }
-//    if (FLAGS_show_debug_image)
-//      cv::imshow("debug", debugImageDrawer.draw());
-//    if (FLAGS_show_track_res)
-//      cv::imshow("tracking", trackingDebugImageDrawer.drawAllLevels());
+    //    if (FLAGS_show_debug_image)
+    //      cv::imshow("debug", debugImageDrawer.draw());
+    //    if (FLAGS_show_track_res)
+    //      cv::imshow("tracking", trackingDebugImageDrawer.drawAllLevels());
     if (FLAGS_show_debug_image || FLAGS_show_track_res)
       cv::waitKey(1);
   }

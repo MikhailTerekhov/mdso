@@ -47,11 +47,13 @@ protected:
   static constexpr int sndFrameDoF = sndDoF + affDoF,
                        restFrameDoF = restDoF + affDoF;
 
+  EnergyFunctionTest()
+      : pointsPerFrame(FLAGS_opt_count / keyFramesCount) {}
+
   void SetUp() override {
     settings = getFlaggedSettings();
-    settings.setMaxOptimizedPoints(FLAGS_opt_count);
-    settings.keyFrame.setImmaturePointsNum(settings.maxOptimizedPoints() /
-                                           keyFramesCount);
+    settings.setMaxOptimizedPoints(pointsPerFrame * keyFramesCount);
+    settings.keyFrame.setImmaturePointsNum(pointsPerFrame);
     residualSettings = settings.getResidualSettings();
 
     reader.reset(new MultiFovReader(FLAGS_mfov_dir));
@@ -121,6 +123,7 @@ protected:
   ResidualSettings residualSettings;
   IdentityPreprocessor idPrep;
   std::mt19937 mt;
+  int pointsPerFrame;
 
 private:
   void setSecondFrame(MatXX &jacobian, int residualInd, const MatR4t &dr_dq,
@@ -269,6 +272,8 @@ TEST_F(EnergyFunctionTest, isHessianCorrect) {
   LOG(INFO) << "relative H_pointpoint error = " << relPointPointErr << "\n";
   ASSERT_LE(relPointPointErr, ErrorBounds<T>::hessianRelErr);
 }
+
+TEST(EnergyFunctionTest, LoadFactor) {}
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);

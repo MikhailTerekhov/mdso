@@ -85,9 +85,9 @@ sample<RightExpParametrization<SE3t>, std::mt19937>(std::mt19937 &g) {
 
 template <>
 S2Parametrization sample<S2Parametrization, std::mt19937>(std::mt19937 &g) {
-    auto [center, init] = sampleSphere(g);
-//  Vec3 center(0, 0, 0);
-//  Vec3 init(0, 0, 1);
+  auto [center, init] = sampleSphere(g);
+  //  Vec3 center(0, 0, 0);
+  //  Vec3 init(0, 0, 1);
   return S2Parametrization(center, init);
 }
 

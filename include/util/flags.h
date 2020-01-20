@@ -47,7 +47,6 @@ DECLARE_int32(shift_between_keyframes);
 namespace mdso {
 
 Settings getFlaggedSettings();
-
 }
 
 #endif

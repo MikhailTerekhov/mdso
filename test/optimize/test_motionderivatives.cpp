@@ -207,10 +207,10 @@ TEST_P(MotionDerivativesTest, CorrectDiffActionHost) {
     T err = tangentErr(expected, actual, GetParam().hostBodyToWorld.so3(),
                        expectedTang, actualTang);
     ASSERT_LE(err, dActionErr) << "d_dq_host big error (=" << err << ")\n"
-                          << "actual =\n"
-                          << actualTang << "\nexpected =\n"
-                          << expectedTang << "\nparams:\n"
-                          << GetParam();
+                               << "actual =\n"
+                               << actualTang << "\nexpected =\n"
+                               << expectedTang << "\nparams:\n"
+                               << GetParam();
   }
 }
 

@@ -336,4 +336,4 @@ EnergyFunction::Hessian EnergyFunction::getHessian() {
   return hessian;
 }
 
-}
+} // namespace mdso::optimize

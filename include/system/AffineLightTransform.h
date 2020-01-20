@@ -3,9 +3,9 @@
 
 #include <Eigen/Core>
 #include <cstring>
+#include <opencv2/opencv.hpp>
 #include <ostream>
 #include <random>
-#include <opencv2/opencv.hpp>
 
 namespace mdso {
 

@@ -23,9 +23,7 @@ public:
     return points;
   }
 
-  inline const std::vector<Residual> &getResiduals() const {
-    return residuals;
-  }
+  inline const std::vector<Residual> &getResiduals() const { return residuals; }
 
   Hessian getHessian();
 

@@ -6,7 +6,6 @@
 #include "util/geometry.h"
 #include "util/util.h"
 #include <ceres/ceres.h>
-#include <ceres/local_parameterization.h>
 #include <ceres/cubic_interpolation.h>
 #include <ceres/local_parameterization.h>
 

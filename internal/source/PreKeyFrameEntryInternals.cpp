@@ -13,8 +13,7 @@ PreKeyFrameEntryInternals::PreKeyFrameEntryInternals(
   }
 }
 
-PreKeyFrameEntryInternals::Grid_t &
-PreKeyFrameEntryInternals::grid(int lvl) {
+PreKeyFrameEntryInternals::Grid_t &PreKeyFrameEntryInternals::grid(int lvl) {
   CHECK(lvl >= 0 && lvl < pyrSettings.levelNum());
   return *reinterpret_cast<Grid_t *>(&gridsData[lvl * sizeof(Grid_t)]);
 }

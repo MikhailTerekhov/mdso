@@ -236,13 +236,13 @@ Residual::getDeltaHessian(const static_vector<T, MPS> &values,
 }
 
 Residual::FrameFrameHessian::FrameFrameHessian()
-  : qtqt(Mat77t::Zero())
-  , qtab(Mat72t::Zero())
-  , abqt(Mat27t::Zero())
-  , abab(Mat22t::Zero()) {}
+    : qtqt(Mat77t::Zero())
+    , qtab(Mat72t::Zero())
+    , abqt(Mat27t::Zero())
+    , abab(Mat22t::Zero()) {}
 
-Residual::FrameFrameHessian &Residual::FrameFrameHessian::operator+=(
-    const Residual::FrameFrameHessian &other) {
+Residual::FrameFrameHessian &Residual::FrameFrameHessian::
+operator+=(const Residual::FrameFrameHessian &other) {
   qtqt += other.qtqt;
   qtab += other.qtab;
   abqt += other.abqt;
@@ -260,18 +260,18 @@ Residual::FrameFrameHessian Residual::FrameFrameHessian::transpose() const {
 }
 
 Residual::FramePointHessian::FramePointHessian()
-  : qtd(Vec7t::Zero())
-  , abd(Vec2t::Zero()) {}
+    : qtd(Vec7t::Zero())
+    , abd(Vec2t::Zero()) {}
 
-Residual::FramePointHessian &Residual::FramePointHessian::operator+=(
-    const Residual::FramePointHessian &other) {
+Residual::FramePointHessian &Residual::FramePointHessian::
+operator+=(const Residual::FramePointHessian &other) {
   qtd += other.qtd;
   abd += other.abd;
   return *this;
 }
 
 Residual::DeltaHessian::DeltaHessian()
-  : pointPoint(0) {}
+    : pointPoint(0) {}
 
 std::ostream &operator<<(std::ostream &os, const Residual &res) {
   os << "host ind = " << res.hostInd()

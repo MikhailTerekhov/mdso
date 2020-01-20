@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
   CHECK(fs::is_directory(extrinsicsDir));
   CHECK(fs::is_directory(masksDir));
   RobotcarReader reader(chunkDir, modelsDir, extrinsicsDir, readerSettings);
-//  reader.provideMasks(masksDir);
+  //  reader.provideMasks(masksDir);
 
   RobotcarReader::CamName camName = RobotcarReader::CAM_REAR;
   if (FLAGS_cam_name == "left")

@@ -31,7 +31,8 @@ MotionDerivatives::MotionDerivatives(const SE3t &hostFrameToBody,
                                      const SE3t &targetBodyToFrame) {
   SE3t targetWorldToBody = targetBodyToWorld.inverse();
 
-  daction_dt_host = (targetBodyToFrame.so3() * targetWorldToBody.so3()).matrix();
+  daction_dt_host =
+      (targetBodyToFrame.so3() * targetWorldToBody.so3()).matrix();
   daction_dt_target = -daction_dt_host;
 
   Mat44t hostLeft = (targetBodyToFrame * targetWorldToBody).matrix();
@@ -63,7 +64,7 @@ MotionDerivatives::MotionDerivatives(const SE3t &hostFrameToBody,
 }
 
 Mat34t MotionDerivatives::daction_dq(const Mat34t *dmatrix_dq,
-                                      const Vec4t &vH) {
+                                     const Vec4t &vH) {
   Mat34t result;
   for (int i = 0; i < 4; ++i)
     result.col(i) = dmatrix_dq[i] * vH;

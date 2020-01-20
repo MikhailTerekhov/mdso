@@ -425,7 +425,8 @@ void DsoSystem::traceOn(const PreKeyFrame &frame) {
               << ": " << retByStatus[s];
 }
 
-void DsoSystem::addMultiFrame(const cv::Mat3b frames[], Timestamp timestamps[]) {
+void DsoSystem::addMultiFrame(const cv::Mat3b frames[],
+                              Timestamp timestamps[]) {
   if (!isInitialized) {
     LOG(INFO) << "put into initializer" << std::endl;
 
@@ -451,9 +452,9 @@ void DsoSystem::addMultiFrame(const cv::Mat3b frames[], Timestamp timestamps[]) 
         obs->initialized(initializedKFs.data(), keyFrames.size());
 
       // BundleAdjuster bundleAdjuster(cam, settings.bundleAdjuster,
-      // settings.residualPattern, settings.residualWeighting, settings.intensity,
-      // settings.affineLight, settings.threading, settings.depth);
-      // for (auto &p : keyFrames)
+      // settings.residualPattern, settings.residualWeighting,
+      // settings.intensity, settings.affineLight, settings.threading,
+      // settings.depth); for (auto &p : keyFrames)
       // bundleAdjuster.addKeyFrame(&p.second);
       // bundleAdjuster.adjust(settingMaxFirstBAIterations);
 
@@ -567,14 +568,14 @@ void DsoSystem::addMultiFrame(const cv::Mat3b frames[], Timestamp timestamps[]) 
     for (DsoObserver *obs : observers.dso)
       obs->newBaseFrame(baseFrame());
 
-//    if (settings.bundleAdjuster.runBA) {
-//      std::vector<KeyFrame *> kfPtrs(keyFrames.size());
-//      for (int i = 0; i < keyFrames.size(); ++i)
-//        kfPtrs[i] = keyFrames[i].get();
-//      BundleAdjuster bundleAdjuster(cam, kfPtrs.data(), keyFrames.size(),
-//                                    settings.getBundleAdjusterSettings());
-//      bundleAdjuster.adjust(settings.bundleAdjuster.maxIterations);
-//    }
+    //    if (settings.bundleAdjuster.runBA) {
+    //      std::vector<KeyFrame *> kfPtrs(keyFrames.size());
+    //      for (int i = 0; i < keyFrames.size(); ++i)
+    //        kfPtrs[i] = keyFrames[i].get();
+    //      BundleAdjuster bundleAdjuster(cam, kfPtrs.data(), keyFrames.size(),
+    //                                    settings.getBundleAdjusterSettings());
+    //      bundleAdjuster.adjust(settings.bundleAdjuster.maxIterations);
+    //    }
 
     std::vector<StdVector<Vec2>> points(cam->bundle.size());
     std::vector<std::vector<double>> depths(cam->bundle.size());

@@ -5,17 +5,16 @@
 
 namespace mdso {
 
-template <typename LieGroup>
-class BaseAndTangent {
+template <typename LieGroup> class BaseAndTangent {
   using Tangent = typename LieGroup::Tangent;
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   BaseAndTangent(const LieGroup &init)
-    : base(init)
-    , mDelta(LieGroup::Tangent::Zero())
-    , combined(init) {}
+      : base(init)
+      , mDelta(LieGroup::Tangent::Zero())
+      , combined(init) {}
 
   BaseAndTangent(const LieGroup &base, const Tangent &delta)
       : base(base)
@@ -55,6 +54,6 @@ private:
 
 using SE3BaseAndTangent = BaseAndTangent<SE3>;
 
-}
+} // namespace mdso
 
 #endif

@@ -58,7 +58,8 @@ void CloudWriterGT::keyFramesMarginalized(const KeyFrame *marginalized[],
       int pkfInd = findInd(pkfTs);
       std::vector<Vec3> points;
       points.reserve(pointsInFrameGT[pkfInd].size());
-      SE3 frameToWorld = kf->thisToWorld() * preKeyFrame->baseToThis().inverse();
+      SE3 frameToWorld =
+          kf->thisToWorld() * preKeyFrame->baseToThis().inverse();
       for (const Vec3 &p : pointsInFrameGT[pkfInd])
         points.push_back(frameToWorld * sim3Aligner->alignScale(p));
       cloudHolder.putPoints(points, colors[pkfInd]);
