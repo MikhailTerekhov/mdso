@@ -11,9 +11,9 @@ namespace mdso::optimize {
 class EnergyFunction {
 public:
   struct Hessian {
-    MatXX frameFrame;
-    MatXX framePoint;
-    VecX pointPoint;
+    MatXXt frameFrame;
+    MatXXt framePoint;
+    VecXt pointPoint;
   };
 
   EnergyFunction(CameraBundle *camBundle, KeyFrame *newKeyFrames[],

@@ -75,10 +75,7 @@ ImmaturePoint::ImmaturePoint(KeyFrameEntry *host, const Vec2 &p,
   cam = baseFrame.cam;
 
   camBase = &cam->bundle[host->ind].cam;
-  if (!camBase->isOnImage(p, PH)) {
-    state = OOB;
-    return;
-  }
+  CHECK(camBase->isOnImage(p, PH));
 
   for (int i = 0; i < PS; ++i) {
     Vec2 curP = p + settings.residualPattern.pattern()[i];

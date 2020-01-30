@@ -90,7 +90,11 @@ public:
     return map(ray.data());
   }
 
-  bool isMappable(const Vec3 &point) const;
+  template <typename T>
+  bool isMappable(const Eigen::Matrix<T, 3, 1> &ray) const {
+    T angle = atan2(ray.template head<2>().norm(), ray[2]);
+    return angle < maxAngle;
+  }
 
   template <typename T>
   cv::Mat undistort(const cv::Mat &img, const Mat33 &cameraMatrix) const {

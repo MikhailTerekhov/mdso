@@ -66,7 +66,8 @@ KeyFrame::KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame,
         preKeyFrame->image(i), preKeyFrame->frames[i].gradNorm,
         kfSettings.immaturePointsNum() / camNum, nullptr);
     frames.emplace_back(this, i, preKeyFrame->frames[i].timestamp);
-    addImmatures(selected.data(), selected.size(), i, tracingSettings);
+    addImmatures(selected.data(), selected.size(), i,
+                 &preKeyFrame->cam->bundle[i].cam, tracingSettings);
     frames[i].lightWorldToThis =
         preKeyFrame->baseFrame
             ? preKeyFrame->frames[i].lightBaseToThis *
@@ -76,10 +77,14 @@ KeyFrame::KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame,
 }
 
 void KeyFrame::addImmatures(const cv::Point points[], int size, int numInBundle,
+                            CameraModel *cam,
                             const PointTracerSettings &tracingSettings) {
-  for (int i = 0; i < size; ++i)
-    frames[numInBundle].immaturePoints.emplace_back(
-        &frames[numInBundle], toVec2(points[i]), tracingSettings);
+  for (int i = 0; i < size; ++i) {
+    Vec2 p = toVec2(points[i]);
+    if (cam->isOnImage(p, tracingSettings.residualPattern.height))
+      frames[numInBundle].immaturePoints.emplace_back(&frames[numInBundle], p,
+                                                      tracingSettings);
+  }
 }
 
 } // namespace mdso

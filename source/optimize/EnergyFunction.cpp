@@ -7,8 +7,7 @@ namespace mdso::optimize {
 
 EnergyFunction::OptimizationParams::OptimizationParams(
     CameraBundle *cam, const std::vector<KeyFrame *> &keyFrames)
-    : secondFrame(keyFrames[0]->thisToWorld().cast<T>(),
-                  keyFrames[1]->thisToWorld().cast<T>())
+    : secondFrame(keyFrames[0]->thisToWorld(), keyFrames[1]->thisToWorld())
     , lightWorldToFrame(
           boost::extents[keyFrames.size() - 1][cam->bundle.size()]) {
   restFrames.reserve(keyFrames.size() - 2);
@@ -18,7 +17,7 @@ EnergyFunction::OptimizationParams::OptimizationParams(
   for (int fi = 1; fi < keyFrames.size(); ++fi)
     for (int ci = 0; ci < cam->bundle.size(); ++ci)
       lightWorldToFrame[fi - 1][ci] =
-          keyFrames[fi]->frames[ci].lightWorldToThis;
+          keyFrames[fi]->frames[ci].lightWorldToThis.cast<T>();
 }
 
 EnergyFunction::EnergyFunction(CameraBundle *camBundle, KeyFrame **newKeyFrames,
@@ -44,7 +43,9 @@ EnergyFunction::EnergyFunction(CameraBundle *camBundle, KeyFrame **newKeyFrames,
     for (int hostCamInd = 0; hostCamInd < cam->bundle.size(); ++hostCamInd) {
       for (OptimizedPoint &op :
            keyFrames[hostInd]->frames[hostCamInd].optimizedPoints) {
-        Vec3t ray = op.depth() * op.dir;
+        if (op.state != OptimizedPoint::ACTIVE)
+          continue;
+        Vec3t ray = (op.depth() * op.dir).cast<T>();
         bool hasResiduals = false;
         for (int targetInd = 0; targetInd < numKeyFrames; ++targetInd) {
           if (hostInd == targetInd)
@@ -74,11 +75,13 @@ EnergyFunction::EnergyFunction(CameraBundle *camBundle, KeyFrame **newKeyFrames,
                 &keyFrames[hostInd]->frames[hostCamInd],
                 &keyFrames[targetInd]->frames[targetCamInd], &op,
                 hostToTargetImage, lossFunction.get(), settings);
-            hasResiduals = true;
           }
         }
       }
     }
+
+  LOG(INFO) << "Created EnergyFunction with " << residuals.size()
+            << " residuals\n";
 }
 
 SE3t EnergyFunction::getBodyToWorld(int frameInd) const {
@@ -99,9 +102,9 @@ const MotionDerivatives &EnergyFunction::getHostToTargetDiff(int hostInd,
       hostToTargetDiff[hostInd][hostCamInd][targetInd][targetCamInd];
   if (derivatives)
     return derivatives.value();
-  derivatives.emplace(cam->bundle[hostCamInd].thisToBody,
+  derivatives.emplace(cam->bundle[hostCamInd].thisToBody.cast<T>(),
                       getBodyToWorld(hostInd), getBodyToWorld(targetInd),
-                      cam->bundle[targetCamInd].bodyToThis);
+                      cam->bundle[targetCamInd].bodyToThis.cast<T>());
   return derivatives.value();
 }
 
@@ -176,9 +179,9 @@ EnergyFunction::Hessian EnergyFunction::getHessian() {
   int pointPars = nonconstPoints;
 
   Hessian hessian;
-  hessian.frameFrame = MatXX::Zero(framePars, framePars);
-  hessian.framePoint = MatXX::Zero(framePars, pointPars);
-  hessian.pointPoint = VecX::Zero(pointPars);
+  hessian.frameFrame = MatXXt::Zero(framePars, framePars);
+  hessian.framePoint = MatXXt::Zero(framePars, pointPars);
+  hessian.pointPoint = VecXt::Zero(pointPars);
 
   Array2d<Accumulator<Residual::FrameFrameHessian>> frameFrameBlocks(
       boost::extents[nonconstFrames][nonconstFrames]);
@@ -202,7 +205,7 @@ EnergyFunction::Hessian EnergyFunction::getHessian() {
         residual.getJacobian(curHostToTarget, curDHostToTarget,
                              lightWorldToHost, curLightHostToTarget);
     Residual::DeltaHessian deltaHessian =
-        Residual::getDeltaHessian(values, weights, jacobian);
+        Residual::getDeltaHessian(weights, jacobian);
 
     int him1 = hi - 1, tim1 = ti - 1;
     if (hi > 0)
@@ -306,7 +309,7 @@ EnergyFunction::Hessian EnergyFunction::getHessian() {
   }
 
   {
-    MatXX &frameFrame = hessian.frameFrame;
+    MatXXt &frameFrame = hessian.frameFrame;
     int rows = frameFrame.rows();
     for (int startRow = sndFrameDoF; startRow < rows;
          startRow += restFrameDoF) {
@@ -321,7 +324,7 @@ EnergyFunction::Hessian EnergyFunction::getHessian() {
 
   int totalActive = 0;
   for (int fim1 = 0; fim1 < nonconstFrames; ++fim1)
-    for (int pi = 0; pi < nonconstFrames; ++pi)
+    for (int pi = 0; pi < nonconstPoints; ++pi)
       if (framePointBlocks[fim1][pi].wasUsed())
         totalActive++;
 

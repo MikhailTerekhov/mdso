@@ -36,19 +36,20 @@ void S2Parametrization::recalcOrts() {
              v.data();
   Vec3t v1, v2;
   if (minI == 0)
-    v1 = Vec3(0, -v[2], v[1]).normalized();
+    v1 = Vec3t(0, -v[2], v[1]).normalized();
   else if (minI == 1)
-    v1 = Vec3(-v[2], 0, v[0]).normalized();
+    v1 = Vec3t(-v[2], 0, v[0]).normalized();
   else
-    v1 = Vec3(-v[1], v[0], 0).normalized();
+    v1 = Vec3t(-v[1], v[0], 0).normalized();
   v2 = v.cross(v1).normalized();
   localToWorldRot << v1, v2, v;
 }
 
-SO3xS2Parametrization::SO3xS2Parametrization(const SE3t &f1ToWorld,
-                                             const SE3t &f2ToWorld)
-    : mSo3(f2ToWorld.so3())
-    , mS2(f1ToWorld.translation(), f2ToWorld.translation()) {}
+SO3xS2Parametrization::SO3xS2Parametrization(const SE3 &f1ToWorld,
+                                             const SE3 &f2ToWorld)
+    : mSo3(f2ToWorld.so3().cast<T>())
+    , mS2(f1ToWorld.translation().cast<T>(),
+          f2ToWorld.translation().cast<T>()) {}
 
 SO3xS2Parametrization::SO3xS2Parametrization(const SO3t &baseRot,
                                              const Vec3t &centerTrans,

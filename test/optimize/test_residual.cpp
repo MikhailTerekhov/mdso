@@ -27,18 +27,18 @@ template <typename T> struct ErrorBounds;
 
 template <> struct ErrorBounds<float> {
   static constexpr float resEps = 2;
-  static constexpr float valueEps = 1e-7;
-  static constexpr float diffRotEps = 1e-7;
-  static constexpr float diffTransEps = 1e-7;
-  static constexpr float diffAffEps = 1e-7;
+  static constexpr float valueEps = 1e-2;
+  static constexpr float diffRotEps = 2e-2;
+  static constexpr float diffTransEps = 2e-2;
+  static constexpr float diffAffEps = 1e-6;
   static constexpr float diffDepthEps = 1e-7;
 
-  static constexpr float qtqtEps = 1e-7;
-  static constexpr float qtabEps = 1e-7;
+  static constexpr float qtqtEps = 1e-5;
+  static constexpr float qtabEps = 1e-5;
   static constexpr float ababEps = 1e-7;
-  static constexpr float qtdEps = 1e-7;
-  static constexpr float abdEps = 1e-7;
-  static constexpr float ddEps = 1e-7;
+  static constexpr float qtdEps = 1e-5;
+  static constexpr float abdEps = 1e-4;
+  static constexpr float ddEps = 1e-5;
 };
 
 template <> struct ErrorBounds<double> {
@@ -141,10 +141,11 @@ protected:
     kf2.reset(new KeyFrame(std::move(pkf2), pixelSelectors, settings.keyFrame,
                            settings.getPointTracerSettings()));
 
-    for (ImmaturePoint &ip : kf1->frames[0].immaturePoints) {
-      ip.setTrueDepth(depths1(toCvPoint(ip.p)), settings.pointTracer);
-      kf1->frames[0].optimizedPoints.emplace_back(ip);
-    }
+    for (ImmaturePoint &ip : kf1->frames[0].immaturePoints)
+      if (ip.state == ImmaturePoint::ACTIVE) {
+        ip.setTrueDepth(depths1(toCvPoint(ip.p)), settings.pointTracer);
+        kf1->frames[0].optimizedPoints.emplace_back(ip);
+      }
     kf1->frames[0].immaturePoints.clear();
   }
 
@@ -172,8 +173,10 @@ protected:
 TEST_F(ResidualTest, IsSmallOnGT) {
   static constexpr double expectedPercentileOfSmall = 0.1;
 
-  SE3 hostToTarget = cam->bundle[1].bodyToThis * kf2->thisToWorld().inverse() *
-                     kf1->thisToWorld() * cam->bundle[0].thisToBody;
+  SE3t hostToTarget =
+      (cam->bundle[1].bodyToThis * kf2->thisToWorld().inverse() *
+       kf1->thisToWorld() * cam->bundle[0].thisToBody)
+          .cast<T>();
   AffineLightTransform<T> lightHostToTarget =
       (kf2->frames[1].lightWorldToThis *
        kf1->frames[0].lightWorldToThis.inverse())
@@ -182,10 +185,15 @@ TEST_F(ResidualTest, IsSmallOnGT) {
   StdVector<Residual> residuals;
   ceres::TrivialLoss loss;
   int pointInd = 0;
-  for (OptimizedPoint &op : kf1->frames[0].optimizedPoints)
-    residuals.emplace_back(0, 0, 1, 1, pointInd++, &op.logDepth, cam.get(),
+  auto &optimizedPoints = kf1->frames[0].optimizedPoints;
+  std::vector<T> logDepths(optimizedPoints.size());
+  for (int i = 0; i < optimizedPoints.size(); ++i) {
+    OptimizedPoint &op = optimizedPoints[i];
+    logDepths[i] = op.logDepth;
+    residuals.emplace_back(0, 0, 1, 1, pointInd++, &logDepths[i], cam.get(),
                            &kf1->frames[0], &kf2->frames[1], &op, hostToTarget,
                            &loss, residualSettings);
+  }
 
   std::vector<static_vector<T, Residual::MPS>> resValues;
 
@@ -224,14 +232,31 @@ TEST_F(ResidualTest, IsSmallOnGT) {
   }
 }
 
+template <typename From, typename To> To castScalar(const From &from) {
+  return static_cast<To>(from);
+}
+
+template <> Vec2 castScalar<Vec2t, Vec2>(const Vec2t &from) {
+  return from.cast<double>();
+}
+
+template <typename From, typename To, int C>
+static_vector<To, C> castVector(const static_vector<From, C> &from) {
+  static_vector<To, C> result(from.size());
+  for (int i = 0; i < from.size(); ++i)
+    result[i] = castScalar<From, To>(from[i]);
+  return result;
+}
+
 class ResidualCostFunctor {
 public:
-  ResidualCostFunctor(
-      PreKeyFrameEntryInternals::Interpolator_t *targetFrame,
-      const SE3 &hostFrameToBody, const SE3 &targetBodyToFrame, const Vec3 &dir,
-      const static_vector<Vec2, Residual::MPS> &reprojPattern,
-      const static_vector<double, Residual::MPS> &hostIntencities,
-      const CameraModel &camTarget, const ResidualSettings &settings)
+  ResidualCostFunctor(PreKeyFrameEntryInternals::Interpolator_t *targetFrame,
+                      const SE3 &hostFrameToBody, const SE3 &targetBodyToFrame,
+                      const Vec3 &dir,
+                      const static_vector<Vec2t, Residual::MPS> &reprojPattern,
+                      const static_vector<T, Residual::MPS> &hostIntencities,
+                      const CameraModel &camTarget,
+                      const ResidualSettings &settings)
       : targetFrame(targetFrame)
       , hostFrameToBody(hostFrameToBody)
       , targetBodyToFrame(targetBodyToFrame)
@@ -288,8 +313,8 @@ private:
   PreKeyFrameEntryInternals::Interpolator_t *targetFrame;
   SE3 hostFrameToBody, targetBodyToFrame;
   Vec3 dir;
-  static_vector<Vec2, Residual::MPS> reprojPattern;
-  static_vector<double, Residual::MPS> hostIntencities;
+  static_vector<Vec2t, Residual::MPS> reprojPattern;
+  static_vector<T, Residual::MPS> hostIntencities;
   CameraModel camTarget;
   const ResidualSettings &settings;
 };
@@ -323,8 +348,9 @@ TEST_F(ResidualTest, AreValuesAndJacobianCorrect) {
   SE3 targetBodyToFrame = cam->bundle[1].bodyToThis;
   SE3 hostToWorld = kf1->thisToWorld();
   SE3 targetToWorld = kf2->thisToWorld();
-  SE3 hostToTarget = targetBodyToFrame * targetToWorld.inverse() * hostToWorld *
-                     hostFrameToBody;
+  SE3t hostToTarget = (targetBodyToFrame * targetToWorld.inverse() *
+                       hostToWorld * hostFrameToBody)
+                          .cast<T>();
   AffLightT lightWorldToHost = kf1->frames[0].lightWorldToThis.cast<T>();
   AffLightT lightWorldToTarget = kf2->frames[1].lightWorldToThis.cast<T>();
   AffLightT lightHostToTarget =
@@ -338,11 +364,15 @@ TEST_F(ResidualTest, AreValuesAndJacobianCorrect) {
   std::vector<EvalError> errors;
   double timeEvalMy = 0, timeEvalAuto = 0;
   int pointInd = 0;
-  for (OptimizedPoint &op : kf1->frames[0].optimizedPoints) {
+  auto &optimizedPoints = kf1->frames[0].optimizedPoints;
+  std::vector<T> logDepths(optimizedPoints.size());
+  for (int i = 0; i < optimizedPoints.size(); ++i) {
+    OptimizedPoint &op = optimizedPoints[i];
+    logDepths[i] = op.logDepth;
     std::chrono::time_point<std::chrono::system_clock> start, end;
     start = std::chrono::system_clock::now();
 
-    Residual residual(0, 0, 1, 1, pointInd++, &op.logDepth, cam.get(),
+    Residual residual(0, 0, 1, 1, pointInd++, &logDepths[i], cam.get(),
                       &kf1->frames[0], &kf2->frames[1], &op, hostToTarget,
                       &loss, residualSettings);
     Vec2 reproj;
@@ -351,9 +381,8 @@ TEST_F(ResidualTest, AreValuesAndJacobianCorrect) {
     VecX actualValues(patternSize);
     for (int i = 0; i < patternSize; ++i)
       actualValues[i] = actualValuesStatic[i];
-    Residual::Jacobian jacobian =
-        residual.getJacobian(hostToTarget.cast<T>(), dHostToTarget,
-                             lightWorldToHost, lightHostToTarget);
+    Residual::Jacobian jacobian = residual.getJacobian(
+        hostToTarget, dHostToTarget, lightWorldToHost, lightHostToTarget);
 
     end = std::chrono::system_clock::now();
     timeEvalMy +=
@@ -449,7 +478,7 @@ TEST_F(ResidualTest, AreValuesAndJacobianCorrect) {
     error.lightWorldToTargetErr =
         (actual_dr_daff_target - expected_dr_daff_target.cast<T>()).norm();
 
-    EXPECT_LE(relOrAbs(error.valueErr, expectedValues.norm(), valueEps),
+    EXPECT_LE(relOrAbs(error.valueErr, T(expectedValues.norm()), valueEps),
               valueEps)
         << "actual:\n"
         << actualValues.transpose() << "\nexpected:\n"
@@ -459,8 +488,8 @@ TEST_F(ResidualTest, AreValuesAndJacobianCorrect) {
               diffRotEps)
         << "actual:\n"
         << actual_dr_dq_host_tang << "\nexpected:\n"
-        << expected_dr_dq_host_tang << "\n";
-    EXPECT_LE(relOrAbs(error.hostToWorldTransErr, expected_dr_dt_host.norm(),
+        << expected_dr_dq_host_tang << "\ni = " << i << "\n";
+    EXPECT_LE(relOrAbs(error.hostToWorldTransErr, T(expected_dr_dt_host.norm()),
                        diffTransEps),
               diffTransEps)
         << "actual:\n"
@@ -473,26 +502,27 @@ TEST_F(ResidualTest, AreValuesAndJacobianCorrect) {
         << actual_dr_dq_target_tang << "\nexpected:\n"
         << expected_dr_dq_target_tang << "\n";
     EXPECT_LE(relOrAbs(error.targetToWorldTransErr,
-                       expected_dr_dt_target.norm(), diffTransEps),
+                       T(expected_dr_dt_target.norm()), diffTransEps),
               diffTransEps)
         << "actual:\n"
         << actual_dr_dt_target << "\nexpected:\n"
-        << expected_dr_dt_target << "\n";
-    EXPECT_LE(relOrAbs(error.lightWorldToHostErr, expected_dr_daff_host.norm(),
-                       diffAffEps),
+        << expected_dr_dt_target
+        << "\nabs error = " << error.targetToWorldTransErr << "\n";
+    EXPECT_LE(relOrAbs(error.lightWorldToHostErr,
+                       T(expected_dr_daff_host.norm()), diffAffEps),
               diffAffEps)
         << "actual:\n"
         << actual_dr_daff_host << "\nexpected:\n"
         << expected_dr_daff_host << "\n";
     EXPECT_LE(relOrAbs(error.lightWorldToTargetErr,
-                       expected_dr_daff_target.norm(), diffAffEps),
+                       T(expected_dr_daff_target.norm()), diffAffEps),
               diffAffEps)
         << "actual:\n"
         << actual_dr_daff_target << "\nexpected:\n"
         << expected_dr_daff_target << "\n";
-    EXPECT_LE(
-        relOrAbs(error.diffLogDepthErr, expected_dr_dlogd.norm(), diffDepthEps),
-        diffDepthEps)
+    EXPECT_LE(relOrAbs(error.diffLogDepthErr, T(expected_dr_dlogd.norm()),
+                       diffDepthEps),
+              diffDepthEps)
         << "actual:\n"
         << actual_dr_dlogd << "\nexpected:\n"
         << expected_dr_dlogd << "\n";
@@ -601,8 +631,9 @@ TEST_F(ResidualTest, IsDeltaHessianCorrect) {
   SE3 targetBodyToFrame = cam->bundle[1].bodyToThis;
   SE3 hostToWorld = kf1->thisToWorld();
   SE3 targetToWorld = kf2->thisToWorld();
-  SE3 hostToTarget = targetBodyToFrame * targetToWorld.inverse() * hostToWorld *
-                     hostFrameToBody;
+  SE3t hostToTarget = (targetBodyToFrame * targetToWorld.inverse() *
+                       hostToWorld * hostFrameToBody)
+                          .cast<T>();
   AffLightT lightWorldToHost = kf1->frames[0].lightWorldToThis.cast<T>();
   AffLightT lightWorldToTarget = kf2->frames[1].lightWorldToThis.cast<T>();
   AffLightT lightHostToTarget =
@@ -613,14 +644,15 @@ TEST_F(ResidualTest, IsDeltaHessianCorrect) {
       kf2->thisToWorld().cast<T>(), cam->bundle[1].bodyToThis.cast<T>());
 
   ceres::TrivialLoss loss;
-  std::vector<EvalError> errors;
-  double timeEvalMy = 0, timeEvalAuto = 0;
   int pointInd = 0;
-  for (OptimizedPoint &op : kf1->frames[0].optimizedPoints) {
-    std::chrono::time_point<std::chrono::system_clock> start, end;
-    start = std::chrono::system_clock::now();
+  auto &optimizedPoints = kf1->frames[0].optimizedPoints;
+  std::vector<T> logDepths(optimizedPoints.size());
+  std::vector<T> errors;
+  for (int i = 0; i < optimizedPoints.size(); ++i) {
+    OptimizedPoint &op = optimizedPoints[i];
+    logDepths[i] = op.logDepth;
 
-    Residual residual(0, 0, 1, 1, pointInd++, &op.logDepth, cam.get(),
+    Residual residual(0, 0, 1, 1, pointInd++, &logDepths[i], cam.get(),
                       &kf1->frames[0], &kf2->frames[1], &op, hostToTarget,
                       &loss, residualSettings);
     Vec2 reproj;
@@ -630,65 +662,74 @@ TEST_F(ResidualTest, IsDeltaHessianCorrect) {
                              lightWorldToHost, lightHostToTarget);
     auto weights = residual.getWeights(values);
     Residual::DeltaHessian actual =
-        Residual::getDeltaHessian(values, weights, jacobian);
+        Residual::getDeltaHessian(weights, jacobian);
     Residual::DeltaHessian expected =
         getExpectedDeltaHessian(jacobian, weights);
 
-    CHECK_LE(
+    //    T err = relMatrixErr(actual.hostHost.qtqt, expected.hostHost.qtqt,
+    //    0.1); EXPECT_LE(err,
+    //              0.1);
+    //    errors.push_back(err);
+    ASSERT_LE(
         relMatrixErr(actual.hostHost.qtqt, expected.hostHost.qtqt, qtqtEps),
-        qtqtEps);
-    CHECK_LE(
+        qtqtEps)
+        << "\ni = " << i << "\n";
+    ASSERT_LE(
         relMatrixErr(actual.hostHost.qtab, expected.hostHost.qtab, qtqtEps),
         qtabEps);
-    CHECK_LE(
+    ASSERT_LE(
         relMatrixErr(actual.hostHost.abqt, expected.hostHost.abqt, qtabEps),
         qtabEps);
-    CHECK_LE(
+    ASSERT_LE(
         relMatrixErr(actual.hostHost.abab, expected.hostHost.abab, ababEps),
         ababEps);
 
-    CHECK_LE(
+    ASSERT_LE(
         relMatrixErr(actual.hostTarget.qtqt, expected.hostTarget.qtqt, qtqtEps),
         qtqtEps);
-    CHECK_LE(
+    ASSERT_LE(
         relMatrixErr(actual.hostTarget.qtab, expected.hostTarget.qtab, qtqtEps),
         qtabEps);
-    CHECK_LE(
+    ASSERT_LE(
         relMatrixErr(actual.hostTarget.abqt, expected.hostTarget.abqt, qtabEps),
         qtabEps);
-    CHECK_LE(
+    ASSERT_LE(
         relMatrixErr(actual.hostTarget.abab, expected.hostTarget.abab, ababEps),
         ababEps);
 
-    CHECK_LE(relMatrixErr(actual.targetTarget.qtqt, expected.targetTarget.qtqt,
-                          qtqtEps),
-             qtqtEps);
-    CHECK_LE(relMatrixErr(actual.targetTarget.qtab, expected.targetTarget.qtab,
-                          qtqtEps),
-             qtabEps);
-    CHECK_LE(relMatrixErr(actual.targetTarget.abqt, expected.targetTarget.abqt,
-                          qtabEps),
-             qtabEps);
-    CHECK_LE(relMatrixErr(actual.targetTarget.qtqt, expected.targetTarget.qtqt,
-                          qtqtEps),
-             qtqtEps);
+    ASSERT_LE(relMatrixErr(actual.targetTarget.qtqt, expected.targetTarget.qtqt,
+                           qtqtEps),
+              qtqtEps);
+    ASSERT_LE(relMatrixErr(actual.targetTarget.qtab, expected.targetTarget.qtab,
+                           qtqtEps),
+              qtabEps);
+    ASSERT_LE(relMatrixErr(actual.targetTarget.abqt, expected.targetTarget.abqt,
+                           qtabEps),
+              qtabEps);
+    ASSERT_LE(relMatrixErr(actual.targetTarget.qtqt, expected.targetTarget.qtqt,
+                           qtqtEps),
+              qtqtEps);
 
-    CHECK_LE(relMatrixErr(actual.hostPoint.qtd, expected.hostPoint.qtd, qtdEps),
-             qtdEps);
-    CHECK_LE(relMatrixErr(actual.hostPoint.abd, expected.hostPoint.abd, abdEps),
-             abdEps);
+    ASSERT_LE(
+        relMatrixErr(actual.hostPoint.qtd, expected.hostPoint.qtd, qtdEps),
+        qtdEps);
+    ASSERT_LE(
+        relMatrixErr(actual.hostPoint.abd, expected.hostPoint.abd, abdEps),
+        abdEps);
 
-    CHECK_LE(
+    ASSERT_LE(
         relMatrixErr(actual.targetPoint.qtd, expected.targetPoint.qtd, qtdEps),
         qtdEps);
-    CHECK_LE(
+    ASSERT_LE(
         relMatrixErr(actual.targetPoint.abd, expected.targetPoint.abd, abdEps),
         abdEps);
 
-    CHECK_LE(relOrAbs(actual.pointPoint - expected.pointPoint,
-                      expected.pointPoint, ddEps),
-             ddEps);
+    ASSERT_LE(relOrAbs(actual.pointPoint - expected.pointPoint,
+                       expected.pointPoint, ddEps),
+              ddEps);
   }
+
+  outputArray("relqtqt.txt", errors);
 }
 
 int main(int argc, char **argv) {

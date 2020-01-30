@@ -77,6 +77,8 @@ public:
 
     Vec2t gradItarget[MPS];
 
+    bool isInfDepth;
+
     MatR4t dr_dq_host(int patternSize) const;
     MatR3t dr_dt_host(int patternSize) const;
     MatR4t dr_dq_target(int patternSize) const;
@@ -107,10 +109,10 @@ public:
   inline int targetCamInd() const { return mTargetCamInd; }
   inline int pointInd() const { return mPointInd; }
 
-  inline static_vector<Vec2, MPS> getReprojPattern() const {
+  inline static_vector<Vec2t, MPS> getReprojPattern() const {
     return reprojPattern;
   }
-  inline static_vector<double, MPS> getHostIntensities() const {
+  inline static_vector<T, MPS> getHostIntensities() const {
     return hostIntensities;
   }
 
@@ -120,7 +122,7 @@ public:
     return getValues(hostToTargetImage, lightHostToTarget, nullptr);
   }
 
-  static_vector<T, MPS> getValues(const SE3 &hostToTargetImage,
+  static_vector<T, MPS> getValues(const SE3t &hostToTargetImage,
                                   const AffLightT &lightHostToTarget,
                                   Vec2 *reprojOut) const;
   static_vector<T, MPS> getWeights(const static_vector<T, MPS> &values) const;
@@ -129,8 +131,7 @@ public:
                        const AffLightT &lightWorldToHost,
                        const AffLightT &lightHostToTarget) const;
 
-  static DeltaHessian getDeltaHessian(const static_vector<T, MPS> &values,
-                                      const static_vector<T, MPS> &weights,
+  static DeltaHessian getDeltaHessian(const static_vector<T, MPS> &weights,
                                       const Residual::Jacobian &jacobian);
 
   friend std::ostream &operator<<(std::ostream &os, const Residual &res);

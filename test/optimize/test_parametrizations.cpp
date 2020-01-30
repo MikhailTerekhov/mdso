@@ -12,25 +12,25 @@ constexpr int sampleCount = 100;
 template <typename T> struct ErrorBounds;
 
 template <> struct ErrorBounds<float> {
-  static constexpr float zeroAddRelDelta = 1e-7;
-  static constexpr float jacobianRelDelta = 1e-7;
+  static constexpr float zeroAddRelDelta = 1e-6;
+  static constexpr float jacobianRelDelta = 1e-5;
 
   template <typename Parametrization> struct OnManifold;
 };
 
 template <>
 struct ErrorBounds<float>::OnManifold<RightExpParametrization<SO3t>> {
-  static constexpr float value = 1e-8;
+  static constexpr float value = 1e-6;
 };
 template <>
 struct ErrorBounds<float>::OnManifold<RightExpParametrization<SE3t>> {
-  static constexpr float value = 1e-8;
+  static constexpr float value = 1e-6;
 };
 template <> struct ErrorBounds<float>::OnManifold<S2Parametrization> {
-  static constexpr float value = 1e-8;
+  static constexpr float value = 1e-6;
 };
 template <> struct ErrorBounds<float>::OnManifold<SO3xS2Parametrization> {
-  static constexpr float value = 1e-8;
+  static constexpr float value = 1e-6;
 };
 
 template <> struct ErrorBounds<double> {
@@ -149,10 +149,11 @@ public:
       : p(p) {}
 
   bool operator()(const double *deltaP, double *result) const {
-    using Tangent = typename Parametrization::Tangent;
+    using TangentD = Eigen::Matrix<double, Parametrization::DoF, 1>;
+    using TangentT = Eigen::Matrix<T, Parametrization::DoF, 1>;
     Parametrization newP = p;
-    Eigen::Map<const Tangent> deltaM(deltaP);
-    Tangent delta(deltaM);
+    Eigen::Map<const TangentD> deltaM(deltaP);
+    TangentT delta(deltaM.template cast<T>());
     newP.addDelta(delta);
     auto value = newP.value();
     for (int i = 0; i < Parametrization::num_parameters; ++i)
@@ -169,35 +170,38 @@ TYPED_TEST(ParametrizationTest, diffPlus) {
   constexpr int nparams = Parametrization::num_parameters;
   constexpr int DoF = Parametrization::DoF;
   using VecNPt = Eigen::Matrix<T, nparams, 1>;
-  using VecDoFt = Eigen::Matrix<T, DoF, 1>;
-  using MatDiff = Eigen::Matrix<T, nparams, DoF, Eigen::RowMajor>;
+  using VecNP = Eigen::Matrix<double, nparams, 1>;
+  using VecDoF = Eigen::Matrix<double, DoF, 1>;
+  using MatDiff = Eigen::Matrix<double, nparams, DoF, Eigen::RowMajor>;
 
   for (const Parametrization &p : this->samples) {
     ceres::NumericDiffCostFunction<PlusFunctor<Parametrization>, ceres::RIDDERS,
                                    nparams, DoF>
         plus(new PlusFunctor(p));
     MatDiff expectedJacobian;
-    VecDoFt delta = VecDoFt::Zero();
-    VecNPt pPlus0;
-    auto value = p.value();
-    Eigen::Map<VecNPt> pRaw(value.data());
+    VecDoF delta = VecDoF::Zero();
+    VecNP expectedValue;
+    auto actualValueOrig = p.value();
+    Eigen::Map<VecNPt> valueMap(actualValueOrig.data());
+    VecNP actualValue = valueMap.template cast<double>();
     double *expectedJacobianData = expectedJacobian.data();
     double *deltaData = delta.data();
-    plus.Evaluate(&deltaData, pPlus0.data(), &expectedJacobianData);
-    MatDiff actualJacobian = p.diffPlus();
+    plus.Evaluate(&deltaData, expectedValue.data(), &expectedJacobianData);
+    MatDiff actualJacobian = p.diffPlus().template cast<double>();
 
-    T errJacobian =
+    double errJacobian =
         (expectedJacobian - actualJacobian).norm() / expectedJacobian.norm();
     ASSERT_LE(errJacobian, ErrorBounds<T>::jacobianRelDelta)
         << "expected =\n"
         << expectedJacobian << "\nactual =\n"
         << actualJacobian;
 
-    T errZeroAdd = (pPlus0 - pRaw).norm() / pRaw.norm();
+    double errZeroAdd =
+        (expectedValue - actualValue).norm() / actualValue.norm();
     ASSERT_LE(errZeroAdd, ErrorBounds<T>::zeroAddRelDelta)
         << "expected =\n"
-        << pRaw.transpose() << "\nactual =\n"
-        << pPlus0.transpose();
+        << expectedValue.transpose() << "\nactual =\n"
+        << expectedValue.transpose();
   }
 }
 

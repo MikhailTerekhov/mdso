@@ -26,8 +26,8 @@ Residual::Residual(int hostInd, int hostCamInd, int targetInd, int targetCamInd,
     , lossFunction(lossFunction)
     , camTarget(&cam->bundle[targetCamInd].cam)
     , target(targetFrame)
-    , hostDir(optimizedPoint->dir.cast<T>())
     , hostPoint(optimizedPoint->p.cast<T>())
+    , hostDir(optimizedPoint->dir.cast<T>())
     , settings(settings)
     , reprojPattern(settings.residualPattern.pattern().size())
     , hostIntensities(settings.residualPattern.pattern().size())
@@ -39,10 +39,11 @@ Residual::Residual(int hostInd, int hostCamInd, int targetInd, int targetCamInd,
   for (int i = 0; i < reprojPattern.size(); ++i) {
     Vec2t r = camTarget->map(
         hostToTargetImage *
-        (depth *
-         camHost
-             ->unmap((hostPoint + settings.residualPattern.pattern()[i]).eval())
-             .normalized()));
+        (depth * camHost
+                     ->unmap((hostPoint +
+                              settings.residualPattern.pattern()[i].cast<T>())
+                                 .eval())
+                     .normalized()));
     reprojPattern[i] = r - reproj;
   }
 
@@ -112,8 +113,12 @@ Residual::getJacobian(const SE3t &hostToTarget,
       &target->preKeyFrameEntry->internals->interpolator(0);
 
   T depth = exp(*logDepth);
-  if (!std::isfinite(depth))
+
+  jacobian.isInfDepth = false;
+  if (!std::isfinite(depth)) {
+    jacobian.isInfDepth = true;
     depth = settings.depth.max;
+  }
   Vec3t hostVec = depth * hostDir;
   Vec4t hostVecH = makeHomogeneous(hostVec);
   Vec3t targetVec = hostToTarget * hostVec;
@@ -192,8 +197,7 @@ inline Residual::FramePointHessian H_framepoint(const Mat27t &dp_dqt,
 }
 
 Residual::DeltaHessian
-Residual::getDeltaHessian(const static_vector<T, MPS> &values,
-                          const static_vector<T, MPS> &weights,
+Residual::getDeltaHessian(const static_vector<T, MPS> &weights,
                           const Residual::Jacobian &jacobian) {
 
   DeltaHessian deltaHessian;
@@ -203,8 +207,8 @@ Residual::getDeltaHessian(const static_vector<T, MPS> &values,
   Mat27t dtarget_dp_dqt;
   dtarget_dp_dqt << jacobian.dtarget.dp_dq, jacobian.dtarget.dp_dt;
 
-  Mat22t sum_wgradgradT;
-  for (int i = 0; i < values.size(); ++i)
+  Mat22t sum_wgradgradT = Mat22t::Zero();
+  for (int i = 0; i < weights.size(); ++i)
     sum_wgradgradT += weights[i] * jacobian.gradItarget[i] *
                       jacobian.gradItarget[i].transpose();
   Mat22t sum_gradab_host =

@@ -169,6 +169,13 @@ set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -march=native")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g3 -DNDEBUG -march=native")
 
+if (FLOAT_OPTIMIZATION)
+  add_definitions(-DOPT_T=float)
+else()
+  add_definitions(-DOPT_T=double)
+endif()
+
+
 add_library(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES}
     ${dso_internal_SOURCE_FILES} ${dso_internal_HEADER_FILES}
     ${essietial_5pt_estimator_SOURCE_FILES}

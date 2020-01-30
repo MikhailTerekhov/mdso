@@ -58,6 +58,7 @@ struct KeyFrame {
 
 private:
   void addImmatures(const cv::Point points[], int size, int numInBundle,
+                    CameraModel *cam,
                     const PointTracerSettings &tracingSettings);
 };
 

@@ -78,11 +78,6 @@ CameraModel::CameraModel(int width, int height, double f, double cx, double cy,
   LOG(INFO) << "\nmap poly coeffs = " << mapPolyCoeffs.transpose() << "\n\n";
 }
 
-bool CameraModel::isMappable(const Vec3 &point) const {
-  double angle = atan2(point.head<2>().norm(), point[2]);
-  return angle < maxAngle;
-}
-
 template <typename T>
 std::pair<Eigen::Matrix<T, 2, 1>, Eigen::Matrix<T, 2, 3>>
 diffMapHelper(const CameraModel *cam, const Eigen::Matrix<T, 3, 1> &ray) {

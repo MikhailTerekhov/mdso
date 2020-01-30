@@ -19,7 +19,7 @@
 namespace mdso {
 
 namespace optimize {
-using T = double;
+using T = OPT_T;
 using Vec2t = Eigen::Matrix<T, 2, 1>;
 using Vec3t = Eigen::Matrix<T, 3, 1>;
 using Vec4t = Eigen::Matrix<T, 4, 1>;
@@ -27,6 +27,7 @@ using Vec5t = Eigen::Matrix<T, 5, 1>;
 using Vec7t = Eigen::Matrix<T, 7, 1>;
 using Vec8t = Eigen::Matrix<T, 8, 1>;
 using Vec9t = Eigen::Matrix<T, 9, 1>;
+using VecXt = Eigen::Matrix<T, Eigen::Dynamic, 1>;
 
 using Mat22t = Eigen::Matrix<T, 2, 2>;
 using Mat23t = Eigen::Matrix<T, 2, 3>;
@@ -50,6 +51,7 @@ using Mat12x4t = Eigen::Matrix<T, 12, 4>;
 using MatX2t = Eigen::Matrix<T, Eigen::Dynamic, 2>;
 using MatX3t = Eigen::Matrix<T, Eigen::Dynamic, 3>;
 using MatX4t = Eigen::Matrix<T, Eigen::Dynamic, 4>;
+using MatXXt = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 
 using SE3t = Sophus::SE3<T>;
 using SO3t = Sophus::SO3<T>;
