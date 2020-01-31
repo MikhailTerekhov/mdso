@@ -18,7 +18,7 @@ using MatX4RM = Eigen::Matrix<double, Eigen::Dynamic, 4, Eigen::RowMajor>;
 
 using MatX3RMt = Eigen::Matrix<T, Eigen::Dynamic, 3, Eigen::RowMajor>;
 
-using WeightsVector = static_vector<T, Residual::MPS>;
+using WeightsVector = VecRt;
 
 DEFINE_string(mfov_dir, "/shared/datasets/mfov",
               "Root folder of the MultiFoV dataset.");
@@ -195,7 +195,7 @@ TEST_F(ResidualTest, IsSmallOnGT) {
                            &loss, residualSettings);
   }
 
-  std::vector<static_vector<T, Residual::MPS>> resValues;
+  StdVector<VecRt> resValues;
 
   //  cv::Mat3b f1 = kf1->frames[0].preKeyFrameEntry->frameColored.clone();
   //  cv::Mat3b f2 = kf2->frames[1].preKeyFrameEntry->frameColored.clone();
@@ -232,29 +232,13 @@ TEST_F(ResidualTest, IsSmallOnGT) {
   }
 }
 
-template <typename From, typename To> To castScalar(const From &from) {
-  return static_cast<To>(from);
-}
-
-template <> Vec2 castScalar<Vec2t, Vec2>(const Vec2t &from) {
-  return from.cast<double>();
-}
-
-template <typename From, typename To, int C>
-static_vector<To, C> castVector(const static_vector<From, C> &from) {
-  static_vector<To, C> result(from.size());
-  for (int i = 0; i < from.size(); ++i)
-    result[i] = castScalar<From, To>(from[i]);
-  return result;
-}
-
 class ResidualCostFunctor {
 public:
   ResidualCostFunctor(PreKeyFrameEntryInternals::Interpolator_t *targetFrame,
                       const SE3 &hostFrameToBody, const SE3 &targetBodyToFrame,
                       const Vec3 &dir,
                       const static_vector<Vec2t, Residual::MPS> &reprojPattern,
-                      const static_vector<T, Residual::MPS> &hostIntencities,
+                      const VecRt &hostIntencities,
                       const CameraModel &camTarget,
                       const ResidualSettings &settings)
       : targetFrame(targetFrame)
@@ -314,7 +298,7 @@ private:
   SE3 hostFrameToBody, targetBodyToFrame;
   Vec3 dir;
   static_vector<Vec2t, Residual::MPS> reprojPattern;
-  static_vector<T, Residual::MPS> hostIntencities;
+  VecRt hostIntencities;
   CameraModel camTarget;
   const ResidualSettings &settings;
 };
@@ -376,11 +360,8 @@ TEST_F(ResidualTest, AreValuesAndJacobianCorrect) {
                       &kf1->frames[0], &kf2->frames[1], &op, hostToTarget,
                       &loss, residualSettings);
     Vec2 reproj;
-    auto actualValuesStatic =
+    auto actualValues =
         residual.getValues(hostToTarget, lightHostToTarget, &reproj);
-    VecX actualValues(patternSize);
-    for (int i = 0; i < patternSize; ++i)
-      actualValues[i] = actualValuesStatic[i];
     Residual::Jacobian jacobian = residual.getJacobian(
         hostToTarget, dHostToTarget, lightWorldToHost, lightHostToTarget);
 
@@ -399,21 +380,6 @@ TEST_F(ResidualTest, AreValuesAndJacobianCorrect) {
     auto actual_dr_daff_host = jacobian.dr_daff_host(patternSize);
     auto actual_dr_daff_target = jacobian.dr_daff_target(patternSize);
     auto actual_dr_dlogd = jacobian.dr_dlogd(patternSize);
-
-    //    for (int i = 0; i < patternSize; ++i) {
-    //      actual_dr_dq_host.row(i) =
-    //          jacobian.gradItarget[i].transpose() * jacobian.dhost.dp_dq;
-    //      actual_dr_dt_host.row(i) =
-    //          jacobian.gradItarget[i].transpose() * jacobian.dhost.dp_dt;
-    //      actual_dr_dq_target.row(i) =
-    //          jacobian.gradItarget[i].transpose() * jacobian.dtarget.dp_dq;
-    //      actual_dr_dt_target.row(i) =
-    //          jacobian.gradItarget[i].transpose() * jacobian.dtarget.dp_dt;
-    //      actual_dr_daff_host.row(i) = jacobian.dhost.dr_dab[i].transpose();
-    //      actual_dr_daff_target.row(i) =
-    //      jacobian.dtarget.dr_dab[i].transpose(); actual_dr_dlogd[i] =
-    //          jacobian.gradItarget[i].transpose() * jacobian.dp_dlogd;
-    //    }
 
     ceres::AutoDiffCostFunction<ResidualCostFunctor, ceres::DYNAMIC, 4, 3, 4, 3,
                                 2, 2, 1>

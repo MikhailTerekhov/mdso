@@ -64,18 +64,21 @@ public:
     struct DiffFrameParams {
       EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
+      DiffFrameParams(int patternSize);
+
       Eigen::Matrix<T, 2, SO3t::num_parameters> dp_dq;
-      Eigen::Matrix<T, 2, 3> dp_dt;
-      Vec2t dr_dab[MPS];
+      Mat23t dp_dt;
+      MatR2t dr_dab;
     };
 
-    Mat23t dpi;
+    Jacobian(int patternSize);
 
     DiffFrameParams dhost;
     DiffFrameParams dtarget;
     Vec2t dp_dlogd;
 
-    Vec2t gradItarget[MPS];
+    // each row is a transposed gradient
+    MatR2t gradItarget;
 
     bool isInfDepth;
 
@@ -112,26 +115,22 @@ public:
   inline static_vector<Vec2t, MPS> getReprojPattern() const {
     return reprojPattern;
   }
-  inline static_vector<T, MPS> getHostIntensities() const {
-    return hostIntensities;
-  }
+  inline VecRt getHostIntensities() const { return hostIntensities; }
 
-  inline static_vector<T, MPS>
-  getValues(const SE3t &hostToTargetImage,
-            const AffLightT &lightHostToTarget) const {
+  inline VecRt getValues(const SE3t &hostToTargetImage,
+                         const AffLightT &lightHostToTarget) const {
     return getValues(hostToTargetImage, lightHostToTarget, nullptr);
   }
 
-  static_vector<T, MPS> getValues(const SE3t &hostToTargetImage,
-                                  const AffLightT &lightHostToTarget,
-                                  Vec2 *reprojOut) const;
-  static_vector<T, MPS> getWeights(const static_vector<T, MPS> &values) const;
+  VecRt getValues(const SE3t &hostToTargetImage,
+                  const AffLightT &lightHostToTarget, Vec2 *reprojOut) const;
+  VecRt getWeights(const VecRt &values) const;
   Jacobian getJacobian(const SE3t &hostToTarget,
                        const MotionDerivatives &dHostToTarget,
                        const AffLightT &lightWorldToHost,
                        const AffLightT &lightHostToTarget) const;
 
-  static DeltaHessian getDeltaHessian(const static_vector<T, MPS> &weights,
+  static DeltaHessian getDeltaHessian(const VecRt &weights,
                                       const Residual::Jacobian &jacobian);
 
   friend std::ostream &operator<<(std::ostream &os, const Residual &res);
@@ -152,8 +151,8 @@ private:
   Vec3t hostDir;
   const ResidualSettings &settings;
   static_vector<Vec2t, MPS> reprojPattern;
-  static_vector<T, MPS> hostIntensities;
-  static_vector<T, MPS> gradWeights;
+  VecRt hostIntensities;
+  VecRt gradWeights;
 };
 
 } // namespace mdso::optimize

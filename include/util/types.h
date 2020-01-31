@@ -31,6 +31,7 @@ using VecXt = Eigen::Matrix<T, Eigen::Dynamic, 1>;
 
 using Mat22t = Eigen::Matrix<T, 2, 2>;
 using Mat23t = Eigen::Matrix<T, 2, 3>;
+using Mat24t = Eigen::Matrix<T, 2, 4>;
 using Mat26t = Eigen::Matrix<T, 2, 6>;
 using Mat27t = Eigen::Matrix<T, 2, 7>;
 using Mat33t = Eigen::Matrix<T, 3, 3>;
