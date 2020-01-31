@@ -14,7 +14,7 @@ bool cmp(const cv::Point &a, const cv::Point &b) {
 }
 
 TEST(UtilTest, DepthedImagePyramid) {
-  const int w = 1024, h = 512, cnt = 2000;
+  const int w = 1024, h = 512, cnt = 200;
 
   std::mt19937 mt;
   std::uniform_int_distribution<int> x(0, w - 1), y(0, h - 1);
@@ -34,10 +34,13 @@ TEST(UtilTest, DepthedImagePyramid) {
   DepthedImagePyramid tst(base, Settings::Pyramid::default_levelNum,
                           pnts.data(), dps.data(), ws.data(), pnts.size());
 
-  for (int i = 0; i < pnts.size(); ++i) {
-    for (int pl = 0; pl < Settings::Pyramid::default_levelNum; ++pl) {
-      cv::Point p = toCvPoint(pnts[i]);
-      ASSERT_GT(tst.depths[pl](p / (1 << pl)), 0)
+  for (int pl = 0; pl < Settings::Pyramid::default_levelNum; ++pl) {
+    cv::Mat1d depthMat(h / (1 << pl), w / (1 << pl));
+    for (const auto [p, d] : tst.depths[pl])
+      depthMat(toCvPoint(p)) = d;
+    for (int i = 0; i < pnts.size(); ++i) {
+      cv::Point p = toCvPoint((pnts[i] / (1 << pl)).eval());
+      ASSERT_GT(depthMat(p), 0)
           << "pl=" << pl << " p=" << p << " psh=" << p / (1 << pl) << " i=" << i
           << " d=" << dps[i] << " w=" << ws[i] << " porig=" << pnts[i]
           << std::endl;

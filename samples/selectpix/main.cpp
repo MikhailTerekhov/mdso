@@ -37,7 +37,7 @@ Where dir names a directory with images with .jpg extension
 
   for (const fs::path &fname : fnames) {
     if (isImage(fname)) {
-      cv::Mat imCol = cv::imread(fname.c_str());
+      cv::Mat3b imCol = cv::imread(fname.c_str());
       cv::Mat im = cvtBgrToGray(imCol);
       if (!im.data)
         continue;

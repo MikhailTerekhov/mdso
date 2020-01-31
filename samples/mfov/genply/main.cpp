@@ -267,7 +267,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
   DsoSystem dso(&cam, preprocessor, observers, settings);
   for (int it = FLAGS_start; it < FLAGS_start + FLAGS_count; ++it) {
     std::cout << "add frame #" << it << std::endl;
-    cv::Mat frame = reader.getFrame(it);
+    cv::Mat3b frame = reader.getFrame(it);
     Timestamp timestamp = it;
     dso.addMultiFrame(&frame, &timestamp);
 
