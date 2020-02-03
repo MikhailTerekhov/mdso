@@ -27,35 +27,6 @@ class Residual {
 public:
   static constexpr int MPS = Settings::ResidualPattern::max_size;
 
-  Residual(int hostInd, int hostCamInd, int targetInd, int targetCamInd,
-           int pointInd, const T *logDepth, CameraBundle *cam,
-           KeyFrameEntry *hostFrame, KeyFrameEntry *targetFrame,
-           OptimizedPoint *optimizedPoint, const SE3t &hostToTargetImage,
-           ceres::LossFunction *lossFunction, const ResidualSettings &settings);
-
-  struct FrameFrameHessian {
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
-    FrameFrameHessian();
-    FrameFrameHessian &operator+=(const FrameFrameHessian &other);
-    FrameFrameHessian transpose() const;
-
-    Eigen::Matrix<T, SE3t::num_parameters, SE3t::num_parameters> qtqt;
-    Eigen::Matrix<T, SE3t::num_parameters, AffLightT::DoF> qtab;
-    Eigen::Matrix<T, AffLightT::DoF, SE3t::num_parameters> abqt;
-    Eigen::Matrix<T, AffLightT::DoF, AffLightT::DoF> abab;
-  };
-
-  struct FramePointHessian {
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
-    FramePointHessian();
-    FramePointHessian &operator+=(const FramePointHessian &other);
-
-    Eigen::Matrix<T, SE3t::num_parameters, 1> qtd;
-    Eigen::Matrix<T, AffLightT::DoF, 1> abd;
-  };
-
   struct Jacobian {
     static constexpr int MPS = Settings::ResidualPattern::max_size;
 
@@ -91,6 +62,29 @@ public:
     VecRt dr_dlogd(int patternSize) const;
   };
 
+  struct FrameFrameHessian {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    FrameFrameHessian();
+    FrameFrameHessian &operator+=(const FrameFrameHessian &other);
+    FrameFrameHessian transpose() const;
+
+    Eigen::Matrix<T, SE3t::num_parameters, SE3t::num_parameters> qtqt;
+    Eigen::Matrix<T, SE3t::num_parameters, AffLightT::DoF> qtab;
+    Eigen::Matrix<T, AffLightT::DoF, SE3t::num_parameters> abqt;
+    Eigen::Matrix<T, AffLightT::DoF, AffLightT::DoF> abab;
+  };
+
+  struct FramePointHessian {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    FramePointHessian();
+    FramePointHessian &operator+=(const FramePointHessian &other);
+
+    Eigen::Matrix<T, SE3t::num_parameters, 1> qtd;
+    Eigen::Matrix<T, AffLightT::DoF, 1> abd;
+  };
+
   struct DeltaHessian {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -106,6 +100,32 @@ public:
     T pointPoint;
   };
 
+  struct FrameGradient {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    FrameGradient();
+
+    Eigen::Matrix<T, SE3t::num_parameters, 1> qt;
+    Eigen::Matrix<T, AffLightT::DoF, 1> ab;
+  };
+
+  struct DeltaGradient {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    DeltaGradient();
+
+    FrameGradient host;
+    FrameGradient target;
+
+    T point;
+  };
+
+  Residual(int hostInd, int hostCamInd, int targetInd, int targetCamInd,
+           int pointInd, const T *logDepth, CameraBundle *cam,
+           KeyFrameEntry *hostFrame, KeyFrameEntry *targetFrame,
+           OptimizedPoint *optimizedPoint, const SE3t &hostToTargetImage,
+           ceres::LossFunction *lossFunction, const ResidualSettings &settings);
+
   inline int hostInd() const { return mHostInd; }
   inline int hostCamInd() const { return mHostCamInd; }
   inline int targetInd() const { return mTargetInd; }
@@ -116,22 +136,24 @@ public:
     return reprojPattern;
   }
   inline VecRt getHostIntensities() const { return hostIntensities; }
+  inline Vec3t getHostDir() const { return hostDir; }
 
   inline VecRt getValues(const SE3t &hostToTargetImage,
                          const AffLightT &lightHostToTarget) const {
     return getValues(hostToTargetImage, lightHostToTarget, nullptr);
   }
-
   VecRt getValues(const SE3t &hostToTargetImage,
                   const AffLightT &lightHostToTarget, Vec2 *reprojOut) const;
-  VecRt getWeights(const VecRt &values) const;
+  VecRt getHessianWeights(const VecRt &values) const;
+  VecRt getGradientWeights(const VecRt &values) const;
   Jacobian getJacobian(const SE3t &hostToTarget,
                        const MotionDerivatives &dHostToTarget,
                        const AffLightT &lightWorldToHost,
                        const AffLightT &lightHostToTarget) const;
-
-  static DeltaHessian getDeltaHessian(const VecRt &weights,
-                                      const Residual::Jacobian &jacobian);
+  DeltaHessian getDeltaHessian(const VecRt &values,
+                               const Residual::Jacobian &jacobian) const;
+  DeltaGradient getDeltaGradient(const VecRt &values,
+                                 const Residual::Jacobian &jacobian) const;
 
   friend std::ostream &operator<<(std::ostream &os, const Residual &res);
 

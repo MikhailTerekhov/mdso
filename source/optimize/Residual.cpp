@@ -74,6 +74,51 @@ Residual::Jacobian::Jacobian(int patternSize)
     , gradItarget(MatR2t::Zero(patternSize, 2))
     , isInfDepth(false) {}
 
+Residual::FrameFrameHessian::FrameFrameHessian()
+    : qtqt(Mat77t::Zero())
+    , qtab(Mat72t::Zero())
+    , abqt(Mat27t::Zero())
+    , abab(Mat22t::Zero()) {}
+
+Residual::FrameFrameHessian &Residual::FrameFrameHessian::
+operator+=(const Residual::FrameFrameHessian &other) {
+  qtqt += other.qtqt;
+  qtab += other.qtab;
+  abqt += other.abqt;
+  abab += other.abab;
+  return *this;
+}
+
+Residual::FrameFrameHessian Residual::FrameFrameHessian::transpose() const {
+  FrameFrameHessian transposed;
+  transposed.qtqt = qtqt.transpose();
+  transposed.qtab = abqt.transpose();
+  transposed.abqt = qtab.transpose();
+  transposed.abab = abab.transpose();
+  return transposed;
+}
+
+Residual::FramePointHessian::FramePointHessian()
+    : qtd(Vec7t::Zero())
+    , abd(Vec2t::Zero()) {}
+
+Residual::FramePointHessian &Residual::FramePointHessian::
+operator+=(const Residual::FramePointHessian &other) {
+  qtd += other.qtd;
+  abd += other.abd;
+  return *this;
+}
+
+Residual::DeltaHessian::DeltaHessian()
+    : pointPoint(0) {}
+
+Residual::FrameGradient::FrameGradient()
+    : qt(Vec7t::Zero())
+    , ab(Vec2t::Zero()) {}
+
+Residual::DeltaGradient::DeltaGradient()
+    : point(0) {}
+
 VecRt Residual::getValues(const SE3t &hostToTargetImage,
                           const AffLightT &lightHostToTarget,
                           Vec2 *reprojOut) const {
@@ -96,7 +141,7 @@ VecRt Residual::getValues(const SE3t &hostToTargetImage,
   return result;
 }
 
-VecRt Residual::getWeights(const VecRt &values) const {
+VecRt Residual::getHessianWeights(const VecRt &values) const {
   VecRt weights(settings.residualPattern.pattern().size());
   for (int i = 0; i < weights.size(); ++i) {
     double v = values[i];
@@ -109,6 +154,18 @@ VecRt Residual::getWeights(const VecRt &values) const {
       w = settings.residualWeighting.lossEps * rho[1];
     }
     weights[i] = gradWeights[i] * w;
+  }
+  return weights;
+}
+
+VecRt Residual::getGradientWeights(const optimize::VecRt &values) const {
+  VecRt weights(settings.residualPattern.pattern().size());
+  for (int i = 0; i < weights.size(); ++i) {
+    double v = values[i];
+    double v2 = v * v;
+    double rho[3];
+    lossFunction->Evaluate(v2, rho);
+    weights[i] = gradWeights[i] * rho[1];
   }
   return weights;
 }
@@ -195,8 +252,9 @@ inline Residual::FramePointHessian H_framepoint(const Mat27t &dp_dqt,
 }
 
 Residual::DeltaHessian
-Residual::getDeltaHessian(const VecRt &weights,
-                          const Residual::Jacobian &jacobian) {
+Residual::getDeltaHessian(const VecRt &values,
+                          const Residual::Jacobian &jacobian) const {
+  VecRt weights = getHessianWeights(values);
 
   DeltaHessian deltaHessian;
 
@@ -235,43 +293,29 @@ Residual::getDeltaHessian(const VecRt &weights,
   return deltaHessian;
 }
 
-Residual::FrameFrameHessian::FrameFrameHessian()
-    : qtqt(Mat77t::Zero())
-    , qtab(Mat72t::Zero())
-    , abqt(Mat27t::Zero())
-    , abab(Mat22t::Zero()) {}
-
-Residual::FrameFrameHessian &Residual::FrameFrameHessian::
-operator+=(const Residual::FrameFrameHessian &other) {
-  qtqt += other.qtqt;
-  qtab += other.qtab;
-  abqt += other.abqt;
-  abab += other.abab;
-  return *this;
+inline Residual::FrameGradient
+getFrameGradient(const Residual::Jacobian::DiffFrameParams &dframe,
+                 const Vec2t &gradWR, const VecRt &wr) {
+  Residual::FrameGradient frameGradient;
+  frameGradient.qt.head<4>() = dframe.dp_dq.transpose() * gradWR;
+  frameGradient.qt.tail<3>() = dframe.dp_dt.transpose() * gradWR;
+  frameGradient.ab = dframe.dr_dab.transpose() * wr;
+  return frameGradient;
 }
 
-Residual::FrameFrameHessian Residual::FrameFrameHessian::transpose() const {
-  FrameFrameHessian transposed;
-  transposed.qtqt = qtqt.transpose();
-  transposed.qtab = abqt.transpose();
-  transposed.abqt = qtab.transpose();
-  transposed.abab = abab.transpose();
-  return transposed;
+Residual::DeltaGradient
+Residual::getDeltaGradient(const VecRt &values,
+                           const Residual::Jacobian &jacobian) const {
+  DeltaGradient deltaGradient;
+
+  VecRt weights = getGradientWeights(values);
+  VecRt wr = weights.cwiseProduct(values);
+  Vec2t gradWR = jacobian.gradItarget.transpose() * wr;
+  deltaGradient.host = getFrameGradient(jacobian.dhost, gradWR, wr);
+  deltaGradient.target = getFrameGradient(jacobian.dtarget, gradWR, wr);
+  deltaGradient.point = jacobian.dp_dlogd.dot(gradWR);
+  return deltaGradient;
 }
-
-Residual::FramePointHessian::FramePointHessian()
-    : qtd(Vec7t::Zero())
-    , abd(Vec2t::Zero()) {}
-
-Residual::FramePointHessian &Residual::FramePointHessian::
-operator+=(const Residual::FramePointHessian &other) {
-  qtd += other.qtd;
-  abd += other.abd;
-  return *this;
-}
-
-Residual::DeltaHessian::DeltaHessian()
-    : pointPoint(0) {}
 
 std::ostream &operator<<(std::ostream &os, const Residual &res) {
   os << "host ind = " << res.hostInd()
@@ -283,16 +327,6 @@ std::ostream &operator<<(std::ostream &os, const Residual &res) {
      << "\nhost dir = " << res.hostDir.transpose() << "\n";
   return os;
 }
-
-// std::ostream &operator<<(std::ostream &os, const Residual::Jacobian
-// &jacobian) {
-//  os << "d(pi)/dp = \n"
-//     << jacobian.dpi << "\ndp/dq(host) = \n"
-//     << jacobian.dhost.dp_dq << "\ndp/dt(host) = \n"
-//     << jacobian.dhost.dp_dt << "\ndp/dq(target) = \n"
-//     << jacobian.dtarget.dp_dq << "\ndp/dt(target) = \n"
-//     << jacobian.dtarget.dp_dt;
-//}
 
 MatR4t Residual::Jacobian::dr_dq_host(int patternSize) const {
   return gradItarget * dhost.dp_dq;

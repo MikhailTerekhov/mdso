@@ -200,12 +200,11 @@ EnergyFunction::Hessian EnergyFunction::getHessian() {
     AffLightT lightWorldToHost = getLightWorldToFrame(hi, hci);
     AffLightT curLightHostToTarget = getLightHostToTarget(hi, hci, ti, tci);
     auto values = residual.getValues(curHostToTarget, curLightHostToTarget);
-    auto weights = residual.getWeights(values);
     Residual::Jacobian jacobian =
         residual.getJacobian(curHostToTarget, curDHostToTarget,
                              lightWorldToHost, curLightHostToTarget);
     Residual::DeltaHessian deltaHessian =
-        Residual::getDeltaHessian(weights, jacobian);
+        residual.getDeltaHessian(values, jacobian);
 
     int him1 = hi - 1, tim1 = ti - 1;
     if (hi > 0)
