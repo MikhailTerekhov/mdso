@@ -62,15 +62,24 @@ EnergyFunction::EnergyFunction(CameraBundle *camBundle, KeyFrame **keyFrames,
 
 int EnergyFunction::numPoints() const { return parameters.numPoints(); }
 
+VecRt EnergyFunction::getValues(int residualInd) {
+  CHECK_GE(residualInd, 0);
+  CHECK_LT(residualInd, residuals.size());
+  if (!valuesAndDerivatives)
+    valuesAndDerivatives.emplace(cam, parameters, residuals);
+  return valuesAndDerivatives.value().values[residualInd];
+}
+
 EnergyFunction::Hessian EnergyFunction::getHessian() {
-  constexpr int sndDoF = SecondFrameParametrization::DoF;
-  constexpr int restDoF = FrameParametrization::DoF;
-  constexpr int affDoF = AffLightT::DoF;
-  constexpr int sndFrameDoF = sndDoF + affDoF, restFrameDoF = restDoF + affDoF;
+  constexpr int sndDoF = Parameters::sndDoF;
+  constexpr int restDoF = Parameters::restDoF;
+  constexpr int affDoF = Parameters::affDoF;
+  constexpr int sndFrameDoF = Parameters::sndFrameDoF;
+  constexpr int restFrameDoF = Parameters::restFrameDoF;
 
   int nonconstFrames = parameters.numKeyFrames() - 1;
   int nonconstPoints = parameters.numPoints();
-  int framePars = (nonconstFrames - 1) * restFrameDoF + sndFrameDoF;
+  int framePars = parameters.frameParameters();
   int pointPars = nonconstPoints;
 
   if (!valuesAndDerivatives)
@@ -237,6 +246,71 @@ EnergyFunction::Hessian EnergyFunction::getHessian() {
   return hessian;
 }
 
+EnergyFunction::Gradient EnergyFunction::getGradient() {
+  constexpr int sndDoF = Parameters::sndDoF;
+  constexpr int restDoF = Parameters::restDoF;
+  constexpr int affDoF = Parameters::affDoF;
+  constexpr int sndFrameDoF = Parameters::sndFrameDoF;
+  constexpr int restFrameDoF = Parameters::restFrameDoF;
+
+  int nonconstFrames = parameters.numKeyFrames() - 1;
+  int nonconstPoints = parameters.numPoints();
+  int framePars = parameters.frameParameters();
+  int pointPars = nonconstPoints;
+
+  if (!valuesAndDerivatives)
+    valuesAndDerivatives.emplace(cam, parameters, residuals);
+
+  const ValuesAndDerivatives &valuesAndDerivativesRef =
+      valuesAndDerivatives.value();
+
+  EnergyFunction::Gradient gradient;
+  gradient.frame = VecXt::Zero(parameters.frameParameters());
+  gradient.point = VecXt::Zero(parameters.numPoints());
+
+  std::vector<Accumulator<Residual::FrameGradient>> frameBlocks(nonconstFrames);
+
+  for (int i = 0; i < residuals.size(); ++i) {
+    Residual &residual = residuals[i];
+    int hi = residual.hostInd(), hci = residual.hostCamInd(),
+        ti = residual.targetInd(), tci = residual.targetCamInd(),
+        pi = residual.pointInd();
+    int him1 = hi - 1, tim1 = ti - 1;
+    CHECK_NE(hi, ti);
+
+    Residual::DeltaGradient deltaGradient =
+        residual.getDeltaGradient(valuesAndDerivativesRef.values[i],
+                                  valuesAndDerivativesRef.residualJacobians[i]);
+    if (hi > 0)
+      frameBlocks[him1] += deltaGradient.host;
+    if (ti > 0)
+      frameBlocks[tim1] += deltaGradient.target;
+    gradient.point[pi] += deltaGradient.point;
+  }
+
+  const Mat75t &sndParam =
+      valuesAndDerivativesRef.parametrizationJacobians.dSecondFrame;
+  const auto &restParams =
+      valuesAndDerivativesRef.parametrizationJacobians.dRestFrames;
+  if (frameBlocks[0].wasUsed()) {
+    const Residual::FrameGradient &sndFrameGradient =
+        frameBlocks[0].accumulated();
+    gradient.frame.head<sndDoF>() = sndParam.transpose() * sndFrameGradient.qt;
+    gradient.frame.segment<affDoF>(sndDoF) = sndFrameGradient.ab;
+  }
+  for (int fi = 1, startElem = sndFrameDoF; fi < nonconstFrames;
+       ++fi, startElem += restFrameDoF)
+    if (frameBlocks[fi].wasUsed()) {
+      int fim1 = fi - 1;
+      const Residual::FrameGradient &frameBlock = frameBlocks[fi].accumulated();
+      gradient.frame.segment<restDoF>(startElem) =
+          restParams[fim1].transpose() * frameBlock.qt;
+      gradient.frame.segment<affDoF>(startElem + restDoF) = frameBlock.ab;
+    }
+
+  return gradient;
+}
+
 EnergyFunction::Parameters::Parameters(CameraBundle *cam, KeyFrame **keyFrames,
                                        int newNumKeyFrames)
     : firstBodyToWorld(keyFrames[0]->thisToWorld().cast<T>())
@@ -278,6 +352,10 @@ int EnergyFunction::Parameters::numPoints() const { return logDepths.size(); }
 
 int EnergyFunction::Parameters::camBundleSize() const {
   return lightWorldToFrame.shape()[1];
+}
+
+int EnergyFunction::Parameters::frameParameters() const {
+  return restFrames.size() * restFrameDoF + sndFrameDoF;
 }
 
 void EnergyFunction::Parameters::addPoint(T logDepth) {

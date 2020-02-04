@@ -116,6 +116,13 @@ Residual::FrameGradient::FrameGradient()
     : qt(Vec7t::Zero())
     , ab(Vec2t::Zero()) {}
 
+Residual::FrameGradient &Residual::FrameGradient::
+operator+=(const FrameGradient &other) {
+  qt += other.qt;
+  ab += other.ab;
+  return *this;
+}
+
 Residual::DeltaGradient::DeltaGradient()
     : point(0) {}
 

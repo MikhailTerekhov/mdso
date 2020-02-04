@@ -10,9 +10,6 @@ DEFINE_string(mfov_dir, "/shared/datasets/mfov",
               "Root folder of the MultiFoV dataset.");
 
 DEFINE_int32(opt_count, 100, "Number of optimized points in the problem.");
-DEFINE_bool(get_fill_factor, false,
-            "If set to true, HessianTest only returns H_framepoint fill factor "
-            "without hessian correctness checking.");
 
 using namespace mdso;
 using namespace mdso::optimize;
@@ -23,11 +20,13 @@ using MatSp = Eigen::SparseMatrix<T>;
 template <typename T> struct ErrorBounds;
 
 template <> struct ErrorBounds<float> {
-  static constexpr double hessianRelErr = 1;
+  static constexpr float hessianRelErr = 1e-2;
+  static constexpr float gradientRelErr = 2e-2;
 };
 
 template <> struct ErrorBounds<double> {
-  static constexpr double hessianRelErr = 1e-7;
+  static constexpr double hessianRelErr = 1e-10;
+  static constexpr double gradientRelErr = 1e-11;
 };
 
 class EnergyFunctionTest : public ::testing::Test {
@@ -96,15 +95,63 @@ protected:
                                             kfPtrs.size(), residualSettings));
   }
 
-  void setFrame(MatXXt &jacobian, int residualInd, int frameInd,
-                const MatR4t &dr_dq, const MatR3t &dr_dt,
-                const MatR2t &dr_daff) {
-    if (frameInd == 0)
-      return;
-    if (frameInd == 1)
-      setSecondFrame(jacobian, residualInd, dr_dq, dr_dt, dr_daff);
-    else
-      setOtherFrame(jacobian, residualInd, frameInd, dr_dq, dr_dt, dr_daff);
+  MatXXt getExpectedJacobian() {
+    int PS = settings.residualPattern.pattern().size();
+    int totalFrameParams = sndFrameDoF + (keyFramesCount - 2) * restFrameDoF;
+    MatXXt expectedJacobian =
+        MatXXt::Zero(PS * energyFunction->getResiduals().size(),
+                     totalFrameParams + energyFunction->numPoints());
+    std::cout << "evaluating jacobian: 0% ... ";
+    std::cout.flush();
+    int percent = 0, step = 10;
+    int numResiduals = energyFunction->getResiduals().size();
+    for (int ri = 0; ri < numResiduals; ++ri) {
+      const Residual &res = energyFunction->getResiduals()[ri];
+      int hi = res.hostInd(), ti = res.targetInd();
+      int pi = res.pointInd();
+
+      KeyFrame *host = keyFrames[hi].get();
+      KeyFrame *target = keyFrames[ti].get();
+      SE3t hostToWorld = host->thisToWorld().cast<T>();
+      SE3t targetToWorld = target->thisToWorld().cast<T>();
+      SE3t hostFrameToBody = cam->bundle[0].thisToBody.cast<T>();
+      SE3t targetBodyToFrame = cam->bundle[0].bodyToThis.cast<T>();
+
+      AffLightT lightHostToTarget = (target->frames[0].lightWorldToThis *
+                                     host->frames[0].lightWorldToThis.inverse())
+                                        .cast<T>();
+
+      MotionDerivatives dHostToTarget(hostFrameToBody, hostToWorld,
+                                      targetToWorld, targetBodyToFrame);
+      SE3t hostToTarget = targetBodyToFrame * targetToWorld.inverse() *
+                          hostToWorld * hostFrameToBody;
+
+      VecRt values = res.getValues(hostToTarget, lightHostToTarget);
+      VecRt weights = res.getHessianWeights(values);
+      VecRt sqrtWeights = weights.cwiseSqrt();
+
+      Residual::Jacobian rj = res.getJacobian(
+          hostToTarget, dHostToTarget,
+          host->frames[0].lightWorldToThis.cast<T>(), lightHostToTarget);
+
+      setFrame(expectedJacobian, ri, hi, rj.dr_dq_host(PS), rj.dr_dt_host(PS),
+               rj.dr_daff_host(PS));
+      setFrame(expectedJacobian, ri, ti, rj.dr_dq_target(PS),
+               rj.dr_dt_target(PS), rj.dr_daff_target(PS));
+      int depthCol = totalFrameParams + pi;
+      expectedJacobian.block(ri * PS, depthCol, PS, 1) = rj.dr_dlogd(PS);
+
+      int oldPercent = percent;
+      percent = double(ri + 1) / numResiduals * 100.0;
+      if (percent == 100)
+        std::cout << "100%" << std::endl;
+      else if (oldPercent != percent && percent % step == 0) {
+        std::cout << percent << "% ... ";
+        std::cout.flush();
+      }
+    }
+
+    return expectedJacobian;
   }
 
   std::unique_ptr<MultiFovReader> reader;
@@ -120,6 +167,17 @@ protected:
   int pointsPerFrame;
 
 private:
+  void setFrame(MatXXt &jacobian, int residualInd, int frameInd,
+                const MatR4t &dr_dq, const MatR3t &dr_dt,
+                const MatR2t &dr_daff) {
+    if (frameInd == 0)
+      return;
+    if (frameInd == 1)
+      setSecondFrame(jacobian, residualInd, dr_dq, dr_dt, dr_daff);
+    else
+      setOtherFrame(jacobian, residualInd, frameInd, dr_dq, dr_dt, dr_daff);
+  }
+
   void setSecondFrame(MatXXt &jacobian, int residualInd, const MatR4t &dr_dq,
                       const MatR3t &dr_dt, const MatR2t &dr_daff) {
     int PS = settings.residualPattern.pattern().size();
@@ -149,11 +207,6 @@ private:
   }
 };
 
-template <typename MatrixT>
-MatrixT weightRows(const MatrixT &mat, const VecRt &weights) {
-  return weights.asDiagonal() * mat;
-}
-
 double fillFactor(const MatXXt &mat, double eps) {
   return double((mat.array().abs() >= eps).count()) / mat.size();
 }
@@ -165,104 +218,19 @@ template <typename MatrixT> int countNaNs(const MatrixT &mat) {
 TEST_F(EnergyFunctionTest, isHessianCorrect) {
   static_assert(keyFramesCount >= 2);
 
-  if (FLAGS_get_fill_factor) {
-    std::chrono::time_point<std::chrono::system_clock> start, end;
-    start = std::chrono::system_clock::now();
-    EnergyFunction::Hessian hessian = energyFunction->getHessian();
-    end = std::chrono::system_clock::now();
-    LOG(INFO) << "hessian evaluation time = "
-              << std::chrono::duration_cast<std::chrono::nanoseconds>(end -
-                                                                      start)
-                         .count() *
-                     1e-9
-              << " seconds\n";
-
-    {
-      std::chrono::time_point<std::chrono::system_clock> start, end;
-      start = std::chrono::system_clock::now();
-      MatXXt schurCompl = hessian.framePoint * hessian.pointPoint.asDiagonal() *
-                          hessian.framePoint.transpose();
-      end = std::chrono::system_clock::now();
-      LOG(INFO) << "Schur complement evaluation time = "
-                << std::chrono::duration_cast<std::chrono::nanoseconds>(end -
-                                                                        start)
-                           .count() *
-                       1e-9
-                << " seconds\n";
-    }
-
-    constexpr double eps = 1e-5;
-    LOG(INFO) << "H_frameframe fill factor = "
-              << fillFactor(hessian.frameFrame, eps) << "\n";
-    LOG(INFO) << "H_framepoint fill factor = "
-              << fillFactor(hessian.framePoint, eps) << "\n";
-    return;
-  }
-
   const int PS = residualSettings.residualPattern.pattern().size();
   int totalFrameParams = sndFrameDoF + (keyFramesCount - 2) * restFrameDoF;
-  MatXXt expectedJacobian(PS * energyFunction->getResiduals().size(),
-                          totalFrameParams + energyFunction->numPoints());
-  std::cout << "evaluating jacobian: 0% ... ";
-  std::cout.flush();
-  int percent = 0, step = 10;
   int numResiduals = energyFunction->getResiduals().size();
-  for (int ri = 0; ri < numResiduals; ++ri) {
-    const Residual &res = energyFunction->getResiduals()[ri];
-    int hi = res.hostInd(), ti = res.targetInd();
-    int pi = res.pointInd();
-
-    KeyFrame *host = keyFrames[hi].get();
-    KeyFrame *target = keyFrames[ti].get();
-    SE3t hostToWorld = host->thisToWorld().cast<T>();
-    SE3t targetToWorld = target->thisToWorld().cast<T>();
-    SE3t hostFrameToBody = cam->bundle[0].thisToBody.cast<T>();
-    SE3t targetBodyToFrame = cam->bundle[0].bodyToThis.cast<T>();
-
-    AffLightT lightHostToTarget = (target->frames[0].lightWorldToThis *
-                                   host->frames[0].lightWorldToThis.inverse())
-                                      .cast<T>();
-
-    MotionDerivatives dHostToTarget(hostFrameToBody, hostToWorld, targetToWorld,
-                                    targetBodyToFrame);
-    SE3t hostToTarget = targetBodyToFrame * targetToWorld.inverse() *
-                        hostToWorld * hostFrameToBody;
-
-    VecRt values = res.getValues(hostToTarget, lightHostToTarget);
-    VecRt weights = res.getHessianWeights(values);
-    VecRt sqrtWeights = weights.cwiseSqrt();
-
-    Residual::Jacobian rj = res.getJacobian(
-        hostToTarget, dHostToTarget, host->frames[0].lightWorldToThis.cast<T>(),
-        lightHostToTarget);
-    Residual::DeltaHessian dh = res.getDeltaHessian(values, rj);
-
-    setFrame(expectedJacobian, ri, hi,
-             weightRows(rj.dr_dq_host(PS), sqrtWeights),
-             weightRows(rj.dr_dt_host(PS), sqrtWeights),
-             weightRows(rj.dr_daff_host(PS), sqrtWeights));
-    setFrame(expectedJacobian, ri, ti,
-             weightRows(rj.dr_dq_target(PS), sqrtWeights),
-             weightRows(rj.dr_dt_target(PS), sqrtWeights),
-             weightRows(rj.dr_daff_target(PS), sqrtWeights));
-    int depthCol = totalFrameParams + pi;
-    ASSERT_LT(depthCol, expectedJacobian.cols());
-    VecRt JD = rj.dr_dlogd(PS);
-    auto weightedJD = weightRows(JD, sqrtWeights);
-
-    expectedJacobian.block(ri * PS, depthCol, PS, 1) = weightedJD;
-
-    int oldPercent = percent;
-    percent = double(ri + 1) / numResiduals * 100.0;
-    if (percent == 100)
-      std::cout << "100%" << std::endl;
-    else if (oldPercent != percent && percent % step == 0) {
-      std::cout << percent << "% ... ";
-      std::cout.flush();
-    }
-  }
-
   int numPoints = energyFunction->numPoints();
+  const auto &residuals = energyFunction->getResiduals();
+
+  MatXXt expectedJacobian = getExpectedJacobian();
+  VecXt weights(expectedJacobian.rows());
+  ASSERT_EQ(weights.size(), PS * energyFunction->getResiduals().size());
+
+  for (int i = 0; i < residuals.size(); ++i)
+    weights.segment(i * PS, PS) =
+        residuals[i].getHessianWeights(energyFunction->getValues(i));
 
   LOG(INFO) << "jacobian size: " << expectedJacobian.rows() << " x "
             << expectedJacobian.cols();
@@ -270,7 +238,8 @@ TEST_F(EnergyFunctionTest, isHessianCorrect) {
   LOG(INFO) << "evaluating J^T J...";
 
   MatXX expectedHessian =
-      (expectedJacobian.transpose() * expectedJacobian).cast<double>();
+      (expectedJacobian.transpose() * weights.asDiagonal() * expectedJacobian)
+          .cast<double>();
 
   MatXX expectedFrameFrame =
       expectedHessian.topLeftCorner(totalFrameParams, totalFrameParams);
@@ -311,6 +280,41 @@ TEST_F(EnergyFunctionTest, isHessianCorrect) {
                             expectedPointPoint.norm();
   LOG(INFO) << "relative H_pointpoint error = " << relPointPointErr << "\n";
   EXPECT_LE(relPointPointErr, ErrorBounds<T>::hessianRelErr);
+}
+
+TEST_F(EnergyFunctionTest, isGradientCorrect) {
+  static_assert(keyFramesCount >= 2);
+
+  const int PS = residualSettings.residualPattern.pattern().size();
+  int totalFrameParams = sndFrameDoF + (keyFramesCount - 2) * restFrameDoF;
+  int numResiduals = energyFunction->getResiduals().size();
+  int numPoints = energyFunction->numPoints();
+  const auto &residuals = energyFunction->getResiduals();
+
+  MatXXt expectedJacobian = getExpectedJacobian();
+  VecXt weights(expectedJacobian.rows());
+  VecXt values(expectedJacobian.rows());
+  ASSERT_EQ(weights.size(), PS * energyFunction->getResiduals().size());
+  for (int i = 0; i < residuals.size(); ++i) {
+    VecRt curValues = energyFunction->getValues(i);
+    values.segment(i * PS, PS) = curValues;
+    weights.segment(i * PS, PS) = residuals[i].getGradientWeights(curValues);
+  }
+
+  VecXt expectedGradient =
+      expectedJacobian.transpose() * weights.asDiagonal() * values;
+  VecXt expectedFrame = expectedGradient.head(totalFrameParams);
+  VecXt expectedPoint = expectedGradient.tail(numPoints);
+  EnergyFunction::Gradient actualGradient = energyFunction->getGradient();
+
+  double relFrameErr =
+      (expectedFrame - actualGradient.frame).norm() / expectedFrame.norm();
+  double relPointErr =
+      (expectedPoint - actualGradient.point).norm() / expectedPoint.norm();
+  LOG(INFO) << "relative frame gradient err = " << relFrameErr;
+  LOG(INFO) << "relative point gradient err = " << relPointErr;
+  EXPECT_LE(relFrameErr, ErrorBounds<T>::gradientRelErr);
+  EXPECT_LE(relPointErr, ErrorBounds<T>::gradientRelErr);
 }
 
 int main(int argc, char **argv) {

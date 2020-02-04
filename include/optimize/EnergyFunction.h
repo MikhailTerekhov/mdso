@@ -16,14 +16,21 @@ public:
     VecXt pointPoint;
   };
 
+  struct Gradient {
+    VecXt frame;
+    VecXt point;
+  };
+
   EnergyFunction(CameraBundle *camBundle, KeyFrame *keyFrames[],
                  int numKeyFrames, const ResidualSettings &settings);
 
   int numPoints() const;
 
+  VecRt getValues(int residualInd);
   inline const StdVector<Residual> &getResiduals() const { return residuals; }
 
   Hessian getHessian();
+  Gradient getGradient();
 
 private:
   using SecondFrameParametrization = SO3xS2Parametrization;
@@ -31,6 +38,12 @@ private:
 
   class Parameters {
   public:
+    static constexpr int sndDoF = SecondFrameParametrization::DoF;
+    static constexpr int restDoF = FrameParametrization::DoF;
+    static constexpr int affDoF = AffLightT::DoF;
+    static constexpr int sndFrameDoF = sndDoF + affDoF;
+    static constexpr int restFrameDoF = restDoF + affDoF;
+
     struct Jacobians {
       Jacobians(const Parameters &parameters);
 
@@ -45,6 +58,7 @@ private:
     int numKeyFrames() const;
     int numPoints() const;
     int camBundleSize() const;
+    int frameParameters() const;
 
     void addPoint(T logDepth);
     const T &logDepth(int i) const;

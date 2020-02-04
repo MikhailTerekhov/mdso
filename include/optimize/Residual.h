@@ -106,6 +106,7 @@ public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
     FrameGradient();
+    FrameGradient &operator+=(const FrameGradient &other);
 
     Eigen::Matrix<T, SE3t::num_parameters, 1> qt;
     Eigen::Matrix<T, AffLightT::DoF, 1> ab;
