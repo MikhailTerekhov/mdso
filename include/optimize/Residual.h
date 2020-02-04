@@ -25,6 +25,8 @@ using MatR7t = Eigen::Matrix<T, Eigen::Dynamic, 7, Eigen::ColMajor,
 
 class Residual {
 public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
   static constexpr int MPS = Settings::ResidualPattern::max_size;
 
   struct Jacobian {

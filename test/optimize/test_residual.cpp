@@ -216,7 +216,7 @@ protected:
   std::unique_ptr<CameraBundle> cam;
   std::unique_ptr<KeyFrame> kf1, kf2;
   std::unique_ptr<ceres::LossFunction> lossFunction;
-  std::vector<Residual> residuals;
+  StdVector<Residual> residuals;
   std::vector<T> logDepths;
   Settings settings;
   ResidualSettings residualSettings;

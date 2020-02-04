@@ -30,14 +30,6 @@ template <> struct ErrorBounds<double> {
   static constexpr double hessianRelErr = 1e-7;
 };
 
-template <typename MatrixT>
-void setBlock(std::vector<Triplet> &triplets, const MatrixT &block,
-              int startRow, int startCol) {
-  for (int r = startRow, br = 0; br < block.rows(); ++r, ++br)
-    for (int c = startCol, bc = 0; bc < block.cols(); ++c, ++bc)
-      triplets.emplace_back(r, c, block(br, bc));
-}
-
 class EnergyFunctionTest : public ::testing::Test {
 protected:
   static constexpr int keyFramesCount = 7;
@@ -210,8 +202,7 @@ TEST_F(EnergyFunctionTest, isHessianCorrect) {
   const int PS = residualSettings.residualPattern.pattern().size();
   int totalFrameParams = sndFrameDoF + (keyFramesCount - 2) * restFrameDoF;
   MatXXt expectedJacobian(PS * energyFunction->getResiduals().size(),
-                          totalFrameParams +
-                              energyFunction->getOptimizedPoints().size());
+                          totalFrameParams + energyFunction->numPoints());
   std::cout << "evaluating jacobian: 0% ... ";
   std::cout.flush();
   int percent = 0, step = 10;
@@ -239,7 +230,7 @@ TEST_F(EnergyFunctionTest, isHessianCorrect) {
 
     VecRt values = res.getValues(hostToTarget, lightHostToTarget);
     VecRt weights = res.getHessianWeights(values);
-    VecRt sqrtWeights = weights.array().sqrt().matrix();
+    VecRt sqrtWeights = weights.cwiseSqrt();
 
     Residual::Jacobian rj = res.getJacobian(
         hostToTarget, dHostToTarget, host->frames[0].lightWorldToThis.cast<T>(),
@@ -271,7 +262,7 @@ TEST_F(EnergyFunctionTest, isHessianCorrect) {
     }
   }
 
-  int numPoints = energyFunction->getOptimizedPoints().size();
+  int numPoints = energyFunction->numPoints();
 
   LOG(INFO) << "jacobian size: " << expectedJacobian.rows() << " x "
             << expectedJacobian.cols();
