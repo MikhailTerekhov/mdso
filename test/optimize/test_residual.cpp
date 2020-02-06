@@ -184,10 +184,9 @@ protected:
     for (int i = 0; i < optimizedPoints.size(); ++i) {
       OptimizedPoint &op = optimizedPoints[i];
       logDepths[i] = op.logDepth;
-      residuals.emplace_back(0, 0, 1, 1, i, &logDepths[i], cam.get(),
-                             &kf1->frames[0], &kf2->frames[1], &op,
-                             hostToTarget, lossFunction.get(),
-                             residualSettings);
+      residuals.emplace_back(0, 0, 1, 1, i, cam.get(), &kf1->frames[0],
+                             &kf2->frames[1], &op, logDepths[i], hostToTarget,
+                             lossFunction.get(), residualSettings);
     }
   }
 
@@ -264,8 +263,8 @@ TEST_F(ResidualTestGtPoses, IsSmallOnGt) {
   for (int i = 0; i < residuals.size(); ++i) {
     OptimizedPoint &op = kf1->frames[0].optimizedPoints[i];
     Vec2 reproj;
-    resValues.push_back(
-        residuals[i].getValues(hostToTarget, lightHostToTarget, &reproj));
+    resValues.push_back(residuals[i].getValues(hostToTarget, lightHostToTarget,
+                                               op.logDepth, &reproj));
     //    putDot(f1, toCvPoint(op.p), CV_GREEN);
     //    putDot(f2, toCvPoint(reproj), CV_GREEN);
   }
@@ -390,10 +389,12 @@ TEST_F(ResidualTestDriftedPoses, AreValuesAndJacobianCorrect) {
     std::chrono::time_point<std::chrono::system_clock> start, end;
     start = std::chrono::system_clock::now();
     Vec2 reproj;
+    double logDepth = logDepths[residual.pointInd()];
     auto actualValues =
-        residual.getValues(hostToTarget, lightHostToTarget, &reproj);
-    Residual::Jacobian jacobian = residual.getJacobian(
-        hostToTarget, *dhostToTarget, lightWorldToHost, lightHostToTarget);
+        residual.getValues(hostToTarget, lightHostToTarget, logDepth, &reproj);
+    Residual::Jacobian jacobian =
+        residual.getJacobian(hostToTarget, *dhostToTarget, lightWorldToHost,
+                             lightHostToTarget, logDepth);
 
     end = std::chrono::system_clock::now();
     timeEvalMy +=
@@ -422,7 +423,6 @@ TEST_F(ResidualTestDriftedPoses, AreValuesAndJacobianCorrect) {
                        residualSettings),
                    patternSize);
 
-    double logDepth = logDepths[residual.pointInd()];
     const double *parameters[7] = {hostToWorld.so3().data(),
                                    hostToWorld.translation().data(),
                                    targetToWorld.so3().data(),
@@ -616,10 +616,13 @@ TEST_F(ResidualTestDriftedPoses, IsDeltaHessianCorrect) {
 
   for (const Residual &residual : residuals) {
     Vec2 reproj;
-    VecRt values = residual.getValues(hostToTarget, lightHostToTarget, &reproj);
+    T logDepth = logDepths[residual.pointInd()];
+    VecRt values =
+        residual.getValues(hostToTarget, lightHostToTarget, logDepth, &reproj);
     VecRt weights = residual.getHessianWeights(values);
-    Residual::Jacobian jacobian = residual.getJacobian(
-        hostToTarget, *dhostToTarget, lightWorldToHost, lightHostToTarget);
+    Residual::Jacobian jacobian =
+        residual.getJacobian(hostToTarget, *dhostToTarget, lightWorldToHost,
+                             lightHostToTarget, logDepth);
     Residual::DeltaHessian actual = residual.getDeltaHessian(values, jacobian);
     Residual::DeltaHessian expected =
         getExpectedDeltaHessian(jacobian, weights);
@@ -719,10 +722,13 @@ getExpectedDeltaGradient(const Residual::Jacobian &jacobian,
 
 TEST_F(ResidualTestDriftedPoses, IsDeltaGradientCorrect) {
   for (const Residual &residual : residuals) {
-    VecRt values = residual.getValues(hostToTarget, lightHostToTarget);
+    T logDepth = logDepths[residual.pointInd()];
+    VecRt values =
+        residual.getValues(hostToTarget, lightHostToTarget, logDepth);
     VecRt weights = residual.getGradientWeights(values);
-    Residual::Jacobian jacobian = residual.getJacobian(
-        hostToTarget, *dhostToTarget, lightWorldToHost, lightHostToTarget);
+    Residual::Jacobian jacobian =
+        residual.getJacobian(hostToTarget, *dhostToTarget, lightWorldToHost,
+                             lightHostToTarget, logDepth);
     Residual::DeltaGradient actual =
         residual.getDeltaGradient(values, jacobian);
     Residual::DeltaGradient expected =

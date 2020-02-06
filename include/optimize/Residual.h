@@ -44,6 +44,15 @@ public:
       MatR2t dr_dab;
     };
 
+    struct CachedValues {
+      EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+      Vec2 reproj;
+      MatR2t gradItarget;
+      T expDepth;
+      T expA;
+    };
+
     Jacobian(int patternSize);
 
     DiffFrameParams dhost;
@@ -124,9 +133,9 @@ public:
   };
 
   Residual(int hostInd, int hostCamInd, int targetInd, int targetCamInd,
-           int pointInd, const T *logDepth, CameraBundle *cam,
-           KeyFrameEntry *hostFrame, KeyFrameEntry *targetFrame,
-           OptimizedPoint *optimizedPoint, const SE3t &hostToTargetImage,
+           int pointInd, CameraBundle *cam, KeyFrameEntry *hostFrame,
+           KeyFrameEntry *targetFrame, OptimizedPoint *optimizedPoint,
+           T logDepth, const SE3t &hostToTargetImage,
            ceres::LossFunction *lossFunction, const ResidualSettings &settings);
 
   inline int hostInd() const { return mHostInd; }
@@ -142,17 +151,18 @@ public:
   inline Vec3t getHostDir() const { return hostDir; }
 
   inline VecRt getValues(const SE3t &hostToTargetImage,
-                         const AffLightT &lightHostToTarget) const {
-    return getValues(hostToTargetImage, lightHostToTarget, nullptr);
+                         const AffLightT &lightHostToTarget, T logDepth) const {
+    return getValues(hostToTargetImage, lightHostToTarget, logDepth, nullptr);
   }
   VecRt getValues(const SE3t &hostToTargetImage,
-                  const AffLightT &lightHostToTarget, Vec2 *reprojOut) const;
+                  const AffLightT &lightHostToTarget, T logDepth,
+                  Vec2 *reprojOut) const;
   VecRt getHessianWeights(const VecRt &values) const;
   VecRt getGradientWeights(const VecRt &values) const;
   Jacobian getJacobian(const SE3t &hostToTarget,
                        const MotionDerivatives &dHostToTarget,
                        const AffLightT &lightWorldToHost,
-                       const AffLightT &lightHostToTarget) const;
+                       const AffLightT &lightHostToTarget, T logDepth) const;
   DeltaHessian getDeltaHessian(const VecRt &values,
                                const Residual::Jacobian &jacobian) const;
   DeltaGradient getDeltaGradient(const VecRt &values,
@@ -166,8 +176,6 @@ private:
   int mTargetInd;
   int mTargetCamInd;
   int mPointInd;
-
-  const T *logDepth;
 
   ceres::LossFunction *lossFunction;
   CameraModel *camTarget;

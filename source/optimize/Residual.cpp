@@ -11,10 +11,9 @@ Vec3t remapDepthed(const SE3t &frameToFrame, const Vec3t &ray, T depth) {
 }
 
 Residual::Residual(int hostInd, int hostCamInd, int targetInd, int targetCamInd,
-                   int pointInd, const T *logDepth, CameraBundle *cam,
-                   KeyFrameEntry *hostFrame, KeyFrameEntry *targetFrame,
-                   OptimizedPoint *optimizedPoint,
-                   const SE3t &hostToTargetImage,
+                   int pointInd, CameraBundle *cam, KeyFrameEntry *hostFrame,
+                   KeyFrameEntry *targetFrame, OptimizedPoint *optimizedPoint,
+                   T logDepth, const SE3t &hostToTargetImage,
                    ceres::LossFunction *lossFunction,
                    const ResidualSettings &settings)
     : mHostInd(hostInd)
@@ -22,7 +21,6 @@ Residual::Residual(int hostInd, int hostCamInd, int targetInd, int targetCamInd,
     , mTargetInd(targetInd)
     , mTargetCamInd(targetCamInd)
     , mPointInd(pointInd)
-    , logDepth(logDepth)
     , lossFunction(lossFunction)
     , camTarget(&cam->bundle[targetCamInd].cam)
     , target(targetFrame)
@@ -33,7 +31,7 @@ Residual::Residual(int hostInd, int hostCamInd, int targetInd, int targetCamInd,
     , hostIntensities(settings.residualPattern.pattern().size())
     , gradWeights(settings.residualPattern.pattern().size()) {
   CameraModel *camHost = &cam->bundle[hostCamInd].cam;
-  T depth = exp(*logDepth);
+  T depth = exp(logDepth);
   Vec2t reproj =
       camTarget->map(remapDepthed(hostToTargetImage, hostDir, depth));
   for (int i = 0; i < reprojPattern.size(); ++i) {
@@ -127,11 +125,11 @@ Residual::DeltaGradient::DeltaGradient()
     : point(0) {}
 
 VecRt Residual::getValues(const SE3t &hostToTargetImage,
-                          const AffLightT &lightHostToTarget,
+                          const AffLightT &lightHostToTarget, T logDepth,
                           Vec2 *reprojOut) const {
   auto &targetInterp = target->preKeyFrameEntry->internals->interpolator(0);
   VecRt result(settings.residualPattern.pattern().size());
-  T depth = exp(*logDepth);
+  T depth = exp(logDepth);
   Vec2t reproj =
       camTarget->map(remapDepthed(hostToTargetImage, hostDir, depth));
   for (int i = 0; i < result.size(); ++i) {
@@ -177,16 +175,16 @@ VecRt Residual::getGradientWeights(const optimize::VecRt &values) const {
   return weights;
 }
 
-Residual::Jacobian
-Residual::getJacobian(const SE3t &hostToTarget,
-                      const MotionDerivatives &dHostToTarget,
-                      const AffLightT &lightWorldToHost,
-                      const AffLightT &lightHostToTarget) const {
+Residual::Jacobian Residual::getJacobian(const SE3t &hostToTarget,
+                                         const MotionDerivatives &dHostToTarget,
+                                         const AffLightT &lightWorldToHost,
+                                         const AffLightT &lightHostToTarget,
+                                         T logDepth) const {
   Jacobian jacobian(settings.residualPattern.pattern().size());
   PreKeyFrameEntryInternals::Interpolator_t *targetInterp =
       &target->preKeyFrameEntry->internals->interpolator(0);
 
-  T depth = exp(*logDepth);
+  T depth = exp(logDepth);
 
   jacobian.isInfDepth = false;
   if (!std::isfinite(depth)) {
@@ -329,7 +327,7 @@ std::ostream &operator<<(std::ostream &os, const Residual &res) {
      << "\nhost cam ind = " << res.hostCamInd()
      << "\ntarget ind = " << res.targetInd()
      << "\ntarget cam ind = " << res.targetCamInd()
-     << "\npoint ind = " << res.pointInd() << "\nlog(depth) = " << *res.logDepth
+     << "\npoint ind = " << res.pointInd()
      << "\nhost point = " << res.hostPoint.transpose()
      << "\nhost dir = " << res.hostDir.transpose() << "\n";
   return os;
