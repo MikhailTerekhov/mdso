@@ -12,6 +12,10 @@ if (ASAN_BUILD)
     link_libraries("-fsanitize=address")
 endif()
 
+if (PROFILE_BUILD)
+    link_libraries("-lprofiler")
+endif()
+
 find_package(Eigen3 REQUIRED)
 find_package(TBB REQUIRED)
 find_package(gflags REQUIRED)
