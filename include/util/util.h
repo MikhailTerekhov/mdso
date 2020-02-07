@@ -3,6 +3,7 @@
 
 #include "util/settings.h"
 #include "util/types.h"
+#include <chrono>
 #include <opencv2/opencv.hpp>
 #include <vector>
 
@@ -132,6 +133,13 @@ cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
 std::vector<double> readBin(const fs::path &filename);
 
 std::string curTimeBrief();
+
+template <typename Time>
+double secondsBetween(const Time &start, const Time &end) {
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+             .count() *
+         1e-9;
+}
 
 template <typename T>
 inline void checkBounds(const cv::Mat_<T> &mat, const cv::Point &p) {

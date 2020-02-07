@@ -132,6 +132,17 @@ public:
     T point;
   };
 
+  struct CachedValues {
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+    CachedValues(int patternSize);
+
+    Vec2 reproj;
+    MatR2t gradItarget;
+    T depth;
+    T lightHostToTargetExpA;
+  };
+
   Residual(int hostInd, int hostCamInd, int targetInd, int targetCamInd,
            int pointInd, CameraBundle *cam, KeyFrameEntry *hostFrame,
            KeyFrameEntry *targetFrame, OptimizedPoint *optimizedPoint,
@@ -143,6 +154,7 @@ public:
   inline int targetInd() const { return mTargetInd; }
   inline int targetCamInd() const { return mTargetCamInd; }
   inline int pointInd() const { return mPointInd; }
+  inline int patternSize() const { return settings.patternSize(); }
 
   inline static_vector<Vec2t, MPS> getReprojPattern() const {
     return reprojPattern;
@@ -156,13 +168,14 @@ public:
   }
   VecRt getValues(const SE3t &hostToTargetImage,
                   const AffLightT &lightHostToTarget, T logDepth,
-                  Vec2 *reprojOut) const;
+                  CachedValues *cachedValues) const;
   VecRt getHessianWeights(const VecRt &values) const;
   VecRt getGradientWeights(const VecRt &values) const;
   Jacobian getJacobian(const SE3t &hostToTarget,
                        const MotionDerivatives &dHostToTarget,
                        const AffLightT &lightWorldToHost,
-                       const AffLightT &lightHostToTarget, T logDepth) const;
+                       const AffLightT &lightHostToTarget, T logDepth,
+                       const CachedValues &cachedValues) const;
   DeltaHessian getDeltaHessian(const VecRt &values,
                                const Residual::Jacobian &jacobian) const;
   DeltaGradient getDeltaGradient(const VecRt &values,

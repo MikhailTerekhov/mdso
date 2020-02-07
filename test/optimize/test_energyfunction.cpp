@@ -132,14 +132,15 @@ protected:
       SE3t hostToTarget = targetBodyToFrame * targetToWorld.inverse() *
                           hostToWorld * hostFrameToBody;
 
-      VecRt values = energyFunction->getResidualValues(ri);
-      VecRt weights = res.getHessianWeights(values);
-      VecRt sqrtWeights = weights.cwiseSqrt();
+      Residual::CachedValues cachedValues(residualSettings.patternSize());
+      VecRt values =
+          res.getValues(hostToTarget, lightHostToTarget,
+                        energyFunction->getLogDepth(res), &cachedValues);
 
-      Residual::Jacobian rj =
-          res.getJacobian(hostToTarget, dHostToTarget,
-                          host->frames[0].lightWorldToThis.cast<T>(),
-                          lightHostToTarget, energyFunction->getLogDepth(res));
+      Residual::Jacobian rj = res.getJacobian(
+          hostToTarget, dHostToTarget,
+          host->frames[0].lightWorldToThis.cast<T>(), lightHostToTarget,
+          energyFunction->getLogDepth(res), cachedValues);
 
       setFrame(expectedJacobian, ri, hi, rj.dr_dq_host(PS), rj.dr_dt_host(PS),
                rj.dr_daff_host(PS));
@@ -226,6 +227,8 @@ TEST_F(EnergyFunctionTest, isHessianCorrect) {
   static_assert(keyFramesCount >= 2);
 
   if (FLAGS_profile_only) {
+    std::chrono::time_point<std::chrono::system_clock> start, end;
+    start = std::chrono::system_clock::now();
     for (int i = 0; i < FLAGS_num_evaluations; ++i) {
       if (i % 20 == 0)
         std::cout << "i = " << i << std::endl;
@@ -234,6 +237,13 @@ TEST_F(EnergyFunctionTest, isHessianCorrect) {
       EnergyFunction::Gradient actualGradient = energyFunction->getGradient();
       energyFunction->clearPrecomputations();
     }
+    end = std::chrono::system_clock::now();
+    double totalTime = secondsBetween(start, end);
+    LOG(INFO) << "time of hessian and gradient evaluation ("
+              << FLAGS_num_evaluations << " times): " << totalTime;
+    LOG(INFO) << totalTime / FLAGS_num_evaluations
+              << " sec for one computation on average (" << FLAGS_opt_count
+              << " optimized points, " << keyFramesCount << " keyframes)";
   } else {
     EnergyFunction::Hessian actualHessian = energyFunction->getHessian();
 

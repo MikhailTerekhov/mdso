@@ -22,7 +22,10 @@ template <typename T> struct AffineLightTransform {
     return *this;
   }
 
-  inline T operator()(const T &x) const { return ea() * x + b(); }
+  inline T operator()(const T &x, const T &expA) const {
+    return expA * x + b();
+  }
+  inline T operator()(const T &x) const { return (*this)(x, ea()); }
   template <typename U> cv::Mat_<U> operator()(const cv::Mat_<U> &mat) const {
     cv::Mat_<U> result;
     cv::convertScaleAbs(mat, result, ea(), b());

@@ -67,7 +67,7 @@ int EnergyFunction::numPoints() const { return parameters.numPoints(); }
 VecRt EnergyFunction::getResidualValues(int residualInd) {
   CHECK_GE(residualInd, 0);
   CHECK_LT(residualInd, residuals.size());
-  return getAllValues()[residualInd];
+  return getAllValues().values(residualInd);
 }
 
 EnergyFunction::Hessian EnergyFunction::getHessian() {
@@ -114,7 +114,7 @@ EnergyFunction::getHessian(PrecomputedHostToTarget &hostToTarget,
     CHECK_NE(hi, ti);
 
     Residual::DeltaHessian deltaHessian = residual.getDeltaHessian(
-        valuesRef[i], derivativesRef.residualJacobians[i]);
+        getResidualValues(i), derivativesRef.residualJacobians[i]);
 
     int him1 = hi - 1, tim1 = ti - 1;
     if (hi > 0)
@@ -294,7 +294,7 @@ EnergyFunction::getGradient(PrecomputedHostToTarget &hostToTarget,
     CHECK_NE(hi, ti);
 
     Residual::DeltaGradient deltaGradient = residual.getDeltaGradient(
-        valuesRef[i], derivativesRef.residualJacobians[i]);
+        valuesRef.values(i), derivativesRef.residualJacobians[i]);
     if (hi > 0)
       frameBlocks[him1] += deltaGradient.host;
     if (ti > 0)
@@ -454,6 +454,36 @@ void EnergyFunction::Parameters::apply() {
     optimizedPoints[pi]->logDepth = state.logDepths[pi];
 }
 
+EnergyFunction::Values::Values(
+    const StdVector<Residual> &residuals, const Parameters &parameters,
+    PrecomputedHostToTarget &hostToTarget,
+    PrecomputedLightHostToTarget &lightHostToTarget) {
+  valsAndCache.reserve(residuals.size());
+  for (const Residual &res : residuals) {
+    int hi = res.hostInd(), hci = res.hostCamInd(), ti = res.targetInd(),
+        tci = res.targetCamInd(), pi = res.pointInd();
+    valsAndCache.push_back(
+        {VecRt(res.patternSize()), Residual::CachedValues(res.patternSize())});
+    valsAndCache.back().first =
+        res.getValues(hostToTarget.get(hi, hci, ti, tci),
+                      lightHostToTarget.get(hi, hci, ti, tci),
+                      parameters.logDepth(pi), &valsAndCache.back().second);
+  }
+}
+
+const VecRt &EnergyFunction::Values::values(int residualInd) const {
+  CHECK_GE(residualInd, 0);
+  CHECK_LT(residualInd, valsAndCache.size());
+  return valsAndCache[residualInd].first;
+}
+
+const Residual::CachedValues &
+EnergyFunction::Values::cachedValues(int residualInd) const {
+  CHECK_GE(residualInd, 0);
+  CHECK_LT(residualInd, valsAndCache.size());
+  return valsAndCache[residualInd].second;
+}
+
 EnergyFunction::PrecomputedHostToTarget::PrecomputedHostToTarget(
     CameraBundle *cam, const Parameters *parameters)
     : parameters(parameters)
@@ -544,13 +574,13 @@ AffLightT EnergyFunction::PrecomputedLightHostToTarget::get(int hostInd,
 
 EnergyFunction::Derivatives::Derivatives(
     const Parameters &parameters, const StdVector<Residual> &residuals,
-    PrecomputedHostToTarget &hostToTarget,
+    const Values &values, PrecomputedHostToTarget &hostToTarget,
     PrecomputedMotionDerivatives &motionDerivatives,
     PrecomputedLightHostToTarget &lightHostToTarget)
     : parametrizationJacobians(parameters) {
   residualJacobians.reserve(residuals.size());
-  for (int i = 0; i < residuals.size(); ++i) {
-    const Residual &res = residuals[i];
+  for (int ri = 0; ri < residuals.size(); ++ri) {
+    const Residual &res = residuals[ri];
     int hi = res.hostInd(), hci = res.hostCamInd(), ti = res.targetInd(),
         tci = res.targetCamInd(), pi = res.pointInd();
     SE3t curHostToTarget = hostToTarget.get(hi, hci, ti, tci);
@@ -560,9 +590,9 @@ EnergyFunction::Derivatives::Derivatives(
         motionDerivatives.get(hi, hci, ti, tci);
 
     T logDepth = parameters.logDepth(pi);
-    residualJacobians.push_back(
-        res.getJacobian(curHostToTarget, dHostToTarget, lightWorldToHost,
-                        curLightHostToTarget, logDepth));
+    residualJacobians.push_back(res.getJacobian(
+        curHostToTarget, dHostToTarget, lightWorldToHost, curLightHostToTarget,
+        logDepth, values.cachedValues(ri)));
   }
 }
 
@@ -579,16 +609,7 @@ EnergyFunction::Values &
 EnergyFunction::getAllValues(PrecomputedHostToTarget &hostToTarget,
                              PrecomputedLightHostToTarget &lightHostToTarget) {
   if (!values) {
-    values.emplace();
-    Values &vals = values.value();
-    vals.reserve(residuals.size());
-    for (const Residual &res : residuals) {
-      int hi = res.hostInd(), hci = res.hostCamInd(), ti = res.targetInd(),
-          tci = res.targetCamInd(), pi = res.pointInd();
-      vals.push_back(res.getValues(hostToTarget.get(hi, hci, ti, tci),
-                                   lightHostToTarget.get(hi, hci, ti, tci),
-                                   parameters.logDepth(pi)));
-    }
+    values.emplace(residuals, parameters, hostToTarget, lightHostToTarget);
   }
   return values.value();
 }
@@ -598,8 +619,9 @@ EnergyFunction::Derivatives &EnergyFunction::getDerivatives(
     PrecomputedMotionDerivatives &motionDerivatives,
     PrecomputedLightHostToTarget &lightHostToTarget) {
   if (!derivatives)
-    derivatives.emplace(parameters, residuals, hostToTarget, motionDerivatives,
-                        lightHostToTarget);
+    derivatives.emplace(parameters, residuals,
+                        getAllValues(hostToTarget, lightHostToTarget),
+                        hostToTarget, motionDerivatives, lightHostToTarget);
   return derivatives.value();
 }
 

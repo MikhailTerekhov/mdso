@@ -124,24 +124,40 @@ operator+=(const FrameGradient &other) {
 Residual::DeltaGradient::DeltaGradient()
     : point(0) {}
 
+Residual::CachedValues::CachedValues(int patternSize)
+    : reproj(Vec2::Zero())
+    , gradItarget(MatR2t::Zero(patternSize, 2))
+    , depth(0)
+    , lightHostToTargetExpA(0) {}
+
 VecRt Residual::getValues(const SE3t &hostToTargetImage,
                           const AffLightT &lightHostToTarget, T logDepth,
-                          Vec2 *reprojOut) const {
+                          CachedValues *cachedValues) const {
   auto &targetInterp = target->preKeyFrameEntry->internals->interpolator(0);
   VecRt result(settings.residualPattern.pattern().size());
   T depth = exp(logDepth);
+  double lightHostToTargetExpA = lightHostToTarget.ea();
   Vec2t reproj =
       camTarget->map(remapDepthed(hostToTargetImage, hostDir, depth));
+  if (cachedValues) {
+    cachedValues->depth = depth;
+    cachedValues->reproj = reproj.cast<double>();
+    cachedValues->lightHostToTargetExpA = lightHostToTargetExpA;
+  }
   for (int i = 0; i < result.size(); ++i) {
     Vec2t p = reproj + reprojPattern[i];
     double targetIntensity = INF;
-    targetInterp.Evaluate(p[1], p[0], &targetIntensity);
-    T hostIntensity = lightHostToTarget(hostIntensities[i]);
+    if (cachedValues) {
+      Vec2 gradItarget;
+      targetInterp.Evaluate(p[1], p[0], &targetIntensity, &gradItarget[1],
+                            &gradItarget[0]);
+      cachedValues->gradItarget.row(i) = gradItarget.transpose().cast<T>();
+    } else
+      targetInterp.Evaluate(p[1], p[0], &targetIntensity);
+    T hostIntensity =
+        lightHostToTarget(hostIntensities[i], lightHostToTargetExpA);
     result[i] = T(targetIntensity) - hostIntensity;
   }
-
-  if (reprojOut)
-    *reprojOut = reproj.cast<double>();
 
   return result;
 }
@@ -175,16 +191,15 @@ VecRt Residual::getGradientWeights(const optimize::VecRt &values) const {
   return weights;
 }
 
-Residual::Jacobian Residual::getJacobian(const SE3t &hostToTarget,
-                                         const MotionDerivatives &dHostToTarget,
-                                         const AffLightT &lightWorldToHost,
-                                         const AffLightT &lightHostToTarget,
-                                         T logDepth) const {
+Residual::Jacobian Residual::getJacobian(
+    const SE3t &hostToTarget, const MotionDerivatives &dHostToTarget,
+    const AffLightT &lightWorldToHost, const AffLightT &lightHostToTarget,
+    T logDepth, const CachedValues &cachedValues) const {
   Jacobian jacobian(settings.residualPattern.pattern().size());
   PreKeyFrameEntryInternals::Interpolator_t *targetInterp =
       &target->preKeyFrameEntry->internals->interpolator(0);
 
-  T depth = exp(logDepth);
+  T depth = cachedValues.depth;
 
   jacobian.isInfDepth = false;
   if (!std::isfinite(depth)) {
@@ -197,14 +212,7 @@ Residual::Jacobian Residual::getJacobian(const SE3t &hostToTarget,
 
   auto [reproj, dpi] = camTarget->diffMap(targetVec);
 
-  for (int i = 0; i < settings.residualPattern.pattern().size(); ++i) {
-    Vec2t p = reproj + reprojPattern[i];
-    Vec2 gradItarget;
-    double intensity = INF;
-    targetInterp->Evaluate(p[1], p[0], &intensity, &gradItarget[1],
-                           &gradItarget[0]);
-    jacobian.gradItarget.row(i) = gradItarget.cast<T>().transpose();
-  }
+  jacobian.gradItarget = cachedValues.gradItarget;
 
   jacobian.dp_dlogd = dpi * (hostToTarget.so3() * hostVec);
   jacobian.dhost.dp_dq = dpi * dHostToTarget.daction_dq_host(hostVecH);
@@ -212,11 +220,13 @@ Residual::Jacobian Residual::getJacobian(const SE3t &hostToTarget,
   jacobian.dtarget.dp_dq = dpi * dHostToTarget.daction_dq_target(hostVecH);
   jacobian.dtarget.dp_dt = dpi * dHostToTarget.daction_dt_target;
 
+  T lightHostToTargetExpA = cachedValues.lightHostToTargetExpA;
+
   for (int i = 0; i < settings.residualPattern.pattern().size(); ++i) {
     double d_da =
-        lightHostToTarget.ea() * (hostIntensities[i] - lightWorldToHost.b());
+        lightHostToTargetExpA * (hostIntensities[i] - lightWorldToHost.b());
     jacobian.dhost.dr_dab(i, 0) = d_da;
-    jacobian.dhost.dr_dab(i, 1) = lightHostToTarget.ea();
+    jacobian.dhost.dr_dab(i, 1) = lightHostToTargetExpA;
     jacobian.dtarget.dr_dab(i, 0) = -d_da;
     jacobian.dtarget.dr_dab(i, 1) = -1;
   }

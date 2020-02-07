@@ -392,6 +392,8 @@ struct BundleAdjusterSettings {
 };
 
 struct ResidualSettings {
+  inline int patternSize() const { return residualPattern.pattern().size(); }
+
   Settings::ResidualPattern residualPattern = {};
   Settings::ResidualWeighting residualWeighting = {};
   Settings::Intensity intensity = {};

@@ -39,7 +39,6 @@ public:
   void clearPrecomputations();
 
 private:
-  using Values = StdVector<VecRt>;
   using SecondFrameParametrization = SO3xS2Parametrization;
   using FrameParametrization = RightExpParametrization<SE3t>;
 
@@ -132,9 +131,22 @@ private:
     Array4d<std::optional<AffLightT>> lightHostToTarget;
   };
 
+  class Values {
+  public:
+    Values(const StdVector<Residual> &residuals, const Parameters &parameters,
+           PrecomputedHostToTarget &hostToTarget,
+           PrecomputedLightHostToTarget &lightHostToTarget);
+
+    const VecRt &values(int residualInd) const;
+    const Residual::CachedValues &cachedValues(int residualInd) const;
+
+  private:
+    StdVector<std::pair<VecRt, Residual::CachedValues>> valsAndCache;
+  };
+
   struct Derivatives {
     Derivatives(const Parameters &parameters,
-                const StdVector<Residual> &residuals,
+                const StdVector<Residual> &residuals, const Values &values,
                 PrecomputedHostToTarget &hostToTarget,
                 PrecomputedMotionDerivatives &motionDerivatives,
                 PrecomputedLightHostToTarget &lightHostToTarget);
