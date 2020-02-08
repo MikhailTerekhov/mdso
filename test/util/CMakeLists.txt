@@ -1,4 +1,4 @@
-set(TESTS test_cameramodel test_triangulation test_geometry test_util)
+set(TESTS test_cameramodel test_triangulation test_geometry test_util test_bilinearinterpolator)
 
 foreach(CUR_TEST ${TESTS})
     add_executable(${CUR_TEST} ${CUR_TEST}.cpp)

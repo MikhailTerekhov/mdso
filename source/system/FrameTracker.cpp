@@ -13,8 +13,7 @@ struct PointTrackingResidual {
       const Vec3 &posImage, double baseIntensity, const SE3 &baseToBody,
       const SE3 &bodyToRef, const AffLight &affLightBaseToRef,
       CameraModel *camTracked,
-      const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
-          *trackedFrame)
+      const PreKeyFrameEntryInternals::Interpolator_t *trackedFrame)
       : posBody(baseToBody * posImage)
       , bodyToRef(bodyToRef)
       , affLightBaseToRef(affLightBaseToRef)
@@ -57,8 +56,7 @@ struct PointTrackingResidual {
   AffLight affLightBaseToRef;
   double baseIntensity;
   const CameraModel *camTracked;
-  const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
-      *trackedFrame;
+  const PreKeyFrameEntryInternals::Interpolator_t *trackedFrame;
 };
 
 TrackingResult::TrackingResult(int camNumber)

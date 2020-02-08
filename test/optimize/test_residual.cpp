@@ -34,7 +34,7 @@ template <> struct ErrorBounds<float> {
   static constexpr float diffDepthEps = 1e-7;
 
   static constexpr float qtqtEps = 1e-5;
-  static constexpr float qtabEps = 1e-5;
+  static constexpr float qtabEps = 5e-5;
   static constexpr float ababEps = 1e-7;
   static constexpr float qtdEps = 1e-5;
   static constexpr float abdEps = 1e-4;
@@ -42,7 +42,9 @@ template <> struct ErrorBounds<float> {
 
   static constexpr float qtEps = 1e-4;
   static constexpr float abEps = 5e-5;
-  static constexpr float dEps = 1e-5;
+  static constexpr float dEps = 5e-5;
+
+  static constexpr float minProximity = 1e-3;
 };
 
 template <> struct ErrorBounds<double> {
@@ -63,6 +65,8 @@ template <> struct ErrorBounds<double> {
   static constexpr double qtEps = 1e-10;
   static constexpr double abEps = 1e-10;
   static constexpr double dEps = 1e-12;
+
+  static constexpr float minProximity = 1e-12;
 };
 
 template <typename T> T relOrAbs(T err, T nrm, T eps) {
@@ -210,6 +214,8 @@ protected:
   static constexpr T abEps = ErrorBounds<T>::abEps;
   static constexpr T dEps = ErrorBounds<T>::dEps;
 
+  static constexpr T minProximity = ErrorBounds<T>::minProximity;
+
   std::unique_ptr<MultiFovReader> reader;
   std::mt19937 mt;
   std::unique_ptr<CameraBundle> cam;
@@ -281,6 +287,15 @@ TEST_F(ResidualTestGtPoses, IsSmallOnGt) {
   }
 }
 
+double edgeProximity(double p0, double p1) {
+  return std::min({p0 - std::floor(p0), std::ceil(p0) - p0, p1 - std::floor(p1),
+                   std::ceil(p1) - p1});
+}
+
+template <typename T> double toDouble(const T &val) { return val.a; }
+template <> double toDouble<double>(const double &val) { return val; }
+template <> double toDouble<float>(const float &val) { return val; }
+
 class ResidualCostFunctor {
 public:
   ResidualCostFunctor(PreKeyFrameEntryInternals::Interpolator_t *targetFrame,
@@ -289,7 +304,8 @@ public:
                       const static_vector<Vec2t, Residual::MPS> &reprojPattern,
                       const VecRt &hostIntencities,
                       const CameraModel &camTarget,
-                      const ResidualSettings &settings)
+                      const ResidualSettings &settings,
+                      double *outLastProximity)
       : targetFrame(targetFrame)
       , hostFrameToBody(hostFrameToBody)
       , targetBodyToFrame(targetBodyToFrame)
@@ -297,7 +313,8 @@ public:
       , reprojPattern(reprojPattern)
       , hostIntencities(hostIntencities)
       , camTarget(camTarget)
-      , settings(settings) {}
+      , settings(settings)
+      , outLastProximity(outLastProximity) {}
 
 public:
   template <typename T>
@@ -327,8 +344,13 @@ public:
         targetBodyToFrame * (targetToWorld.inverse() *
                              (hostToWorld * (hostFrameToBody * hostImVec)));
     Vec2t targetP = camTarget.map(targetImVec.data());
+
+    double lastProximity = INF;
     for (int i = 0; i < hostIntencities.size(); ++i) {
       Vec2t patternP = targetP + reprojPattern[i].cast<T>();
+      lastProximity =
+          std::min(lastProximity,
+                   edgeProximity(toDouble(patternP[0]), toDouble(patternP[1])));
       T targetIntensity;
       targetFrame->Evaluate(patternP[1], patternP[0], &targetIntensity);
       //      T transformedHostIntensity =
@@ -339,10 +361,13 @@ public:
       residual[i] = targetIntensity - transformedHostIntensity;
     }
 
+    *outLastProximity = lastProximity;
+
     return true;
   }
 
 private:
+  double *outLastProximity;
   PreKeyFrameEntryInternals::Interpolator_t *targetFrame;
   SE3 hostFrameToBody, targetBodyToFrame;
   Vec3 dir;
@@ -374,6 +399,7 @@ TEST_F(ResidualTestDriftedPoses, AreValuesAndJacobianCorrect) {
   std::vector<EvalError> errors;
   double timeEvalMy = 0, timeEvalAuto = 0;
   int pointInd = 0;
+  int numDiscarded = 0;
   for (const Residual &residual : residuals) {
     std::chrono::time_point<std::chrono::system_clock> start, end;
     start = std::chrono::system_clock::now();
@@ -398,16 +424,17 @@ TEST_F(ResidualTestDriftedPoses, AreValuesAndJacobianCorrect) {
     auto actual_dr_daff_target = jacobian.dr_daff_target(patternSize);
     auto actual_dr_dlogd = jacobian.dr_dlogd(patternSize);
 
+    double proximity = 0;
+    ResidualCostFunctor *residualCostFunctor = new ResidualCostFunctor(
+        &kf2->preKeyFrame->frames[1].internals->interpolator(0),
+        hostFrameToBody, targetBodyToFrame,
+        residual.getHostDir().cast<double>(), residual.getReprojPattern(),
+        residual.getHostIntensities(), cam->bundle[1].cam, residualSettings,
+        &proximity);
+
     ceres::AutoDiffCostFunction<ResidualCostFunctor, ceres::DYNAMIC, 4, 3, 4, 3,
                                 2, 2, 1>
-        residualCF(new ResidualCostFunctor(
-                       &kf2->preKeyFrame->frames[1].internals->interpolator(0),
-                       hostFrameToBody, targetBodyToFrame,
-                       residual.getHostDir().cast<double>(),
-                       residual.getReprojPattern(),
-                       residual.getHostIntensities(), cam->bundle[1].cam,
-                       residualSettings),
-                   patternSize);
+        residualCF(residualCostFunctor, patternSize);
 
     const double *parameters[7] = {hostToWorld.so3().data(),
                                    hostToWorld.translation().data(),
@@ -440,6 +467,11 @@ TEST_F(ResidualTestDriftedPoses, AreValuesAndJacobianCorrect) {
 
     timeEvalAuto += secondsBetween(start, end);
 
+    if (proximity < minProximity) {
+      numDiscarded++;
+      continue;
+    }
+
     EvalError error;
     error.valueErr = (actualValues - expectedValues.cast<T>()).norm();
     error.hostToWorldRotErr = tangentErr(
@@ -469,7 +501,9 @@ TEST_F(ResidualTestDriftedPoses, AreValuesAndJacobianCorrect) {
               diffRotEps)
         << "actual:\n"
         << actual_dr_dq_host_tang << "\nexpected:\n"
-        << expected_dr_dq_host_tang;
+        << expected_dr_dq_host_tang
+        << "\nreproj = " << cachedValues.reproj.transpose()
+        << "\nproximity = " << proximity;
     EXPECT_LE(relOrAbs(error.hostToWorldTransErr, T(expected_dr_dt_host.norm()),
                        diffTransEps),
               diffTransEps)
@@ -511,6 +545,12 @@ TEST_F(ResidualTestDriftedPoses, AreValuesAndJacobianCorrect) {
     errors.push_back(error);
   }
 
+  double relDiscarded = double(numDiscarded) / residuals.size();
+
+  EXPECT_LT(relDiscarded, 0.05) << "Too much points were discarded";
+
+  LOG(INFO) << "discarded because of the edge proximity: " << numDiscarded
+            << " of " << residuals.size();
   LOG(INFO) << "total time on smart jacobian eval: " << timeEvalMy << std::endl;
   LOG(INFO) << "total time on auto  jacobian eval: " << timeEvalAuto
             << std::endl;

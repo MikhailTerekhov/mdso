@@ -141,10 +141,12 @@ int ImmaturePoint::pointsToTrace(const CameraModel &camRef,
 }
 
 Vec2 ImmaturePoint::tracePrecise(
-    const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>> &refFrame,
+    const PreKeyFrameEntryInternals &refFrameInternals, int pyrLevel,
     const Vec2 &from, const Vec2 &to, double intencities[], Vec2 pattern[],
     double &bestDispl, double &bestEnergy,
     const PointTracerSettings &settings) {
+  const PreKeyFrameEntryInternals::Interpolator_t &refFrame =
+      refFrameInternals.interpolator(pyrLevel);
   Vec2 dir = to - from;
   dir.normalize();
   Vec2 bestPoint = (from + to) * 0.5;
@@ -381,9 +383,9 @@ ImmaturePoint::traceOn(const PreKeyFrame::FrameEntry &refFrameEntry,
       Vec2 reproj = camRef.map(baseToRef * (bestDepth * baseDirections[i]));
       pattern[i] = scale * (reproj - points[bestInd]);
     }
-    bestPoint = tracePrecise(
-        refFrame.frames[indRef].internals->interpolator(bestPyrLevel), from, to,
-        intencities.data(), pattern.data(), bestDispl, bestEnergy, settings);
+    bestPoint = tracePrecise(*refFrame.frames[indRef].internals, bestPyrLevel,
+                             from, to, intencities.data(), pattern.data(),
+                             bestDispl, bestEnergy, settings);
     depth = triangulate(baseToRef, baseDirections[0],
                         camRef.unmap((bestPoint / scale).eval()))[0];
   } else

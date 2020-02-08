@@ -1,6 +1,7 @@
 #ifndef INCLUDE_PREKEYFRAMEINTERNALS
 #define INCLUDE_PREKEYFRAMEINTERNALS
 
+#include "util/BilinearInterpolator.h"
 #include "util/ImagePyramid.h"
 #include "util/types.h"
 #include <ceres/cubic_interpolation.h>
@@ -10,7 +11,7 @@ namespace mdso {
 class PreKeyFrameEntryInternals {
 public:
   using Grid_t = ceres::Grid2D<unsigned char>;
-  using Interpolator_t = ceres::BiCubicInterpolator<Grid_t>;
+  using Interpolator_t = BilinearInterpolator<Grid_t>;
 
   PreKeyFrameEntryInternals(const ImagePyramid &pyramid,
                             const Settings::Pyramid &pyrSettings);

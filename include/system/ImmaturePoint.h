@@ -11,6 +11,7 @@ namespace mdso {
 
 struct KeyFrameEntry;
 struct KeyFrame;
+class PreKeyFrameEntryInternals;
 
 struct ImmaturePoint {
   static constexpr int MS = Settings::ResidualPattern::max_size;
@@ -82,12 +83,10 @@ private:
                     Vec3 directions[], const PointTracerSettings &settings);
   double estVariance(const Vec2 &searchDirection,
                      const PointTracerSettings &settings);
-  Vec2
-  tracePrecise(const ceres::BiCubicInterpolator<ceres::Grid2D<unsigned char, 1>>
-                   &refFrame,
-               const Vec2 &from, const Vec2 &to, double intencities[],
-               Vec2 pattern[], double &bestDispl, double &bestEnergy,
-               const PointTracerSettings &settings);
+  Vec2 tracePrecise(const PreKeyFrameEntryInternals &refFrameInternals,
+                    int pyrLevel, const Vec2 &from, const Vec2 &to,
+                    double intencities[], Vec2 pattern[], double &bestDispl,
+                    double &bestEnergy, const PointTracerSettings &settings);
 };
 
 } // namespace mdso
