@@ -19,6 +19,8 @@ struct BundleAdjusterSettings;
 
 struct ResidualSettings;
 
+struct EnergyFunctionSettings;
+
 struct Settings {
   struct CameraModel {
     static constexpr int default_mapPolyDegree = 10;
@@ -299,6 +301,25 @@ struct Settings {
     int numThreads = default_numThreads;
   } threading;
 
+  struct Optimization {
+    enum Loss { TRIVIAL, HUBER };
+
+    static constexpr Loss default_lossType = HUBER;
+    Loss lossType = default_lossType;
+
+    static constexpr double default_initialLambda = 0.1;
+    double initialLambda = default_initialLambda;
+
+    static constexpr double default_failMultiplier = 2;
+    double failMultiplier = default_failMultiplier;
+
+    static constexpr double default_successMultiplier = 0.5;
+    double successMultiplier = default_successMultiplier;
+
+    static constexpr double default_pointPointThres = 1e-7;
+    double pointPointThres = default_pointPointThres;
+  } optimization;
+
   static constexpr int default_maxOptimizedPoints = 2000;
   static constexpr int max_maxOptimizedPoints = 10000;
   inline int maxOptimizedPoints() const { return mMaxOptimizedPoints; }
@@ -347,6 +368,7 @@ struct Settings {
   FrameTrackerSettings getFrameTrackerSettings() const;
   BundleAdjusterSettings getBundleAdjusterSettings() const;
   ResidualSettings getResidualSettings() const;
+  EnergyFunctionSettings getEnergyFunctionSettings() const;
 
   Settings getGradientAdjustedSettings(double intencityRequiredToThis,
                                        double gradNormRequiredToThis);
@@ -398,6 +420,11 @@ struct ResidualSettings {
   Settings::ResidualWeighting residualWeighting = {};
   Settings::Intensity intensity = {};
   Settings::Depth depth;
+};
+
+struct EnergyFunctionSettings {
+  ResidualSettings residual;
+  Settings::Optimization optimization;
 };
 
 } // namespace mdso

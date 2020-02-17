@@ -10,19 +10,27 @@ namespace mdso::optimize {
 
 class EnergyFunction {
 public:
-  struct Hessian {
-    MatXXt frameFrame;
-    MatXXt framePoint;
-    VecXt pointPoint;
-  };
-
   struct Gradient {
     VecXt frame;
     VecXt point;
   };
 
+  struct Hessian {
+    Hessian(int frameParams, int pointParams,
+            const Settings::Optimization &settings);
+
+    Hessian levenbergMarquardtDamp(double lambda) const;
+    void solve(const Gradient &gradient, VecXt &deltaFrame, VecXt &deltaPoint,
+               T lambda) const;
+
+    MatXXt frameFrame;
+    MatXXt framePoint;
+    VecXt pointPoint;
+    Settings::Optimization settings;
+  };
+
   EnergyFunction(CameraBundle *camBundle, KeyFrame *keyFrames[],
-                 int numKeyFrames, const ResidualSettings &settings);
+                 int numKeyFrames, const EnergyFunctionSettings &settings);
 
   int numPoints() const;
 
@@ -38,6 +46,8 @@ public:
   void precomputeValuesAndDerivatives();
   void clearPrecomputations();
 
+  void optimize(int maxInterations);
+
 private:
   using SecondFrameParametrization = SO3xS2Parametrization;
   using FrameParametrization = RightExpParametrization<SE3t>;
@@ -52,9 +62,10 @@ private:
 
     struct State {
       int frameParameters() const;
-      void applyUpdate(const VecX &deltaFrame, const VecX &deltaPoints);
+      void applyUpdate(const VecXt &deltaFrame, const VecXt &deltaPoints);
 
       State(KeyFrame **keyFrames, int newNumKeyFrames);
+
       VecXt logDepths;
       SE3t firstBodyToWorld;
       SecondFrameParametrization secondFrame;
@@ -82,9 +93,9 @@ private:
 
     void setPoints(std::vector<OptimizedPoint *> &&newOptimizedPoints);
 
-    void update(const VecX &deltaFrame, const VecX &deltaPoints);
+    void update(const VecXt &deltaFrame, const VecXt &deltaPoints);
     State saveState() const;
-    void recoverState(State &&oldState);
+    void recoverState(State oldState);
     void apply();
 
   private:
@@ -134,13 +145,16 @@ private:
   class Values {
   public:
     Values(const StdVector<Residual> &residuals, const Parameters &parameters,
+           const ceres::LossFunction *lossFunction,
            PrecomputedHostToTarget &hostToTarget,
            PrecomputedLightHostToTarget &lightHostToTarget);
 
     const VecRt &values(int residualInd) const;
     const Residual::CachedValues &cachedValues(int residualInd) const;
+    T totalEnergy() const;
 
   private:
+    const ceres::LossFunction *lossFunction;
     StdVector<std::pair<VecRt, Residual::CachedValues>> valsAndCache;
   };
 
@@ -155,18 +169,26 @@ private:
     Parameters::Jacobians parametrizationJacobians;
   };
 
+  PrecomputedHostToTarget precomputeHostToTarget() const;
+  PrecomputedMotionDerivatives precomputeMotionDerivatives() const;
+  PrecomputedLightHostToTarget precomputeLightHostToTarget() const;
+
+  Values createValues(PrecomputedHostToTarget &hostToTarget,
+                      PrecomputedLightHostToTarget &lightHostToTarget);
   Values &getAllValues();
   Values &getAllValues(PrecomputedHostToTarget &hostToTarget,
                        PrecomputedLightHostToTarget &lightHostToTarget);
+  Derivatives
+  createDerivatives(const Values &values, PrecomputedHostToTarget &hostToTarget,
+                    PrecomputedMotionDerivatives &motionDerivatives,
+                    PrecomputedLightHostToTarget &lightHostToTarget);
   Derivatives &getDerivatives(PrecomputedHostToTarget &hostToTarget,
                               PrecomputedMotionDerivatives &motionDerivatives,
                               PrecomputedLightHostToTarget &lightHostToTarget);
-  Hessian getHessian(PrecomputedHostToTarget &hostToTarget,
-                     PrecomputedMotionDerivatives &motionDerivatives,
-                     PrecomputedLightHostToTarget &lightHostToTarget);
-  Gradient getGradient(PrecomputedHostToTarget &hostToTarget,
-                       PrecomputedMotionDerivatives &motionDerivatives,
-                       PrecomputedLightHostToTarget &lightHostToTarget);
+  Hessian getHessian(const Values &precomputedValues,
+                     const Derivatives &precomputedDerivatives);
+  Gradient getGradient(const Values &precomputedValues,
+                       const Derivatives &precomputedDerivatives);
 
   StdVector<Residual> residuals;
   std::optional<Values> values;
@@ -174,7 +196,7 @@ private:
   Parameters parameters;
   std::unique_ptr<ceres::LossFunction> lossFunction;
   CameraBundle *cam;
-  ResidualSettings settings;
+  EnergyFunctionSettings settings;
 };
 
 } // namespace mdso::optimize

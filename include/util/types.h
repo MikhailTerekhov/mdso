@@ -134,6 +134,7 @@ template <typename T> SetUniquePtr<T> makeFindPtr(T *ptr) {
 }
 
 using Timestamp = int64_t;
+using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
 
 template <typename T>
 using StdUnorderedSetOfPtrs = std::unordered_set<SetUniquePtr<T>>;

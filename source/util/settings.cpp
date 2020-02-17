@@ -56,4 +56,8 @@ ResidualSettings Settings::getResidualSettings() const {
   return {residualPattern, residualWeighting, intensity, depth};
 }
 
+EnergyFunctionSettings Settings::getEnergyFunctionSettings() const {
+  return {getResidualSettings(), optimization};
+}
+
 } // namespace mdso

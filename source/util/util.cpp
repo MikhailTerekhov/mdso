@@ -319,4 +319,6 @@ std::string curTimeBrief() {
   return std::string(curTime);
 }
 
+TimePoint now() { return std::chrono::high_resolution_clock::now(); }
+
 } // namespace mdso

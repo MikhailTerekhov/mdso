@@ -16,6 +16,7 @@ DEFINE_bool(profile_only, false,
 DEFINE_int32(num_evaluations, 1000,
              "Number of evaluations to perform for profiling (is only used "
              "when --profile_only is on).");
+DEFINE_double(init_lambda, 1, "Initial lambda for Levenberg-Marquardt.");
 
 using namespace mdso;
 using namespace mdso::optimize;
@@ -47,14 +48,18 @@ protected:
   static constexpr int sndFrameDoF = sndDoF + affDoF,
                        restFrameDoF = restDoF + affDoF;
 
+  static constexpr double transDrift = 0.02;
+  static constexpr double rotDrift = (M_PI / 180.0) * 0.004;
+
   EnergyFunctionTest()
       : pointsPerFrame(FLAGS_opt_count / keyFramesCount) {}
 
   void SetUp() override {
     settings = getFlaggedSettings();
+    settings.optimization.initialLambda = FLAGS_init_lambda;
     settings.setMaxOptimizedPoints(pointsPerFrame * keyFramesCount);
     settings.keyFrame.setImmaturePointsNum(pointsPerFrame);
-    residualSettings = settings.getResidualSettings();
+    energyFunctionSettings = settings.getEnergyFunctionSettings();
 
     reader.reset(new MultiFovReader(FLAGS_mfov_dir));
     SE3 bodyToFrame = SE3::sampleUniform(mt);
@@ -63,6 +68,7 @@ protected:
     pixelSelector.initialize(reader->getFrame(keyFrameNums[0]),
                              settings.keyFrame.immaturePointsNum());
     keyFrames.reserve(keyFramesCount);
+    SE3 worldToFirstGT = reader->getWorldToFrameGT(keyFrameNums[0]);
     for (int i = 0; i < keyFramesCount; ++i) {
       Timestamp ts = keyFrameNums[i];
       AffLight lightWorldToF = sampleAffLight<double>(settings.affineLight, mt);
@@ -75,8 +81,16 @@ protected:
                                           settings.keyFrame,
                                           settings.getPointTracerSettings()));
       keyFrames.back()->frames[0].lightWorldToThis = lightWorldToF;
-      keyFrames.back()->thisToWorld.setValue(
-          reader->getWorldToFrameGT(keyFrameNums[i]).inverse());
+
+      SE3 frameToWorldGT = reader->getWorldToFrameGT(keyFrameNums[i]).inverse();
+      SE3 firstToThisGT = worldToFirstGT * frameToWorldGT;
+      double transErr = firstToThisGT.translation().norm() * transDrift;
+      double rotErr = firstToThisGT.so3().log().norm() * rotDrift;
+      SE3 frameToWorld = i == 0
+                             ? frameToWorldGT
+                             : sampleSe3(transErr, rotErr, mt) * frameToWorldGT;
+      keyFrames.back()->thisToWorld.setValue(frameToWorld);
+
       cv::Mat1d depths = reader->getDepths(keyFrameNums[i]);
       for (ImmaturePoint &ip : keyFrames.back()->frames[0].immaturePoints) {
         cv::Point p = toCvPoint(ip.p);
@@ -97,8 +111,8 @@ protected:
     kfPtrs.reserve(keyFrames.size());
     for (auto &kf : keyFrames)
       kfPtrs.push_back(kf.get());
-    energyFunction.reset(new EnergyFunction(cam.get(), kfPtrs.data(),
-                                            kfPtrs.size(), residualSettings));
+    energyFunction.reset(new EnergyFunction(
+        cam.get(), kfPtrs.data(), kfPtrs.size(), energyFunctionSettings));
   }
 
   MatXXt getExpectedJacobian() {
@@ -132,7 +146,7 @@ protected:
       SE3t hostToTarget = targetBodyToFrame * targetToWorld.inverse() *
                           hostToWorld * hostFrameToBody;
 
-      Residual::CachedValues cachedValues(residualSettings.patternSize());
+      Residual::CachedValues cachedValues(PS);
       VecRt values =
           res.getValues(hostToTarget, lightHostToTarget,
                         energyFunction->getLogDepth(res), &cachedValues);
@@ -162,6 +176,26 @@ protected:
     return expectedJacobian;
   }
 
+  double transError() const {
+    Eigen::Matrix<double, keyFramesCount, 1> errs;
+    for (int i = 0; i < keyFramesCount; ++i) {
+      SE3 err = keyFrames[i]->thisToWorld() *
+                reader->getWorldToFrameGT(keyFrameNums[i]);
+      errs[i] = err.translation().norm();
+    }
+    return errs.norm();
+  }
+
+  double rotError() const {
+    Eigen::Matrix<double, keyFramesCount, 1> errs;
+    for (int i = 0; i < keyFramesCount; ++i) {
+      SE3 err = keyFrames[i]->thisToWorld() *
+                reader->getWorldToFrameGT(keyFrameNums[i]);
+      errs[i] = err.so3().log().norm();
+    }
+    return errs.norm() * (180. / M_PI);
+  }
+
   std::unique_ptr<MultiFovReader> reader;
   std::unique_ptr<CameraBundle> cam;
   std::vector<std::unique_ptr<KeyFrame>> keyFrames;
@@ -169,7 +203,7 @@ protected:
   std::unique_ptr<SO3xS2Parametrization> secondFrameParam;
   std::vector<RightExpParametrization<SE3t>> restFrameParams;
   Settings settings;
-  ResidualSettings residualSettings;
+  EnergyFunctionSettings energyFunctionSettings;
   IdentityPreprocessor idPrep;
   std::mt19937 mt;
   int pointsPerFrame;
@@ -215,7 +249,7 @@ private:
   }
 };
 
-double fillFactor(const MatXXt &mat, double eps) {
+double fillFactor(const MatXX &mat, double eps) {
   return double((mat.array().abs() >= eps).count()) / mat.size();
 }
 
@@ -247,7 +281,7 @@ TEST_F(EnergyFunctionTest, isHessianCorrect) {
   } else {
     EnergyFunction::Hessian actualHessian = energyFunction->getHessian();
 
-    const int PS = residualSettings.residualPattern.pattern().size();
+    const int PS = settings.residualPattern.pattern().size();
     int totalFrameParams = sndFrameDoF + (keyFramesCount - 2) * restFrameDoF;
     int numResiduals = energyFunction->getResiduals().size();
     int numPoints = energyFunction->numPoints();
@@ -288,6 +322,13 @@ TEST_F(EnergyFunctionTest, isHessianCorrect) {
               << expectedFrameFrame.size();
     LOG(INFO) << "NaNs in actual FrameFrame: " << countNaNs(actualFrameFrame)
               << " of " << actualFrameFrame.size();
+    constexpr double relEps = 1e-8;
+    double ffEps = (actualFrameFrame.norm() / actualFrameFrame.size()) * relEps;
+    LOG(INFO) << "FrameFrame fill factor = "
+              << fillFactor(actualFrameFrame, ffEps);
+    double fpEps = (actualFramePoint.norm() / actualFramePoint.size()) * relEps;
+    LOG(INFO) << "FramePoint fill factor = "
+              << fillFactor(actualFramePoint, ffEps);
 
     ASSERT_EQ(expectedFrameFrame.rows(), actualFrameFrame.rows());
     ASSERT_EQ(expectedFrameFrame.cols(), actualFrameFrame.cols());
@@ -323,7 +364,7 @@ TEST_F(EnergyFunctionTest, isGradientCorrect) {
   } else {
     EnergyFunction::Gradient actualGradient = energyFunction->getGradient();
 
-    const int PS = residualSettings.residualPattern.pattern().size();
+    const int PS = settings.residualPattern.pattern().size();
     int totalFrameParams = sndFrameDoF + (keyFramesCount - 2) * restFrameDoF;
     int numResiduals = energyFunction->getResiduals().size();
     int numPoints = energyFunction->numPoints();
@@ -354,6 +395,23 @@ TEST_F(EnergyFunctionTest, isGradientCorrect) {
     EXPECT_LE(relFrameErr, ErrorBounds<T>::gradientRelErr);
     EXPECT_LE(relPointErr, ErrorBounds<T>::gradientRelErr);
   }
+}
+
+TEST_F(EnergyFunctionTest, DISABLED_DoesOptimizationHelp) {
+  constexpr int numIterations = 100;
+
+  double transErrBefore = transError();
+  double rotErrBefore = rotError();
+
+  energyFunction->optimize(numIterations);
+
+  double transErrAfter = transError();
+  double rotErrAfter = rotError();
+
+  LOG(INFO) << "trans err before: " << transErrBefore;
+  LOG(INFO) << "trans err after : " << transErrAfter;
+  LOG(INFO) << "rot err before: " << rotErrBefore;
+  LOG(INFO) << "rot err after : " << rotErrAfter;
 }
 
 int main(int argc, char **argv) {

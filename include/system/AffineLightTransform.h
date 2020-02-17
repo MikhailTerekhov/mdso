@@ -47,14 +47,13 @@ template <typename T> struct AffineLightTransform {
     return AffineLightTransform<T>(-a(), -b() * exp(-a()));
   }
 
-  static void normalizeMultiplier(AffineLightTransform<T> &toNormalize,
-                                  AffineLightTransform<T> &relative) {
-    relative.data[0] -= toNormalize.data[0];
-    toNormalize.data[0] = T(0);
-  }
-
   template <typename U> AffineLightTransform<U> cast() const {
     return AffineLightTransform<U>(U(data[0]), U(data[1]));
+  }
+
+  void applyUpdate(const Eigen::Matrix<T, 2, 1> &delta) {
+    data[0] += delta[0];
+    data[1] += delta[1];
   }
 
   friend std::ostream &operator<<(std::ostream &os,

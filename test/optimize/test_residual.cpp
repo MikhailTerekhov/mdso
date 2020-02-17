@@ -84,17 +84,6 @@ cv::Mat3b cvtAff(const cv::Mat3b &mat, const AffLight &aff) {
   return result;
 }
 
-template <typename UniformBitGenerator>
-SE3 sampleSe3(double rotDelta, double transDelta, UniformBitGenerator &gen) {
-  double t2 = transDelta / 2;
-  double r2 = rotDelta / 2;
-  std::uniform_real_distribution<double> dtrans(-t2, t2);
-  std::uniform_real_distribution<double> drot(-r2, r2);
-  Vec3 trans(dtrans(gen), dtrans(gen), dtrans(gen));
-  Vec3 rot(drot(gen), drot(gen), drot(gen));
-  return SE3(SO3::exp(rot), trans);
-}
-
 class ResidualTestBase : public ::testing::Test {
 protected:
   static constexpr int fnum1 = 375, fnum2 = 385;
@@ -401,8 +390,8 @@ TEST_F(ResidualTestDriftedPoses, AreValuesAndJacobianCorrect) {
   int pointInd = 0;
   int numDiscarded = 0;
   for (const Residual &residual : residuals) {
-    std::chrono::time_point<std::chrono::system_clock> start, end;
-    start = std::chrono::system_clock::now();
+    TimePoint start, end;
+    start = now();
     double logDepth = logDepths[residual.pointInd()];
     Residual::CachedValues cachedValues(patternSize);
     auto actualValues = residual.getValues(hostToTarget, lightHostToTarget,
@@ -411,7 +400,7 @@ TEST_F(ResidualTestDriftedPoses, AreValuesAndJacobianCorrect) {
         residual.getJacobian(hostToTarget, *dhostToTarget, lightWorldToHost,
                              lightHostToTarget, logDepth, cachedValues);
 
-    end = std::chrono::system_clock::now();
+    end = now();
     timeEvalMy += secondsBetween(start, end);
 
     auto actual_dr_dq_host = jacobian.dr_dq_host(patternSize);

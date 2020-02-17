@@ -134,6 +134,8 @@ std::vector<double> readBin(const fs::path &filename);
 
 std::string curTimeBrief();
 
+TimePoint now();
+
 template <typename Time>
 double secondsBetween(const Time &start, const Time &end) {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
@@ -157,6 +159,17 @@ AffineLightTransform<T> sampleAffLight(const Settings::AffineLight &affSettings,
   std::uniform_real_distribution<T> db(affSettings.minAffineLightB,
                                        affSettings.maxAffineLightB);
   return AffineLightTransform<T>(da(gen), db(gen));
+}
+
+template <typename UniformBitGenerator>
+SE3 sampleSe3(double rotDelta, double transDelta, UniformBitGenerator &gen) {
+  double t2 = transDelta / 2;
+  double r2 = rotDelta / 2;
+  std::uniform_real_distribution<double> dtrans(-t2, t2);
+  std::uniform_real_distribution<double> drot(-r2, r2);
+  Vec3 trans(dtrans(gen), dtrans(gen), dtrans(gen));
+  Vec3 rot(drot(gen), drot(gen), drot(gen));
+  return SE3(SO3::exp(rot), trans);
 }
 
 namespace optimize {

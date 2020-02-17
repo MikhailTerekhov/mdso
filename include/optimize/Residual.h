@@ -22,6 +22,8 @@ using MatR6t = Eigen::Matrix<T, Eigen::Dynamic, 6, Eigen::ColMajor,
                              Settings::ResidualPattern::max_size>;
 using MatR7t = Eigen::Matrix<T, Eigen::Dynamic, 7, Eigen::ColMajor,
                              Settings::ResidualPattern::max_size>;
+using MatRx19t = Eigen::Matrix<T, Eigen::Dynamic, 19, Eigen::ColMajor,
+                               Settings::ResidualPattern::max_size>;
 
 class Residual {
 public:
@@ -71,6 +73,7 @@ public:
     MatR2t dr_daff_host(int patternSize) const;
     MatR2t dr_daff_target(int patternSize) const;
     VecRt dr_dlogd(int patternSize) const;
+    MatRx19t dr_dparams(int patternSize) const;
   };
 
   struct FrameFrameHessian {

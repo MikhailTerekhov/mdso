@@ -83,6 +83,8 @@ DEFINE_bool(deterministic, true,
 DEFINE_int32(shift_between_keyframes, Settings::default_keyFrameDist,
              "Difference in frame numbers between chosen keyFrames.");
 
+DEFINE_bool(trivial_loss, false, "Use trivial loss function?");
+
 namespace mdso {
 
 Settings getFlaggedSettings() {
@@ -112,6 +114,9 @@ Settings getFlaggedSettings() {
   settings.useRandomOptimizedChoice = FLAGS_use_random_optimized_choice;
   settings.disableMarginalization = FLAGS_disable_marginalization;
   settings.setKeyFrameDist(FLAGS_shift_between_keyframes);
+  settings.optimization.lossType = FLAGS_trivial_loss
+                                       ? Settings::Optimization::TRIVIAL
+                                       : Settings::Optimization::HUBER;
 
   return settings;
 }

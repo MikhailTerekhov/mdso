@@ -44,6 +44,8 @@ DECLARE_bool(deterministic);
 
 DECLARE_int32(shift_between_keyframes);
 
+DECLARE_bool(trivial_loss);
+
 namespace mdso {
 
 Settings getFlaggedSettings();

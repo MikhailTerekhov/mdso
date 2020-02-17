@@ -371,4 +371,13 @@ VecRt Residual::Jacobian::dr_dlogd(int patternSize) const {
   return gradItarget * dp_dlogd;
 }
 
+MatRx19t Residual::Jacobian::dr_dparams(int patternSize) const {
+  MatRx19t result(patternSize, 19);
+  result << dr_dq_host(patternSize), dr_dt_host(patternSize),
+      dr_dq_target(patternSize), dr_dt_target(patternSize),
+      dr_daff_host(patternSize), dr_daff_target(patternSize),
+      dr_dlogd(patternSize);
+  return result;
+}
+
 } // namespace mdso::optimize

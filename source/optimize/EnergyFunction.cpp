@@ -3,16 +3,31 @@
 
 namespace mdso::optimize {
 
+std::unique_ptr<ceres::LossFunction> getLoss(Settings::Optimization::Loss type,
+                                             double outlierDiff) {
+  using loss_ptr = std::unique_ptr<ceres::LossFunction>;
+
+  switch (type) {
+  case Settings::Optimization::TRIVIAL:
+    return loss_ptr(new ceres::TrivialLoss());
+  case Settings::Optimization::HUBER:
+    return loss_ptr(new ceres::HuberLoss(outlierDiff));
+  default:
+    return loss_ptr(new ceres::TrivialLoss());
+  }
+}
+
 EnergyFunction::EnergyFunction(CameraBundle *camBundle, KeyFrame **keyFrames,
                                int numKeyFrames,
-                               const ResidualSettings &settings)
+                               const EnergyFunctionSettings &settings)
     : parameters(camBundle, keyFrames, numKeyFrames)
-    , lossFunction(new ceres::HuberLoss(settings.intensity.outlierDiff))
+    , lossFunction(getLoss(settings.optimization.lossType,
+                           settings.residual.intensity.outlierDiff))
     , cam(camBundle)
     , settings(settings) {
   CHECK(numKeyFrames >= 2);
 
-  int PH = settings.residualPattern.height;
+  int PH = settings.residual.residualPattern.height;
 
   PrecomputedHostToTarget hostToTarget(cam, &parameters);
   std::vector<OptimizedPoint *> optimizedPoints;
@@ -50,7 +65,7 @@ EnergyFunction::EnergyFunction(CameraBundle *camBundle, KeyFrame **keyFrames,
                                    &keyFrames[hostInd]->frames[hostCamInd],
                                    &keyFrames[targetInd]->frames[targetCamInd],
                                    &op, op.logDepth, hostToTargetImage,
-                                   lossFunction.get(), settings);
+                                   lossFunction.get(), settings.residual);
           }
         }
       }
@@ -74,13 +89,15 @@ EnergyFunction::Hessian EnergyFunction::getHessian() {
   PrecomputedHostToTarget hostToTarget(cam, &parameters);
   PrecomputedMotionDerivatives motionDerivatives(cam, &parameters);
   PrecomputedLightHostToTarget lightHostToTarget(&parameters);
-  return getHessian(hostToTarget, motionDerivatives, lightHostToTarget);
+  const Values &values = getAllValues(hostToTarget, lightHostToTarget);
+  const Derivatives &derivatives =
+      getDerivatives(hostToTarget, motionDerivatives, lightHostToTarget);
+  return getHessian(values, derivatives);
 }
 
 EnergyFunction::Hessian
-EnergyFunction::getHessian(PrecomputedHostToTarget &hostToTarget,
-                           PrecomputedMotionDerivatives &motionDerivatives,
-                           PrecomputedLightHostToTarget &lightHostToTarget) {
+EnergyFunction::getHessian(const Values &precomputedValues,
+                           const Derivatives &precomputedDerivatives) {
   constexpr int sndDoF = Parameters::sndDoF;
   constexpr int restDoF = Parameters::restDoF;
   constexpr int affDoF = Parameters::affDoF;
@@ -92,14 +109,8 @@ EnergyFunction::getHessian(PrecomputedHostToTarget &hostToTarget,
   int framePars = parameters.frameParameters();
   int pointPars = nonconstPoints;
 
-  const Values &valuesRef = getAllValues(hostToTarget, lightHostToTarget);
-  const Derivatives &derivativesRef =
-      getDerivatives(hostToTarget, motionDerivatives, lightHostToTarget);
-
-  Hessian hessian;
-  hessian.frameFrame = MatXXt::Zero(framePars, framePars);
-  hessian.framePoint = MatXXt::Zero(framePars, pointPars);
-  hessian.pointPoint = VecXt::Zero(pointPars);
+  Hessian hessian(framePars, pointPars, settings.optimization);
+  Eigen::ArrayXi useCount = Eigen::ArrayXi::Zero(pointPars, 1);
 
   Array2d<Accumulator<Residual::FrameFrameHessian>> frameFrameBlocks(
       boost::extents[nonconstFrames][nonconstFrames]);
@@ -113,8 +124,9 @@ EnergyFunction::getHessian(PrecomputedHostToTarget &hostToTarget,
         pi = residual.pointInd();
     CHECK_NE(hi, ti);
 
-    Residual::DeltaHessian deltaHessian = residual.getDeltaHessian(
-        getResidualValues(i), derivativesRef.residualJacobians[i]);
+    Residual::DeltaHessian deltaHessian =
+        residual.getDeltaHessian(precomputedValues.values(i),
+                                 precomputedDerivatives.residualJacobians[i]);
 
     int him1 = hi - 1, tim1 = ti - 1;
     if (hi > 0)
@@ -134,10 +146,17 @@ EnergyFunction::getHessian(PrecomputedHostToTarget &hostToTarget,
       framePointBlocks[tim1][pi] += deltaHessian.targetPoint;
 
     hessian.pointPoint[pi] += deltaHessian.pointPoint;
+    useCount[pi]++;
   }
 
+  int pointsUsed = (useCount > 0).count();
+  constexpr double thresh = 1e-7;
+  int pointsNonzero = (hessian.pointPoint.array() > thresh).count();
+  LOG(INFO) << pointsUsed << " / " << nonconstPoints << "points used";
+  LOG(INFO) << pointsNonzero << "points have positive PP hessian";
+
   const Mat75t &sndParamDiff =
-      derivativesRef.parametrizationJacobians.dSecondFrame;
+      precomputedDerivatives.parametrizationJacobians.dSecondFrame;
 
   if (frameFrameBlocks[0][0].wasUsed()) {
     const Residual::FrameFrameHessian &topLeftBlock =
@@ -158,7 +177,7 @@ EnergyFunction::getHessian(PrecomputedHostToTarget &hostToTarget,
       continue;
     int i2m1 = i2 - 1;
     const Mat76t &paramDiff =
-        derivativesRef.parametrizationJacobians.dRestFrames[i2m1];
+        precomputedDerivatives.parametrizationJacobians.dRestFrames[i2m1];
     const Residual::FrameFrameHessian &curBlock =
         frameFrameBlocks[0][i2].accumulated();
     hessian.frameFrame.block<sndDoF, restDoF>(0, startCol) =
@@ -180,9 +199,9 @@ EnergyFunction::getHessian(PrecomputedHostToTarget &hostToTarget,
       const Residual::FrameFrameHessian &curBlock =
           frameFrameBlocks[i1][i2].accumulated();
       const Mat76t &hostParamDiff =
-          derivativesRef.parametrizationJacobians.dRestFrames[i1m1];
+          precomputedDerivatives.parametrizationJacobians.dRestFrames[i1m1];
       const Mat76t &targetParamDiff =
-          derivativesRef.parametrizationJacobians.dRestFrames[i2m1];
+          precomputedDerivatives.parametrizationJacobians.dRestFrames[i2m1];
 
       hessian.frameFrame.block<restDoF, restDoF>(startRow, startCol) =
           hostParamDiff.transpose() * curBlock.qtqt * targetParamDiff;
@@ -213,7 +232,7 @@ EnergyFunction::getHessian(PrecomputedHostToTarget &hostToTarget,
       const Residual::FramePointHessian &curBlock =
           framePointBlocks[fi][pi].accumulated();
       const Mat76t &paramDiff =
-          derivativesRef.parametrizationJacobians.dRestFrames[fim1];
+          precomputedDerivatives.parametrizationJacobians.dRestFrames[fim1];
 
       hessian.framePoint.block<restDoF, 1>(startRow, pi) =
           paramDiff.transpose() * curBlock.qtd;
@@ -257,13 +276,15 @@ EnergyFunction::Gradient EnergyFunction::getGradient() {
   PrecomputedHostToTarget hostToTarget(cam, &parameters);
   PrecomputedMotionDerivatives motionDerivatives(cam, &parameters);
   PrecomputedLightHostToTarget lightHostToTarget(&parameters);
-  return getGradient(hostToTarget, motionDerivatives, lightHostToTarget);
+  const Values &valuesRef = getAllValues(hostToTarget, lightHostToTarget);
+  const Derivatives &derivativesRef =
+      getDerivatives(hostToTarget, motionDerivatives, lightHostToTarget);
+  return getGradient(valuesRef, derivativesRef);
 }
 
 EnergyFunction::Gradient
-EnergyFunction::getGradient(PrecomputedHostToTarget &hostToTarget,
-                            PrecomputedMotionDerivatives &motionDerivatives,
-                            PrecomputedLightHostToTarget &lightHostToTarget) {
+EnergyFunction::getGradient(const Values &precomputedValues,
+                            const Derivatives &precomputedDerivatives) {
   constexpr int sndDoF = Parameters::sndDoF;
   constexpr int restDoF = Parameters::restDoF;
   constexpr int affDoF = Parameters::affDoF;
@@ -274,10 +295,6 @@ EnergyFunction::getGradient(PrecomputedHostToTarget &hostToTarget,
   int nonconstPoints = parameters.numPoints();
   int framePars = parameters.frameParameters();
   int pointPars = nonconstPoints;
-
-  const Values &valuesRef = getAllValues(hostToTarget, lightHostToTarget);
-  const Derivatives &derivativesRef =
-      getDerivatives(hostToTarget, motionDerivatives, lightHostToTarget);
 
   EnergyFunction::Gradient gradient;
   gradient.frame = VecXt::Zero(parameters.frameParameters());
@@ -293,8 +310,9 @@ EnergyFunction::getGradient(PrecomputedHostToTarget &hostToTarget,
     int him1 = hi - 1, tim1 = ti - 1;
     CHECK_NE(hi, ti);
 
-    Residual::DeltaGradient deltaGradient = residual.getDeltaGradient(
-        valuesRef.values(i), derivativesRef.residualJacobians[i]);
+    Residual::DeltaGradient deltaGradient =
+        residual.getDeltaGradient(precomputedValues.values(i),
+                                  precomputedDerivatives.residualJacobians[i]);
     if (hi > 0)
       frameBlocks[him1] += deltaGradient.host;
     if (ti > 0)
@@ -302,8 +320,10 @@ EnergyFunction::getGradient(PrecomputedHostToTarget &hostToTarget,
     gradient.point[pi] += deltaGradient.point;
   }
 
-  const Mat75t &sndParam = derivativesRef.parametrizationJacobians.dSecondFrame;
-  const auto &restParams = derivativesRef.parametrizationJacobians.dRestFrames;
+  const Mat75t &sndParam =
+      precomputedDerivatives.parametrizationJacobians.dSecondFrame;
+  const auto &restParams =
+      precomputedDerivatives.parametrizationJacobians.dRestFrames;
   if (frameBlocks[0].wasUsed()) {
     const Residual::FrameGradient &sndFrameGradient =
         frameBlocks[0].accumulated();
@@ -334,6 +354,188 @@ void EnergyFunction::precomputeValuesAndDerivatives() {
 void EnergyFunction::clearPrecomputations() {
   values.reset();
   derivatives.reset();
+}
+
+void EnergyFunction::optimize(int maxIterations) {
+  T lambda = settings.optimization.initialLambda;
+  MatXXt ff[2];
+  std::optional<Derivatives> deriv[2];
+  auto hostToTarget = precomputeHostToTarget();
+  auto motionDerivatives = precomputeMotionDerivatives();
+  auto lightHostToTarget = precomputeLightHostToTarget();
+  Values curValues = createValues(hostToTarget, lightHostToTarget);
+  Derivatives curDerivatives = createDerivatives(
+      curValues, hostToTarget, motionDerivatives, lightHostToTarget);
+  Hessian hessian = getHessian(curValues, curDerivatives);
+  Gradient gradient = getGradient(curValues, curDerivatives);
+  bool parametersUpdated = false;
+  for (int it = 0; it < maxIterations; ++it) {
+    std::cout << "it = " << it << "\n";
+    TimePoint start, end;
+    start = now();
+
+    T curEnergy = curValues.totalEnergy();
+    std::cout << "cur energy = " << curEnergy << "\n";
+
+    if (parametersUpdated) {
+      motionDerivatives = precomputeMotionDerivatives();
+      curDerivatives = createDerivatives(curValues, hostToTarget,
+                                         motionDerivatives, lightHostToTarget);
+      hessian = getHessian(curValues, curDerivatives);
+      gradient = getGradient(curValues, curDerivatives);
+    }
+
+    //    {
+    //      deriv[it % 2].emplace(curDerivatives);
+    //      ff[it % 2] = hessian.frameFrame;
+    //      if (it > 0) {
+    //        std::cout << "ff diff = " << (ff[0] - ff[1]).norm() / ff[0].norm()
+    //                  << '\n';
+    //        double rerr = 0, rsum = 0;
+    //        int PS = settings.residual.patternSize();
+    //        for (int ri = 0; ri < deriv[0].value().residualJacobians.size();
+    //        ++ri) {
+    //          auto dr1 =
+    //          deriv[0].value().residualJacobians[ri].dr_dparams(PS); auto dr2
+    //          = deriv[1].value().residualJacobians[ri].dr_dparams(PS); rerr +=
+    //          (dr1 - dr2).norm(); rsum += dr1.norm();
+    //        }
+    //        std::cout << "rel dres err = " << rerr / rsum << "\n";
+    //        double perr = 0, psum = 0;
+    //        auto dp1 = deriv[0].value().parametrizationJacobians.dSecondFrame;
+    //        auto dp2 = deriv[1].value().parametrizationJacobians.dSecondFrame;
+    //        perr += (dp1 - dp2).norm();
+    //        psum += dp1.norm();
+    //        for (int pi = 0;
+    //             pi <
+    //             deriv[0].value().parametrizationJacobians.dRestFrames.size();
+    //             ++pi) {
+    //          auto dp1 =
+    //          deriv[0].value().parametrizationJacobians.dRestFrames[pi]; auto
+    //          dp2 = deriv[1].value().parametrizationJacobians.dRestFrames[pi];
+    //          perr += (dp1 - dp2).norm();
+    //          psum += dp1.norm();
+    //        }
+    //        std::cout << "rel dparm err = " << perr / psum << "\n";
+    //      }
+    //    }
+
+    Hessian dampedHessian = hessian.levenbergMarquardtDamp(lambda);
+
+    VecXt deltaFrame, deltaPoint;
+    dampedHessian.solve(gradient, deltaFrame, deltaPoint, lambda);
+
+    Parameters::State savedState = parameters.saveState();
+    parameters.update(deltaFrame, deltaPoint);
+
+    auto newHostToTarget = precomputeHostToTarget();
+    auto newLightHostToTarget = precomputeLightHostToTarget();
+    Values newValues = createValues(newHostToTarget, newLightHostToTarget);
+
+    T newEnergy = newValues.totalEnergy();
+    std::cout << "new energy = " << newEnergy
+              << " delta = " << newEnergy - curEnergy << "\n";
+
+    LOG(INFO) << "optimization step #" << it << ": curEnergy = " << curEnergy
+              << " newEnergy = " << newEnergy;
+
+    if (newEnergy >= curEnergy) {
+      parameters.recoverState(std::move(savedState));
+      lambda *= settings.optimization.failMultiplier;
+      parametersUpdated = false;
+    } else {
+      lambda *= settings.optimization.successMultiplier;
+      curValues = std::move(newValues);
+      hostToTarget = std::move(newHostToTarget);
+      lightHostToTarget = std::move(newLightHostToTarget);
+      parametersUpdated = true;
+    }
+
+    end = now();
+    LOG(INFO) << "step took " << secondsBetween(start, end);
+  }
+
+  parameters.apply();
+}
+
+EnergyFunction::Hessian::Hessian(int frameParams, int pointParams,
+                                 const Settings::Optimization &settings)
+    : frameFrame(frameParams, frameParams)
+    , framePoint(frameParams, pointParams)
+    , pointPoint(pointParams)
+    , settings(settings) {
+  frameFrame.setZero();
+  framePoint.setZero();
+  pointPoint.setZero();
+}
+
+EnergyFunction::Hessian
+EnergyFunction::Hessian::levenbergMarquardtDamp(double lambda) const {
+  Hessian result = *this;
+  result.frameFrame.diagonal() *= (1 + lambda);
+  result.pointPoint *= (1 + lambda);
+  return result;
+}
+
+std::vector<int> indsBigger(const VecXt &vec, T threshold) {
+  std::vector<int> inds;
+  inds.reserve(vec.size());
+  for (int i = 0; i < vec.size(); ++i)
+    if (vec[i] > threshold)
+      inds.push_back(i);
+
+  return inds;
+}
+
+// slicing is introduced in Eigen 3.4 only, not the current stable release
+VecXt sliceInds(const VecXt &vec, const std::vector<int> &inds) {
+  VecXt sliced(inds.size());
+  for (int i = 0; i < inds.size(); ++i)
+    sliced[i] = vec[inds[i]];
+  return sliced;
+}
+
+MatXXt sliceCols(const MatXXt &mat, const std::vector<int> &inds) {
+  MatXXt sliced(mat.rows(), inds.size());
+  for (int i = 0; i < inds.size(); ++i)
+    sliced.col(i) = mat.col(inds[i]);
+  return sliced;
+}
+
+void extendWithZeros(VecXt &vec, const std::vector<int> &indsPresent,
+                     int newSize) {
+  VecXt extended(newSize);
+  extended.setZero();
+  for (int i = 0; i < indsPresent.size(); ++i)
+    extended[indsPresent[i]] = vec[i];
+  vec = extended;
+}
+
+void EnergyFunction::Hessian::solve(const Gradient &gradient, VecXt &deltaFrame,
+                                    VecXt &deltaPoint, T lambda) const {
+  deltaFrame = -gradient.frame / lambda;
+  deltaPoint = -gradient.point / lambda;
+  //  int totalPoints = pointPoint.size();
+  //  std::vector<int> pointIndsUsed =
+  //      indsBigger(pointPoint, settings.pointPointThres);
+  //  VecXt pointPointSliced = sliceInds(pointPoint, pointIndsUsed);
+  //  MatXXt framePointSliced = sliceCols(framePoint, pointIndsUsed);
+  //  VecXt gradPointSliced = sliceInds(gradient.point, pointIndsUsed);
+  //
+  //  VecXt pointPointInv = pointPointSliced.cwiseInverse();
+  //  CHECK_EQ((!pointPointInv.array().isFinite()).count(), 0);
+  //  MatXXt hessianSchur = frameFrame - framePointSliced *
+  //                                         pointPointInv.asDiagonal() *
+  //                                         framePointSliced.transpose();
+  //  VecXt pointPointInv_point = pointPointInv.cwiseProduct(-gradPointSliced);
+  //  VecXt gradientSchur =
+  //      -gradient.frame - framePointSliced * pointPointInv_point;
+  //  deltaFrame = hessianSchur.ldlt().solve(gradientSchur);
+  //  deltaPoint =
+  //      pointPointInv_point -
+  //      pointPointInv.cwiseProduct(framePointSliced.transpose() * deltaFrame);
+  //
+  //  extendWithZeros(deltaPoint, pointIndsUsed, totalPoints);
 }
 
 EnergyFunction::Parameters::Jacobians::Jacobians(const State &state)
@@ -370,10 +572,19 @@ int EnergyFunction::Parameters::State::frameParameters() const {
   return restFrames.size() * restFrameDoF + sndFrameDoF;
 }
 
-void EnergyFunction::Parameters::State::applyUpdate(const VecX &deltaFrame,
-                                                    const VecX &deltaPoints) {
+void EnergyFunction::Parameters::State::applyUpdate(const VecXt &deltaFrame,
+                                                    const VecXt &deltaPoints) {
   CHECK_EQ(deltaFrame.size(), frameParameters());
   CHECK_EQ(deltaPoints.size(), logDepths.size());
+
+  secondFrame.addDelta(deltaFrame.head<sndDoF>());
+  lightWorldToFrame[0][0].applyUpdate(deltaFrame.segment<affDoF>(sndDoF));
+  for (int fi = 0, startInd = sndFrameDoF; fi < restFrames.size();
+       ++fi, startInd += restFrameDoF) {
+    restFrames[fi].addDelta(deltaFrame.segment<restDoF>(startInd));
+    lightWorldToFrame[fi + 1][0].applyUpdate(
+        deltaFrame.segment<affDoF>(startInd + restDoF));
+  }
 }
 
 EnergyFunction::Parameters::Parameters(CameraBundle *cam,
@@ -433,15 +644,14 @@ EnergyFunction::Parameters::saveState() const {
   return state;
 }
 
-void EnergyFunction::Parameters::recoverState(
-    optimize::EnergyFunction::Parameters::State &&oldState) {
-  state = oldState;
+void EnergyFunction::Parameters::recoverState(State oldState) {
+  state = std::move(oldState);
   CHECK_EQ(state.restFrames.size() + 2, keyFrames.size());
   CHECK_EQ(state.logDepths.size(), optimizedPoints.size());
 }
 
-void EnergyFunction::Parameters::update(const VecX &deltaFrame,
-                                        const VecX &deltaPoints) {
+void EnergyFunction::Parameters::update(const VecXt &deltaFrame,
+                                        const VecXt &deltaPoints) {
   state.applyUpdate(deltaFrame, deltaPoints);
 }
 
@@ -454,10 +664,12 @@ void EnergyFunction::Parameters::apply() {
     optimizedPoints[pi]->logDepth = state.logDepths[pi];
 }
 
-EnergyFunction::Values::Values(
-    const StdVector<Residual> &residuals, const Parameters &parameters,
-    PrecomputedHostToTarget &hostToTarget,
-    PrecomputedLightHostToTarget &lightHostToTarget) {
+EnergyFunction::Values::Values(const StdVector<Residual> &residuals,
+                               const Parameters &parameters,
+                               const ceres::LossFunction *lossFunction,
+                               PrecomputedHostToTarget &hostToTarget,
+                               PrecomputedLightHostToTarget &lightHostToTarget)
+    : lossFunction(lossFunction) {
   valsAndCache.reserve(residuals.size());
   for (const Residual &res : residuals) {
     int hi = res.hostInd(), hci = res.hostCamInd(), ti = res.targetInd(),
@@ -482,6 +694,20 @@ EnergyFunction::Values::cachedValues(int residualInd) const {
   CHECK_GE(residualInd, 0);
   CHECK_LT(residualInd, valsAndCache.size());
   return valsAndCache[residualInd].second;
+}
+
+T EnergyFunction::Values::totalEnergy() const {
+  CHECK_GT(valsAndCache.size(), 0);
+  int patternSize = valsAndCache[0].first.size();
+  Accumulator<T> energy;
+  for (const auto &[vals, cache] : valsAndCache)
+    for (int i = 0; i < patternSize; ++i) {
+      double v2 = vals[i] * vals[i];
+      double rho[3];
+      lossFunction->Evaluate(v2, rho);
+      energy += T(rho[0]);
+    }
+  return energy.accumulated();
 }
 
 EnergyFunction::PrecomputedHostToTarget::PrecomputedHostToTarget(
@@ -556,7 +782,10 @@ EnergyFunction::PrecomputedLightHostToTarget::PrecomputedLightHostToTarget(
     , lightHostToTarget(boost::extents[parameters->numKeyFrames()]
                                       [parameters->camBundleSize()]
                                       [parameters->numKeyFrames()]
-                                      [parameters->camBundleSize()]) {}
+                                      [parameters->camBundleSize()]) {
+  //  for (int hostInd = 0; hostInd < parameters->numKeyFrames(); ++hostInd)
+  //    for (int hostCa)
+}
 
 AffLightT EnergyFunction::PrecomputedLightHostToTarget::get(int hostInd,
                                                             int hostCamInd,
@@ -596,22 +825,49 @@ EnergyFunction::Derivatives::Derivatives(
   }
 }
 
+EnergyFunction::PrecomputedHostToTarget
+EnergyFunction::precomputeHostToTarget() const {
+  return PrecomputedHostToTarget(cam, &parameters);
+}
+EnergyFunction::PrecomputedMotionDerivatives
+EnergyFunction::precomputeMotionDerivatives() const {
+  return PrecomputedMotionDerivatives(cam, &parameters);
+}
+
+EnergyFunction::PrecomputedLightHostToTarget
+EnergyFunction::precomputeLightHostToTarget() const {
+  return PrecomputedLightHostToTarget(&parameters);
+}
+
+EnergyFunction::Values
+EnergyFunction::createValues(PrecomputedHostToTarget &hostToTarget,
+                             PrecomputedLightHostToTarget &lightHostToTarget) {
+  return Values(residuals, parameters, lossFunction.get(), hostToTarget,
+                lightHostToTarget);
+}
+
 EnergyFunction::Values &EnergyFunction::getAllValues() {
-  if (!values) {
-    PrecomputedHostToTarget hostToTarget(cam, &parameters);
-    PrecomputedLightHostToTarget lightHostToTarget(&parameters);
-    return getAllValues(hostToTarget, lightHostToTarget);
-  }
-  return values.value();
+  PrecomputedHostToTarget hostToTarget = precomputeHostToTarget();
+  PrecomputedLightHostToTarget lightHostToTarget =
+      precomputeLightHostToTarget();
+  return getAllValues(hostToTarget, lightHostToTarget);
 }
 
 EnergyFunction::Values &
 EnergyFunction::getAllValues(PrecomputedHostToTarget &hostToTarget,
                              PrecomputedLightHostToTarget &lightHostToTarget) {
-  if (!values) {
-    values.emplace(residuals, parameters, hostToTarget, lightHostToTarget);
-  }
+  if (!values)
+    values.emplace(residuals, parameters, lossFunction.get(), hostToTarget,
+                   lightHostToTarget);
   return values.value();
+}
+
+EnergyFunction::Derivatives EnergyFunction::createDerivatives(
+    const Values &values, PrecomputedHostToTarget &hostToTarget,
+    PrecomputedMotionDerivatives &motionDerivatives,
+    PrecomputedLightHostToTarget &lightHostToTarget) {
+  return Derivatives(parameters, residuals, values, hostToTarget,
+                     motionDerivatives, lightHostToTarget);
 }
 
 EnergyFunction::Derivatives &EnergyFunction::getDerivatives(
