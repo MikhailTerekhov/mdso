@@ -1,10 +1,13 @@
 #ifndef INCLUDE_ACCUMULATOR
 #define INCLUDE_ACCUMULATOR
 
+#include "util/types.h"
+
+namespace mdso::optimize {
+
 template <typename BlockT> class Accumulator {
 public:
-  Accumulator()
-      : mWasUsed(false) {}
+  Accumulator();
 
   Accumulator &operator+=(const BlockT &block) {
     mAccumulated += block;
@@ -19,5 +22,14 @@ private:
   BlockT mAccumulated;
   bool mWasUsed;
 };
+
+template <typename MatrixT>
+Accumulator<MatrixT>::Accumulator()
+    : mWasUsed(false)
+    , mAccumulated(MatrixT::Zero()) {}
+
+template <> Accumulator<T>::Accumulator();
+
+} // namespace mdso::optimize
 
 #endif

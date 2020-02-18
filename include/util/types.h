@@ -103,6 +103,7 @@ namespace fs = std::filesystem;
 
 using boost::container::static_vector;
 template <typename T> using Array2d = boost::multi_array<T, 2>;
+template <typename T> using Array3d = boost::multi_array<T, 3>;
 template <typename T> using Array4d = boost::multi_array<T, 4>;
 
 template <typename T>

@@ -61,9 +61,15 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/output/DepthPyramidDrawer.h
 
     ${PROJECT_SOURCE_DIR}/include/optimize/EnergyFunction.h
-        ${PROJECT_SOURCE_DIR}/include/optimize/parametrizations.h
+    ${PROJECT_SOURCE_DIR}/include/optimize/parametrizations.h
     ${PROJECT_SOURCE_DIR}/include/optimize/Residual.h
     ${PROJECT_SOURCE_DIR}/include/optimize/MotionDerivatives.h
+    ${PROJECT_SOURCE_DIR}/include/optimize/FrameParameterOrder.h
+    ${PROJECT_SOURCE_DIR}/include/optimize/Accumulator.h
+    ${PROJECT_SOURCE_DIR}/include/optimize/Parameters.h
+    ${PROJECT_SOURCE_DIR}/include/optimize/DeltaParameterVector.h
+    ${PROJECT_SOURCE_DIR}/include/optimize/Hessian.h
+    ${PROJECT_SOURCE_DIR}/include/optimize/Gradient.h
 
     ${PROJECT_SOURCE_DIR}/include/system/AffineLightTransform.h
     ${PROJECT_SOURCE_DIR}/include/system/SphericalPlus.h
@@ -125,6 +131,12 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/optimize/Residual.cpp
     ${PROJECT_SOURCE_DIR}/source/optimize/MotionDerivatives.cpp
     ${PROJECT_SOURCE_DIR}/source/optimize/parametrizations.cpp
+    ${PROJECT_SOURCE_DIR}/source/optimize/FrameParameterOrder.cpp
+    ${PROJECT_SOURCE_DIR}/source/optimize/Accumulator.cpp
+    ${PROJECT_SOURCE_DIR}/source/optimize/Parameters.cpp
+    ${PROJECT_SOURCE_DIR}/source/optimize/DeltaParameterVector.cpp
+    ${PROJECT_SOURCE_DIR}/source/optimize/Hessian.cpp
+    ${PROJECT_SOURCE_DIR}/source/optimize/Gradient.cpp
 
     ${PROJECT_SOURCE_DIR}/source/system/SphericalPlus.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoSystem.cpp

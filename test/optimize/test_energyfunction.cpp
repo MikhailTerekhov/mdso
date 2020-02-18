@@ -64,6 +64,10 @@ protected:
     reader.reset(new MultiFovReader(FLAGS_mfov_dir));
     SE3 bodyToFrame = SE3::sampleUniform(mt);
     cam.reset(new CameraBundle(&bodyToFrame, reader->cam.get(), 1));
+
+    frameParameterOrder.reset(
+        new FrameParameterOrder(keyFramesCount, cam->bundle.size()));
+
     PixelSelector pixelSelector;
     pixelSelector.initialize(reader->getFrame(keyFrameNums[0]),
                              settings.keyFrame.immaturePointsNum());
@@ -117,18 +121,18 @@ protected:
 
   MatXXt getExpectedJacobian() {
     int PS = settings.residualPattern.pattern().size();
-    int totalFrameParams = sndFrameDoF + (keyFramesCount - 2) * restFrameDoF;
     MatXXt expectedJacobian =
         MatXXt::Zero(PS * energyFunction->getResiduals().size(),
-                     totalFrameParams + energyFunction->numPoints());
+                     frameParameterOrder->totalFrameParameters() +
+                         energyFunction->numPoints());
     std::cout << "evaluating jacobian: 0% ... ";
     std::cout.flush();
     int percent = 0, step = 10;
     int numResiduals = energyFunction->getResiduals().size();
     for (int ri = 0; ri < numResiduals; ++ri) {
       const Residual &res = energyFunction->getResiduals()[ri];
-      int hi = res.hostInd(), ti = res.targetInd();
-      int pi = res.pointInd();
+      int hi = res.hostInd(), hci = res.hostCamInd(), ti = res.targetInd(),
+          tci = res.targetCamInd(), pi = res.pointInd();
 
       KeyFrame *host = keyFrames[hi].get();
       KeyFrame *target = keyFrames[ti].get();
@@ -156,11 +160,11 @@ protected:
           host->frames[0].lightWorldToThis.cast<T>(), lightHostToTarget,
           energyFunction->getLogDepth(res), cachedValues);
 
-      setFrame(expectedJacobian, ri, hi, rj.dr_dq_host(PS), rj.dr_dt_host(PS),
-               rj.dr_daff_host(PS));
-      setFrame(expectedJacobian, ri, ti, rj.dr_dq_target(PS),
+      setFrame(expectedJacobian, ri, hi, hci, rj.dr_dq_host(PS),
+               rj.dr_dt_host(PS), rj.dr_daff_host(PS));
+      setFrame(expectedJacobian, ri, ti, tci, rj.dr_dq_target(PS),
                rj.dr_dt_target(PS), rj.dr_daff_target(PS));
-      int depthCol = totalFrameParams + pi;
+      int depthCol = frameParameterOrder->totalFrameParameters() + pi;
       expectedJacobian.block(ri * PS, depthCol, PS, 1) = rj.dr_dlogd(PS);
 
       int oldPercent = percent;
@@ -198,6 +202,7 @@ protected:
 
   std::unique_ptr<MultiFovReader> reader;
   std::unique_ptr<CameraBundle> cam;
+  std::unique_ptr<FrameParameterOrder> frameParameterOrder;
   std::vector<std::unique_ptr<KeyFrame>> keyFrames;
   std::unique_ptr<EnergyFunction> energyFunction;
   std::unique_ptr<SO3xS2Parametrization> secondFrameParam;
@@ -209,43 +214,49 @@ protected:
   int pointsPerFrame;
 
 private:
-  void setFrame(MatXXt &jacobian, int residualInd, int frameInd,
+  void setFrame(MatXXt &jacobian, int residualInd, int frameInd, int camInd,
                 const MatR4t &dr_dq, const MatR3t &dr_dt,
                 const MatR2t &dr_daff) {
     if (frameInd == 0)
       return;
     if (frameInd == 1)
-      setSecondFrame(jacobian, residualInd, dr_dq, dr_dt, dr_daff);
+      setSecondFrame(jacobian, residualInd, camInd, dr_dq, dr_dt, dr_daff);
     else
-      setOtherFrame(jacobian, residualInd, frameInd, dr_dq, dr_dt, dr_daff);
+      setOtherFrame(jacobian, residualInd, frameInd, camInd, dr_dq, dr_dt,
+                    dr_daff);
   }
 
-  void setSecondFrame(MatXXt &jacobian, int residualInd, const MatR4t &dr_dq,
-                      const MatR3t &dr_dt, const MatR2t &dr_daff) {
+  void setSecondFrame(MatXXt &jacobian, int residualInd, int camInd,
+                      const MatR4t &dr_dq, const MatR3t &dr_dt,
+                      const MatR2t &dr_daff) {
     int PS = settings.residualPattern.pattern().size();
     int startRow = residualInd * PS;
     MatR7t dr_dqt(PS, 7);
     dr_dqt << dr_dq, dr_dt;
     Mat75t diffPlus = secondFrameParam->diffPlus();
     MatR5t dr_dqt_tang = dr_dqt * diffPlus;
-    jacobian.block(startRow, 0, PS, sndDoF) = dr_dqt_tang;
-    jacobian.block(startRow, sndDoF, PS, 2) = dr_daff;
+    jacobian.block(startRow, frameParameterOrder->frameToWorld(1), PS, sndDoF) =
+        dr_dqt_tang;
+    jacobian.block(startRow, frameParameterOrder->lightWorldToFrame(1, camInd),
+                   PS, 2) = dr_daff;
   }
 
   void setOtherFrame(MatXXt &jacobian, int residualInd, int frameInd,
-                     const MatR4t &dr_dq, const MatR3t &dr_dt,
+                     int camInd, const MatR4t &dr_dq, const MatR3t &dr_dt,
                      const MatR2t &dr_daff) {
     CHECK_GE(frameInd, 2);
     int PS = settings.residualPattern.pattern().size();
-    int startRow = residualInd * PS,
-        startCol = sndFrameDoF + restFrameDoF * (frameInd - 2);
+    int startRow = residualInd * PS;
     MatR7t dr_dqt(PS, 7);
     dr_dqt << dr_dq, dr_dt;
     Mat76t diffPlus = restFrameParams[frameInd - 2].diffPlus();
     MatR6t dr_dqt_tang = dr_dqt * diffPlus;
 
-    jacobian.block(startRow, startCol, PS, restDoF) = dr_dqt_tang;
-    jacobian.block(startRow, startCol + restDoF, PS, 2) = dr_daff;
+    jacobian.block(startRow, frameParameterOrder->frameToWorld(frameInd), PS,
+                   restDoF) = dr_dqt_tang;
+    jacobian.block(startRow,
+                   frameParameterOrder->lightWorldToFrame(frameInd, camInd), PS,
+                   2) = dr_daff;
   }
 };
 
@@ -267,8 +278,8 @@ TEST_F(EnergyFunctionTest, isHessianCorrect) {
       if (i % 20 == 0)
         std::cout << "i = " << i << std::endl;
       energyFunction->precomputeValuesAndDerivatives();
-      EnergyFunction::Hessian actualHessian = energyFunction->getHessian();
-      EnergyFunction::Gradient actualGradient = energyFunction->getGradient();
+      Hessian actualHessian = energyFunction->getHessian();
+      Gradient actualGradient = energyFunction->getGradient();
       energyFunction->clearPrecomputations();
     }
     end = std::chrono::system_clock::now();
@@ -279,7 +290,7 @@ TEST_F(EnergyFunctionTest, isHessianCorrect) {
               << " sec for one computation on average (" << FLAGS_opt_count
               << " optimized points, " << keyFramesCount << " keyframes)";
   } else {
-    EnergyFunction::Hessian actualHessian = energyFunction->getHessian();
+    Hessian actualHessian = energyFunction->getHessian();
 
     const int PS = settings.residualPattern.pattern().size();
     int totalFrameParams = sndFrameDoF + (keyFramesCount - 2) * restFrameDoF;
@@ -311,9 +322,9 @@ TEST_F(EnergyFunctionTest, isHessianCorrect) {
     VecX expectedPointPoint =
         expectedHessian.bottomRightCorner(numPoints, numPoints).diagonal();
 
-    MatXX actualFrameFrame = actualHessian.frameFrame.cast<double>();
-    MatXX actualFramePoint = actualHessian.framePoint.cast<double>();
-    VecX actualPointPoint = actualHessian.pointPoint.cast<double>();
+    MatXX actualFrameFrame = actualHessian.getFrameFrame().cast<double>();
+    MatXX actualFramePoint = actualHessian.getFramePoint().cast<double>();
+    VecX actualPointPoint = actualHessian.getPointPoint().cast<double>();
 
     LOG(INFO) << "NaNs in jacobian: " << countNaNs(expectedJacobian) << " of "
               << expectedJacobian.size();
@@ -338,6 +349,9 @@ TEST_F(EnergyFunctionTest, isHessianCorrect) {
     LOG(INFO) << "relative H_frameframe error = " << relFrameFrameErr << "\n";
     EXPECT_LE(relFrameFrameErr, ErrorBounds<T>::hessianRelErr);
 
+    MatXX ffDiff = (actualFrameFrame - expectedFrameFrame);
+    outputMatrix("ff_diff.txt", ffDiff);
+
     ASSERT_EQ(expectedFramePoint.rows(), actualFramePoint.rows());
     ASSERT_EQ(expectedFramePoint.cols(), actualFramePoint.cols());
     double relFramePointErr = (expectedFramePoint - actualFramePoint).norm() /
@@ -354,50 +368,41 @@ TEST_F(EnergyFunctionTest, isHessianCorrect) {
 
 TEST_F(EnergyFunctionTest, isGradientCorrect) {
   static_assert(keyFramesCount >= 2);
+  Gradient actualGradient = energyFunction->getGradient();
 
-  if (FLAGS_profile_only) {
-    //    for (int i = 0; i < FLAGS_num_evaluations; ++i) {
-    //      EnergyFunction::Gradient actualGradient =
-    //      energyFunction->getGradient();
-    //      energyFunction->clearPrecomputations();
-    //    }
-  } else {
-    EnergyFunction::Gradient actualGradient = energyFunction->getGradient();
+  const int PS = settings.residualPattern.pattern().size();
+  int numResiduals = energyFunction->getResiduals().size();
+  int numPoints = energyFunction->numPoints();
 
-    const int PS = settings.residualPattern.pattern().size();
-    int totalFrameParams = sndFrameDoF + (keyFramesCount - 2) * restFrameDoF;
-    int numResiduals = energyFunction->getResiduals().size();
-    int numPoints = energyFunction->numPoints();
+  const auto &residuals = energyFunction->getResiduals();
 
-    const auto &residuals = energyFunction->getResiduals();
-
-    MatXXt expectedJacobian = getExpectedJacobian();
-    VecXt weights(expectedJacobian.rows());
-    VecXt values(expectedJacobian.rows());
-    ASSERT_EQ(weights.size(), PS * energyFunction->getResiduals().size());
-    for (int i = 0; i < residuals.size(); ++i) {
-      VecRt curValues = energyFunction->getResidualValues(i);
-      values.segment(i * PS, PS) = curValues;
-      weights.segment(i * PS, PS) = residuals[i].getGradientWeights(curValues);
-    }
-
-    VecXt expectedGradient =
-        expectedJacobian.transpose() * weights.asDiagonal() * values;
-    VecXt expectedFrame = expectedGradient.head(totalFrameParams);
-    VecXt expectedPoint = expectedGradient.tail(numPoints);
-
-    double relFrameErr =
-        (expectedFrame - actualGradient.frame).norm() / expectedFrame.norm();
-    double relPointErr =
-        (expectedPoint - actualGradient.point).norm() / expectedPoint.norm();
-    LOG(INFO) << "relative frame gradient err = " << relFrameErr;
-    LOG(INFO) << "relative point gradient err = " << relPointErr;
-    EXPECT_LE(relFrameErr, ErrorBounds<T>::gradientRelErr);
-    EXPECT_LE(relPointErr, ErrorBounds<T>::gradientRelErr);
+  MatXXt expectedJacobian = getExpectedJacobian();
+  VecXt weights(expectedJacobian.rows());
+  VecXt values(expectedJacobian.rows());
+  ASSERT_EQ(weights.size(), PS * energyFunction->getResiduals().size());
+  for (int i = 0; i < residuals.size(); ++i) {
+    VecRt curValues = energyFunction->getResidualValues(i);
+    values.segment(i * PS, PS) = curValues;
+    weights.segment(i * PS, PS) = residuals[i].getGradientWeights(curValues);
   }
+
+  VecXt expectedGradient =
+      expectedJacobian.transpose() * weights.asDiagonal() * values;
+  VecXt expectedFrame =
+      expectedGradient.head(frameParameterOrder->totalFrameParameters());
+  VecXt expectedPoint = expectedGradient.tail(numPoints);
+
+  double relFrameErr =
+      (expectedFrame - actualGradient.getFrame()).norm() / expectedFrame.norm();
+  double relPointErr =
+      (expectedPoint - actualGradient.getPoint()).norm() / expectedPoint.norm();
+  LOG(INFO) << "relative frame gradient err = " << relFrameErr;
+  LOG(INFO) << "relative point gradient err = " << relPointErr;
+  EXPECT_LE(relFrameErr, ErrorBounds<T>::gradientRelErr);
+  EXPECT_LE(relPointErr, ErrorBounds<T>::gradientRelErr);
 }
 
-TEST_F(EnergyFunctionTest, DISABLED_DoesOptimizationHelp) {
+TEST_F(EnergyFunctionTest, DoesOptimizationHelp) {
   constexpr int numIterations = 100;
 
   double transErrBefore = transError();

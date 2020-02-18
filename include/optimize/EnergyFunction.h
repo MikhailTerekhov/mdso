@@ -2,6 +2,11 @@
 #define INCLUDE_ENERGYFUNCTION
 
 #include "Residual.h"
+#include "optimize/DeltaParameterVector.h"
+#include "optimize/FrameParameterOrder.h"
+#include "optimize/Gradient.h"
+#include "optimize/Hessian.h"
+#include "optimize/Parameters.h"
 #include "optimize/parametrizations.h"
 #include "util/types.h"
 #include <optional>
@@ -10,25 +15,6 @@ namespace mdso::optimize {
 
 class EnergyFunction {
 public:
-  struct Gradient {
-    VecXt frame;
-    VecXt point;
-  };
-
-  struct Hessian {
-    Hessian(int frameParams, int pointParams,
-            const Settings::Optimization &settings);
-
-    Hessian levenbergMarquardtDamp(double lambda) const;
-    void solve(const Gradient &gradient, VecXt &deltaFrame, VecXt &deltaPoint,
-               T lambda) const;
-
-    MatXXt frameFrame;
-    MatXXt framePoint;
-    VecXt pointPoint;
-    Settings::Optimization settings;
-  };
-
   EnergyFunction(CameraBundle *camBundle, KeyFrame *keyFrames[],
                  int numKeyFrames, const EnergyFunctionSettings &settings);
 
@@ -49,61 +35,6 @@ public:
   void optimize(int maxInterations);
 
 private:
-  using SecondFrameParametrization = SO3xS2Parametrization;
-  using FrameParametrization = RightExpParametrization<SE3t>;
-
-  class Parameters {
-  public:
-    static constexpr int sndDoF = SecondFrameParametrization::DoF;
-    static constexpr int restDoF = FrameParametrization::DoF;
-    static constexpr int affDoF = AffLightT::DoF;
-    static constexpr int sndFrameDoF = sndDoF + affDoF;
-    static constexpr int restFrameDoF = restDoF + affDoF;
-
-    struct State {
-      int frameParameters() const;
-      void applyUpdate(const VecXt &deltaFrame, const VecXt &deltaPoints);
-
-      State(KeyFrame **keyFrames, int newNumKeyFrames);
-
-      VecXt logDepths;
-      SE3t firstBodyToWorld;
-      SecondFrameParametrization secondFrame;
-      StdVector<FrameParametrization> restFrames;
-      Array2d<AffLightT> lightWorldToFrame;
-    };
-
-    struct Jacobians {
-      Jacobians(const State &state);
-      Jacobians(const Parameters &parameters);
-
-      SecondFrameParametrization::MatDiff dSecondFrame;
-      StdVector<FrameParametrization::MatDiff> dRestFrames;
-    };
-
-    Parameters(CameraBundle *cam, KeyFrame **newKeyFrames, int newNumKeyFrames);
-
-    SE3t getBodyToWorld(int frameInd) const;
-    AffLightT getLightWorldToFrame(int frameInd, int frameCamInd) const;
-    int numKeyFrames() const;
-    int numPoints() const;
-    int camBundleSize() const;
-    int frameParameters() const;
-    T logDepth(int i) const;
-
-    void setPoints(std::vector<OptimizedPoint *> &&newOptimizedPoints);
-
-    void update(const VecXt &deltaFrame, const VecXt &deltaPoints);
-    State saveState() const;
-    void recoverState(State oldState);
-    void apply();
-
-  private:
-    State state;
-    std::vector<OptimizedPoint *> optimizedPoints;
-    std::vector<KeyFrame *> keyFrames;
-  };
-
   class PrecomputedHostToTarget {
   public:
     PrecomputedHostToTarget(CameraBundle *cam, const Parameters *parameters);

@@ -83,6 +83,14 @@ private:
   S2Parametrization mS2;
 };
 
+using SecondFrameParametrization = SO3xS2Parametrization;
+using FrameParametrization = RightExpParametrization<SE3t>;
+
+constexpr int sndDoF = SecondFrameParametrization::DoF;
+constexpr int restDoF = FrameParametrization::DoF;
+constexpr int affDoF = AffLightT::DoF;
+constexpr int pointDoF = 1;
+
 } // namespace mdso::optimize
 
 #endif
