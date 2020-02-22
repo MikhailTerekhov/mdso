@@ -63,6 +63,7 @@ protected:
 
     reader.reset(new MultiFovReader(FLAGS_mfov_dir));
     SE3 bodyToFrame = SE3::sampleUniform(mt);
+    bodyToFrame.translation() *= 0.05;
     cam.reset(new CameraBundle(&bodyToFrame, reader->cam.get(), 1));
 
     frameParameterOrder.reset(
@@ -87,13 +88,15 @@ protected:
       keyFrames.back()->frames[0].lightWorldToThis = lightWorldToF;
 
       SE3 frameToWorldGT = reader->getWorldToFrameGT(keyFrameNums[i]).inverse();
-      SE3 firstToThisGT = worldToFirstGT * frameToWorldGT;
-      double transErr = firstToThisGT.translation().norm() * transDrift;
-      double rotErr = firstToThisGT.so3().log().norm() * rotDrift;
+      SE3 thisToFirstGT = worldToFirstGT * frameToWorldGT;
+      double transErr = thisToFirstGT.translation().norm() * transDrift;
+      double rotErr = thisToFirstGT.so3().log().norm() * rotDrift;
       SE3 frameToWorld = i == 0
                              ? frameToWorldGT
-                             : sampleSe3(transErr, rotErr, mt) * frameToWorldGT;
-      keyFrames.back()->thisToWorld.setValue(frameToWorld);
+                             : frameToWorldGT * sampleSe3(rotErr, transErr, mt);
+
+      keyFrames.back()->thisToWorld.setValue(frameToWorld *
+                                             cam->bundle[0].bodyToThis);
 
       cv::Mat1d depths = reader->getDepths(keyFrameNums[i]);
       for (ImmaturePoint &ip : keyFrames.back()->frames[0].immaturePoints) {
@@ -181,23 +184,32 @@ protected:
   }
 
   double transError() const {
-    Eigen::Matrix<double, keyFramesCount, 1> errs;
-    for (int i = 0; i < keyFramesCount; ++i) {
-      SE3 err = keyFrames[i]->thisToWorld() *
+    double sumErr = 0;
+    for (int i = 1; i < keyFramesCount; ++i) {
+      SE3 err = keyFrames[i]->thisToWorld() * cam->bundle[0].thisToBody *
                 reader->getWorldToFrameGT(keyFrameNums[i]);
-      errs[i] = err.translation().norm();
+      SE3 thisToFirstGT = reader->getWorldToFrameGT(keyFrameNums[0]) *
+                          reader->getWorldToFrameGT(keyFrameNums[i]).inverse();
+      //      sumErr += err.translation().norm() /
+      //      thisToFirstGT.translation().norm();
+      sumErr += err.translation().norm();
     }
-    return errs.norm();
+
+    return 100 * sumErr / (keyFramesCount - 1);
   }
 
   double rotError() const {
-    Eigen::Matrix<double, keyFramesCount, 1> errs;
+    double sumErr = 0;
     for (int i = 0; i < keyFramesCount; ++i) {
-      SE3 err = keyFrames[i]->thisToWorld() *
+      SE3 err = keyFrames[i]->thisToWorld() * cam->bundle[0].thisToBody *
                 reader->getWorldToFrameGT(keyFrameNums[i]);
-      errs[i] = err.so3().log().norm();
+      SE3 thisToFirstGT = reader->getWorldToFrameGT(keyFrameNums[0]) *
+                          reader->getWorldToFrameGT(keyFrameNums[i]).inverse();
+      //      sumErr += err.so3().log().norm() /
+      //      thisToFirstGT.translation().norm();
+      sumErr += err.so3().log().norm();
     }
-    return errs.norm() * (180. / M_PI);
+    return sumErr * (180. / M_PI) / (keyFramesCount - 1);
   }
 
   std::unique_ptr<MultiFovReader> reader;
@@ -417,6 +429,10 @@ TEST_F(EnergyFunctionTest, DoesOptimizationHelp) {
   LOG(INFO) << "trans err after : " << transErrAfter;
   LOG(INFO) << "rot err before: " << rotErrBefore;
   LOG(INFO) << "rot err after : " << rotErrAfter;
+  std::cout << "trans err before: " << transErrBefore << "\n";
+  std::cout << "trans err after : " << transErrAfter << "\n";
+  std::cout << "rot err before: " << rotErrBefore << "\n";
+  std::cout << "rot err after : " << rotErrAfter << "\n";
 }
 
 int main(int argc, char **argv) {

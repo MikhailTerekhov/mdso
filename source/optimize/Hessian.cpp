@@ -162,10 +162,8 @@ void Hessian::fillLowerBlocks() {
 
 Hessian Hessian::levenbergMarquardtDamp(double lambda) const {
   Hessian result = *this;
-  double frameFrameNorm = result.frameFrame.diagonal().norm();
-  result.frameFrame.diagonal() +=
-      VecXt::Constant(result.frameFrame.rows(), lambda);
-  result.pointPoint += VecXt::Constant(result.pointPoint.size(), lambda);
+  result.frameFrame.diagonal() *= (1 + lambda);
+  result.pointPoint *= (1 + lambda);
   return result;
 }
 
