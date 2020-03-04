@@ -69,6 +69,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--gt", help="file with ground truth trajectory")
 parser.add_argument("-a", "--align", help="Align GT trajectory?",
                     action="store_true")
+parser.add_argument("-s", "--scale_fix", help="Try to align the scale with ground truth?",
+                    action="store_true")
 parser.add_argument("--video_dir", help="directory to put video with sliding "
                     "window of trajectories into")
 parser.add_argument("-r", "--russian", help="use russian legend",
@@ -149,7 +151,7 @@ for ind, fname in enumerate(args.traj):
     traj = traj[first:last]
     if has_gt and args.align:
         print(f'align, len={len(traj)} {len(ground_truth)}')
-        traj = align(traj, ground_truth)
+        traj = align(traj, ground_truth, need_scale_fix=args.scale_fix)
     if args.labels:
         label_ours = args.labels[ind]
         col = next(cycol)

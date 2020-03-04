@@ -101,11 +101,17 @@ void Parameters::update(const DeltaParameterVector &delta) {
   state.applyUpdate(delta);
 }
 
-void Parameters::apply() {
+void Parameters::apply() const {
   keyFrames[1]->thisToWorld.setValue(state.secondFrame.value().cast<double>());
-  for (int fi = 0; fi < state.restFrames.size(); ++fi)
-    keyFrames[fi + 2]->thisToWorld.setValue(
-        state.restFrames[fi].value().cast<double>());
+  for (int fi = 2; fi < keyFrames.size(); ++fi)
+    keyFrames[fi]->thisToWorld.setValue(
+        state.restFrames[fi - 2].value().cast<double>());
+
+  for (int fi = 1; fi < keyFrames.size(); ++fi)
+    for (int ci = 0; ci < camBundleSize(); ++ci)
+      keyFrames[fi]->frames[ci].lightWorldToThis =
+          state.lightWorldToFrame[fi - 1][ci].cast<double>();
+
   for (int pi = 0; pi < optimizedPoints.size(); ++pi)
     optimizedPoints[pi]->logDepth = state.logDepths[pi];
 }

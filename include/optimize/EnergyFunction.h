@@ -32,6 +32,9 @@ public:
   void precomputeValuesAndDerivatives();
   void clearPrecomputations();
 
+  Parameters::State saveState() const;
+  void recoverState(const Parameters::State &oldState);
+
   void optimize(int maxInterations);
 
 private:

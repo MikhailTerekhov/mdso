@@ -162,8 +162,12 @@ void Hessian::fillLowerBlocks() {
 
 Hessian Hessian::levenbergMarquardtDamp(double lambda) const {
   Hessian result = *this;
-  result.frameFrame.diagonal() *= (1 + lambda);
-  result.pointPoint *= (1 + lambda);
+  for (int i = 0; i < result.frameFrame.rows(); ++i)
+    if (result.frameFrame(i, i) > 0)
+      result.frameFrame(i, i) *= (1 + lambda);
+  for (int i = 0; i < result.pointPoint.size(); ++i)
+    if (result.pointPoint[i] > 0)
+      result.pointPoint[i] *= (1 + lambda);
   return result;
 }
 

@@ -50,6 +50,7 @@ public:
   const std::vector<const Triangle *> &triangles() const;
 
   Triangle *enclosingTriangle(const Vec2 &point);
+  const Triangle *enclosingTriangle(const Vec2 &point) const;
   bool isIncidentToBoundary(const Triangle *tri) const;
 
   cv::Mat draw(int imgWidth, int imgHeight, cv::Scalar bgCol,

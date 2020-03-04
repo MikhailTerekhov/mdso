@@ -172,6 +172,27 @@ SE3 sampleSe3(double rotDelta, double transDelta, UniformBitGenerator &gen) {
   return SE3(SO3::exp(rot), trans);
 }
 
+template <typename T>
+void sparsify(std::vector<T> *v[], int numVectors, int neededTotal) {
+  int total =
+      std::accumulate(v, v + numVectors, 0,
+                      [](int x, std::vector<T> *v) { return x + v->size(); });
+  if (total < neededTotal)
+    return;
+
+  std::mt19937 mt;
+  for (int i = 0; i < numVectors; ++i)
+    std::shuffle(v[i]->begin(), v[i]->end(), mt);
+
+  int cur = 0;
+  for (int i = 0; i < numVectors - 1; ++i) {
+    int remain = double(v[i]->size()) / total * neededTotal;
+    v[i]->resize(remain);
+    cur += remain;
+  }
+  v[numVectors - 1]->resize(neededTotal - cur);
+}
+
 namespace optimize {
 
 template <int nret, int Options1, int Options2, int MaxRows1, int MaxRows2>

@@ -66,6 +66,8 @@ Triangulation::Triangulation(const StdVector<Vec2> &newPoints,
     indices[i] = i;
   std::shuffle(indices.begin(), indices.end(), mt);
 
+  LOG(INFO) << "creating triangulation from " << indices.size() << " points";
+  int percent = 0;
   for (int i = 0; i < int(indices.size()); ++i) {
     Vertex *vert = makeVertex(newPoints[indices[i]], indices[i]);
     Vertex *vertCreated = addPoint(vert);
@@ -75,6 +77,13 @@ Triangulation::Triangulation(const StdVector<Vec2> &newPoints,
       _vertices.pop_back();
     } else
       indicesInv[indices[i]] = i + 3;
+
+    int newPercent = double(i + 1) / indices.size() * 100;
+    if (newPercent >= percent + 10) {
+      LOG(INFO) << newPercent << "%";
+      google::FlushLogFiles(google::GLOG_INFO);
+      percent = newPercent;
+    }
   }
 
   tidy();
@@ -289,12 +298,21 @@ inline bool Triangulation::isEdgeLegal(Edge *edge) const {
 }
 
 Triangulation::Triangle *Triangulation::enclosingTriangle(const Vec2 &point) {
+  const Triangle *constTri =
+      const_cast<const Triangulation *>(this)->enclosingTriangle(point);
+  return const_cast<Triangulation::Triangle *>(constTri);
+}
+
+const Triangulation::Triangle *
+Triangulation::enclosingTriangle(const Vec2 &point) const {
   if (!isInsideBound(point))
     return nullptr;
 
   // "visibility walk"
 
   //  std::cout << "look for " << point.transpose() << std::endl;
+
+  std::mt19937 localMt;
 
   Edge *curEdge = *_vertices[0]->edges.begin();
   if (curEdge->triang[0] != nullptr && doesContain(curEdge->triang[0], point))
@@ -345,7 +363,7 @@ Triangulation::Triangle *Triangulation::enclosingTriangle(const Vec2 &point) {
 
     int randomChoice;
     if (isPossibleWay[0] && isPossibleWay[1])
-      randomChoice = mt() & 1;
+      randomChoice = localMt() & 1;
     else
       randomChoice = 1;
 

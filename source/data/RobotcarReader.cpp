@@ -1,6 +1,4 @@
-#include "RobotcarReader.h"
-
-#include <sophus/so3.hpp>
+#include "data/RobotcarReader.h"
 
 // clang-format off
 const SE3 RobotcarReader::camToImage = 
@@ -39,6 +37,11 @@ SE3 readBodyToLidar(const fs::path &extrinsicsFile) {
   LOG(INFO) << "file: " << extrinsicsFile << "\nthis -> body:\n"
             << lidarToBody.matrix();
   return lidarToBody.inverse();
+}
+
+SE3 readBodyToIns(const fs::path &extrinsicsFile) {
+  SE3 insToBody = readFromExtrin(extrinsicsFile);
+  return insToBody.inverse();
 }
 
 CameraBundle
@@ -118,9 +121,56 @@ void readVo(const fs::path &voFile, std::vector<Timestamp> &timestamps,
   LOG(INFO) << "there are " << skipCount << " skips in total";
 }
 
+void readRtk(const fs::path &rtkFile, const SE3 &bodyToIns, bool correctRtk,
+             std::vector<Timestamp> &timestamps,
+             StdVector<SE3> &rtkBodyToWorld) {
+  std::ifstream rtkIfs(rtkFile);
+  std::string curLine;
+  std::getline(rtkIfs, curLine);
+  std::optional<SE3> worldToFirst;
+  while (std::getline(rtkIfs, curLine)) {
+    Timestamp ts;
+    double latitude, longitude, altitude;
+    double northing, easting, down;
+    double vNorth, vEast, vDown;
+    double roll, pitch, yaw;
+    constexpr int needToRead = 13;
+    int numRead =
+        sscanf(curLine.c_str(),
+               "%lu,%lf,%lf,%lf,%lf,%lf,%lf,%*3c,%lf,%lf,%lf,%lf,%lf,%lf\n",
+               &ts, &latitude, &longitude, &altitude, &northing, &easting,
+               &down, &vNorth, &vEast, &vDown, &roll, &pitch, &yaw);
+    if (numRead != needToRead) {
+      LOG(WARNING) << "Read " << numRead << " instead of " << needToRead
+                   << " elements in RTK ground truth";
+      break;
+    }
+    SE3 curBodyToWorld =
+        correctRtk
+            ? fromXyzrpy(-easting, northing, down, roll, pitch, yaw) * bodyToIns
+            : fromXyzrpy(northing, easting, down, roll, pitch, yaw) * bodyToIns;
+
+    if (!worldToFirst) {
+      worldToFirst.emplace(curBodyToWorld.inverse());
+      curBodyToWorld = SE3();
+    } else
+      curBodyToWorld = worldToFirst.value() * curBodyToWorld;
+
+    timestamps.push_back(ts);
+    rtkBodyToWorld.push_back(curBodyToWorld);
+  }
+
+  double timeCovered = double(timestamps.back() - timestamps[0]) / 1e6;
+  LOG(INFO) << "RTK data time covered = " << timeCovered << " sec";
+  LOG(INFO) << "RTK data num positions = " << timestamps.size()
+            << "; avg time between positions = "
+            << timeCovered / timestamps.size();
+}
+
 RobotcarReader::RobotcarReader(const fs::path &_chunkDir,
                                const fs::path &modelsDir,
                                const fs::path &extrinsicsDir,
+                               const std::optional<fs::path> &rtkDir,
                                const ReaderSettings &_settings)
     : bodyToLeft(readBodyToCam(extrinsicsDir / "mono_left.txt"))
     , bodyToRear(readBodyToCam(extrinsicsDir / "mono_rear.txt"))
@@ -128,6 +178,7 @@ RobotcarReader::RobotcarReader(const fs::path &_chunkDir,
     , bodyToLmsFront(readBodyToLidar(extrinsicsDir / "lms_front.txt"))
     , bodyToLmsRear(readBodyToLidar(extrinsicsDir / "lms_rear.txt"))
     , bodyToLdmrs(readBodyToLidar(extrinsicsDir / "ldmrs.txt"))
+    , bodyToIns(readBodyToIns(extrinsicsDir / "ins.txt"))
     , mCam(createFromData(modelsDir, bodyToLeft, bodyToRear, bodyToRight,
                           imageWidth, imageHeight, _settings.cam))
     , chunkDir(_chunkDir)
@@ -153,10 +204,39 @@ RobotcarReader::RobotcarReader(const fs::path &_chunkDir,
   readTs(chunkDir / "lms_rear.timestamps", mLmsRearTs);
   readTs(chunkDir / "ldmrs.timestamps", mLdmrsTs);
 
-  readVo(chunkDir / fs::path("vo") / fs::path("vo.csv"), mVoTs, voBodyToFirst,
+  bool isRtkFound = false;
+  if (rtkDir) {
+    fs::path rtkFile = rtkDir.value() / chunkDir.filename() / "rtk.csv";
+    if (fs::is_regular_file(rtkFile)) {
+      readRtk(rtkFile, bodyToIns, settings.correctRtk, mGroundTruthTs,
+              gtBodyToWorld);
+      isRtkFound = true;
+    }
+  }
+
+  readVo(chunkDir / fs::path("vo") / fs::path("vo.csv"), mVoTs, voBodyToWorld,
          settings.fillVoGaps);
+  if (!isRtkFound) {
+    LOG(WARNING) << "No RTK ground truth for chunk \'" << chunkDir
+                 << "\' found";
+    readVo(chunkDir / fs::path("vo") / fs::path("vo.csv"), mGroundTruthTs,
+           gtBodyToWorld, settings.fillVoGaps);
+  }
 
   syncTimestamps();
+
+  printVoAndRtk();
+}
+
+void RobotcarReader::printVoAndRtk() const {
+  std::ofstream outVo("vo_traj.txt");
+  std::ofstream outGt("gt_traj.txt");
+  for (int i = 0; i < mGroundTruthTs.size(); ++i) {
+    if (mGroundTruthTs[i] < mVoTs[0] || mGroundTruthTs[i] >= mVoTs.back())
+      continue;
+    putInMatrixForm(outGt, gtBodyToWorld[i]);
+    putInMatrixForm(outVo, tsToWorld(mGroundTruthTs[i], true));
+  }
 }
 
 void RobotcarReader::provideMasks(const fs::path &masksDir) {
@@ -176,17 +256,18 @@ void RobotcarReader::provideMasks(const fs::path &masksDir) {
   mMasksProvided = true;
 }
 
-int RobotcarReader::numFrames() const { return leftTs().size(); }
+int RobotcarReader::numFrames() const { return mLeftTs.size(); }
 
-std::array<RobotcarReader::FrameEntry, RobotcarReader::numCams>
-RobotcarReader::frame(int idx) const {
-  CHECK(idx >= 0 && idx < numFrames());
+std::vector<RobotcarReader::FrameEntry>
+RobotcarReader::frame(int frameInd) const {
+  CHECK_GE(frameInd, 0);
+  CHECK_LT(frameInd, numFrames());
   fs::path leftPath = chunkDir / fs::path("mono_left") /
-                      fs::path(std::to_string(leftTs()[idx]) + ".png");
+                      fs::path(std::to_string(mLeftTs[frameInd]) + ".png");
   fs::path rearPath = chunkDir / fs::path("mono_rear") /
-                      fs::path(std::to_string(rearTs()[idx]) + ".png");
+                      fs::path(std::to_string(mRearTs[frameInd]) + ".png");
   fs::path rightPath = chunkDir / fs::path("mono_right") /
-                       fs::path(std::to_string(rightTs()[idx]) + ".png");
+                       fs::path(std::to_string(mRightTs[frameInd]) + ".png");
 
   CHECK(fs::is_regular_file(leftPath));
   CHECK(fs::is_regular_file(rearPath));
@@ -196,37 +277,152 @@ RobotcarReader::frame(int idx) const {
   cv::Mat1b rearOrig = cv::imread(rearPath.native(), cv::IMREAD_GRAYSCALE);
   cv::Mat1b rightOrig = cv::imread(rightPath.native(), cv::IMREAD_GRAYSCALE);
 
-  std::array<FrameEntry, numCams> result;
+  std::vector<FrameEntry> result(numCams);
   cv::cvtColor(leftOrig, result[0].frame, cv::COLOR_BayerBG2BGR);
-  result[0].timestamp = leftTs()[idx];
+  result[0].timestamp = mLeftTs[frameInd];
   cv::cvtColor(rearOrig, result[1].frame, cv::COLOR_BayerBG2BGR);
-  result[1].timestamp = rearTs()[idx];
+  result[1].timestamp = mRearTs[frameInd];
   cv::cvtColor(rightOrig, result[2].frame, cv::COLOR_BayerBG2BGR);
-  result[2].timestamp = rightTs()[idx];
+  result[2].timestamp = mRightTs[frameInd];
 
   return result;
 }
 
-SE3 RobotcarReader::tsToTs(Timestamp src, Timestamp dst) const {
-  return tsToFirst(dst).inverse() * tsToFirst(src);
+void filterOutSameBox(StdVector<std::pair<Vec2, double>> &projected,
+                      double boxSize, int maxWidth, int maxHeight) {
+  std::vector<int> usedInds;
+  usedInds.reserve(projected.size());
+  cv::Mat1b mask(maxHeight / boxSize, maxWidth / boxSize, false);
+  Eigen::AlignedBox2i bound(Vec2i::Ones(), Vec2i(mask.cols - 2, mask.rows - 2));
+  for (int i = 0; i < projected.size(); ++i) {
+    Vec2 p = projected[i].first / boxSize;
+    cv::Point cvp = toCvPoint(p);
+    if (bound.contains(p.cast<int>()) && !mask(cvp)) {
+      mask(cvp) = true;
+      usedInds.push_back(i);
+    }
+  }
+
+  for (int i = 0; i < usedInds.size(); ++i)
+    projected[i] = projected[usedInds[i]];
+  projected.resize(usedInds.size());
 }
 
-SE3 RobotcarReader::tsToFirst(Timestamp ts) const {
-  CHECK(ts >= voTs()[0] && ts <= voTs().back())
-      << "Interpolating outside of VO! "
-      << "ts = " << ts << ", bounds = [" << voTs()[0] << ", " << voTs().back()
-      << "]";
-  CHECK(voTs().size() >= 2);
-  if (ts == voTs()[0])
-    return voBodyToFirst[0];
+std::unique_ptr<FrameDepths> RobotcarReader::depths(int frameInd) const {
+  Timestamp baseTs = tsFromInd(frameInd);
+  Timestamp timeWindow = settings.projectedTimeWindow * 1e6;
+  Timestamp tsFrom = baseTs - timeWindow, tsTo = baseTs + timeWindow;
+  auto projected = project(tsFrom, tsTo, baseTs);
 
-  int ind = std::lower_bound(voTs().begin(), voTs().end(), ts) - voTs().begin();
-  CHECK(ind > 0 && ind < voBodyToFirst.size());
-  SE3 highToLow = voBodyToFirst[ind - 1].inverse() * voBodyToFirst[ind];
-  double tsFrac =
-      double(ts - voTs()[ind - 1]) / (voTs()[ind] - voTs()[ind - 1]);
+  std::stringstream str;
+  str << "sizes of the projected cloud (unfiltered): ";
+  for (int ci = 0; ci < projected.size(); ++ci)
+    str << projected[ci].size() << " ";
+  LOG(INFO) << str.str();
+
+  for (int ci = 0; ci < projected.size(); ++ci)
+    filterOutSameBox(projected[ci], settings.boxFilterSize,
+                     mCam.bundle[ci].cam.getWidth(),
+                     mCam.bundle[ci].cam.getHeight());
+
+  std::unique_ptr<RobotcarReader::Depths> result(
+      new RobotcarReader::Depths(mCam, projected, settings.triangulation));
+
+  return std::unique_ptr<FrameDepths>(result.release());
+}
+
+StdVector<Vec2> getPoints(const StdVector<std::pair<Vec2, double>> &projected) {
+  StdVector<Vec2> result(projected.size());
+  for (int i = 0; i < projected.size(); ++i)
+    result[i] = projected[i].first;
+  return result;
+}
+
+std::vector<double>
+getDepths(const StdVector<std::pair<Vec2, double>> &projected) {
+  std::vector<double> result(projected.size());
+  for (int i = 0; i < projected.size(); ++i)
+    result[i] = projected[i].second;
+  return result;
+}
+
+RobotcarReader::Depths::Depths(
+    const CameraBundle &cam,
+    const std::array<StdVector<std::pair<Vec2, double>>, numCams> &projected,
+    const Settings::Triangulation &settings)
+    : terrains{Terrain(&cam.bundle[0].cam, getPoints(projected[0]),
+                       getDepths(projected[0]), settings),
+               Terrain(&cam.bundle[1].cam, getPoints(projected[1]),
+                       getDepths(projected[1]), settings),
+               Terrain(&cam.bundle[2].cam, getPoints(projected[2]),
+                       getDepths(projected[2]), settings)} {}
+
+std::optional<double> RobotcarReader::Depths::depth(int camInd,
+                                                    const Vec2 &point) const {
+  CHECK_GE(camInd, 0);
+  CHECK_LT(camInd, numCams);
+  double depth;
+  bool wasInterpolated = terrains[camInd](point, depth);
+  if (wasInterpolated)
+    return std::make_optional(depth);
+  else
+    return std::nullopt;
+}
+
+cv::Mat3b RobotcarReader::Depths::draw(cv::Mat3b frames[]) {
+  cv::Mat3b drawn[numCams];
+  for (int ci = 0; ci < numCams; ++ci) {
+    drawn[ci] = frames[ci].clone();
+    terrains[ci].draw(drawn[ci], CV_GREEN);
+  }
+
+  cv::Mat3b result;
+  cv::hconcat(drawn, numCams, result);
+  return result;
+}
+
+Timestamp RobotcarReader::tsFromInd(int frameInd) const {
+  return (mLeftTs[frameInd] + mRearTs[frameInd] + mRightTs[frameInd]) / 3;
+}
+
+int RobotcarReader::indFromTs(Timestamp ts) const {
+  CHECK_GE(ts, mLeftTs[0]);
+  CHECK_LT(ts, mLeftTs.back());
+  return std::lower_bound(mLeftTs.begin(), mLeftTs.end(), ts) - mLeftTs.begin();
+}
+
+std::optional<SE3> RobotcarReader::getFrameToWorld(int frameInd) const {
+  Timestamp ts = tsFromInd(frameInd);
+  if (ts < mGroundTruthTs[0] || ts > mGroundTruthTs.back())
+    return std::nullopt;
+  return std::optional<SE3>(tsToWorld(ts));
+}
+
+SE3 tsToWorldHelper(Timestamp ts, const StdVector<SE3> &bodyToWorld,
+                    const std::vector<Timestamp> &timestamps) {
+  CHECK(ts >= timestamps[0] && ts <= timestamps.back())
+      << "Interpolating outside of ground truth! "
+      << "ts = " << ts << ", bounds = [" << timestamps[0] << ", "
+      << timestamps.back() << "]";
+  CHECK(timestamps.size() >= 2);
+  if (ts == timestamps[0])
+    return bodyToWorld[0];
+
+  int ind = std::lower_bound(timestamps.begin(), timestamps.end(), ts) -
+            timestamps.begin();
+  CHECK(ind > 0 && ind < bodyToWorld.size());
+  SE3 highToLow = bodyToWorld[ind - 1].inverse() * bodyToWorld[ind];
+  double tsFrac = double(ts - timestamps[ind - 1]) /
+                  (timestamps[ind] - timestamps[ind - 1]);
   SE3 tsToLow = SE3::exp(tsFrac * highToLow.log());
-  return voBodyToFirst[ind - 1] * tsToLow;
+  return bodyToWorld[ind - 1] * tsToLow;
+}
+
+SE3 RobotcarReader::tsToWorld(Timestamp ts, bool useVo) const {
+  if (useVo)
+    return tsToWorldHelper(ts, voBodyToWorld, mVoTs);
+  else
+    return tsToWorldHelper(ts, gtBodyToWorld, mGroundTruthTs);
 }
 
 void RobotcarReader::getPointCloudHelper(
@@ -243,7 +439,8 @@ void RobotcarReader::getPointCloudHelper(
   std::cout << "scanning the cloud: 0% ...";
   std::cout.flush();
   for (int i = indFrom; i < indTo; ++i) {
-    SE3 sensorToBase = tsToTs(timestamps[i], base) * sensorToBody;
+    SE3 sensorToBase =
+        tsToWorld(base).inverse() * tsToWorld(timestamps[i]) * sensorToBody;
     fs::path scanFile =
         scanDir / fs::path(std::to_string(timestamps[i]) + ".bin");
     std::vector<double> data = readBin(scanFile);
@@ -279,7 +476,7 @@ std::vector<Vec3> RobotcarReader::getLmsFrontCloud(Timestamp from, Timestamp to,
                                                    Timestamp base) const {
   std::vector<Vec3> cloud;
   getPointCloudHelper(cloud, lmsFrontDir, bodyToLmsFront.inverse(), base,
-                      lmsFrontTs(), from, to, false);
+                      mLmsFrontTs, from, to, false);
   return cloud;
 }
 
@@ -287,21 +484,22 @@ std::vector<Vec3> RobotcarReader::getLmsRearCloud(Timestamp from, Timestamp to,
                                                   Timestamp base) const {
   std::vector<Vec3> cloud;
   getPointCloudHelper(cloud, lmsRearDir, bodyToLmsRear.inverse(), base,
-                      lmsRearTs(), from, to, false);
+                      mLmsRearTs, from, to, false);
   return cloud;
 }
 
 std::vector<Vec3> RobotcarReader::getLdmrsCloud(Timestamp from, Timestamp to,
                                                 Timestamp base) const {
   std::vector<Vec3> cloud;
-  getPointCloudHelper(cloud, ldmrsDir, bodyToLdmrs.inverse(), base, ldmrsTs(),
+  getPointCloudHelper(cloud, ldmrsDir, bodyToLdmrs.inverse(), base, mLdmrsTs,
                       from, to, true);
   return cloud;
 }
 
 std::array<StdVector<std::pair<Vec2, double>>, RobotcarReader::numCams>
 RobotcarReader::project(Timestamp from, Timestamp to, Timestamp base,
-                        bool useLmsFront, bool useLmsRear, bool useLdmrs) {
+                        bool useLmsFront, bool useLmsRear,
+                        bool useLdmrs) const {
   std::vector<Vec3> lmsFrontCloud;
   if (useLmsFront)
     lmsFrontCloud = getLmsFrontCloud(from, to, base);
@@ -320,7 +518,7 @@ RobotcarReader::project(Timestamp from, Timestamp to, Timestamp base,
 }
 
 std::array<StdVector<std::pair<Vec2, double>>, RobotcarReader::numCams>
-RobotcarReader::project(const std::vector<Vec3> &cloud) {
+RobotcarReader::project(const std::vector<Vec3> &cloud) const {
   std::array<StdVector<std::pair<Vec2, double>>, RobotcarReader::numCams>
       result;
   for (int camInd = 0; camInd < RobotcarReader::numCams; ++camInd) {
@@ -335,6 +533,17 @@ RobotcarReader::project(const std::vector<Vec3> &cloud) {
     }
   }
   return result;
+}
+
+Timestamp RobotcarReader::minTs() const {
+  return std::max({mLeftTs[0], mRearTs[0], mRightTs[0], mGroundTruthTs[0],
+                   mLmsFrontTs[0], mLmsRearTs[0], mLdmrsTs[0]});
+}
+
+Timestamp RobotcarReader::maxTs() const {
+  return std::min({mLeftTs.back(), mRearTs.back(), mRightTs.back(),
+                   mGroundTruthTs.back(), mLmsFrontTs.back(), mLmsRearTs.back(),
+                   mLdmrsTs.back()});
 }
 
 constexpr int npos = -1;

@@ -1,4 +1,4 @@
-#include "MultiFovReader.h"
+#include "data/MultiFovReader.h"
 #include "util/types.h"
 
 MultiFovReader::MultiFovReader(const fs::path &newMultiFovDir)

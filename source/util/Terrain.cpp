@@ -2,7 +2,7 @@
 
 namespace mdso {
 
-Terrain::Terrain(CameraModel *cam, const StdVector<Vec2> &points,
+Terrain::Terrain(const CameraModel *cam, const StdVector<Vec2> &points,
                  const std::vector<double> &depths,
                  const Settings::Triangulation &triangulationSettings)
     : depths(depths)
@@ -37,7 +37,7 @@ bool Terrain::hasInterpolatedDepth(const Vec2 &p, double &nodeProximity) {
   return true;
 }
 
-bool Terrain::operator()(const Vec2 &p, double &resDepth) {
+bool Terrain::operator()(const Vec2 &p, double &resDepth) const {
   auto tri = triang.enclosingTriangle(p);
   if (tri == nullptr || triang.isIncidentToBoundary(tri))
     return false;

@@ -31,10 +31,10 @@ def align_to_zero(traj):
     fix = traj[0].inverse()
     return [fix * m for m in traj]
 
-def align(traj, gt):
+def align(traj, gt, need_scale_fix=True):
     t01 = traj[1].inverse() * traj[0]
     g01 = gt[1].inverse() * gt[0]
-    scale_fix = norm(g01.t) / norm(t01.t)
+    scale_fix = norm(g01.t) / norm(t01.t) if need_scale_fix else 1
     res = [se3(m.R, scale_fix * m.t) for m in traj]
     tg = gt[0] * res[0].inverse()
     res = [tg * m for m in res]

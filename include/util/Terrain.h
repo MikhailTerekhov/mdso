@@ -1,3 +1,6 @@
+#ifndef INCLUDE_TERRAIN
+#define INCLUDE_TERRAIN
+
 #include "system/CameraModel.h"
 #include "util/Triangulation.h"
 
@@ -9,13 +12,13 @@ class Terrain {
   using Triangle = Triangulation::Triangle;
 
 public:
-  Terrain(CameraModel *cam, const StdVector<Vec2> &points,
+  Terrain(const CameraModel *cam, const StdVector<Vec2> &points,
           const std::vector<double> &depths,
           const Settings::Triangulation &triangulationSettings = {});
 
   bool hasInterpolatedDepth(const Vec2 &p);
   bool hasInterpolatedDepth(const Vec2 &p, double &nodeProximity);
-  bool operator()(const Vec2 &p, double &resDepth);
+  bool operator()(const Vec2 &p, double &resDepth) const;
 
   void draw(cv::Mat &img, cv::Scalar edgeCol);
   void draw(cv::Mat &img, cv::Scalar edgeCol, int thickness);
@@ -31,3 +34,5 @@ private:
 };
 
 } // namespace mdso
+
+#endif

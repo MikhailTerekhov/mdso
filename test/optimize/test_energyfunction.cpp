@@ -1,4 +1,4 @@
-#include "MultiFovReader.h"
+#include "data/MultiFovReader.h"
 #include "optimize/EnergyFunction.h"
 #include "system/IdentityPreprocessor.h"
 #include "util/flags.h"
@@ -417,22 +417,42 @@ TEST_F(EnergyFunctionTest, isGradientCorrect) {
 TEST_F(EnergyFunctionTest, DoesOptimizationHelp) {
   constexpr int numIterations = 100;
 
-  double transErrBefore = transError();
-  double rotErrBefore = rotError();
+  auto state = energyFunction->saveState();
+  if (FLAGS_profile_only) {
+    constexpr int shortNumIterations = 3;
+    double totalTime = 0;
+    for (int it = 0; it < FLAGS_num_evaluations; ++it) {
+      if (it % 100 == 0)
+        std::cout << "it = " << it << std::endl;
+      TimePoint start, end;
+      start = now();
+      energyFunction->optimize(shortNumIterations);
+      end = now();
+      totalTime += secondsBetween(start, end);
+      energyFunction->recoverState(state);
+    }
+    double avgTimeIter =
+        totalTime / (FLAGS_num_evaluations * shortNumIterations);
+    LOG(INFO) << "avg time per iteration = " << avgTimeIter;
+    std::cout << "avg time per iteration = " << avgTimeIter << "\n";
+  } else {
+    double transErrBefore = transError();
+    double rotErrBefore = rotError();
 
-  energyFunction->optimize(numIterations);
+    energyFunction->optimize(numIterations);
 
-  double transErrAfter = transError();
-  double rotErrAfter = rotError();
+    double transErrAfter = transError();
+    double rotErrAfter = rotError();
 
-  LOG(INFO) << "trans err before: " << transErrBefore;
-  LOG(INFO) << "trans err after : " << transErrAfter;
-  LOG(INFO) << "rot err before: " << rotErrBefore;
-  LOG(INFO) << "rot err after : " << rotErrAfter;
-  std::cout << "trans err before: " << transErrBefore << "\n";
-  std::cout << "trans err after : " << transErrAfter << "\n";
-  std::cout << "rot err before: " << rotErrBefore << "\n";
-  std::cout << "rot err after : " << rotErrAfter << "\n";
+    LOG(INFO) << "trans err before: " << transErrBefore;
+    LOG(INFO) << "trans err after : " << transErrAfter;
+    LOG(INFO) << "rot err before: " << rotErrBefore;
+    LOG(INFO) << "rot err after : " << rotErrAfter;
+    std::cout << "trans err before: " << transErrBefore << "\n";
+    std::cout << "trans err after : " << transErrAfter << "\n";
+    std::cout << "rot err before: " << rotErrBefore << "\n";
+    std::cout << "rot err after : " << rotErrAfter << "\n";
+  }
 }
 
 int main(int argc, char **argv) {

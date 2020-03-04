@@ -56,7 +56,7 @@ public:
   void update(const DeltaParameterVector &delta);
   State saveState() const;
   void recoverState(State oldState);
-  void apply();
+  void apply() const;
 
 private:
   State state;

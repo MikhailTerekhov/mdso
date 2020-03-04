@@ -63,7 +63,7 @@ KeyFrame::KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame,
   int camNum = preKeyFrame->cam->bundle.size();
   for (int i = 0; i < camNum; ++i) {
     PixelSelector::PointVector selected = pixelSelector[i].select(
-        preKeyFrame->image(i), preKeyFrame->frames[i].gradNorm,
+        preKeyFrame->frames[i].frameColored, preKeyFrame->frames[i].gradNorm,
         kfSettings.immaturePointsNum() / camNum, nullptr);
     frames.emplace_back(this, i, preKeyFrame->frames[i].timestamp);
     addImmatures(selected.data(), selected.size(), i,

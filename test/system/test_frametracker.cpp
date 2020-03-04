@@ -1,5 +1,5 @@
-#include "../../samples/mfov/reader/MultiFovReader.h"
-#include "../../samples/robotcar/reader/RobotcarReader.h"
+#include "data/MultiFovReader.h"
+#include "data/RobotcarReader.h"
 #include "output/TrackingDebugImageDrawer.h"
 #include "system/FrameTracker.h"
 #include "system/IdentityPreprocessor.h"
@@ -28,6 +28,9 @@ DEFINE_string(
     "/shared/datasets/oxford-robotcar/robotcar-dataset-sdk/extrinsics",
     "Path to a directory with RobotCar dataset extrinsic parameters, as "
     "provided in the dataset SDK.");
+
+DEFINE_string(rtk_dir, "/shared/datasets/oxford-robotcar/rtk",
+              "Directory with RTK ground truth poses.");
 
 DEFINE_double(
     time_win, 5,
@@ -139,6 +142,9 @@ protected:
   void SetUp() override {
     LOG(INFO) << "settings up another test";
 
+    ReaderSettings readerSettings;
+    readerSettings.projectedTimeWindow = FLAGS_time_win;
+
     int lidarS = FLAGS_rel_point_size_lidar *
                  (RobotcarReader::imageWidth + RobotcarReader::imageHeight) / 2;
     int contrastS = FLAGS_rel_point_size_contr *
@@ -164,24 +170,28 @@ protected:
     fs::path modelsDir(FLAGS_models_dir);
     fs::path extrinsicsDir(FLAGS_extrinsics_dir);
     fs::path masksDir(FLAGS_masks_dir);
+    fs::path rtkDir(FLAGS_rtk_dir);
     ASSERT_TRUE(fs::is_directory(chunkDir));
     ASSERT_TRUE(fs::is_directory(modelsDir));
     ASSERT_TRUE(fs::is_directory(extrinsicsDir));
     ASSERT_TRUE(fs::is_directory(masksDir));
     ASSERT_GT(levelNum, 0);
     ASSERT_LT(levelNum, Settings::Pyramid::max_levelNum);
-    reader = std::unique_ptr<RobotcarReader>(
-        new RobotcarReader(chunkDir, modelsDir, extrinsicsDir));
+
+    std::optional<fs::path> maybeRtkDir;
+    if (fs::is_directory(rtkDir))
+      maybeRtkDir.emplace(rtkDir);
+
+    reader = std::unique_ptr<RobotcarReader>(new RobotcarReader(
+        chunkDir, modelsDir, extrinsicsDir, maybeRtkDir, readerSettings));
     reader->provideMasks(masksDir);
 
     settings.pyramid.setLevelNum(levelNum);
     settings.affineLight.optimizeAffineLight = GetParam().optimizeAffineLight;
     settings.frameTracker.doIntercameraReprojection = FLAGS_reproj_intercam;
 
-    baseInd = std::lower_bound(reader->leftTs().begin(), reader->leftTs().end(),
-                               baseTs) -
-              reader->leftTs().begin();
-    ASSERT_LT(baseInd + framesTracked, reader->leftTs().size());
+    baseInd = reader->indFromTs(baseTs);
+    ASSERT_LT(baseInd + framesTracked, reader->maxTs());
     auto frame = reader->frame(baseInd);
     cv::Mat1b imgGray[RobotcarReader::numCams];
     cv::Mat1d gradX[RobotcarReader::numCams], gradY[RobotcarReader::numCams],
@@ -193,7 +203,7 @@ protected:
 
     Timestamp timeWin = FLAGS_time_win * 1e6;
     Timestamp minTs = baseTs - timeWin, maxTs = baseTs + timeWin;
-    ASSERT_GT(reader->leftTs()[baseInd], minTs);
+    ASSERT_GT(reader->tsFromInd(baseInd), minTs);
     auto projected = reader->project(minTs, maxTs, baseTs);
 
     FrameTracker::DepthedMultiFrame baseForTracker;
@@ -297,7 +307,8 @@ protected:
     cv::imwrite(std::string(contrastDepthsPath), contrastTotalIm);
     cv::imwrite(std::string(terrainsPath), terrainsTotalIm);
 
-    camPyr = reader->cam().camPyr(levelNum);
+    cam.reset(new CameraBundle(reader->cam()));
+    camPyr = cam->camPyr(levelNum);
     preprocessor = std::unique_ptr<Preprocessor>(new IdentityPreprocessor);
 
     std::vector<int> drawingOrder = {0, 2, 1};
@@ -327,6 +338,7 @@ protected:
   Settings settings;
   CameraBundle::CamPyr camPyr;
   std::unique_ptr<RobotcarReader> reader;
+  std::unique_ptr<CameraBundle> cam;
   std::unique_ptr<KeyFrame> baseFrame;
   std::unique_ptr<FrameTracker> frameTracker;
   std::unique_ptr<Preprocessor> preprocessor;
@@ -399,8 +411,8 @@ TEST_P(FrameTrackerRobotcarTest, doesTracking) {
   DummyTrajectoryHolder<RobotcarReader::numCams> trajectoryHolder;
   AffLight defaultAffLight[RobotcarReader::numCams];
   Timestamp baseTimestamps[RobotcarReader::numCams] = {
-      reader->leftTs()[baseInd], reader->rearTs()[baseInd],
-      reader->rightTs()[baseInd]};
+      reader->tsFromInd(baseInd), reader->tsFromInd(baseInd),
+      reader->tsFromInd(baseInd)};
   SE3 idSe3;
   trajectoryHolder.pushBack(idSe3, defaultAffLight, baseTimestamps);
   std::unique_ptr<TrackingPredictor> trackingPredictor(
@@ -409,9 +421,17 @@ TEST_P(FrameTrackerRobotcarTest, doesTracking) {
   double totalPath = 0;
   double transDrift = INF, rotDrift = INF;
   double sumRightMLeft = 0, sumRearMLeft = 0;
+  auto maybeBaseToWorld = reader->getFrameToWorld(baseInd);
+  CHECK(maybeBaseToWorld);
+  SE3 baseToWorld = maybeBaseToWorld.value();
   for (int relInd = 1; relInd < framesTracked - 1; ++relInd) {
     int frameInd = baseInd + relInd;
     auto frame = reader->frame(frameInd);
+
+    auto maybeTrackedToWorld = reader->getFrameToWorld(frameInd);
+    CHECK(maybeTrackedToWorld);
+    SE3 gtTrackedToWorld = maybeTrackedToWorld.value();
+
     cv::Mat3b coloredFrames[RobotcarReader::numCams];
     Timestamp timestamps[RobotcarReader::numCams];
     for (int camInd = 0; camInd < RobotcarReader::numCams; ++camInd) {
@@ -419,7 +439,7 @@ TEST_P(FrameTrackerRobotcarTest, doesTracking) {
       timestamps[camInd] = frame[camInd].timestamp;
     }
     std::unique_ptr<PreKeyFrame> preKeyFrame(
-        new PreKeyFrame(baseFrame.get(), &reader->cam(), preprocessor.get(),
+        new PreKeyFrame(baseFrame.get(), cam.get(), preprocessor.get(),
                         coloredFrames, relInd, timestamps, settings.pyramid));
     Timestamp avgTs =
         std::accumulate(timestamps, timestamps + RobotcarReader::numCams,
@@ -433,23 +453,23 @@ TEST_P(FrameTrackerRobotcarTest, doesTracking) {
     sumRearMLeft += std::abs(rearMLeft);
     TrackingResult coarse = trackingPredictor->predictAt(avgTs, 0);
     SE3 oldPredictedBaseToThis = coarse.baseToTracked;
-    SE3 voBaseToTracked = reader->tsToTs(baseTs, reader->leftTs()[frameInd]);
+    SE3 gtBaseToTracked = gtTrackedToWorld.inverse() * baseToWorld;
     if (FLAGS_use_vo_for_prediction)
-      coarse.baseToTracked = voBaseToTracked;
+      coarse.baseToTracked = gtBaseToTracked;
     TrackingResult trackingResult =
         frameTracker->trackFrame(*preKeyFrame, coarse);
 
     trajectoryHolder.pushBack(trackingResult.baseToTracked.inverse(),
                               trackingResult.lightBaseToTracked.data(),
                               timestamps);
-    SE3 err = trackingResult.baseToTracked * voBaseToTracked.inverse();
-    SE3 voCurToPrev = reader->tsToTs(trajectoryHolder.timestamp(relInd),
-                                     trajectoryHolder.timestamp(relInd - 1));
+    SE3 err = trackingResult.baseToTracked * gtBaseToTracked.inverse();
+    SE3 gtCurToPrev = reader->getFrameToWorld(frameInd - 1).value().inverse() *
+                      gtTrackedToWorld;
     LOG(INFO) << "vo cur to prev trans norm = "
-              << voCurToPrev.translation().norm() << ", ts diff = "
+              << gtCurToPrev.translation().norm() << ", ts diff = "
               << trajectoryHolder.timestamp(relInd) -
                      trajectoryHolder.timestamp(relInd - 1);
-    totalPath += voCurToPrev.translation().norm();
+    totalPath += gtCurToPrev.translation().norm();
     double transErr = err.translation().norm();
     double rotErr = err.so3().log().norm();
     transDrift = transErr / totalPath;
@@ -474,7 +494,7 @@ TEST_P(FrameTrackerRobotcarTest, doesTracking) {
 
     putInMatrixForm(predictedOfs, oldPredictedBaseToThis.inverse());
     putInMatrixForm(trackedOfs, trackingResult.baseToTracked.inverse());
-    putInMatrixForm(voOfs, voBaseToTracked.inverse());
+    putInMatrixForm(voOfs, gtBaseToTracked.inverse());
   }
 
   LOG(INFO) << "avg |right - left| (s) = "

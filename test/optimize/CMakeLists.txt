@@ -19,6 +19,3 @@ target_include_directories(test_energyfunction
     ${PROJECT_SOURCE_DIR}/samples/mfov/reader
     ${PROJECT_SOURCE_DIR}/internal/include
 )
-
-target_link_libraries(test_residual mfov_reader)
-target_link_libraries(test_energyfunction mfov_reader)

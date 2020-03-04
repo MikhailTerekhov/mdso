@@ -1,7 +1,8 @@
-#include "../reader/RobotcarReader.h"
+#include "data/RobotcarReader.h"
+#include "util/PixelSelector.h"
 #include "util/util.h"
 
-DEFINE_string(chunk_dir, "/shared/datasets/oxford-robotcar/2014-05-06-12-54-54",
+DEFINE_string(chunk_dir, "/shared/datasets/oxford-robotcar/2015-08-21-16-23-57",
               "Name of the chunk to output pointcloud from.");
 DEFINE_string(models_dir, "data/models/robotcar",
               "Directory with omnidirectional camera models. It is provided in "
@@ -10,6 +11,8 @@ DEFINE_string(models_dir, "data/models/robotcar",
 DEFINE_string(extrinsics_dir, "thirdparty/robotcar-dataset-sdk/extrinsics",
               "Directory with RobotCar dataset sensor extrinsics, provided in "
               "the dataset SDK.");
+DEFINE_string(rtk_dir, "/shared/datasets/oxford-robotcar/rtk",
+              "Directory with RTK ground truth poses.");
 DEFINE_bool(gen_clouds, true,
             "Do we need to generate whole clouds from the dump?");
 DEFINE_string(
@@ -29,13 +32,19 @@ DEFINE_string(out_traj_interp, "vo_interp.txt",
               "The file to write interpolated VO trajectory into.");
 DEFINE_int32(interp_gran, 1000,
              "Number of poses to be output into interpolated vo trajectory");
-DEFINE_int32(cloud_points, 1'000'000,
+DEFINE_int32(max_proj_points, 20'000, "Maximum number of projected points.");
+DEFINE_int32(cloud_points, 20'000'000,
              "Number of points to be written into the cloud");
 DEFINE_bool(fill_vo_gaps, false,
             "Do we need to fill the gaps in VO trajectory?");
 DEFINE_string(
     out_project, "projected.png",
     "Name of the file to output the image with the projected cloud into.");
+DEFINE_string(
+    out_interp, "interpolated.png",
+    "Name of the file to output the image with the interpolated depths.");
+DEFINE_string(out_triang, "triangulations.png",
+              "Name of the file to output the image with triangulations.");
 DEFINE_int32(project_idx, 750,
              "Index of the frame to project point cloud onto.");
 DEFINE_double(
@@ -46,27 +55,6 @@ DEFINE_double(
 DEFINE_double(
     rel_point_size, 0.001,
     "Relative to w+h point size on the images with projected points.");
-
-template <typename T>
-void sparsify(std::vector<T> *v[], int numVectors, int neededTotal) {
-  int total =
-      std::accumulate(v, v + numVectors, 0,
-                      [](int x, std::vector<T> *v) { return x + v->size(); });
-  if (total < neededTotal)
-    return;
-
-  std::mt19937 mt;
-  for (int i = 0; i < numVectors; ++i)
-    std::shuffle(v[i]->begin(), v[i]->end(), mt);
-
-  int cur = 0;
-  for (int i = 0; i < numVectors - 1; ++i) {
-    int remain = double(v[i]->size()) / total * neededTotal;
-    v[i]->resize(remain);
-    cur += remain;
-  }
-  v[numVectors - 1]->resize(neededTotal - cur);
-}
 
 cv::Mat3b project(const RobotcarReader &reader, int idx) {
   auto frame = reader.frame(idx);
@@ -86,10 +74,11 @@ cv::Mat3b project(const RobotcarReader &reader, int idx) {
 
   int s = FLAGS_rel_point_size *
           (RobotcarReader::imageWidth + RobotcarReader::imageHeight) / 2;
+  CameraBundle cam = reader.cam();
   for (int i = 0; i < RobotcarReader::numCams; ++i) {
     CHECK(frame[i].frame.channels() == 3);
     images[i] = frame[i].frame.clone();
-    SE3 bodyToCam = reader.cam().bundle[i].bodyToThis;
+    SE3 bodyToCam = cam.bundle[i].bodyToThis;
     StdVector<Vec2> points;
     std::vector<double> depths;
     for (const Vec3 &p : cloud) {
@@ -113,6 +102,48 @@ cv::Mat3b project(const RobotcarReader &reader, int idx) {
 
   cv::Mat3b result;
   cv::hconcat(images, RobotcarReader::numCams, result);
+  return result;
+}
+
+cv::Mat3b interpolate(const RobotcarReader &reader, int pointsNeeded, int idx) {
+  auto frame = reader.frame(idx);
+  CameraBundle cam = reader.cam();
+  std::vector<PixelSelector> pixelSelectors(cam.bundle.size());
+  std::vector<cv::Mat3b> interp(cam.bundle.size());
+  auto depths = reader.depths(idx);
+  cv::Mat3b framesDrawn[RobotcarReader::numCams];
+  for (int ci = 0; ci < RobotcarReader::numCams; ++ci)
+    framesDrawn[ci] = frame[ci].frame;
+  cv::Mat3b triangs =
+      dynamic_cast<RobotcarReader::Depths *>(depths.get())->draw(framesDrawn);
+  cv::imwrite(FLAGS_out_triang, triangs);
+
+  for (int ci = 0; ci < cam.bundle.size(); ++ci) {
+    pixelSelectors[ci].initialize(frame[ci].frame,
+                                  pointsNeeded / cam.bundle.size());
+    cv::Mat1b frameGray = cvtBgrToGray(frame[ci].frame);
+    cv::Mat1d gradX, gradY, gradNorm;
+    grad(frameGray, gradX, gradY, gradNorm);
+    PixelSelector::PointVector points = pixelSelectors[ci].select(
+        frame[ci].frame, gradNorm, pointsNeeded / cam.bundle.size());
+    std::vector<double> depthVals;
+    std::vector<cv::Point> pointsSet;
+    for (cv::Point p : points) {
+      std::optional<double> d = depths->depth(ci, toVec2(p));
+      if (d) {
+        depthVals.push_back(d.value());
+        pointsSet.push_back(p);
+      }
+    }
+
+    interp[ci] = frame[ci].frame.clone();
+    for (int i = 0; i < pointsSet.size(); ++i)
+      cv::circle(interp[ci], pointsSet[i], 5,
+                 depthCol(depthVals[i], minDepthCol, maxDepthCol), cv::FILLED);
+  }
+
+  cv::Mat3b result;
+  cv::hconcat(interp.data(), interp.size(), result);
   return result;
 }
 
@@ -146,22 +177,22 @@ int main(int argc, char *argv[]) {
 
   ReaderSettings settings;
   settings.fillVoGaps = FLAGS_fill_vo_gaps;
+  settings.projectedTimeWindow = FLAGS_time_win;
+  std::optional<fs::path> rtkDir(FLAGS_rtk_dir);
+  //  rtkDir.reset();
   RobotcarReader reader(FLAGS_chunk_dir, FLAGS_models_dir, FLAGS_extrinsics_dir,
-                        settings);
+                        rtkDir, settings);
 
-  Timestamp minTs = std::max(std::max(reader.voTs()[0], reader.lmsFrontTs()[0]),
-                             reader.lmsRearTs()[0]);
-  Timestamp maxTs =
-      std::min(std::min(reader.voTs().back(), reader.lmsFrontTs().back()),
-               reader.lmsRearTs().back());
+  Timestamp minTs = reader.minTs();
+  Timestamp maxTs = reader.maxTs();
   Timestamp baseTs = minTs;
 
   if (FLAGS_gen_clouds)
     genClouds(reader, minTs, maxTs, baseTs);
 
   std::ofstream ofsTrajOrig(FLAGS_out_traj_orig);
-  for (const SE3 &bodyToFirst : reader.getVoBodyToFirst()) {
-    putInMatrixForm(ofsTrajOrig, bodyToFirst);
+  for (const SE3 &bodyToWorld : reader.getGtBodyToWorld()) {
+    putInMatrixForm(ofsTrajOrig, bodyToWorld);
   }
 
   std::ofstream ofsTrajInterp(FLAGS_out_traj_interp);
@@ -169,11 +200,14 @@ int main(int argc, char *argv[]) {
   double step = double(allTime) / FLAGS_interp_gran;
   for (int i = 0; i < FLAGS_interp_gran; ++i) {
     Timestamp ts = minTs + step * i;
-    putInMatrixForm(ofsTrajInterp, reader.tsToTs(ts, reader.voTs()[0]));
+    putInMatrixForm(ofsTrajInterp, reader.tsToWorld(ts));
   }
 
   cv::Mat3b proj = project(reader, FLAGS_project_idx);
   cv::imwrite(FLAGS_out_project, proj);
+
+  cv::Mat3b interp = interpolate(reader, 2000, FLAGS_project_idx);
+  cv::imwrite(FLAGS_out_interp, interp);
 
   return 0;
 }

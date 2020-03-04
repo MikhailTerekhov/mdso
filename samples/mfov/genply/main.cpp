@@ -1,4 +1,4 @@
-#include "../reader/MultiFovReader.h"
+#include "data/MultiFovReader.h"
 #include "output/CloudWriter.h"
 #include "output/CloudWriterGT.h"
 #include "output/DebugImageDrawer.h"

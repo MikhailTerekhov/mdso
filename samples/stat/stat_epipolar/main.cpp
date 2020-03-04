@@ -1,4 +1,4 @@
-#include "../../reader/MultiFovReader.h"
+#include "data/MultiFovReader.h"
 #include "system/DelaunayDsoInitializer.h"
 #include "system/DsoSystem.h"
 #include "system/StereoMatcher.h"

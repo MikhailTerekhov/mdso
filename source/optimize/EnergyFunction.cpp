@@ -155,6 +155,15 @@ void EnergyFunction::clearPrecomputations() {
   derivatives.reset();
 }
 
+Parameters::State EnergyFunction::saveState() const {
+  return parameters.saveState();
+}
+
+void EnergyFunction::recoverState(const Parameters::State &oldState) {
+  parameters.recoverState(oldState);
+  clearPrecomputations();
+}
+
 void EnergyFunction::optimize(int maxIterations) {
   T lambda = settings.optimization.initialLambda;
   auto hostToTarget = precomputeHostToTarget();
@@ -167,12 +176,12 @@ void EnergyFunction::optimize(int maxIterations) {
   Gradient gradient = getGradient(curValues, curDerivatives);
   bool parametersUpdated = false;
   for (int it = 0; it < maxIterations; ++it) {
-    std::cout << "it = " << it << "\n";
+    LOG(INFO) << "it = " << it << "\n";
     TimePoint start, end;
     start = now();
 
     T curEnergy = curValues.totalEnergy();
-    std::cout << "cur energy = " << curEnergy << "\n";
+    LOG(INFO) << "cur energy = " << curEnergy << "\n";
 
     if (parametersUpdated) {
       motionDerivatives = precomputeMotionDerivatives();
@@ -194,11 +203,9 @@ void EnergyFunction::optimize(int maxIterations) {
     Values newValues = createValues(newHostToTarget, newLightHostToTarget);
 
     T newEnergy = newValues.totalEnergy();
-    std::cout << "new energy = " << newEnergy
-              << " delta = " << newEnergy - curEnergy << "\n";
-
     LOG(INFO) << "optimization step #" << it << ": curEnergy = " << curEnergy
-              << " newEnergy = " << newEnergy;
+              << " newEnergy = " << newEnergy
+              << " delta = " << newEnergy - curEnergy;
 
     if (newEnergy >= curEnergy) {
       parameters.recoverState(std::move(savedState));
