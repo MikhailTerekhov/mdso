@@ -2,6 +2,7 @@
 #include "output/DsoObserver.h"
 #include "output/FrameTrackerObserver.h"
 #include "system/AffineLightTransform.h"
+#include "system/BundleAdjusterCeres.h"
 #include "system/DelaunayDsoInitializer.h"
 #include "system/StereoMatcher.h"
 #include "system/TrackingPredictorRot.h"
@@ -451,7 +452,7 @@ void DsoSystem::addMultiFrame(const cv::Mat3b frames[],
       for (DsoObserver *obs : observers.dso)
         obs->initialized(initializedKFs.data(), keyFrames.size());
 
-      // BundleAdjuster bundleAdjuster(cam, settings.bundleAdjuster,
+      // BundleAdjusterCeres bundleAdjuster(cam, settings.bundleAdjuster,
       // settings.residualPattern, settings.residualWeighting,
       // settings.intensity, settings.affineLight, settings.threading,
       // settings.depth); for (auto &p : keyFrames)
@@ -515,7 +516,7 @@ void DsoSystem::addMultiFrame(const cv::Mat3b frames[],
       new PreKeyFrame(&baseFrame(), cam, preprocessor, frames, globalFrameNum,
                       timestamps, settings.pyramid));
 
-  allFrames.push_back(preKeyFrame.get());
+  allFrames.emplace_back(preKeyFrame.get());
 
   TrackingResult predicted = trackingPredictor->predictAt(
       timestamp(globalFrameNum), baseFrame().preKeyFrame->globalFrameNum);
@@ -547,7 +548,6 @@ void DsoSystem::addMultiFrame(const cv::Mat3b frames[],
   if (!needNewKf) {
     baseFrame().trackedFrames.push_back(std::move(preKeyFrame));
   } else {
-
     SE3 preToWorld = FrameToWorldExtractor()(preKeyFrame.get());
 
     keyFrames.push_back(std::unique_ptr<KeyFrame>(new KeyFrame(
@@ -568,14 +568,14 @@ void DsoSystem::addMultiFrame(const cv::Mat3b frames[],
     for (DsoObserver *obs : observers.dso)
       obs->newBaseFrame(baseFrame());
 
-    //    if (settings.bundleAdjuster.runBA) {
-    //      std::vector<KeyFrame *> kfPtrs(keyFrames.size());
-    //      for (int i = 0; i < keyFrames.size(); ++i)
-    //        kfPtrs[i] = keyFrames[i].get();
-    //      BundleAdjuster bundleAdjuster(cam, kfPtrs.data(), keyFrames.size(),
-    //                                    settings.getBundleAdjusterSettings());
-    //      bundleAdjuster.adjust(settings.bundleAdjuster.maxIterations);
-    //    }
+    if (settings.bundleAdjuster.runBA) {
+      std::vector<KeyFrame *> kfPtrs(keyFrames.size());
+      for (int i = 0; i < keyFrames.size(); ++i)
+        kfPtrs[i] = keyFrames[i].get();
+      BundleAdjusterCeres bundleAdjuster(cam, kfPtrs.data(), keyFrames.size(),
+                                         settings.getBundleAdjusterSettings());
+      bundleAdjuster.adjust(settings.bundleAdjuster.maxIterations);
+    }
 
     std::vector<StdVector<Vec2>> points(cam->bundle.size());
     std::vector<std::vector<double>> depths(cam->bundle.size());

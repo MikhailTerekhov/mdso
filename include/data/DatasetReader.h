@@ -24,11 +24,9 @@ public:
 
   virtual int numFrames() const = 0;
   virtual std::vector<FrameEntry> frame(int frameInd) const = 0;
-
   virtual CameraBundle cam() const = 0;
-
   virtual std::unique_ptr<FrameDepths> depths(int frameInd) const = 0;
-  virtual std::optional<SE3> getFrameToWorld(int frameInd) const = 0;
+  virtual std::optional<SE3> frameToWorld(int frameInd) const = 0;
 };
 
 } // namespace mdso

@@ -59,7 +59,7 @@ public:
   CameraBundle cam() const override { return mCam; }
 
   std::unique_ptr<FrameDepths> depths(int frameInd) const override;
-  std::optional<SE3> getFrameToWorld(int frameInd) const override;
+  std::optional<SE3> frameToWorld(int frameInd) const override;
 
   SE3 tsToWorld(Timestamp ts, bool useVo = false) const;
 

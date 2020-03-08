@@ -64,20 +64,23 @@ protected:
     reader.reset(new MultiFovReader(FLAGS_mfov_dir));
     SE3 bodyToFrame = SE3::sampleUniform(mt);
     bodyToFrame.translation() *= 0.05;
-    cam.reset(new CameraBundle(&bodyToFrame, reader->cam.get(), 1));
+    CameraModel cameraModel = reader->cam().bundle[0].cam;
+    cam.reset(new CameraBundle(&bodyToFrame, &cameraModel, 1));
 
     frameParameterOrder.reset(
         new FrameParameterOrder(keyFramesCount, cam->bundle.size()));
 
     PixelSelector pixelSelector;
-    pixelSelector.initialize(reader->getFrame(keyFrameNums[0]),
+    pixelSelector.initialize(reader->frame(keyFrameNums[0])[0].frame,
                              settings.keyFrame.immaturePointsNum());
     keyFrames.reserve(keyFramesCount);
-    SE3 worldToFirstGT = reader->getWorldToFrameGT(keyFrameNums[0]);
+    auto kf0ToWorld = reader->frameToWorld(keyFrameNums[0]);
+    CHECK(kf0ToWorld);
+    SE3 worldToFirstGT = kf0ToWorld.value().inverse();
     for (int i = 0; i < keyFramesCount; ++i) {
       Timestamp ts = keyFrameNums[i];
       AffLight lightWorldToF = sampleAffLight<double>(settings.affineLight, mt);
-      cv::Mat3b coloredFrame = reader->getFrame(keyFrameNums[i]);
+      cv::Mat3b coloredFrame = reader->frame(keyFrameNums[i])[0].frame;
       coloredFrame = lightWorldToF(coloredFrame);
       std::unique_ptr<PreKeyFrame> pkf(
           new PreKeyFrame(nullptr, cam.get(), &idPrep, &coloredFrame, i, &ts,
@@ -87,7 +90,9 @@ protected:
                                           settings.getPointTracerSettings()));
       keyFrames.back()->frames[0].lightWorldToThis = lightWorldToF;
 
-      SE3 frameToWorldGT = reader->getWorldToFrameGT(keyFrameNums[i]).inverse();
+      auto maybeFrameToWorldGT = reader->frameToWorld(keyFrameNums[i]);
+      CHECK(maybeFrameToWorldGT);
+      SE3 frameToWorldGT = maybeFrameToWorldGT.value();
       SE3 thisToFirstGT = worldToFirstGT * frameToWorldGT;
       double transErr = thisToFirstGT.translation().norm() * transDrift;
       double rotErr = thisToFirstGT.so3().log().norm() * rotDrift;
@@ -98,12 +103,13 @@ protected:
       keyFrames.back()->thisToWorld.setValue(frameToWorld *
                                              cam->bundle[0].bodyToThis);
 
-      cv::Mat1d depths = reader->getDepths(keyFrameNums[i]);
+      auto depths = reader->depths(keyFrameNums[i]);
       for (ImmaturePoint &ip : keyFrames.back()->frames[0].immaturePoints) {
-        cv::Point p = toCvPoint(ip.p);
-        checkBounds(depths, p);
-        ip.setTrueDepth(depths(p), settings.pointTracer);
-        keyFrames.back()->frames[0].optimizedPoints.emplace_back(ip);
+        auto maybeDepth = depths->depth(0, ip.p);
+        if (maybeDepth) {
+          ip.setTrueDepth(maybeDepth.value(), settings.pointTracer);
+          keyFrames.back()->frames[0].optimizedPoints.emplace_back(ip);
+        }
       }
       keyFrames.back()->frames[0].immaturePoints.clear();
     }
@@ -184,12 +190,15 @@ protected:
   }
 
   double transError() const {
+    auto kf0ToWorldGT = reader->frameToWorld(keyFrameNums[0]);
+    CHECK(kf0ToWorldGT);
     double sumErr = 0;
     for (int i = 1; i < keyFramesCount; ++i) {
+      auto kfiToWorldGT = reader->frameToWorld(keyFrameNums[i]);
+      CHECK(kfiToWorldGT);
       SE3 err = keyFrames[i]->thisToWorld() * cam->bundle[0].thisToBody *
-                reader->getWorldToFrameGT(keyFrameNums[i]);
-      SE3 thisToFirstGT = reader->getWorldToFrameGT(keyFrameNums[0]) *
-                          reader->getWorldToFrameGT(keyFrameNums[i]).inverse();
+                kfiToWorldGT.value().inverse();
+      SE3 thisToFirstGT = kf0ToWorldGT.value().inverse() * kfiToWorldGT.value();
       //      sumErr += err.translation().norm() /
       //      thisToFirstGT.translation().norm();
       sumErr += err.translation().norm();
@@ -199,12 +208,15 @@ protected:
   }
 
   double rotError() const {
+    auto kf0ToWorldGT = reader->frameToWorld(keyFrameNums[0]);
+    CHECK(kf0ToWorldGT);
     double sumErr = 0;
     for (int i = 0; i < keyFramesCount; ++i) {
+      auto kfiToWorldGT = reader->frameToWorld(keyFrameNums[i]);
+      CHECK(kfiToWorldGT);
       SE3 err = keyFrames[i]->thisToWorld() * cam->bundle[0].thisToBody *
-                reader->getWorldToFrameGT(keyFrameNums[i]);
-      SE3 thisToFirstGT = reader->getWorldToFrameGT(keyFrameNums[0]) *
-                          reader->getWorldToFrameGT(keyFrameNums[i]).inverse();
+                kfiToWorldGT.value().inverse();
+      SE3 thisToFirstGT = kf0ToWorldGT.value().inverse() * kfiToWorldGT.value();
       //      sumErr += err.so3().log().norm() /
       //      thisToFirstGT.translation().norm();
       sumErr += err.so3().log().norm();

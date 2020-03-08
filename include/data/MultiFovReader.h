@@ -1,28 +1,39 @@
 #ifndef INCLUDE_MULTIFOVREADER
 #define INCLUDE_MULTIFOVREADER
 
-#include "system/CameraModel.h"
-#include "util/types.h"
+#include "data/DatasetReader.h"
 #include <iostream>
 #include <opencv2/opencv.hpp>
 
-using namespace mdso;
+namespace mdso {
 
-class MultiFovReader {
+class MultiFovReader : public DatasetReader {
 public:
+  class Depths : public FrameDepths {
+  public:
+    Depths(const cv::Mat1d &depths);
+
+    std::optional<double> depth(int camInd, const Vec2 &point) const override;
+
+  private:
+    Eigen::AlignedBox2d bound;
+    cv::Mat1d depths;
+  };
+
   MultiFovReader(const fs::path &newDatasetDir);
 
-  cv::Mat getFrame(int globalFrameNum) const;
-  cv::Mat1d getDepths(int globalFrameNum) const;
-  SE3 getWorldToFrameGT(int globalFrameNum) const;
-  const StdVector<SE3> &getAllWorldToFrameGT() const;
-  int getFrameCount() const;
-
-  std::unique_ptr<CameraModel> cam;
+  int numFrames() const override;
+  std::vector<FrameEntry> frame(int frameInd) const override;
+  CameraBundle cam() const override;
+  std::unique_ptr<FrameDepths> depths(int frameInd) const override;
+  std::optional<SE3> frameToWorld(int frameInd) const override;
 
 private:
   fs::path datasetDir;
-  StdVector<SE3> worldToFrameGT;
+  CameraBundle mCam;
+  StdVector<SE3> frameToWorldGT;
 };
+
+} // namespace mdso
 
 #endif

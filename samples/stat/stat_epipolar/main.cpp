@@ -99,8 +99,12 @@ public:
     for (int ind = range.begin(); ind < range.end(); ++ind) {
       int firstFrameNum = startFrames[ind];
       int secondFrameNum = firstFrameNum + FLAGS_disparity_shift;
-      SE3 firstToSecondGT = reader->getWorldToFrameGT(secondFrameNum) *
-                            reader->getWorldToFrameGT(firstFrameNum).inverse();
+      auto firstToWorld = reader->frameToWorld(firstFrameNum);
+      auto secondToWorld = reader->frameToWorld(secondFrameNum);
+      CHEK(firstToWorld);
+      CHECK(secondToWorld);
+      SE3 firstToSecondGT =
+          secondToWorld.value().inverse() * firstToWorld.value();
       SE3 firstToSecond;
       if (FLAGS_precise_placement)
         firstToSecond = firstToSecondGT;

@@ -104,15 +104,16 @@ protected:
     //    SE3 bodyToCam[] = {SE3(), SE3()};
     bodyToCam[0].translation() *= img1ToImg2.translation().norm();
     bodyToCam[1].translation() *= img1ToImg2.translation().norm();
-    CameraModel cams[] = {*reader->cam, *reader->cam};
+    CameraModel cameraModel = reader->cam().bundle[0].cam;
+    CameraModel cams[] = {cameraModel, cameraModel};
     cam.reset(new CameraBundle(bodyToCam, cams, 2));
 
     SE3 kf1ToKf2 = bodyToCam[1].inverse() * img1ToImg2 * bodyToCam[0];
 
     IdentityPreprocessor idPrep;
 
-    cv::Mat3b frame1 = reader->getFrame(fnum1),
-              frame2 = reader->getFrame(fnum2);
+    cv::Mat3b frame1 = reader->frame(fnum1)[0].frame,
+              frame2 = reader->frame(fnum2)[0].frame;
     AffLight lightWorldToF1 = sampleAffLight<double>(settings.affineLight, mt);
     AffLight lightWorldToF2 = sampleAffLight<double>(settings.affineLight, mt);
     //        AffLight lightWorldToF1;
@@ -126,8 +127,7 @@ protected:
     pixelSelectors[0].initialize(frame1, settings.keyFrame.immaturePointsNum());
     pixelSelectors[1].initialize(frame1, settings.keyFrame.immaturePointsNum());
 
-    cv::Mat1d depths1 = reader->getDepths(fnum1),
-              depths2 = reader->getDepths(fnum2);
+    auto depths1 = reader->depths(fnum1);
 
     std::unique_ptr<PreKeyFrame> pkf1(new PreKeyFrame(
         nullptr, cam.get(), &idPrep, frames1Stub, 1, ts1, settings.pyramid));
@@ -149,8 +149,11 @@ protected:
 
     for (ImmaturePoint &ip : kf1->frames[0].immaturePoints)
       if (ip.state == ImmaturePoint::ACTIVE) {
-        ip.setTrueDepth(depths1(toCvPoint(ip.p)), settings.pointTracer);
-        kf1->frames[0].optimizedPoints.emplace_back(ip);
+        auto maybeDepth1 = depths1->depth(0, ip.p);
+        if (maybeDepth1) {
+          ip.setTrueDepth(maybeDepth1.value(), settings.pointTracer);
+          kf1->frames[0].optimizedPoints.emplace_back(ip);
+        }
       }
     kf1->frames[0].immaturePoints.clear();
 
@@ -225,8 +228,11 @@ protected:
 class ResidualTestGtPoses : public ResidualTestBase {
 private:
   std::pair<SE3, SE3> getKfImageToWorld() override {
-    return {reader->getWorldToFrameGT(fnum1).inverse(),
-            reader->getWorldToFrameGT(fnum2).inverse()};
+    auto kf1ToWorld = reader->frameToWorld(fnum1);
+    auto kf2ToWorld = reader->frameToWorld(fnum2);
+    CHECK(kf1ToWorld);
+    CHECK(kf2ToWorld);
+    return {kf1ToWorld.value(), kf2ToWorld.value()};
   }
 };
 
@@ -236,14 +242,16 @@ private:
   static constexpr double rotDrift = (M_PI / 180.0) * 0.004;
 
   std::pair<SE3, SE3> getKfImageToWorld() override {
-    SE3 img1ToWorldGT = reader->getWorldToFrameGT(fnum1).inverse();
-    SE3 img2ToWorldGT = reader->getWorldToFrameGT(fnum2).inverse();
-    SE3 f1ToF2GT = img2ToWorldGT.inverse() * img1ToWorldGT;
+    auto kf1ToWorldGT = reader->frameToWorld(fnum1);
+    auto kf2ToWorldGT = reader->frameToWorld(fnum2);
+    CHECK(kf1ToWorldGT);
+    CHECK(kf2ToWorldGT);
+    SE3 f1ToF2GT = kf2ToWorldGT.value().inverse() * kf1ToWorldGT.value();
     double trans = f1ToF2GT.translation().norm();
     double transErr = trans * transDrift;
     double rotErr = trans * rotDrift;
-    return {sampleSe3(rotErr, transErr, mt) * img1ToWorldGT,
-            sampleSe3(rotErr, transErr, mt) * img2ToWorldGT};
+    return {sampleSe3(rotErr, transErr, mt) * kf1ToWorldGT.value(),
+            sampleSe3(rotErr, transErr, mt) * kf2ToWorldGT.value()};
   }
 };
 

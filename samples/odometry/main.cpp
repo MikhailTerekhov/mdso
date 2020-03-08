@@ -17,6 +17,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+using namespace mdso;
+
 DEFINE_int32(start, 1, "Number of the starting frame.");
 DEFINE_int32(count, 100, "Number of frames to process.");
 DEFINE_int32(gt_points, 1'000'000,
@@ -88,25 +90,29 @@ void readPointsInFrameGT(const MultiFovReader &reader,
                          std::vector<std::vector<Vec3>> &pointsInFrameGT,
                          std::vector<std::vector<cv::Vec3b>> &colors,
                          int maxPoints) {
+  CameraModel cam = reader.cam().bundle[0].cam;
   std::cout << "filling GT points..." << std::endl;
-  int w = reader.cam->getWidth(), h = reader.cam->getHeight();
+  int w = cam.getWidth(), h = cam.getHeight();
   int step =
       std::ceil(std::sqrt(double(FLAGS_count) * w * h / FLAGS_gt_points));
   const double maxd = 1e10;
   for (int it = FLAGS_start; it < FLAGS_start + FLAGS_count; ++it) {
     pointsInFrameGT[it].reserve((h / step) * (w / step));
-    cv::Mat1d depths = reader.getDepths(it);
-    cv::Mat3b frame = reader.getFrame(it);
+    auto depths = reader.depths(it);
+    cv::Mat3b frame = reader.frame(it)[0].frame;
     for (int y = 0; y < h; y += step)
       for (int x = 0; x < w; x += step) {
-        Vec3 p = reader.cam->unmap(Vec2(x, y));
+        Vec3 p = cam.unmap(Vec2(x, y));
         p.normalize();
-        double d = depths(y, x);
-        if (d > maxd)
-          continue;
-        p *= d;
-        pointsInFrameGT[it].push_back(p);
-        colors[it].push_back(frame(y, x));
+        auto maybeD = depths->depth(0, Vec2(x, y));
+        if (maybeD) {
+          double d = maybeD.value();
+          if (d > maxd)
+            continue;
+          p *= d;
+          pointsInFrameGT[it].push_back(p);
+          colors[it].push_back(frame(y, x));
+        }
       }
   }
 }
@@ -152,7 +158,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
                     : static_cast<Preprocessor *>(&idPreprocessor);
 
   if (FLAGS_use_DoG) {
-    cv::Mat img = reader.getFrame(FLAGS_start);
+    cv::Mat3b img = reader.frame(FLAGS_start)[0].frame;
     cv::Mat1b imgGray = cvtBgrToGray(img);
     cv::Mat1d gradX, gradY, gradNorm;
     grad(imgGray, gradX, gradY, gradNorm);
@@ -177,13 +183,12 @@ It should contain "info" and "data" subdirectories.)abacaba";
     std::cout << "mean int = " << int(meanDog);
   }
 
-  SE3 identity;
-  CameraBundle cam(&identity, reader.cam.get(), 1);
+  CameraBundle cam = reader.cam();
   CameraBundle::CamPyr camPyr = cam.camPyr(settings.pyramid.levelNum());
 
   if (FLAGS_gen_gt_only) {
-    std::vector<std::vector<Vec3>> pointsInFrameGT(reader.getFrameCount());
-    std::vector<std::vector<cv::Vec3b>> colors(reader.getFrameCount());
+    std::vector<std::vector<Vec3>> pointsInFrameGT(reader.numFrames());
+    std::vector<std::vector<cv::Vec3b>> colors(reader.numFrames());
     readPointsInFrameGT(reader, pointsInFrameGT, colors, FLAGS_gt_points);
     std::vector<Vec3> allPoints;
     std::vector<cv::Vec3b> allColors;
@@ -192,7 +197,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
     for (int i = 0; i < pointsInFrameGT.size(); ++i)
       for (int j = 0; j < pointsInFrameGT[i].size(); ++j) {
         const Vec3 &p = pointsInFrameGT[i][j];
-        allPoints.push_back(reader.getWorldToFrameGT(i).inverse() * p);
+        allPoints.push_back(reader.frameToWorld(i).value() * p);
         allColors.push_back(colors[i][j]);
       }
     std::ofstream pointsGTOfs("pointsGT.ply");
@@ -206,11 +211,11 @@ It should contain "info" and "data" subdirectories.)abacaba";
   //      camPyr.data(), settings.frameTracker, settings.pyramid, drawindOrder);
   TrajectoryWriterDso trajectoryWriter(outDir, FLAGS_trajectory_filename);
 
-  StdVector<SE3> frameToWorldGT(reader.getFrameCount());
-  std::vector<Timestamp> timestamps(reader.getFrameCount());
+  StdVector<SE3> frameToWorldGT(reader.numFrames());
+  std::vector<Timestamp> timestamps(reader.numFrames());
   for (int i = 0; i < timestamps.size(); ++i) {
     timestamps[i] = i;
-    frameToWorldGT[i] = reader.getWorldToFrameGT(i).inverse();
+    frameToWorldGT[i] = reader.frameToWorld(i).value();
   }
   TrajectoryWriterGT trajectoryWriterGT(frameToWorldGT.data(),
                                         timestamps.data(), timestamps.size(),
@@ -226,16 +231,15 @@ It should contain "info" and "data" subdirectories.)abacaba";
 
   std::unique_ptr<CloudWriterGT> cloudWriterGTPtr;
   if (FLAGS_gen_gt) {
-    std::vector<std::vector<Vec3>> pointsInFrameGT(reader.getFrameCount());
-    std::vector<std::vector<cv::Vec3b>> colors(reader.getFrameCount());
+    std::vector<std::vector<Vec3>> pointsInFrameGT(reader.numFrames());
+    std::vector<std::vector<cv::Vec3b>> colors(reader.numFrames());
     readPointsInFrameGT(reader, pointsInFrameGT, colors, FLAGS_gt_points);
     cloudWriterGTPtr.reset(new CloudWriterGT(
         frameToWorldGT.data(), timestamps.data(), pointsInFrameGT.data(),
-        colors.data(), reader.getFrameCount(), outDir,
-        FLAGS_gt_cloud_filename));
+        colors.data(), reader.numFrames(), outDir, FLAGS_gt_cloud_filename));
   }
 
-  InterpolationDrawer interpolationDrawer(reader.cam.get());
+  InterpolationDrawer interpolationDrawer(&cam.bundle[0].cam);
 
   DepthPyramidDrawer depthPyramidDrawer;
 
@@ -267,7 +271,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
   DsoSystem dso(&cam, preprocessor, observers, settings);
   for (int it = FLAGS_start; it < FLAGS_start + FLAGS_count; ++it) {
     std::cout << "add frame #" << it << std::endl;
-    cv::Mat3b frame = reader.getFrame(it);
+    cv::Mat3b frame = reader.frame(it)[0].frame;
     Timestamp timestamp = it;
     dso.addMultiFrame(&frame, &timestamp);
 

@@ -1,4 +1,4 @@
-add_subdirectory(mfov)
+add_subdirectory(odometry)
 add_subdirectory(selectpix)
 add_subdirectory(triang)
 add_subdirectory(robotcar)

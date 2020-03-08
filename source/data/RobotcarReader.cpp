@@ -391,7 +391,7 @@ int RobotcarReader::indFromTs(Timestamp ts) const {
   return std::lower_bound(mLeftTs.begin(), mLeftTs.end(), ts) - mLeftTs.begin();
 }
 
-std::optional<SE3> RobotcarReader::getFrameToWorld(int frameInd) const {
+std::optional<SE3> RobotcarReader::frameToWorld(int frameInd) const {
   Timestamp ts = tsFromInd(frameInd);
   if (ts < mGroundTruthTs[0] || ts > mGroundTruthTs.back())
     return std::nullopt;

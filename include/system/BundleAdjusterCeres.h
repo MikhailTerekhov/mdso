@@ -1,5 +1,5 @@
-#ifndef INCLUDE_BUNDLEADJUSTER
-#define INCLUDE_BUNDLEADJUSTER
+#ifndef INCLUDE_BUNDLEADJUSTERCERES
+#define INCLUDE_BUNDLEADJUSTERCERES
 
 #include "system/CameraModel.h"
 #include "system/KeyFrame.h"
@@ -7,15 +7,16 @@
 
 namespace mdso {
 
-class BundleAdjuster {
+class BundleAdjusterCeres {
 public:
-  BundleAdjuster(CameraBundle *cam, KeyFrame *keyFrames[], int size,
-                 const BundleAdjusterSettings &_settings);
+  BundleAdjusterCeres(CameraBundle *cam, KeyFrame *keyFrames[], int size,
+                      const BundleAdjusterSettings &_settings);
   void adjust(int maxNumIterations);
 
 private:
   CameraBundle *cam;
   KeyFrame **keyFrames;
+  StdVector<SE3> bodyToWorld;
   int size;
 
   BundleAdjusterSettings settings;

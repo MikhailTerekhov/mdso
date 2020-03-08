@@ -396,7 +396,7 @@ private:
   StdVector<Elem> elems;
 };
 
-TEST_P(FrameTrackerRobotcarTest, doesTracking) {
+TEST_P(FrameTrackerRobotcarTest, DISABLED_doesTracking) {
   fs::path trackedFile = outDir / fs::path("tracked.txt");
   fs::path predictedFile = outDir / fs::path("predicted.txt");
   fs::path voFile = outDir / fs::path("vo.txt");
@@ -421,14 +421,14 @@ TEST_P(FrameTrackerRobotcarTest, doesTracking) {
   double totalPath = 0;
   double transDrift = INF, rotDrift = INF;
   double sumRightMLeft = 0, sumRearMLeft = 0;
-  auto maybeBaseToWorld = reader->getFrameToWorld(baseInd);
+  auto maybeBaseToWorld = reader->frameToWorld(baseInd);
   CHECK(maybeBaseToWorld);
   SE3 baseToWorld = maybeBaseToWorld.value();
   for (int relInd = 1; relInd < framesTracked - 1; ++relInd) {
     int frameInd = baseInd + relInd;
     auto frame = reader->frame(frameInd);
 
-    auto maybeTrackedToWorld = reader->getFrameToWorld(frameInd);
+    auto maybeTrackedToWorld = reader->frameToWorld(frameInd);
     CHECK(maybeTrackedToWorld);
     SE3 gtTrackedToWorld = maybeTrackedToWorld.value();
 
@@ -463,8 +463,8 @@ TEST_P(FrameTrackerRobotcarTest, doesTracking) {
                               trackingResult.lightBaseToTracked.data(),
                               timestamps);
     SE3 err = trackingResult.baseToTracked * gtBaseToTracked.inverse();
-    SE3 gtCurToPrev = reader->getFrameToWorld(frameInd - 1).value().inverse() *
-                      gtTrackedToWorld;
+    SE3 gtCurToPrev =
+        reader->frameToWorld(frameInd - 1).value().inverse() * gtTrackedToWorld;
     LOG(INFO) << "vo cur to prev trans norm = "
               << gtCurToPrev.translation().norm() << ", ts diff = "
               << trajectoryHolder.timestamp(relInd) -
@@ -558,9 +558,9 @@ protected:
     settings.frameTracker.doIntercameraReprojection = FLAGS_reproj_intercam;
 
     baseInd = int(baseTs);
-    ASSERT_LT(baseInd + framesTracked, reader->getFrameCount());
+    ASSERT_LT(baseInd + framesTracked, reader->numFrames());
 
-    cv::Mat3b baseImgCol = reader->getFrame(baseInd);
+    cv::Mat3b baseImgCol = reader->frame(baseInd)[0].frame;
     cv::Mat1b baseImgGray = cvtBgrToGray(baseImgCol);
     cv::Mat1d gradX, gradY, gradNorm;
     grad(baseImgGray, gradX, gradY, gradNorm);
@@ -573,9 +573,12 @@ protected:
     for (const cv::Point &p : contrastPoints)
       contrastPointsV.push_back(toVec2(p));
     std::vector<double> depths(contrastPoints.size());
-    cv::Mat1d imgDepth = reader->getDepths(baseInd);
-    for (int i = 0; i < depths.size(); ++i)
-      depths[i] = imgDepth(contrastPoints[i]);
+    auto imgDepth = reader->depths(baseInd);
+    for (int i = 0; i < depths.size(); ++i) {
+      auto maybeD = imgDepth->depth(0, contrastPointsV[i]);
+      CHECK(maybeD);
+      depths[i] = maybeD.value();
+    }
     std::vector<double> weights(depths.size(), 1);
 
     FrameTracker::DepthedMultiFrame baseForTracker;
@@ -585,7 +588,8 @@ protected:
 
     std::mt19937 mt;
     bodyToCam = SE3::sampleUniform(mt);
-    CameraBundle cameraBundle(&bodyToCam, reader->cam.get(), 1);
+    CameraModel cameraModel = reader->cam().bundle[0].cam;
+    CameraBundle cameraBundle(&bodyToCam, &cameraModel, 1);
     camPyr = cameraBundle.camPyr(levelNum);
     preprocessor = std::unique_ptr<Preprocessor>(new IdentityPreprocessor);
 
@@ -643,17 +647,21 @@ TEST_P(FrameTrackerMfovTest, doesTracking) {
 
   double totalPath = 0;
   double transDrift = INF, rotDrift = INF;
+  auto maybeBaseToWorld = reader->frameToWorld(baseInd);
+  CHECK(maybeBaseToWorld);
+  SE3 baseToWorld = maybeBaseToWorld.value();
   for (int relInd = 1; relInd < framesTracked - 1; ++relInd) {
     int frameInd = baseInd + relInd;
-    cv::Mat3b frameCol = reader->getFrame(frameInd);
+    cv::Mat3b frameCol = reader->frame(frameInd)[0].frame;
     Timestamp timestamp = frameInd;
     std::unique_ptr<PreKeyFrame> preKeyFrame(
         new PreKeyFrame(baseFrame.get(), &camPyr[0], preprocessor.get(),
                         &frameCol, relInd, &timestamp, settings.pyramid));
     TrackingResult coarse = trackingPredictor->predictAt(timestamp, 0);
     SE3 oldPredictedBaseToThis = coarse.baseToTracked;
-    SE3 gtBaseToTracked = reader->getWorldToFrameGT(frameInd) *
-                          reader->getWorldToFrameGT(baseInd).inverse();
+    auto frameToWorldGT = reader->frameToWorld(frameInd);
+    CHECK(frameToWorldGT);
+    SE3 gtBaseToTracked = frameToWorldGT.value().inverse() * baseToWorld;
     TrackingResult trackingResult =
         frameTracker->trackFrame(*preKeyFrame, coarse);
 
@@ -664,8 +672,11 @@ TEST_P(FrameTrackerMfovTest, doesTracking) {
     SE3 baseToTrackedCam =
         bodyToCam * trackingResult.baseToTracked * bodyToCam.inverse();
     SE3 err = baseToTrackedCam * gtBaseToTracked.inverse();
-    SE3 gtCurToPrev = reader->getWorldToFrameGT(frameInd - 1) *
-                      reader->getWorldToFrameGT(frameInd).inverse();
+
+    auto prevToWorld = reader->frameToWorld(frameInd - 1);
+    CHECK(prevToWorld);
+
+    SE3 gtCurToPrev = prevToWorld.value().inverse() * frameToWorldGT.value();
     LOG(INFO) << "vo cur to prev trans norm = "
               << gtCurToPrev.translation().norm() << ", ts diff = "
               << trajectoryHolder.timestamp(relInd) -
