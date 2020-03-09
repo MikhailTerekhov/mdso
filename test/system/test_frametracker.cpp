@@ -716,12 +716,12 @@ std::vector<TestParams> getParamsMfov() {
   const int levelNum = 4;
   const int pointsNum = 3000;
   const int framesToTrack = 30;
-  const Timestamp ts = 375;
   bool useAffLight = true;
 
   std::vector<TestParams> params;
-  params.push_back(TestParams(fs::path("~"), ts, levelNum, pointsNum,
-                              framesToTrack, useAffLight));
+  for (Timestamp baseTs = 375; baseTs < 475; baseTs += 10)
+    params.push_back(TestParams(fs::path("~"), baseTs, levelNum, pointsNum,
+                                framesToTrack, useAffLight));
   return params;
 }
 

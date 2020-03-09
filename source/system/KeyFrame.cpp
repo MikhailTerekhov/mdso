@@ -2,7 +2,6 @@
 #include "util/defs.h"
 #include "util/settings.h"
 #include "util/util.h"
-#include <opencv2/opencv.hpp>
 
 namespace mdso {
 
@@ -15,13 +14,15 @@ KeyFrameEntry::KeyFrameEntry(const InitializedFrame::FrameEntry &entry,
     , preKeyFrameEntry(&host->preKeyFrame->frames[ind]) {
   immaturePoints.reserve(entry.depthedPoints.size());
   for (const auto &[p, d] : entry.depthedPoints) {
-    immaturePoints.emplace_back(this, p, tracingSettings);
-    immaturePoints.back().depth = d;
+    if (preKeyFrameEntry->host->cam->bundle[ind].cam.isOnImage(
+            p, tracingSettings.residualPattern.height)) {
+      immaturePoints.emplace_back(this, p, tracingSettings);
+      immaturePoints.back().depth = d;
+    }
   }
 }
 
 KeyFrameEntry::KeyFrameEntry(KeyFrame *host, int ind, Timestamp timestamp)
-
     : host(host)
     , ind(ind)
     , timestamp(timestamp)

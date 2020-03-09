@@ -47,9 +47,14 @@ FrameTrackerSettings Settings::getFrameTrackerSettings() const {
 }
 
 BundleAdjusterSettings Settings::getBundleAdjusterSettings() const {
-  return {bundleAdjuster, residualPattern, residualWeighting,
-          intensity,      affineLight,     threading,
-          depth};
+  return {optimization,
+          residualPattern,
+          residualWeighting,
+          intensity,
+          affineLight,
+          threading,
+          depth,
+          getEnergyFunctionSettings()};
 }
 
 ResidualSettings Settings::getResidualSettings() const {

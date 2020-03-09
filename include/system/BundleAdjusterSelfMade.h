@@ -1,13 +1,13 @@
-#ifndef INCLUDE_BUNDLEADJUSTERCERES
-#define INCLUDE_BUNDLEADJUSTERCERES
+#ifndef INCLUDE_BUNDLEADJUSTERSELFMADE
+#define INCLUDE_BUNDLEADJUSTERSELFMADE
 
 #include "system/BundleAdjuster.h"
 
 namespace mdso {
 
-class BundleAdjusterCeres : public BundleAdjuster {
+class BundleAdjusterSelfMade : public BundleAdjuster {
 public:
-  ~BundleAdjusterCeres();
+  ~BundleAdjusterSelfMade();
 
   void adjust(KeyFrame **keyFrames, int numKeyFrames,
               const BundleAdjusterSettings &settings) const override;

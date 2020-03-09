@@ -33,6 +33,7 @@ DECLARE_double(track_fail_factor);
 DECLARE_bool(gt_poses);
 
 DECLARE_bool(run_ba);
+DECLARE_bool(self_written_ba);
 DECLARE_bool(fixed_motion_on_first_ba);
 DECLARE_double(optimized_stddev);
 

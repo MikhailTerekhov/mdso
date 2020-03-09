@@ -201,23 +201,6 @@ struct Settings {
     bool doIntercameraReprojection = default_doIntercameraReprojection;
   } frameTracker;
 
-  struct BundleAdjuster {
-    static constexpr int default_maxIterations = 10;
-    int maxIterations = default_maxIterations;
-
-    static constexpr bool default_fixedMotionOnFirstAdjustent = false;
-    bool fixedMotionOnFirstAdjustent = default_fixedMotionOnFirstAdjustent;
-
-    static constexpr bool default_fixedRotationOnSecondKF = false;
-    bool fixedRotationOnSecondKF = default_fixedRotationOnSecondKF;
-
-    static constexpr bool default_runBA = true;
-    bool runBA = default_runBA;
-
-    static constexpr double default_minFirstToSecondRadius = 1e-2;
-    double minFirstToSecondRadius = default_minFirstToSecondRadius;
-  } bundleAdjuster;
-
   struct Pyramid {
     static constexpr int max_levelNum = 8;
     static constexpr int default_levelNum = 6;
@@ -307,6 +290,18 @@ struct Settings {
     static constexpr Loss default_lossType = HUBER;
     Loss lossType = default_lossType;
 
+    static constexpr int default_maxIterations = 10;
+    int maxIterations = default_maxIterations;
+
+    static constexpr bool default_fixedMotionOnFirstAdjustent = false;
+    bool fixedMotionOnFirstAdjustent = default_fixedMotionOnFirstAdjustent;
+
+    static constexpr bool default_fixedRotationOnSecondKF = false;
+    bool fixedRotationOnSecondKF = default_fixedRotationOnSecondKF;
+
+    static constexpr double default_minFirstToSecondRadius = 1e-2;
+    double minFirstToSecondRadius = default_minFirstToSecondRadius;
+
     static constexpr double default_initialLambda = 0.1;
     double initialLambda = default_initialLambda;
 
@@ -318,6 +313,12 @@ struct Settings {
 
     static constexpr double default_pointPointThres = 1e-7;
     double pointPointThres = default_pointPointThres;
+
+    static constexpr bool default_useSelfWrittenOptimization = true;
+    bool useSelfWrittenOptimization = default_useSelfWrittenOptimization;
+
+    static constexpr bool default_runBA = true;
+    bool runBA = default_runBA;
   } optimization;
 
   static constexpr int default_maxOptimizedPoints = 2000;
@@ -403,16 +404,6 @@ struct FrameTrackerSettings {
   Settings::Threading threading = {};
 };
 
-struct BundleAdjusterSettings {
-  Settings::BundleAdjuster bundleAdjuster = {};
-  Settings::ResidualPattern residualPattern = {};
-  Settings::ResidualWeighting residualWeighting = {};
-  Settings::Intensity intensity = {};
-  Settings::AffineLight affineLight = {};
-  Settings::Threading threading = {};
-  Settings::Depth depth = {};
-};
-
 struct ResidualSettings {
   inline int patternSize() const { return residualPattern.pattern().size(); }
 
@@ -425,6 +416,17 @@ struct ResidualSettings {
 struct EnergyFunctionSettings {
   ResidualSettings residual;
   Settings::Optimization optimization;
+};
+
+struct BundleAdjusterSettings {
+  Settings::Optimization optimization = {};
+  Settings::ResidualPattern residualPattern = {};
+  Settings::ResidualWeighting residualWeighting = {};
+  Settings::Intensity intensity = {};
+  Settings::AffineLight affineLight = {};
+  Settings::Threading threading = {};
+  Settings::Depth depth = {};
+  EnergyFunctionSettings energyFunction = {};
 };
 
 } // namespace mdso

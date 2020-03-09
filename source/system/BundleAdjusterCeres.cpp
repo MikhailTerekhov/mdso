@@ -14,16 +14,7 @@
 
 namespace mdso {
 
-BundleAdjusterCeres::BundleAdjusterCeres(
-    CameraBundle *cam, KeyFrame *keyFrames[], int size,
-    const BundleAdjusterSettings &_settings)
-    : cam(cam)
-    , keyFrames(keyFrames)
-    , size(size)
-    , settings(_settings) {
-  CHECK(size >= 2);
-  CHECK(cam->bundle.size() == 1) << "Multicamera case is NIY";
-}
+BundleAdjusterCeres::~BundleAdjusterCeres() {}
 
 struct DirectResidual {
   DirectResidual(PreKeyFrameEntryInternals::Interpolator_t *hostFrame,
@@ -101,7 +92,13 @@ struct DirectResidual {
   KeyFrame *targetKf;
 };
 
-void BundleAdjusterCeres::adjust(int maxNumIterations) {
+void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
+                                 const BundleAdjusterSettings &settings) const {
+  CHECK_GE(numKeyFrames, 2);
+
+  CameraBundle *cam = keyFrames[0]->preKeyFrame->cam;
+  StdVector<SE3> bodyToWorld;
+
   int pointsTotal = 0, pointsOOB = 0;
 
   CameraModel &camera = cam->bundle[0].cam;
@@ -111,8 +108,8 @@ void BundleAdjusterCeres::adjust(int maxNumIterations) {
 
   ceres::Problem problem;
 
-  bodyToWorld.reserve(size);
-  for (int i = 0; i < size; ++i) {
+  bodyToWorld.reserve(numKeyFrames);
+  for (int i = 0; i < numKeyFrames; ++i) {
     KeyFrame *keyFrame = keyFrames[i];
     bodyToWorld.push_back(keyFrame->thisToWorld());
 
@@ -150,7 +147,7 @@ void BundleAdjusterCeres::adjust(int maxNumIterations) {
   double radius =
       (secondToWorld.translation() - firstToWorld.translation()).norm();
   Vec3 center = firstToWorld.translation();
-  if (radius > settings.bundleAdjuster.minFirstToSecondRadius)
+  if (radius > settings.optimization.minFirstToSecondRadius)
     problem.SetParameterization(
         bodyToWorld[1].translation().data(),
         new ceres::AutoDiffLocalParameterization<SphericalPlus, 3, 2>(
@@ -158,15 +155,15 @@ void BundleAdjusterCeres::adjust(int maxNumIterations) {
   else
     problem.SetParameterBlockConstant(bodyToWorld[1].translation().data());
 
-  if (settings.bundleAdjuster.fixedRotationOnSecondKF)
+  if (settings.optimization.fixedRotationOnSecondKF)
     problem.SetParameterBlockConstant(bodyToWorld[1].so3().data());
 
-  if (settings.bundleAdjuster.fixedMotionOnFirstAdjustent && size == 2) {
+  if (settings.optimization.fixedMotionOnFirstAdjustent && numKeyFrames == 2) {
     problem.SetParameterBlockConstant(bodyToWorld[1].translation().data());
     problem.SetParameterBlockConstant(bodyToWorld[1].so3().data());
   }
 
-  for (int hostInd = 0; hostInd < size; ++hostInd) {
+  for (int hostInd = 0; hostInd < numKeyFrames; ++hostInd) {
     KeyFrame *hostFrame = keyFrames[hostInd];
     for (int hostCamInd = 0; hostCamInd < cam->bundle.size(); ++hostCamInd) {
       KeyFrameEntry &hostEntry = hostFrame->frames[hostCamInd];
@@ -183,7 +180,7 @@ void BundleAdjusterCeres::adjust(int maxNumIterations) {
 
         ordering->AddElementToGroup(&op.logDepth, 0);
 
-        for (int targetInd = 0; targetInd < size; ++targetInd) {
+        for (int targetInd = 0; targetInd < numKeyFrames; ++targetInd) {
           KeyFrame *targetFrame = keyFrames[targetInd];
           for (int targetCamInd = 0; targetCamInd < cam->bundle.size();
                ++targetCamInd) {
@@ -257,13 +254,12 @@ void BundleAdjusterCeres::adjust(int maxNumIterations) {
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_SCHUR;
   options.linear_solver_ordering = ordering;
-  // options.minimizer_progress_to_stdout = true;
-  options.max_num_iterations = maxNumIterations;
+  options.max_num_iterations = settings.optimization.maxIterations;
   options.num_threads = settings.threading.numThreads;
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
 
-  for (int kfInd = 0; kfInd < size; ++kfInd)
+  for (int kfInd = 0; kfInd < numKeyFrames; ++kfInd)
     keyFrames[kfInd]->thisToWorld.setValue(bodyToWorld[kfInd]);
 
   LOG(INFO) << summary.FullReport() << std::endl;

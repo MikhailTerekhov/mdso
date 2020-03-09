@@ -1,15 +1,12 @@
 #include "system/DsoSystem.h"
 #include "output/DsoObserver.h"
 #include "output/FrameTrackerObserver.h"
-#include "system/AffineLightTransform.h"
 #include "system/BundleAdjusterCeres.h"
+#include "system/BundleAdjusterSelfMade.h"
 #include "system/DelaunayDsoInitializer.h"
-#include "system/StereoMatcher.h"
 #include "system/TrackingPredictorRot.h"
 #include "system/TrackingPredictorScrew.h"
-#include "util/defs.h"
 #include "util/flags.h"
-#include "util/geometry.h"
 #include "util/settings.h"
 #include <glog/logging.h>
 #include <optional>
@@ -568,13 +565,19 @@ void DsoSystem::addMultiFrame(const cv::Mat3b frames[],
     for (DsoObserver *obs : observers.dso)
       obs->newBaseFrame(baseFrame());
 
-    if (settings.bundleAdjuster.runBA) {
+    if (settings.optimization.runBA) {
       std::vector<KeyFrame *> kfPtrs(keyFrames.size());
       for (int i = 0; i < keyFrames.size(); ++i)
         kfPtrs[i] = keyFrames[i].get();
-      BundleAdjusterCeres bundleAdjuster(cam, kfPtrs.data(), keyFrames.size(),
-                                         settings.getBundleAdjusterSettings());
-      bundleAdjuster.adjust(settings.bundleAdjuster.maxIterations);
+      if (settings.optimization.useSelfWrittenOptimization) {
+        BundleAdjusterSelfMade bundleAdjuster;
+        bundleAdjuster.adjust(kfPtrs.data(), kfPtrs.size(),
+                              settings.getBundleAdjusterSettings());
+      } else {
+        BundleAdjusterCeres bundleAdjuster;
+        bundleAdjuster.adjust(kfPtrs.data(), kfPtrs.size(),
+                              settings.getBundleAdjusterSettings());
+      }
     }
 
     std::vector<StdVector<Vec2>> points(cam->bundle.size());

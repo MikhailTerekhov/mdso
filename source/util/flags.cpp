@@ -56,11 +56,15 @@ DEFINE_double(track_fail_factor,
               "If RMSE after tracking another frame grew by this factor, "
               "tracking is considered failed.");
 
-DEFINE_bool(run_ba, Settings::BundleAdjuster::default_runBA,
+DEFINE_bool(run_ba, Settings::Optimization::default_runBA,
             "Do we need to run bundle adjustment?");
 
+DEFINE_bool(self_written_ba,
+            Settings::Optimization::default_useSelfWrittenOptimization,
+            "If set to true, Ceres is not used for bundle adjustment.");
+
 DEFINE_bool(fixed_motion_on_first_ba,
-            Settings::BundleAdjuster::default_fixedMotionOnFirstAdjustent,
+            Settings::Optimization::default_fixedMotionOnFirstAdjustent,
             "Optimize only depths when running bundle adjustment on first two "
             "keyframes? We could assume that a good motion estimation is "
             "already availible due to RANSAC initialization and averaging.");
@@ -97,7 +101,8 @@ Settings getFlaggedSettings() {
       FLAGS_run_max_RANSAC_iterations;
   settings.stereoMatcher.stereoGeometryEstimator.runAveraging =
       FLAGS_average_ORB_motion;
-  settings.bundleAdjuster.runBA = FLAGS_run_ba;
+  settings.optimization.runBA = FLAGS_run_ba;
+  settings.optimization.useSelfWrittenOptimization = FLAGS_self_written_ba;
   settings.affineLight.optimizeAffineLight = FLAGS_optimize_affine_light;
   settings.pointTracer.useAltHWeighting = FLAGS_use_alt_H_weighting;
   settings.pointTracer.gnIter = FLAGS_tracing_GN_iter;
@@ -107,8 +112,8 @@ Settings getFlaggedSettings() {
   settings.predictUsingScrew = FLAGS_predict_using_screw;
   settings.frameTracker.useGradWeighting = FLAGS_use_grad_weights_on_tracking;
   settings.frameTracker.trackFailFactor = FLAGS_track_fail_factor;
-  settings.bundleAdjuster.runBA = FLAGS_run_ba;
-  settings.bundleAdjuster.fixedMotionOnFirstAdjustent =
+  settings.optimization.runBA = FLAGS_run_ba;
+  settings.optimization.fixedMotionOnFirstAdjustent =
       FLAGS_fixed_motion_on_first_ba;
   settings.pointTracer.optimizedStddev = FLAGS_optimized_stddev;
   settings.useRandomOptimizedChoice = FLAGS_use_random_optimized_choice;
