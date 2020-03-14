@@ -21,11 +21,14 @@ public:
                     const std::vector<StdVector<std::pair<Vec2, double>>>
                         &pointResiduals) override;
 
+  bool isDrawable() const;
   cv::Mat3b drawAllLevels();
-  cv::Mat3b drawFinestLevel();
+  std::vector<cv::Mat3b> drawFinestLevel();
 
 private:
   cv::Mat3b drawLevel(int pyrLevel);
+
+  bool mIsDrawable;
 
   Settings::FrameTracker frameTrackerSettings;
   Settings::Pyramid pyrSettings;

@@ -50,6 +50,7 @@ DECLARE_bool(trivial_loss);
 namespace mdso {
 
 Settings getFlaggedSettings();
+
 }
 
 #endif

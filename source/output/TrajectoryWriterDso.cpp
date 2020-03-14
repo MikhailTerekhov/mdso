@@ -20,7 +20,7 @@ void TrajectoryWriterDso::addToPool(const PreKeyFrame &frame) {
 
 PosesPool &TrajectoryWriterDso::frameToWorldPool() { return mFrameToWorldPool; }
 
-const fs::path &TrajectoryWriterDso::outputFileName() {
+const fs::path &TrajectoryWriterDso::outputFileName() const {
   return mOutputFileName;
 }
 

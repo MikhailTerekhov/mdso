@@ -100,6 +100,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/system/TrackingPredictor.h
     ${PROJECT_SOURCE_DIR}/include/system/TrackingPredictorRot.h
     ${PROJECT_SOURCE_DIR}/include/system/TrackingPredictorScrew.h
+    ${PROJECT_SOURCE_DIR}/include/system/Reprojector.h
 )
 
 set(dso_SOURCE_FILES
@@ -171,6 +172,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/system/TrackingPredictor.cpp
     ${PROJECT_SOURCE_DIR}/source/system/TrackingPredictorRot.cpp
     ${PROJECT_SOURCE_DIR}/source/system/TrackingPredictorScrew.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/Reprojector.cpp
 )
 
 set(dso_internal_HEADER_FILES

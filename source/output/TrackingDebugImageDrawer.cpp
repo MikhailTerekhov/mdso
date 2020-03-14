@@ -12,7 +12,8 @@ DEFINE_double(debug_max_residual, 12.0,
 TrackingDebugImageDrawer::TrackingDebugImageDrawer(
     CameraBundle camPyr[], const Settings::FrameTracker &frameTrackerSettings,
     const Settings::Pyramid &pyrSettings, const std::vector<int> &drawingOrder)
-    : frameTrackerSettings(frameTrackerSettings)
+    : mIsDrawable(false)
+    , frameTrackerSettings(frameTrackerSettings)
     , pyrSettings(pyrSettings)
     , camPyr(camPyr)
     , curFramePyr(pyrSettings.levelNum())
@@ -25,6 +26,7 @@ TrackingDebugImageDrawer::TrackingDebugImageDrawer(
 }
 
 void TrackingDebugImageDrawer::startTracking(const PreKeyFrame &frame) {
+  mIsDrawable = true;
   for (int camInd = 0; camInd < frame.frames.size(); ++camInd)
     for (int lvl = 0; lvl < pyrSettings.levelNum(); ++lvl)
       curFramePyr[lvl][camInd] = frame.frames[camInd].framePyr[lvl];
@@ -52,7 +54,10 @@ void TrackingDebugImageDrawer::levelTracked(
   }
 }
 
+bool TrackingDebugImageDrawer::isDrawable() const { return mIsDrawable; }
+
 cv::Mat3b TrackingDebugImageDrawer::drawAllLevels() {
+  CHECK(isDrawable());
   std::vector<cv::Mat3b> levels(pyrSettings.levelNum());
   for (int lvl = 0; lvl < levels.size(); ++lvl) {
     std::vector<cv::Mat3b> resized(residualsImg[lvl].size());
@@ -66,9 +71,13 @@ cv::Mat3b TrackingDebugImageDrawer::drawAllLevels() {
   return result;
 }
 
-cv::Mat3b TrackingDebugImageDrawer::drawFinestLevel() { return drawLevel(0); }
+std::vector<cv::Mat3b> TrackingDebugImageDrawer::drawFinestLevel() {
+  CHECK(isDrawable());
+  return residualsImg[0];
+}
 
 cv::Mat3b TrackingDebugImageDrawer::drawLevel(int pyrLevel) {
+  CHECK(isDrawable());
   CHECK(pyrLevel >= 0 && pyrLevel < pyrSettings.levelNum());
   cv::Mat3b result = drawLeveled(
       residualsImg[pyrLevel].data(), residualsImg[pyrLevel].size(),

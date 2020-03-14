@@ -36,12 +36,19 @@ void TrajectoryWriter::keyFramesMarginalized(const KeyFrame *marginalized[],
   PosesPool &pool = frameToWorldPool();
   while (!pool.empty() && pool.top().first < minKfTs) {
     putInMatrixForm(ofs, pool.top().second);
+    writtenKfTs.push_back(pool.top().first);
     pool.pop();
   }
 }
 
 void TrajectoryWriter::destructed(const KeyFrame *lastKeyFrames[], int size) {
   keyFramesMarginalized(lastKeyFrames, size);
+}
+
+void TrajectoryWriter::saveTimestamps(const fs::path &timestampsFile) const {
+  std::ofstream tsOfs(timestampsFile);
+  for (Timestamp ts : writtenKfTs)
+    tsOfs << ts << ' ';
 }
 
 } // namespace mdso

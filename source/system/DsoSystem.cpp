@@ -131,6 +131,14 @@ void DsoSystem::projectOntoFrame(int globalFrameNum, Vec2 *points[],
   }
 }
 
+std::vector<const KeyFrame *> DsoSystem::getKeyFrames() const {
+  std::vector<const KeyFrame *> result;
+  result.reserve(keyFrames.size());
+  for (const auto &kf : keyFrames)
+    result.push_back(kf.get());
+  return result;
+}
+
 int DsoSystem::trajectorySize() const {
   if (allFrames.size() > 0 &&
       std::holds_alternative<PreKeyFrame *>(allFrames.back())) {
@@ -388,7 +396,7 @@ void DsoSystem::activateOptimizedRandom() {
 }
 
 void DsoSystem::activateNewOptimizedPoints() {
-  if (FLAGS_use_random_optimized_choice)
+  if (settings.useRandomOptimizedChoice)
     activateOptimizedRandom();
   else
     activateOptimizedDist();

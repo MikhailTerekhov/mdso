@@ -8,6 +8,7 @@ from matplotlib.widgets import Slider
 from mpl_toolkits.mplot3d import Axes3D
 from traj import *
 from itertools import cycle
+from bisect import bisect_left, bisect_right
 
 
 alpha = 0.5
@@ -88,7 +89,33 @@ parser.add_argument("traj", help="one or more files with trajectories "
                     "(expects them to reside in one directory)", nargs='+')
 parser.add_argument("--labels", help="labels for trajectories, excluding"
                     "ground truth", nargs='+')
+parser.add_argument("-t", "--timestamps", help="File with timestamps of the poses "
+                    "provided in trajectories. If set, --first and --last flags "
+                    "are considered to be timestamps rather than frame numbers")
 args = parser.parse_args()
+
+if args.timestamps is not None:
+    timestamps = np.loadtxt(args.timestamps, dtype=np.int64)
+
+def crop_roi(traj):
+    global args
+    f = 0
+    l = len(traj)
+    if args.timestamps is not None:
+        print(f'ts={timestamps}')
+        if args.first is not None:
+            f = bisect_left(timestamps, args.first)
+        if args.last is not None:
+            l = bisect_right(timestamps, args.last)
+    else:
+        if args.first is not None:
+            f = args.first
+        if args.last is not None:
+            l = args.last
+    f = max(f, 0)
+    l = min(l, len(traj))
+    print(f'f={f} l={l}')
+    return traj[f:l]
 
 if args.labels and len(args.traj) != len(args.labels):
     print('number of labels must be equal to the number of trajectories')
@@ -122,9 +149,7 @@ label_prec = 'точная траектория' if args.russian else 'ground tr
 
 if args.gt:
     ground_truth = extract_motions(args.gt)
-    firstgt = 0 if args.first is None else args.first
-    lastgt  = len(ground_truth) if args.last is None else args.last;
-    ground_truth = ground_truth[firstgt:lastgt]
+    ground_truth = crop_roi(ground_truth)
     if args.align:
         ground_truth = align_to_zero(ground_truth)
     draw_proc(ax, ground_truth, 'green', label_prec)
@@ -141,14 +166,16 @@ cycol = cycle(['blue', 'red', 'orange'])
 for ind, fname in enumerate(args.traj):
     print(f'processing {fname}...')
     traj = extract_motions(fname)
+
+    print(f'full trajectory size is {len(traj)}\n')
+    traj = crop_roi(traj)
+    print(f'cropped trajectory size is {len(traj)}\n')
+
     if len(traj) < 2:
         print(f'too small num of positions: {len(traj)}')
         continue
 
-    first = 0 if args.first is None else args.first
-    last = len(traj) if args.last is None else args.last;
 
-    traj = traj[first:last]
     if has_gt and args.align:
         print(f'align, len={len(traj)} {len(ground_truth)}')
         traj = align(traj, ground_truth, need_scale_fix=args.scale_fix)

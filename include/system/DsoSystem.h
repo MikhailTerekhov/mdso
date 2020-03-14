@@ -37,6 +37,8 @@ public:
                         const std::optional<int **> &pointIndices,
                         const std::optional<double **> &depths, int sizes[]);
 
+  std::vector<const KeyFrame *> getKeyFrames() const;
+
   int trajectorySize() const override;
   int camNumber() const override;
   Timestamp timestamp(int ind) const override;

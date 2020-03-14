@@ -33,7 +33,7 @@ PosesPool &TrajectoryWriterPredict::frameToWorldPool() {
   return mFrameToWorldPool;
 }
 
-const fs::path &TrajectoryWriterPredict::outputFileName() {
+const fs::path &TrajectoryWriterPredict::outputFileName() const {
   return mOutputFileName;
 }
 

@@ -29,6 +29,8 @@ void TrajectoryWriterGT::addToPoolByTimestamp(Timestamp ts) {
 
 PosesPool &TrajectoryWriterGT::frameToWorldPool() { return frameToWorldGTPool; }
 
-const fs::path &TrajectoryWriterGT::outputFileName() { return mOutputFileName; }
+const fs::path &TrajectoryWriterGT::outputFileName() const {
+  return mOutputFileName;
+}
 
 } // namespace mdso

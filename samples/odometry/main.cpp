@@ -38,6 +38,8 @@ DEFINE_bool(gen_gt_only, false, "Generate ground truth point cloud and exit.");
 
 DEFINE_string(debug_img_dir, "debug",
               "Directory for debug images to be put into.");
+DEFINE_string(timestamps_filename, "timestamps.txt",
+              "Timestamps in the resulting trajectory filename.");
 DEFINE_string(trajectory_filename, "tracked_frame_to_world.txt",
               "Resulting trajectory filename (stored in 3x4 matrix form).");
 DEFINE_string(gt_trajectory_filename, "frame_to_world_GT.txt",
@@ -85,6 +87,33 @@ DEFINE_bool(
     "If set to true, output directory is created according to the current "
     "time, instead of using the output_directory flag. The precise format for "
     "the name is output/YYYYMMDD_HHMMSS");
+
+class TrackingErrorCollector : public FrameTrackerObserver {
+public:
+  TrackingErrorCollector(int numLevels)
+      : avgRes(numLevels) {}
+
+  void levelTracked(int pyrLevel, const TrackingResult &result,
+                    const std::vector<StdVector<std::pair<Vec2, double>>>
+                        &pointResiduals) override {
+    double sumRes = 0;
+    int numRes = 0;
+    for (const auto &v : pointResiduals) {
+      numRes += v.size();
+      for (const auto &[p, r] : v)
+        sumRes += r * r;
+    }
+    avgRes[pyrLevel].push_back(sumRes / numRes);
+  }
+
+  void saveErrors(const fs::path &errorsFname) {
+    for (const auto &v : avgRes)
+      outputArray(errorsFname, v);
+  }
+
+private:
+  std::vector<std::vector<double>> avgRes;
+};
 
 void readPointsInFrameGT(const MultiFovReader &reader,
                          std::vector<std::vector<Vec3>> &pointsInFrameGT,
@@ -205,10 +234,10 @@ It should contain "info" and "data" subdirectories.)abacaba";
     return 0;
   }
 
-  std::vector<int> drawindOrder(1, 0);
-  //  DebugImageDrawer debugImageDrawer(drawindOrder);
-  //  TrackingDebugImageDrawer trackingDebugImageDrawer(
-  //      camPyr.data(), settings.frameTracker, settings.pyramid, drawindOrder);
+  std::vector<int> drawingOrder(1, 0);
+  DebugImageDrawer debugImageDrawer(drawingOrder);
+  TrackingDebugImageDrawer trackingDebugImageDrawer(
+      camPyr.data(), settings.frameTracker, settings.pyramid, drawingOrder);
   TrajectoryWriterDso trajectoryWriter(outDir, FLAGS_trajectory_filename);
 
   StdVector<SE3> frameToWorldGT(reader.numFrames());
@@ -244,8 +273,8 @@ It should contain "info" and "data" subdirectories.)abacaba";
   DepthPyramidDrawer depthPyramidDrawer;
 
   Observers observers;
-  //  if (FLAGS_write_files || FLAGS_show_debug_image)
-  //    observers.dso.push_back(&debugImageDrawer);
+  if (FLAGS_write_files || FLAGS_show_debug_image)
+    observers.dso.push_back(&debugImageDrawer);
   observers.dso.push_back(&trajectoryWriter);
   if (FLAGS_gen_gt_trajectory)
     observers.dso.push_back(&trajectoryWriterGT);
@@ -257,10 +286,13 @@ It should contain "info" and "data" subdirectories.)abacaba";
     observers.frameTracker.push_back(&depthPyramidDrawer);
   if (cloudWriterGTPtr)
     observers.dso.push_back(cloudWriterGTPtr.get());
-  //  if (FLAGS_write_files || FLAGS_show_track_res)
-  //    observers.frameTracker.push_back(&trackingDebugImageDrawer);
+  if (FLAGS_write_files || FLAGS_show_track_res)
+    observers.frameTracker.push_back(&trackingDebugImageDrawer);
   if (FLAGS_draw_interpolation)
     observers.initializer.push_back(&interpolationDrawer);
+
+  TrackingErrorCollector errorCollector(settings.pyramid.levelNum());
+  observers.frameTracker.push_back(&errorCollector);
 
   std::cout << "running DSO.." << std::endl;
 
@@ -268,42 +300,47 @@ It should contain "info" and "data" subdirectories.)abacaba";
             << "\nTracker observers: " << observers.frameTracker.size()
             << "\nInit observers: " << observers.initializer.size();
 
-  DsoSystem dso(&cam, preprocessor, observers, settings);
-  for (int it = FLAGS_start; it < FLAGS_start + FLAGS_count; ++it) {
-    std::cout << "add frame #" << it << std::endl;
-    cv::Mat3b frame = reader.frame(it)[0].frame;
-    Timestamp timestamp = it;
-    dso.addMultiFrame(&frame, &timestamp);
+  {
+    DsoSystem dso(&cam, preprocessor, observers, settings);
+    for (int it = FLAGS_start; it < FLAGS_start + FLAGS_count; ++it) {
+      std::cout << "add frame #" << it << std::endl;
+      cv::Mat3b frame = reader.frame(it)[0].frame;
+      Timestamp timestamp = it;
+      dso.addMultiFrame(&frame, &timestamp);
 
-    if (FLAGS_draw_interpolation && interpolationDrawer.didInitialize()) {
-      cv::Mat3b interpolation = interpolationDrawer.draw();
-      fs::path out = outDir / fs::path("interpolation.jpg");
-      cv::imwrite(out.native(), interpolation);
-    }
-
-    if (FLAGS_write_files) {
-      //      cv::Mat3b debugImage = debugImageDrawer.draw();
-      fs::path outDeb =
-          debugImgDir / fs::path("frame#" + std::to_string(it) + ".jpg");
-      //      cv::imwrite(outDeb.native(), debugImage);
-      //      cv::Mat3b trackImage = trackingDebugImageDrawer.drawAllLevels();
-      fs::path outTrack =
-          trackImgDir / fs::path("frame#" + std::to_string(it) + ".jpg");
-      //      cv::imwrite(outTrack.native(), trackImage);
-      if (FLAGS_draw_depth_pyramid && depthPyramidDrawer.pyrChanged()) {
-        cv::Mat pyrImage = depthPyramidDrawer.getLastPyr();
-        fs::path outPyr = fs::path(pyrImgDir) /
-                          fs::path("frame#" + std::to_string(it) + ".jpg");
-        cv::imwrite(outPyr.native(), pyrImage);
+      if (FLAGS_draw_interpolation && interpolationDrawer.didInitialize()) {
+        cv::Mat3b interpolation = interpolationDrawer.draw();
+        fs::path out = outDir / fs::path("interpolation.jpg");
+        cv::imwrite(out.native(), interpolation);
       }
+
+      if (FLAGS_write_files) {
+        if (debugImageDrawer.isDrawable()) {
+          cv::Mat3b debugImage = debugImageDrawer.draw();
+          fs::path outDeb =
+              debugImgDir / fs::path("frame#" + std::to_string(it) + ".jpg");
+          cv::imwrite(outDeb.native(), debugImage);
+        }
+        if (trackingDebugImageDrawer.isDrawable()) {
+          cv::Mat3b trackImage = trackingDebugImageDrawer.drawAllLevels();
+          fs::path outTrack =
+              trackImgDir / fs::path("frame#" + std::to_string(it) + ".jpg");
+          cv::imwrite(outTrack.native(), trackImage);
+        }
+        if (FLAGS_draw_depth_pyramid && depthPyramidDrawer.pyrChanged()) {
+          cv::Mat pyrImage = depthPyramidDrawer.getLastPyr();
+          fs::path outPyr = fs::path(pyrImgDir) /
+                            fs::path("frame#" + std::to_string(it) + ".jpg");
+          cv::imwrite(outPyr.native(), pyrImage);
+        }
+      }
+      if (FLAGS_show_debug_image || FLAGS_show_track_res)
+        cv::waitKey(1);
     }
-    //    if (FLAGS_show_debug_image)
-    //      cv::imshow("debug", debugImageDrawer.draw());
-    //    if (FLAGS_show_track_res)
-    //      cv::imshow("tracking", trackingDebugImageDrawer.drawAllLevels());
-    if (FLAGS_show_debug_image || FLAGS_show_track_res)
-      cv::waitKey(1);
   }
+
+  trajectoryWriter.saveTimestamps(outDir / fs::path(FLAGS_timestamps_filename));
+  errorCollector.saveErrors(outDir / fs::path("residuals_track.txt"));
 
   return 0;
 }

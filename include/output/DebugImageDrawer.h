@@ -4,6 +4,7 @@
 #include "output/DsoObserver.h"
 #include "output/TrackingDebugImageDrawer.h"
 #include "system/DsoSystem.h"
+#include "system/Reprojector.h"
 
 DECLARE_double(debug_rel_point_size);
 DECLARE_int32(debug_image_width);
@@ -20,20 +21,20 @@ public:
   void newFrame(const PreKeyFrame &frame) override;
   void newBaseFrame(const KeyFrame &newBaseFrame) override;
 
+  bool isDrawable() const;
   cv::Mat3b draw();
 
 private:
-  cv::Mat3b drawProjDepths(int camInd, const StdVector<Vec2> &optProj,
-                           const std::vector<double> &optDepths,
-                           const StdVector<Vec2> &immProj,
-                           const std::vector<ImmaturePoint *> &immRefs,
-                           const std::vector<double> &immDepths);
-  cv::Mat3b drawUseful(const StdVector<Vec2> &optBaseProj,
-                       const std::vector<OptimizedPoint *> &optBaseRefs);
-  cv::Mat3b drawStddevs(const StdVector<Vec2> &optProj,
-                        const std::vector<OptimizedPoint *> &optRefs,
-                        const StdVector<Vec2> &immProj,
-                        const std::vector<ImmaturePoint *> &immRefs);
+  std::vector<cv::Mat3b>
+  drawProjDepths(const StdVector<Reprojection> &immatures,
+                 const StdVector<Reprojection> &optimized) const;
+  std::vector<cv::Mat3b>
+  drawUseful(const std::vector<const KeyFrame *> &keyFrames,
+             const StdVector<Reprojection> &optimized) const;
+  std::vector<cv::Mat3b>
+  drawStddevs(const std::vector<const KeyFrame *> &keyFrames,
+              const StdVector<Reprojection> &immatures,
+              const StdVector<Reprojection> &optimized) const;
 
   DsoSystem *dso;
   CameraBundle *cam;
