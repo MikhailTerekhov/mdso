@@ -35,6 +35,9 @@ DEFINE_double(pos_variance, Settings::PointTracer::default_positionVariance,
               "Expected epipolar curve placement deviation");
 DEFINE_double(tracing_impr_factor, Settings::PointTracer::default_imprFactor,
               "Minimum predicted stddev improvement for tracing to happen.");
+DEFINE_double(epi_outlier_e, Settings::PointTracer::default_outlierEnergyFactor,
+              "Part of energy to be in outlier zone for a point to be "
+              "considered outlier while tracing.");
 
 DEFINE_bool(continue_choosing_keyframes,
             Settings::default_continueChoosingKeyFrames,
@@ -107,6 +110,7 @@ Settings getFlaggedSettings() {
   settings.pointTracer.useAltHWeighting = FLAGS_use_alt_H_weighting;
   settings.pointTracer.gnIter = FLAGS_tracing_GN_iter;
   settings.pointTracer.positionVariance = FLAGS_pos_variance;
+  settings.pointTracer.outlierEnergyFactor = FLAGS_epi_outlier_e;
   settings.continueChoosingKeyFrames = FLAGS_continue_choosing_keyframes;
   settings.trackFromLastKf = FLAGS_track_from_last_kf;
   settings.predictUsingScrew = FLAGS_predict_using_screw;

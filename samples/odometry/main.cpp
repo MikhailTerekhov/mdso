@@ -107,8 +107,12 @@ public:
   }
 
   void saveErrors(const fs::path &errorsFname) {
-    for (const auto &v : avgRes)
-      outputArray(errorsFname, v);
+    std::ofstream ofs(errorsFname);
+    for (const auto &v : avgRes) {
+      for (const auto &r : v)
+        ofs << r << ' ';
+      ofs << '\n';
+    }
   }
 
 private:

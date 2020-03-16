@@ -11,7 +11,12 @@ namespace mdso {
 class PreKeyFrameEntryInternals {
 public:
   using Grid_t = ceres::Grid2D<unsigned char>;
+
+#ifdef BICUBIC_INTERPOLATOR
+  using Interpolator_t = ceres::BiCubicInterpolator<Grid_t>;
+#else
   using Interpolator_t = BilinearInterpolator<Grid_t>;
+#endif
 
   PreKeyFrameEntryInternals(const ImagePyramid &pyramid,
                             const Settings::Pyramid &pyrSettings);

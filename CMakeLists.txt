@@ -205,6 +205,9 @@ else()
   add_definitions(-DOPT_T=double)
 endif()
 
+if (BICUBIC_INTERPOLATOR)
+    add_definitions(-DBICUBIC_INTERPOLATOR)
+endif()
 
 add_library(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES}
     ${dso_internal_SOURCE_FILES} ${dso_internal_HEADER_FILES}
