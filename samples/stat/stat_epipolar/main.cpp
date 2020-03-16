@@ -1,7 +1,6 @@
 #include "data/MultiFovReader.h"
-#include "system/DelaunayDsoInitializer.h"
 #include "system/DsoSystem.h"
-#include "system/StereoMatcher.h"
+#include "system/IdentityPreprocessor.h"
 #include "util/defs.h"
 #include "util/flags.h"
 #include "util/geometry.h"
@@ -20,24 +19,6 @@ const int totalFrames = 2500;
 DEFINE_bool(show_epipolar, false,
             "Do we need to show epipolar curves searched?");
 
-KeyFrame kfFromEpipolar(CameraModel *cam, const cv::Mat &baseFrame,
-                        const cv::Mat &frameToTraceOn, const SE3 &firstToSecond,
-                        PixelSelector &pixelSelector,
-                        const Settings &settings) {
-  KeyFrame result(cam, baseFrame, 0, pixelSelector, settings.keyFrame,
-                  settings.pointTracer, settings.intensity,
-                  settings.residualPattern, settings.pyramid);
-  PreKeyFrame toTraceOn(cam, frameToTraceOn, 1, settings.pyramid);
-  toTraceOn.worldToThis = firstToSecond;
-
-  auto deb = FLAGS_show_epipolar ? ImmaturePoint::DRAW_EPIPOLE
-                                 : ImmaturePoint::NO_DEBUG;
-  for (const auto &ip : result.immaturePoints)
-    ip->traceOn(toTraceOn, deb);
-
-  return result;
-}
-
 DEFINE_int32(start_frame, 2, "First baseframe used.");
 DEFINE_int32(end_frame, 2450, "Last baseframe used.");
 DEFINE_int32(disparity_shift, 3,
@@ -55,6 +36,32 @@ DEFINE_bool(show_all, false,
             "traced points on it)?");
 
 DEFINE_bool(run_parallel, true, "Collect all in parallel?");
+
+std::unique_ptr<KeyFrame>
+kfFromEpipolar(CameraBundle *cam, const cv::Mat3b &baseFrame,
+               const cv::Mat3b &frameToTraceOn, const SE3 &firstToSecond,
+               PixelSelector &pixelSelector, const Settings &settings) {
+  PointTracerSettings pointTracerSettings = settings.getPointTracerSettings();
+  IdentityPreprocessor idPrep;
+  Timestamp ts0 = 0, ts1 = 1;
+  std::unique_ptr<PreKeyFrame> pkfResult(new PreKeyFrame(
+      nullptr, cam, &idPrep, &baseFrame, 0, &ts0, settings.pyramid));
+  std::unique_ptr<KeyFrame> result(
+      new KeyFrame(std::move(pkfResult), &pixelSelector, settings.keyFrame,
+                   settings.getPointTracerSettings()));
+  PreKeyFrame toTraceOn(result.get(), cam, &idPrep, &frameToTraceOn, 1, &ts1,
+                        settings.pyramid);
+  TrackingResult trackingResult(1);
+  trackingResult.baseToTracked = firstToSecond;
+  toTraceOn.setTracked(trackingResult);
+
+  auto deb = FLAGS_show_epipolar ? ImmaturePoint::DRAW_EPIPOLE
+                                 : ImmaturePoint::NO_DEBUG;
+  for (ImmaturePoint &ip : result->frames[0].immaturePoints)
+    ip.traceOn(toTraceOn.frames[0], deb, pointTracerSettings);
+
+  return result;
+}
 
 const int lastFrameNumGlobal = 2500;
 
@@ -96,12 +103,15 @@ public:
     PixelSelector pixelSelector;
     std::mt19937 mt;
 
+    CameraBundle cameraBundle = reader->cam();
+    CameraModel &cam = cameraBundle.bundle[0].cam;
+
     for (int ind = range.begin(); ind < range.end(); ++ind) {
       int firstFrameNum = startFrames[ind];
       int secondFrameNum = firstFrameNum + FLAGS_disparity_shift;
       auto firstToWorld = reader->frameToWorld(firstFrameNum);
       auto secondToWorld = reader->frameToWorld(secondFrameNum);
-      CHEK(firstToWorld);
+      CHECK(firstToWorld);
       CHECK(secondToWorld);
       SE3 firstToSecondGT =
           secondToWorld.value().inverse() * firstToWorld.value();
@@ -125,49 +135,39 @@ public:
         firstToSecond = SE3(rot, trans);
       }
 
-      KeyFrame keyFrame =
-          kfFromEpipolar(reader->cam.get(), reader->getFrame(firstFrameNum),
-                         reader->getFrame(secondFrameNum), firstToSecond,
+      std::unique_ptr<KeyFrame> keyFrame =
+          kfFromEpipolar(&cameraBundle, reader->frame(firstFrameNum)[0].frame,
+                         reader->frame(secondFrameNum)[0].frame, firstToSecond,
                          pixelSelector, settings);
 
-      if (FLAGS_show_all) {
-        std::vector<double> depths;
-        for (const auto &ip : keyFrame.immaturePoints)
-          if (ip->state == ImmaturePoint::ACTIVE && ip->maxDepth != INF)
-            depths.push_back(ip->depth);
-        setDepthColBounds(depths);
-        cv::imshow("traced points",
-                   keyFrame.drawDepthedFrame(minDepthCol, maxDepthCol));
-        cv::waitKey();
-      }
-
-      cv::Mat1d dGT = reader->getDepths(firstFrameNum);
-      for (const auto &ip : keyFrame.immaturePoints) {
-        if (ip->state != ImmaturePoint::ACTIVE || ip->maxDepth == INF)
+      auto dGT = reader->depths(firstFrameNum);
+      for (ImmaturePoint &ip : keyFrame->frames[0].immaturePoints) {
+        if (ip.state != ImmaturePoint::ACTIVE || ip.maxDepth == INF)
           continue;
-        double depthGT = dGT(toCvPoint(ip->p));
-        Vec2 reprojGT = reader->cam->map(
-            firstToSecondGT *
-            (depthGT * reader->cam->unmap(ip->p).normalized()));
-        Vec2 reproj = reader->cam->map(
-            firstToSecond *
-            (ip->depth * reader->cam->unmap(ip->p).normalized()));
-        Vec2 reprojBef = reader->cam->map(
-            firstToSecond *
-            (ip->depthBeforeSubpixel * reader->cam->unmap(ip->p).normalized()));
+        std::optional<double> maybeDepthGT = dGT->depth(0, ip.p);
+        if (!maybeDepthGT)
+          continue;
+        double depthGT = maybeDepthGT.value();
+        Vec2 reprojGT =
+            cam.map(firstToSecondGT * (depthGT * cam.unmap(ip.p).normalized()));
+        Vec2 reproj =
+            cam.map(firstToSecond * (ip.depth * cam.unmap(ip.p).normalized()));
+        Vec2 reprojBef =
+            cam.map(firstToSecond *
+                    (ip.depthBeforeSubpixel * cam.unmap(ip.p).normalized()));
 
-        Vec2 reprojInfD = reader->cam->map(
-            firstToSecond.so3() * reader->cam->unmap(ip->p).normalized());
+        Vec2 reprojInfD =
+            cam.map(firstToSecond.so3() * cam.unmap(ip.p).normalized());
         EpiErr e;
         e.disparity = (reproj - reprojInfD).norm();
-        e.expectedErr = std::sqrt(ip->lastFullVar);
+        e.expectedErr = std::sqrt(ip.lastVar);
         e.realErrBef = (reprojGT - reprojBef).norm();
         e.realErr = (reprojGT - reproj).norm();
         e.depthGT = depthGT;
-        e.depth = ip->depth;
-        e.depthBeforeSubpixel = ip->depthBeforeSubpixel;
-        e.eBeforeSubpixel = ip->eBeforeSubpixel;
-        e.eAfterSubpixel = ip->eAfterSubpixel;
+        e.depth = ip.depth;
+        e.depthBeforeSubpixel = ip.depthBeforeSubpixel;
+        e.eBeforeSubpixel = ip.eBeforeSubpixel;
+        e.eAfterSubpixel = ip.eAfterSubpixel;
         errors[ind].push_back(e);
       }
     }
