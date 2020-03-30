@@ -51,23 +51,21 @@ KeyFrame::KeyFrame(const InitializedFrame &initializedFrame, CameraBundle *cam,
     frames.emplace_back(initializedFrame.frames[i], this, i, tracingSettings);
 }
 
-KeyFrame::KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame,
-                   PixelSelector pixelSelector[],
-                   const Settings::KeyFrame &_kfSettings,
-                   const PointTracerSettings &tracingSettings)
+KeyFrame::KeyFrame(
+    std::unique_ptr<PreKeyFrame> newPreKeyFrame,
+    const std::vector<PixelSelector::PointVector> &newImmaturePoints,
+    const Settings::KeyFrame &_kfSettings,
+    const PointTracerSettings &tracingSettings)
     : preKeyFrame(std::move(newPreKeyFrame))
     , thisToWorld(preKeyFrame->baseFrame
                       ? preKeyFrame->baseFrame->thisToWorld() *
                             preKeyFrame->baseToThis().inverse()
-                      : preKeyFrame->baseToThis().inverse())
+                      : SE3())
     , kfSettings(_kfSettings) {
   int camNum = preKeyFrame->cam->bundle.size();
   for (int i = 0; i < camNum; ++i) {
-    PixelSelector::PointVector selected = pixelSelector[i].select(
-        preKeyFrame->frames[i].frameColored, preKeyFrame->frames[i].gradNorm,
-        kfSettings.immaturePointsNum() / camNum, nullptr);
     frames.emplace_back(this, i, preKeyFrame->frames[i].timestamp);
-    addImmatures(selected.data(), selected.size(), i,
+    addImmatures(newImmaturePoints[i].data(), newImmaturePoints[i].size(), i,
                  &preKeyFrame->cam->bundle[i].cam, tracingSettings);
     frames[i].lightWorldToThis =
         preKeyFrame->baseFrame
@@ -76,6 +74,36 @@ KeyFrame::KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame,
             : preKeyFrame->frames[i].lightBaseToThis;
   }
 }
+
+std::vector<PixelSelector::PointVector> select(PreKeyFrame *preKeyFrame,
+                                               PixelSelector pixelSelectors[],
+                                               int totalPointsNeeded) {
+  int numCameras = preKeyFrame->cam->bundle.size();
+  std::vector<PixelSelector::PointVector> selected;
+  selected.reserve(numCameras);
+  for (int i = 0; i < numCameras; ++i)
+    selected.push_back(pixelSelectors[i].select(
+        preKeyFrame->frames[i].frameColored, preKeyFrame->frames[i].gradNorm,
+        totalPointsNeeded / numCameras));
+  return selected;
+}
+
+KeyFrame::KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame,
+                   PixelSelector pixelSelector[],
+                   const Settings::KeyFrame &_kfSettings,
+                   const PointTracerSettings &tracingSettings)
+    : KeyFrame(std::move(newPreKeyFrame),
+               select(newPreKeyFrame.get(), pixelSelector,
+                      _kfSettings.immaturePointsNum()),
+               _kfSettings, tracingSettings) {}
+
+KeyFrame::KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame,
+                   const Settings::KeyFrame &_kfSettings,
+                   const PointTracerSettings &tracingSettings)
+    : KeyFrame(std::move(newPreKeyFrame),
+               std::vector<PixelSelector::PointVector>(
+                   newPreKeyFrame->cam->bundle.size()),
+               _kfSettings, tracingSettings) {}
 
 void KeyFrame::addImmatures(const cv::Point points[], int size, int numInBundle,
                             CameraModel *cam,

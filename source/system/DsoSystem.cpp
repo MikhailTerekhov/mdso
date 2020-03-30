@@ -4,8 +4,10 @@
 #include "system/BundleAdjusterCeres.h"
 #include "system/BundleAdjusterSelfMade.h"
 #include "system/DelaunayDsoInitializer.h"
+#include "system/Reprojector.h"
 #include "system/TrackingPredictorRot.h"
 #include "system/TrackingPredictorScrew.h"
+#include "system/serialization.h"
 #include "util/flags.h"
 #include "util/settings.h"
 #include <glog/logging.h>
@@ -29,7 +31,8 @@ DsoSystem::DsoSystem(CameraBundle *cam, Preprocessor *preprocessor,
                             ? std::unique_ptr<TrackingPredictor>(
                                   new TrackingPredictorScrew(this))
                             : std::unique_ptr<TrackingPredictor>(
-                                  new TrackingPredictorRot(this))) {
+                                  new TrackingPredictorRot(this)))
+    , wasRestored(false) {
   LOG(INFO) << "create DsoSystem" << std::endl;
 
   marginalizedFrames.reserve(settings.expectedFramesCount);
@@ -46,6 +49,57 @@ DsoSystem::DsoSystem(CameraBundle *cam, Preprocessor *preprocessor,
 
   for (DsoObserver *obs : observers.dso)
     obs->created(this, cam, settings);
+}
+
+DsoSystem::DsoSystem(std::vector<std::unique_ptr<KeyFrame>> &restoredKeyFrames,
+                     CameraBundle *_cam, Preprocessor *_preprocessor,
+                     const Observers &_observers, const Settings &_settings)
+    : cam(_cam)
+    , camPyr(cam->camPyr(_settings.pyramid.levelNum()))
+    , isInitialized(true)
+    , settings(_settings)
+    , pointTracerSettings(_settings.getPointTracerSettings())
+    , observers(_observers)
+    , preprocessor(_preprocessor)
+    , trackingPredictor(settings.predictUsingScrew
+                            ? std::unique_ptr<TrackingPredictor>(
+                                  new TrackingPredictorScrew(this))
+                            : std::unique_ptr<TrackingPredictor>(
+                                  new TrackingPredictorRot(this)))
+    , wasRestored(true) {
+  LOG(INFO) << "create DsoSystem from a snapshot" << std::endl;
+  CHECK(settings.trackFromLastKf) << "restoration from a snapshot is supported "
+                                     "when using the last base frame only.";
+
+  marginalizedFrames.reserve(settings.expectedFramesCount);
+  keyFrames.reserve(settings.maxKeyFrames() + 1);
+
+  for (auto &keyFrame : restoredKeyFrames) {
+    keyFrames.push_back(std::move(keyFrame));
+    for (DsoObserver *obs : observers.dso) {
+      obs->newBaseFrame(*keyFrames.back());
+      for (const auto &preKeyFrame : keyFrames.back()->trackedFrames)
+        obs->newFrame(*preKeyFrame);
+    }
+  }
+
+  for (DsoObserver *obs : observers.dso)
+    obs->created(this, cam, settings);
+
+  initializeAllFrames();
+
+  pixelSelector.reserve(cam->bundle.size());
+  for (int i = 0; i < cam->bundle.size(); ++i)
+    pixelSelector.emplace_back(settings.pixelSelector);
+
+  // If there are only 2 keyframes, we decide that the system was only recently
+  // initialized, thus tracking was done over immature points.
+  FrameTracker::DepthedMultiFrame baseForTrack =
+      keyFrames.size() == 2 ? getBaseForTrack<ImmaturePoint>()
+                            : getBaseForTrack<OptimizedPoint>();
+  frameTracker = std::unique_ptr<FrameTracker>(new FrameTracker(
+      camPyr.data(), baseForTrack, baseFrame(), observers.frameTracker,
+      settings.getFrameTrackerSettings()));
 }
 
 DsoSystem::~DsoSystem() {
@@ -182,12 +236,12 @@ Timestamp DsoSystem::timestamp(int ind) const {
 
 class FrameToWorldExtractor {
 public:
-  SE3 operator()(MarginalizedKeyFrame *f) { return f->thisToWorld; }
-  SE3 operator()(MarginalizedPreKeyFrame *f) {
+  SE3 operator()(const MarginalizedKeyFrame *f) { return f->thisToWorld; }
+  SE3 operator()(const MarginalizedPreKeyFrame *f) {
     return f->baseFrame->thisToWorld * f->baseToThis.inverse();
   }
-  SE3 operator()(KeyFrame *f) { return f->thisToWorld(); }
-  SE3 operator()(PreKeyFrame *f) {
+  SE3 operator()(const KeyFrame *f) { return f->thisToWorld(); }
+  SE3 operator()(const PreKeyFrame *f) {
     return f->baseFrame->thisToWorld() * f->baseToThis().inverse();
   }
 };
@@ -222,6 +276,44 @@ private:
 AffLight DsoSystem::affLightWorldToBody(int ind, int camInd) const {
   CHECK(ind >= 0 && ind < allFrames.size());
   return std::visit(LightWorldToFrameExtractor(camInd), allFrames[ind]);
+}
+
+class GlobalFrameNumSetter {
+public:
+  GlobalFrameNumSetter(int globalFrameNum)
+      : globalFrameNum(globalFrameNum) {}
+
+  void operator()(KeyFrame *keyFrame) {
+    keyFrame->preKeyFrame->globalFrameNum = globalFrameNum;
+  }
+  void operator()(PreKeyFrame *preKeyFrame) {
+    preKeyFrame->globalFrameNum = globalFrameNum;
+  }
+  void operator()(MarginalizedKeyFrame *) { CHECK(false); }
+  void operator()(MarginalizedPreKeyFrame *) { CHECK(false); }
+
+private:
+  int globalFrameNum;
+};
+
+void DsoSystem::initializeAllFrames() {
+  allFrames.reserve(settings.expectedFramesCount);
+
+  std::vector<std::pair<Timestamp, FramePointer>> frames;
+  TimestampExtractor timestampExtractor(cam->bundle.size());
+  for (const auto &keyFrame : keyFrames) {
+    frames.push_back(
+        {timestampExtractor(keyFrame.get()), FramePointer(keyFrame.get())});
+    for (const auto &preKeyFrame : keyFrame->trackedFrames)
+      frames.push_back({timestampExtractor(preKeyFrame.get()),
+                        FramePointer(preKeyFrame.get())});
+  }
+  std::sort(frames.begin(), frames.end(),
+            [](auto f1, auto f2) { return f1.first < f2.first; });
+  for (auto [ts, frame] : frames) {
+    std::visit(GlobalFrameNumSetter(allFrames.size()), frame);
+    allFrames.push_back(frame);
+  }
 }
 
 int DsoSystem::totalOptimized() const {
@@ -431,6 +523,30 @@ void DsoSystem::traceOn(const PreKeyFrame &frame) {
               << ": " << retByStatus[s];
 }
 
+template <typename PointT>
+FrameTracker::DepthedMultiFrame DsoSystem::getBaseForTrack() const {
+  std::vector<const KeyFrame *> kfPtrs;
+  kfPtrs.reserve(keyFrames.size());
+  for (const auto &keyFrame : keyFrames)
+    kfPtrs.push_back(keyFrame.get());
+  DepthedPoints depthedPoints =
+      Reprojector<PointT>(kfPtrs.data(), kfPtrs.size(),
+                          FrameToWorldExtractor()(&baseFrame()),
+                          settings.residualPattern.height)
+          .reprojectDepthed();
+
+  FrameTracker::DepthedMultiFrame baseForTrack;
+  baseForTrack.reserve(cam->bundle.size());
+  for (int camInd = 0; camInd < cam->bundle.size(); ++camInd)
+    baseForTrack.emplace_back(baseFrame().preKeyFrame->image(camInd),
+                              settings.pyramid.levelNum(),
+                              depthedPoints.points[camInd].data(),
+                              depthedPoints.depths[camInd].data(),
+                              depthedPoints.weights[camInd].data(),
+                              depthedPoints.points[camInd].size());
+  return baseForTrack;
+}
+
 void DsoSystem::addMultiFrame(const cv::Mat3b frames[],
                               Timestamp timestamps[]) {
   if (!isInitialized) {
@@ -627,6 +743,16 @@ void DsoSystem::addMultiFrame(const cv::Mat3b frames[],
         camPyr.data(), baseForTrack, baseFrame(), observers.frameTracker,
         settings.getFrameTrackerSettings()));
   }
+}
+
+void DsoSystem::saveSnapshot(const fs::path &snapshotDir) const {
+  SnapshotSaver snapshotSaver(snapshotDir,
+                              settings.residualPattern.pattern().size());
+  std::vector<const KeyFrame *> savedKeyFrames;
+  savedKeyFrames.reserve(savedKeyFrames.size());
+  for (const auto &keyFrame : keyFrames)
+    savedKeyFrames.push_back(keyFrame.get());
+  snapshotSaver.save(savedKeyFrames.data(), savedKeyFrames.size());
 }
 
 } // namespace mdso

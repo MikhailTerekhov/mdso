@@ -217,6 +217,11 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
             for (int i = 0; i < PS; ++i) {
               const Vec2 &pos = op.p + settings.residualPattern.pattern()[i];
 
+              CHECK(cam->bundle[hostCamInd].cam.isOnImage(op.p, PH))
+                  << "Optimized point is not on the image! p = "
+                  << op.p.transpose() << "d = " << op.logDepth
+                  << " min = " << op.minDepth << " max = " << op.maxDepth;
+
               DirectResidual *newResidual = new DirectResidual(
                   &hostFrame->preKeyFrame->frames[hostCamInd]
                        .internals->interpolator(0),

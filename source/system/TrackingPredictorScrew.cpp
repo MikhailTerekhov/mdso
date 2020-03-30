@@ -24,8 +24,8 @@ SE3 TrackingPredictorScrew::predictBodyToWorldAt(Timestamp timestamp) const {
   VLOG(1) << "timeLastByLbo = " << timeLastByLbo;
   VLOG(1) << "lbo ts = " << lastButOneTs << ", last ts = " << lastTs
           << ", cur ts = " << timestamp;
-  VLOG(1) << "last - lbo = " << lastTs - lastButOneTs << ", cur - last"
-          << timestamp - lastTs;
+  VLOG(1) << "last - lbo = " << lastTs - lastButOneTs
+          << ", cur - last = " << timestamp - lastTs;
 
   SE3 lastToWorld = trajectoryHolder()->bodyToWorld(size - 1);
   SE3 lastButOneToWorld = trajectoryHolder()->bodyToWorld(size - 2);

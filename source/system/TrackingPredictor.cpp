@@ -9,7 +9,8 @@ TrackingResult TrackingPredictor::predictAt(Timestamp timestamp,
   TrajectoryHolder *traj = trajectoryHolder();
   int camNumber = traj->camNumber();
   int size = traj->trajectorySize();
-  CHECK(baseInd >= 0 && baseInd <= size);
+  CHECK_GE(baseInd, 0);
+  CHECK_LE(baseInd, size);
 
   SE3 trackedToWorld = predictBodyToWorldAt(timestamp);
   SE3 baseToWorld = traj->bodyToWorld(baseInd);

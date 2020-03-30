@@ -4,6 +4,7 @@
 #include "system/AffineLightTransform.h"
 #include "system/CameraModel.h"
 #include "system/PreKeyFrame.h"
+#include "system/SerializerMode.h"
 #include "util/settings.h"
 #include "util/types.h"
 
@@ -12,6 +13,8 @@ namespace mdso {
 struct KeyFrameEntry;
 struct KeyFrame;
 class PreKeyFrameEntryInternals;
+
+template <SerializerMode mode> class PointSerializer;
 
 struct ImmaturePoint {
   static constexpr int MS = Settings::ResidualPattern::max_size;
@@ -38,6 +41,7 @@ struct ImmaturePoint {
 
   ImmaturePoint(KeyFrameEntry *host, const Vec2 &p,
                 const PointTracerSettings &settings = {});
+  ImmaturePoint(KeyFrameEntry *host, PointSerializer<LOAD> &pointSerializer);
 
   TracingStatus traceOn(const PreKeyFrame::FrameEntry &refFrameEntry,
                         TracingDebugType debugType,

@@ -23,7 +23,7 @@ PreKeyFrame::FrameEntry::FrameEntry(PreKeyFrame *host, int ind,
 }
 
 PreKeyFrame::PreKeyFrame(KeyFrame *baseFrame, CameraBundle *cam,
-                         Preprocessor *preprocessor,
+                         const Preprocessor *preprocessor,
                          const cv::Mat3b coloredFrames[], int globalFrameNum,
                          Timestamp timestamps[],
                          const Settings::Pyramid &_pyrSettings)
@@ -44,11 +44,6 @@ PreKeyFrame::PreKeyFrame(KeyFrame *baseFrame, CameraBundle *cam,
   for (int i = 0; i < cam->bundle.size(); ++i)
     frames.emplace_back(this, i, coloredFrames[i], framesProcessed[i],
                         timestamps[i], pyrSettings);
-
-  if (!baseFrame) {
-    TrackingResult result(cam->bundle.size());
-    setTracked(result);
-  }
 }
 
 PreKeyFrame::~PreKeyFrame() {}

@@ -54,12 +54,14 @@ public:
   void provideMasks(const fs::path &masksDir);
 
   int numFrames() const override;
+  int firstTimestampToInd(Timestamp timestamp) const override;
+  std::vector<Timestamp> timestampsFromInd(int frameInd) const override;
   std::vector<FrameEntry> frame(int frameInd) const override;
 
   CameraBundle cam() const override { return mCam; }
 
   std::unique_ptr<FrameDepths> depths(int frameInd) const override;
-  std::optional<SE3> frameToWorld(int frameInd) const override;
+  SE3 frameToWorld(int frameInd) const override;
 
   SE3 tsToWorld(Timestamp ts, bool useVo = false) const;
 
@@ -88,9 +90,6 @@ public:
 
   Timestamp minTs() const;
   Timestamp maxTs() const;
-
-  Timestamp tsFromInd(int frameInd) const;
-  int indFromTs(Timestamp ts) const;
 
 private:
   static const SE3 camToImage;

@@ -2,6 +2,7 @@
 #define INCLUDE_INTERESTPOINT
 
 #include "system/ImmaturePoint.h"
+#include "system/SerializerMode.h"
 #include "util/types.h"
 #include <Eigen/Core>
 #include <Eigen/StdVector>
@@ -10,24 +11,17 @@
 
 namespace mdso {
 
+template <SerializerMode mode> class PointSerializer;
+
 struct OptimizedPoint {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   enum State { ACTIVE, OOB, OUTLIER };
 
-  OptimizedPoint(const ImmaturePoint &immaturePoint)
-      : p(immaturePoint.p)
-      , dir(immaturePoint.dir)
-      , stddev(immaturePoint.stddev)
-      , minDepth(immaturePoint.minDepth)
-      , maxDepth(immaturePoint.maxDepth) {
-    activate(immaturePoint.depth);
-  }
+  OptimizedPoint(const ImmaturePoint &immaturePoint);
+  OptimizedPoint(KeyFrameEntry *, PointSerializer<LOAD> &pointSerializer);
 
-  inline void activate(double depth) {
-    state = ACTIVE;
-    logDepth = std::log(depth);
-  }
+  void activate(double depth);
 
   inline double depth() const { return std::exp(logDepth); }
 

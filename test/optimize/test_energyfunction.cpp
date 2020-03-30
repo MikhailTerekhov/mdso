@@ -74,9 +74,7 @@ protected:
     pixelSelector.initialize(reader->frame(keyFrameNums[0])[0].frame,
                              settings.keyFrame.immaturePointsNum());
     keyFrames.reserve(keyFramesCount);
-    auto kf0ToWorld = reader->frameToWorld(keyFrameNums[0]);
-    CHECK(kf0ToWorld);
-    SE3 worldToFirstGT = kf0ToWorld.value().inverse();
+    SE3 worldToFirstGT = reader->frameToWorld(keyFrameNums[0]).inverse();
     for (int i = 0; i < keyFramesCount; ++i) {
       Timestamp ts = keyFrameNums[i];
       AffLight lightWorldToF = sampleAffLight<double>(settings.affineLight, mt);
@@ -90,9 +88,7 @@ protected:
                                           settings.getPointTracerSettings()));
       keyFrames.back()->frames[0].lightWorldToThis = lightWorldToF;
 
-      auto maybeFrameToWorldGT = reader->frameToWorld(keyFrameNums[i]);
-      CHECK(maybeFrameToWorldGT);
-      SE3 frameToWorldGT = maybeFrameToWorldGT.value();
+      SE3 frameToWorldGT = reader->frameToWorld(keyFrameNums[i]);
       SE3 thisToFirstGT = worldToFirstGT * frameToWorldGT;
       double transErr = thisToFirstGT.translation().norm() * transDrift;
       double rotErr = thisToFirstGT.so3().log().norm() * rotDrift;
@@ -191,14 +187,12 @@ protected:
 
   double transError() const {
     auto kf0ToWorldGT = reader->frameToWorld(keyFrameNums[0]);
-    CHECK(kf0ToWorldGT);
     double sumErr = 0;
     for (int i = 1; i < keyFramesCount; ++i) {
       auto kfiToWorldGT = reader->frameToWorld(keyFrameNums[i]);
-      CHECK(kfiToWorldGT);
       SE3 err = keyFrames[i]->thisToWorld() * cam->bundle[0].thisToBody *
-                kfiToWorldGT.value().inverse();
-      SE3 thisToFirstGT = kf0ToWorldGT.value().inverse() * kfiToWorldGT.value();
+                kfiToWorldGT.inverse();
+      SE3 thisToFirstGT = kf0ToWorldGT.inverse() * kfiToWorldGT;
       //      sumErr += err.translation().norm() /
       //      thisToFirstGT.translation().norm();
       sumErr += err.translation().norm();
@@ -209,14 +203,12 @@ protected:
 
   double rotError() const {
     auto kf0ToWorldGT = reader->frameToWorld(keyFrameNums[0]);
-    CHECK(kf0ToWorldGT);
     double sumErr = 0;
     for (int i = 0; i < keyFramesCount; ++i) {
       auto kfiToWorldGT = reader->frameToWorld(keyFrameNums[i]);
-      CHECK(kfiToWorldGT);
       SE3 err = keyFrames[i]->thisToWorld() * cam->bundle[0].thisToBody *
-                kfiToWorldGT.value().inverse();
-      SE3 thisToFirstGT = kf0ToWorldGT.value().inverse() * kfiToWorldGT.value();
+                kfiToWorldGT.inverse();
+      SE3 thisToFirstGT = kf0ToWorldGT.inverse() * kfiToWorldGT;
       //      sumErr += err.so3().log().norm() /
       //      thisToFirstGT.translation().norm();
       sumErr += err.so3().log().norm();

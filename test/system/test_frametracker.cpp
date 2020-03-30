@@ -186,11 +186,14 @@ protected:
         chunkDir, modelsDir, extrinsicsDir, maybeRtkDir, readerSettings));
     reader->provideMasks(masksDir);
 
+    cam = std::unique_ptr<CameraBundle>(new CameraBundle(reader->cam()));
+
     settings.pyramid.setLevelNum(levelNum);
     settings.affineLight.optimizeAffineLight = GetParam().optimizeAffineLight;
     settings.frameTracker.doIntercameraReprojection = FLAGS_reproj_intercam;
 
-    baseInd = reader->indFromTs(baseTs);
+    int baseInd = reader->firstTimestampToInd(baseTs);
+    std::cout << "baseInd = " << baseInd << '\n';
     ASSERT_LT(baseInd + framesTracked, reader->maxTs());
     auto frame = reader->frame(baseInd);
     cv::Mat1b imgGray[RobotcarReader::numCams];
@@ -203,7 +206,6 @@ protected:
 
     Timestamp timeWin = FLAGS_time_win * 1e6;
     Timestamp minTs = baseTs - timeWin, maxTs = baseTs + timeWin;
-    ASSERT_GT(reader->tsFromInd(baseInd), minTs);
     auto projected = reader->project(minTs, maxTs, baseTs);
 
     FrameTracker::DepthedMultiFrame baseForTracker;
@@ -217,6 +219,7 @@ protected:
       std::cout << "before filter = " << projected[camInd].size() << std::endl;
       filterOutRepeatedPixels(projected[camInd], frame[camInd].frame.cols,
                               frame[camInd].frame.rows, FLAGS_filter_box_size);
+
       std::cout << "after filter = " << projected[camInd].size() << std::endl;
       LOG(INFO) << "after filtering out close points: "
                 << projected[camInd].size();
@@ -226,8 +229,7 @@ protected:
         lidarPoints[i] = projected[camInd][i].first;
         lidarDepths[i] = projected[camInd][i].second;
       }
-      Terrain terrain(&reader->cam().bundle[camInd].cam, lidarPoints,
-                      lidarDepths);
+      Terrain terrain(&cam->bundle[camInd].cam, lidarPoints, lidarDepths);
       int pointsNeeded = pointsUsed / RobotcarReader::numCams;
       PixelSelector::PointVector contrastPoints = pixelSelectors[camInd].select(
           frame[camInd].frame, gradNorm[camInd], pointsNeeded);
@@ -240,7 +242,7 @@ protected:
       filterInterpolatablePoints(contrastPoints, terrain, absExpectedProximity);
       if (reader->masksProvided()) {
         int before = contrastPoints.size();
-        filterByMask(contrastPoints, reader->cam().bundle[camInd].cam.mask());
+        filterByMask(contrastPoints, cam->bundle[camInd].cam.mask());
         int diff = before - int(contrastPoints.size());
         LOG(INFO) << "mask filtered out 1 " << diff;
       }
@@ -254,7 +256,7 @@ protected:
       filterInterpolatablePoints(contrastPoints, terrain, absExpectedProximity);
       if (reader->masksProvided()) {
         int before = contrastPoints.size();
-        filterByMask(contrastPoints, reader->cam().bundle[camInd].cam.mask());
+        filterByMask(contrastPoints, cam->bundle[camInd].cam.mask());
         int diff = before - int(contrastPoints.size());
         LOG(INFO) << "mask filtered out 2 " << diff;
       }
@@ -273,7 +275,7 @@ protected:
         setDepthColBounds(lidarDepths);
       lidarDepthsIm[camInd] = cvtGrayToBgr(imgGray[camInd]);
       contrastDepthsIm[camInd] = lidarDepthsIm[camInd].clone();
-      cv::Mat1b origMask = reader->cam().bundle[camInd].cam.mask();
+      cv::Mat1b origMask = cam->bundle[camInd].cam.mask();
       cv::Mat3b maskIm = cvtGrayToBgr(origMask);
       VLOG(1) << "orig mask sizes = " << origMask.cols << ' ' << origMask.rows;
       VLOG(1) << "mask sizes = " << maskIm.cols << ' ' << maskIm.rows;
@@ -307,7 +309,6 @@ protected:
     cv::imwrite(std::string(contrastDepthsPath), contrastTotalIm);
     cv::imwrite(std::string(terrainsPath), terrainsTotalIm);
 
-    cam.reset(new CameraBundle(reader->cam()));
     camPyr = cam->camPyr(levelNum);
     preprocessor = std::unique_ptr<Preprocessor>(new IdentityPreprocessor);
 
@@ -411,8 +412,9 @@ TEST_P(FrameTrackerRobotcarTest, DISABLED_doesTracking) {
   DummyTrajectoryHolder<RobotcarReader::numCams> trajectoryHolder;
   AffLight defaultAffLight[RobotcarReader::numCams];
   Timestamp baseTimestamps[RobotcarReader::numCams] = {
-      reader->tsFromInd(baseInd), reader->tsFromInd(baseInd),
-      reader->tsFromInd(baseInd)};
+      reader->timestampsFromInd(baseInd)[0],
+      reader->timestampsFromInd(baseInd)[0],
+      reader->timestampsFromInd(baseInd)[0]};
   SE3 idSe3;
   trajectoryHolder.pushBack(idSe3, defaultAffLight, baseTimestamps);
   std::unique_ptr<TrackingPredictor> trackingPredictor(
@@ -421,16 +423,12 @@ TEST_P(FrameTrackerRobotcarTest, DISABLED_doesTracking) {
   double totalPath = 0;
   double transDrift = INF, rotDrift = INF;
   double sumRightMLeft = 0, sumRearMLeft = 0;
-  auto maybeBaseToWorld = reader->frameToWorld(baseInd);
-  CHECK(maybeBaseToWorld);
-  SE3 baseToWorld = maybeBaseToWorld.value();
+  SE3 baseToWorld = reader->frameToWorld(baseInd);
   for (int relInd = 1; relInd < framesTracked - 1; ++relInd) {
     int frameInd = baseInd + relInd;
     auto frame = reader->frame(frameInd);
 
-    auto maybeTrackedToWorld = reader->frameToWorld(frameInd);
-    CHECK(maybeTrackedToWorld);
-    SE3 gtTrackedToWorld = maybeTrackedToWorld.value();
+    SE3 gtTrackedToWorld = reader->frameToWorld(frameInd);
 
     cv::Mat3b coloredFrames[RobotcarReader::numCams];
     Timestamp timestamps[RobotcarReader::numCams];
@@ -464,7 +462,7 @@ TEST_P(FrameTrackerRobotcarTest, DISABLED_doesTracking) {
                               timestamps);
     SE3 err = trackingResult.baseToTracked * gtBaseToTracked.inverse();
     SE3 gtCurToPrev =
-        reader->frameToWorld(frameInd - 1).value().inverse() * gtTrackedToWorld;
+        reader->frameToWorld(frameInd - 1).inverse() * gtTrackedToWorld;
     LOG(INFO) << "vo cur to prev trans norm = "
               << gtCurToPrev.translation().norm() << ", ts diff = "
               << trajectoryHolder.timestamp(relInd) -
@@ -506,13 +504,13 @@ TEST_P(FrameTrackerRobotcarTest, DISABLED_doesTracking) {
 }
 
 std::vector<TestParams> getParamsRobotcar() {
-  Timestamp baseTimestamps[] = {1447410513767257ll};
-  fs::path chunkDir("2015-11-13-10-28-08");
-  //  Timestamp baseTimestamps[] = {1399381498321897ll, 1399381506388605ll,
-  //                                1399381546822399ll, 1399381565109330ll};
-  //  fs::path chunkDir("2014-05-06-12-54-54");
+  //  Timestamp baseTimestamps[] = {1447410513767257ll};
+  //  fs::path chunkDir("2015-11-13-10-28-08");
+  Timestamp baseTimestamps[] = {1399381498321897ll, 1399381506388605ll,
+                                1399381546822399ll, 1399381565109330ll};
+  fs::path chunkDir("2014-05-06-12-54-54");
   const int levelNum = 4;
-  const int pointsNum = 3000;
+  const int pointsNum = 3 * 3000;
   const int framesToTrack = 30;
   bool useAffLight = true;
   std::vector<TestParams> params;
@@ -647,9 +645,7 @@ TEST_P(FrameTrackerMfovTest, doesTracking) {
 
   double totalPath = 0;
   double transDrift = INF, rotDrift = INF;
-  auto maybeBaseToWorld = reader->frameToWorld(baseInd);
-  CHECK(maybeBaseToWorld);
-  SE3 baseToWorld = maybeBaseToWorld.value();
+  SE3 baseToWorld = reader->frameToWorld(baseInd);
   for (int relInd = 1; relInd < framesTracked - 1; ++relInd) {
     int frameInd = baseInd + relInd;
     cv::Mat3b frameCol = reader->frame(frameInd)[0].frame;
@@ -660,8 +656,7 @@ TEST_P(FrameTrackerMfovTest, doesTracking) {
     TrackingResult coarse = trackingPredictor->predictAt(timestamp, 0);
     SE3 oldPredictedBaseToThis = coarse.baseToTracked;
     auto frameToWorldGT = reader->frameToWorld(frameInd);
-    CHECK(frameToWorldGT);
-    SE3 gtBaseToTracked = frameToWorldGT.value().inverse() * baseToWorld;
+    SE3 gtBaseToTracked = frameToWorldGT.inverse() * baseToWorld;
     TrackingResult trackingResult =
         frameTracker->trackFrame(*preKeyFrame, coarse);
 
@@ -674,9 +669,7 @@ TEST_P(FrameTrackerMfovTest, doesTracking) {
     SE3 err = baseToTrackedCam * gtBaseToTracked.inverse();
 
     auto prevToWorld = reader->frameToWorld(frameInd - 1);
-    CHECK(prevToWorld);
-
-    SE3 gtCurToPrev = prevToWorld.value().inverse() * frameToWorldGT.value();
+    SE3 gtCurToPrev = prevToWorld.inverse() * frameToWorldGT;
     LOG(INFO) << "vo cur to prev trans norm = "
               << gtCurToPrev.translation().norm() << ", ts diff = "
               << trajectoryHolder.timestamp(relInd) -

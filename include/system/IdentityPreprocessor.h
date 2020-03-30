@@ -7,7 +7,8 @@ namespace mdso {
 
 class IdentityPreprocessor : public Preprocessor {
 public:
-  void process(cv::Mat1b multiFrame[], cv::Mat1b output[], int size);
+  void process(cv::Mat1b multiFrame[], cv::Mat1b output[],
+               int size) const override;
 };
 
 } // namespace mdso

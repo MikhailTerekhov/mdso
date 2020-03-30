@@ -10,7 +10,7 @@ public:
   virtual ~Preprocessor();
 
   virtual void process(cv::Mat1b multiFrame[], cv::Mat1b output[],
-                       int size) = 0;
+                       int size) const = 0;
 };
 
 } // namespace mdso

@@ -2,9 +2,8 @@
 
 namespace mdso {
 
-TrajectoryWriterDso::TrajectoryWriterDso(const fs::path &outputDirectory,
-                                         const fs::path &fileName)
-    : mOutputFileName(outputDirectory / fileName) {}
+TrajectoryWriterDso::TrajectoryWriterDso(const fs::path &outputFname)
+    : mOutputFileName(outputFname) {}
 
 void TrajectoryWriterDso::addToPool(const KeyFrame &keyFrame) {
   mFrameToWorldPool.push(

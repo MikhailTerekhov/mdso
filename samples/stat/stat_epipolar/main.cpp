@@ -111,10 +111,7 @@ public:
       int secondFrameNum = firstFrameNum + FLAGS_disparity_shift;
       auto firstToWorld = reader->frameToWorld(firstFrameNum);
       auto secondToWorld = reader->frameToWorld(secondFrameNum);
-      CHECK(firstToWorld);
-      CHECK(secondToWorld);
-      SE3 firstToSecondGT =
-          secondToWorld.value().inverse() * firstToWorld.value();
+      SE3 firstToSecondGT = secondToWorld.inverse() * firstToWorld;
       SE3 firstToSecond;
       if (FLAGS_precise_placement)
         firstToSecond = firstToSecondGT;

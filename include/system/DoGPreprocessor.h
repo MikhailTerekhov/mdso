@@ -9,7 +9,8 @@ class DoGPreprocessor : public Preprocessor {
 public:
   DoGPreprocessor(double sigma1, double sigma2, double multiplier);
 
-  void process(cv::Mat1b multiFrame[], cv::Mat1b output[], int size);
+  void process(cv::Mat1b multiFrame[], cv::Mat1b output[],
+               int size) const override;
 
 private:
   double sigma1, sigma2;

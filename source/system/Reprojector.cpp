@@ -2,6 +2,17 @@
 
 namespace mdso {
 
+DepthedPoints::DepthedPoints(int numCams, int totalReprojected)
+    : points(numCams)
+    , depths(numCams)
+    , weights(numCams) {
+  for (int camInd = 0; camInd < numCams; ++camInd) {
+    points[camInd].reserve(totalReprojected);
+    depths[camInd].reserve(totalReprojected);
+    weights[camInd].reserve(totalReprojected);
+  }
+}
+
 template <>
 const StdVector<ImmaturePoint> &
 Reprojector<ImmaturePoint>::getPoints(const KeyFrameEntry &entry) {
@@ -62,6 +73,23 @@ StdVector<Reprojection> Reprojector<PointType>::reproject() const {
   }
 
   return reprojections;
+}
+
+template <typename PointType>
+DepthedPoints Reprojector<PointType>::reprojectDepthed() const {
+  auto reprojections = reproject();
+
+  DepthedPoints depthedPoints(numCams, reprojections.size());
+  for (const auto &reprojection : reprojections) {
+    int ci = reprojection.targetCamInd;
+    depthedPoints.points[ci].push_back(reprojection.reprojected);
+    depthedPoints.depths[ci].push_back(reprojection.reprojectedDepth);
+    const PointType &point =
+        getPoints(keyFrames[reprojection.hostInd]
+                      ->frames[reprojection.hostCamInd])[reprojection.pointInd];
+    depthedPoints.weights[ci].push_back(1 / point.stddev);
+  }
+  return depthedPoints;
 }
 
 template class Reprojector<ImmaturePoint>;

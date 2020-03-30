@@ -101,6 +101,8 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/system/TrackingPredictorRot.h
     ${PROJECT_SOURCE_DIR}/include/system/TrackingPredictorScrew.h
     ${PROJECT_SOURCE_DIR}/include/system/Reprojector.h
+    ${PROJECT_SOURCE_DIR}/include/system/SerializerMode.h
+    ${PROJECT_SOURCE_DIR}/include/system/serialization.h
 )
 
 set(dso_SOURCE_FILES
@@ -158,6 +160,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/system/MarginalizedKeyFrame.cpp
     ${PROJECT_SOURCE_DIR}/source/system/MarginalizedPreKeyFrame.cpp
     ${PROJECT_SOURCE_DIR}/source/system/ImmaturePoint.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/OptimizedPoint.cpp
     ${PROJECT_SOURCE_DIR}/source/system/CameraModel.cpp
     ${PROJECT_SOURCE_DIR}/source/system/CameraBundle.cpp
     ${PROJECT_SOURCE_DIR}/source/system/StereoMatcher.cpp
@@ -173,10 +176,11 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/system/TrackingPredictorRot.cpp
     ${PROJECT_SOURCE_DIR}/source/system/TrackingPredictorScrew.cpp
     ${PROJECT_SOURCE_DIR}/source/system/Reprojector.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/serialization.cpp
 )
 
 set(dso_internal_HEADER_FILES
-        ${PROJECT_SOURCE_DIR}/internal/include/PreKeyFrameEntryInternals.h
+    ${PROJECT_SOURCE_DIR}/internal/include/PreKeyFrameEntryInternals.h
 )
 
 set(dso_internal_SOURCE_FILES

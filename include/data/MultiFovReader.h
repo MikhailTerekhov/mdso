@@ -23,10 +23,12 @@ public:
   MultiFovReader(const fs::path &newDatasetDir);
 
   int numFrames() const override;
+  std::vector<Timestamp> timestampsFromInd(int frameInd) const override;
+  int firstTimestampToInd(Timestamp timestamp) const override;
   std::vector<FrameEntry> frame(int frameInd) const override;
   CameraBundle cam() const override;
   std::unique_ptr<FrameDepths> depths(int frameInd) const override;
-  std::optional<SE3> frameToWorld(int frameInd) const override;
+  SE3 frameToWorld(int frameInd) const override;
 
 private:
   fs::path datasetDir;

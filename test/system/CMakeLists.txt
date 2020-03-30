@@ -1,4 +1,4 @@
-set(TESTS test_stereo test_frametracker)
+set(TESTS test_stereo test_frametracker test_serialization)
 
 foreach(CUR_TEST ${TESTS})
     add_executable(${CUR_TEST} ${CUR_TEST}.cpp)

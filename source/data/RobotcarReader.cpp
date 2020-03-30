@@ -250,13 +250,32 @@ void RobotcarReader::provideMasks(const fs::path &masksDir) {
   cv::Mat3b leftMask = cv::imread(std::string(leftMaskPath));
   cv::Mat3b rearMask = cv::imread(std::string(rearMaskPath));
   cv::Mat3b rightMask = cv::imread(std::string(rightMaskPath));
-  cam().bundle[0].cam.setMask(cvtBgrToGray(leftMask));
-  cam().bundle[1].cam.setMask(cvtBgrToGray(rearMask));
-  cam().bundle[2].cam.setMask(cvtBgrToGray(rightMask));
+  mCam.bundle[0].cam.setMask(cvtBgrToGray(leftMask));
+  mCam.bundle[1].cam.setMask(cvtBgrToGray(rearMask));
+  mCam.bundle[2].cam.setMask(cvtBgrToGray(rightMask));
   mMasksProvided = true;
 }
 
 int RobotcarReader::numFrames() const { return mLeftTs.size(); }
+
+int RobotcarReader::firstTimestampToInd(Timestamp timestamp) const {
+  if (timestamp < mLeftTs[0])
+    return 0;
+  if (timestamp > mLeftTs.back())
+    return numFrames();
+
+  auto it = std::lower_bound(mLeftTs.begin(), mLeftTs.end(), timestamp);
+  if (it == mLeftTs.end())
+    return numFrames();
+  return it - mLeftTs.begin();
+}
+
+std::vector<Timestamp> RobotcarReader::timestampsFromInd(int frameInd) const {
+  CHECK_GE(frameInd, 0);
+  CHECK_LT(frameInd, numFrames());
+
+  return std::vector{mLeftTs[frameInd], mRearTs[frameInd], mRightTs[frameInd]};
+}
 
 std::vector<RobotcarReader::FrameEntry>
 RobotcarReader::frame(int frameInd) const {
@@ -308,8 +327,13 @@ void filterOutSameBox(StdVector<std::pair<Vec2, double>> &projected,
   projected.resize(usedInds.size());
 }
 
+Timestamp avgTimestamp(const std::vector<Timestamp> &timestamps) {
+  return std::accumulate(timestamps.begin(), timestamps.end(), 0) /
+         timestamps.size();
+}
+
 std::unique_ptr<FrameDepths> RobotcarReader::depths(int frameInd) const {
-  Timestamp baseTs = tsFromInd(frameInd);
+  Timestamp baseTs = avgTimestamp(timestampsFromInd(frameInd));
   Timestamp timeWindow = settings.projectedTimeWindow * 1e6;
   Timestamp tsFrom = baseTs - timeWindow, tsTo = baseTs + timeWindow;
   auto projected = project(tsFrom, tsTo, baseTs);
@@ -381,21 +405,14 @@ cv::Mat3b RobotcarReader::Depths::draw(cv::Mat3b frames[]) {
   return result;
 }
 
-Timestamp RobotcarReader::tsFromInd(int frameInd) const {
-  return (mLeftTs[frameInd] + mRearTs[frameInd] + mRightTs[frameInd]) / 3;
-}
+SE3 RobotcarReader::frameToWorld(int frameInd) const {
+  CHECK_GE(frameInd, 0);
+  CHECK_LT(frameInd, numFrames());
 
-int RobotcarReader::indFromTs(Timestamp ts) const {
-  CHECK_GE(ts, mLeftTs[0]);
-  CHECK_LT(ts, mLeftTs.back());
-  return std::lower_bound(mLeftTs.begin(), mLeftTs.end(), ts) - mLeftTs.begin();
-}
-
-std::optional<SE3> RobotcarReader::frameToWorld(int frameInd) const {
-  Timestamp ts = tsFromInd(frameInd);
-  if (ts < mGroundTruthTs[0] || ts > mGroundTruthTs.back())
-    return std::nullopt;
-  return std::optional<SE3>(tsToWorld(ts));
+  Timestamp ts = timestampsFromInd(frameInd)[0];
+  CHECK_GE(ts, mGroundTruthTs[0]);
+  CHECK_LT(ts, mGroundTruthTs.back());
+  return tsToWorld(ts);
 }
 
 SE3 tsToWorldHelper(Timestamp ts, const StdVector<SE3> &bodyToWorld,
@@ -522,13 +539,13 @@ RobotcarReader::project(const std::vector<Vec3> &cloud) const {
   std::array<StdVector<std::pair<Vec2, double>>, RobotcarReader::numCams>
       result;
   for (int camInd = 0; camInd < RobotcarReader::numCams; ++camInd) {
-    SE3 bodyToCam = cam().bundle[camInd].bodyToThis;
+    SE3 bodyToCam = mCam.bundle[camInd].bodyToThis;
     for (const Vec3 &p : cloud) {
       Vec3 moved = bodyToCam * p;
-      if (!cam().bundle[camInd].cam.isMappable(moved))
+      if (!mCam.bundle[camInd].cam.isMappable(moved))
         continue;
       double depth = moved.norm();
-      Vec2 projected = cam().bundle[camInd].cam.map(moved);
+      Vec2 projected = mCam.bundle[camInd].cam.map(moved);
       result[camInd].push_back({projected, depth});
     }
   }

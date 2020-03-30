@@ -230,7 +230,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
     for (int i = 0; i < pointsInFrameGT.size(); ++i)
       for (int j = 0; j < pointsInFrameGT[i].size(); ++j) {
         const Vec3 &p = pointsInFrameGT[i][j];
-        allPoints.push_back(reader.frameToWorld(i).value() * p);
+        allPoints.push_back(reader.frameToWorld(i) * p);
         allColors.push_back(colors[i][j]);
       }
     std::ofstream pointsGTOfs("pointsGT.ply");
@@ -242,13 +242,13 @@ It should contain "info" and "data" subdirectories.)abacaba";
   DebugImageDrawer debugImageDrawer(drawingOrder);
   TrackingDebugImageDrawer trackingDebugImageDrawer(
       camPyr.data(), settings.frameTracker, settings.pyramid, drawingOrder);
-  TrajectoryWriterDso trajectoryWriter(outDir, FLAGS_trajectory_filename);
+  TrajectoryWriterDso trajectoryWriter(outDir / FLAGS_trajectory_filename);
 
   StdVector<SE3> frameToWorldGT(reader.numFrames());
   std::vector<Timestamp> timestamps(reader.numFrames());
   for (int i = 0; i < timestamps.size(); ++i) {
     timestamps[i] = i;
-    frameToWorldGT[i] = reader.frameToWorld(i).value();
+    frameToWorldGT[i] = reader.frameToWorld(i);
   }
   TrajectoryWriterGT trajectoryWriterGT(frameToWorldGT.data(),
                                         timestamps.data(), timestamps.size(),

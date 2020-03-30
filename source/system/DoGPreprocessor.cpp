@@ -9,7 +9,7 @@ DoGPreprocessor::DoGPreprocessor(double sigma1, double sigma2,
     , multiplier(multiplier) {}
 
 void DoGPreprocessor::process(cv::Mat1b multiFrame[], cv::Mat1b output[],
-                              int size) {
+                              int size) const {
   for (int i = 0; i < size; ++i) {
     output[i].create(multiFrame[i].size());
     if (sigma1 < 0.1) {

@@ -7,8 +7,7 @@ namespace mdso {
 
 class TrajectoryWriterDso : public TrajectoryWriter {
 public:
-  TrajectoryWriterDso(const fs::path &outputDirectory,
-                      const fs::path &fileName);
+  TrajectoryWriterDso(const fs::path &outputFname);
 
   void addToPool(const KeyFrame &keyFrame) override;
   void addToPool(const PreKeyFrame &frame) override;

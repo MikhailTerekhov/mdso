@@ -14,6 +14,14 @@ struct Reprojection {
   double reprojectedDepth;
 };
 
+struct DepthedPoints {
+  DepthedPoints(int numCams, int totalReprojected);
+
+  std::vector<StdVector<Vec2>> points;
+  std::vector<std::vector<double>> depths;
+  std::vector<std::vector<double>> weights;
+};
+
 template <typename PointType> class Reprojector {
 public:
   Reprojector(const KeyFrame *const *keyFrames, int numKeyFrames,
@@ -28,6 +36,7 @@ public:
   }
 
   StdVector<Reprojection> reproject() const;
+  DepthedPoints reprojectDepthed() const;
 
 private:
   static const StdVector<PointType> &getPoints(const KeyFrameEntry &entry);

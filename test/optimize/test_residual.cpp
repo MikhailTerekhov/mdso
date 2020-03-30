@@ -228,11 +228,7 @@ protected:
 class ResidualTestGtPoses : public ResidualTestBase {
 private:
   std::pair<SE3, SE3> getKfImageToWorld() override {
-    auto kf1ToWorld = reader->frameToWorld(fnum1);
-    auto kf2ToWorld = reader->frameToWorld(fnum2);
-    CHECK(kf1ToWorld);
-    CHECK(kf2ToWorld);
-    return {kf1ToWorld.value(), kf2ToWorld.value()};
+    return {reader->frameToWorld(fnum1), reader->frameToWorld(fnum2)};
   }
 };
 
@@ -244,14 +240,12 @@ private:
   std::pair<SE3, SE3> getKfImageToWorld() override {
     auto kf1ToWorldGT = reader->frameToWorld(fnum1);
     auto kf2ToWorldGT = reader->frameToWorld(fnum2);
-    CHECK(kf1ToWorldGT);
-    CHECK(kf2ToWorldGT);
-    SE3 f1ToF2GT = kf2ToWorldGT.value().inverse() * kf1ToWorldGT.value();
+    SE3 f1ToF2GT = kf2ToWorldGT.inverse() * kf1ToWorldGT;
     double trans = f1ToF2GT.translation().norm();
     double transErr = trans * transDrift;
     double rotErr = trans * rotDrift;
-    return {sampleSe3(rotErr, transErr, mt) * kf1ToWorldGT.value(),
-            sampleSe3(rotErr, transErr, mt) * kf2ToWorldGT.value()};
+    return {sampleSe3(rotErr, transErr, mt) * kf1ToWorldGT,
+            sampleSe3(rotErr, transErr, mt) * kf2ToWorldGT};
   }
 };
 

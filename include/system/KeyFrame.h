@@ -45,7 +45,14 @@ struct KeyFrame {
            const Settings::Pyramid &pyrSettings = {},
            const PointTracerSettings &tracingSettings = {});
   KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame,
+           const std::vector<PixelSelector::PointVector> &newImmaturePoints,
+           const Settings::KeyFrame &_kfSettings = {},
+           const PointTracerSettings &tracingSettings = {});
+  KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame,
            PixelSelector pixelSelector[],
+           const Settings::KeyFrame &_kfSettings = {},
+           const PointTracerSettings &tracingSettings = {});
+  KeyFrame(std::unique_ptr<PreKeyFrame> newPreKeyFrame,
            const Settings::KeyFrame &_kfSettings = {},
            const PointTracerSettings &tracingSettings = {});
 

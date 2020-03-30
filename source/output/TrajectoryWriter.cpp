@@ -32,11 +32,13 @@ void TrajectoryWriter::keyFramesMarginalized(const KeyFrame *marginalized[],
   }
 
   std::ofstream ofs(outputFileName(), std::ios_base::app);
-  int minKfTs = curKfTs.empty() ? INF : curKfTs[0];
+  Timestamp minKfTs = curKfTs.empty() ? INF : curKfTs[0];
   PosesPool &pool = frameToWorldPool();
   while (!pool.empty() && pool.top().first < minKfTs) {
-    putInMatrixForm(ofs, pool.top().second);
-    writtenKfTs.push_back(pool.top().first);
+    const auto &top = pool.top();
+    mWrittenFrameToWorld.push_back(top.second);
+    putInMatrixForm(ofs, top.second);
+    writtenKfTs.push_back(top.first);
     pool.pop();
   }
 }

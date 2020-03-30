@@ -62,6 +62,22 @@ MultiFovReader::MultiFovReader(const fs::path &newMultiFovDir)
 
 int MultiFovReader::numFrames() const { return frameToWorldGT.size(); }
 
+int MultiFovReader::firstTimestampToInd(Timestamp timestamp) const {
+  if (timestamp < 0)
+    return 0;
+  if (timestamp > numFrames())
+    return numFrames();
+
+  return int(timestamp);
+}
+
+std::vector<Timestamp> MultiFovReader::timestampsFromInd(int frameInd) const {
+  CHECK_GE(frameInd, 0);
+  CHECK_LT(frameInd, numFrames());
+
+  return std::vector<Timestamp>(1, frameInd);
+}
+
 std::vector<DatasetReader::FrameEntry>
 MultiFovReader::frame(int frameInd) const {
   CHECK_GE(frameInd, 0);
@@ -99,14 +115,10 @@ std::unique_ptr<FrameDepths> MultiFovReader::depths(int frameInd) const {
   return std::unique_ptr<FrameDepths>(new Depths(depths));
 }
 
-std::optional<SE3> MultiFovReader::frameToWorld(int frameInd) const {
-  if (frameInd < 0 || frameInd >= frameToWorldGT.size()) {
-    LOG(WARNING) << "frameInd " << frameInd << " is out of bounds [0, "
-                 << frameToWorldGT.size() << ")";
-    return std::nullopt;
-  }
-
-  return std::make_optional(frameToWorldGT[frameInd]);
+SE3 MultiFovReader::frameToWorld(int frameInd) const {
+  CHECK_GE(frameInd, 0);
+  CHECK_LT(frameInd, numFrames());
+  return frameToWorldGT[frameInd];
 }
 
 } // namespace mdso

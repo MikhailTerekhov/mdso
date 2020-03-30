@@ -1,6 +1,7 @@
 #include "system/ImmaturePoint.h"
 #include "PreKeyFrameEntryInternals.h"
 #include "system/KeyFrame.h"
+#include "system/serialization.h"
 #include "util/defs.h"
 #include "util/geometry.h"
 #include "util/util.h"
@@ -89,6 +90,16 @@ ImmaturePoint::ImmaturePoint(KeyFrameEntry *host, const Vec2 &p,
   }
 
   dir = baseDirections[0];
+}
+
+ImmaturePoint::ImmaturePoint(KeyFrameEntry *host,
+                             PointSerializer<LOAD> &pointSerializer)
+    : host(host) {
+  pointSerializer.process(*this);
+
+  const PreKeyFrame &baseFrame = *host->host->preKeyFrame;
+  cam = baseFrame.cam;
+  camBase = &cam->bundle[host->ind].cam;
 }
 
 bool ImmaturePoint::isReady() const { return mIsReady; }

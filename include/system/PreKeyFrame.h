@@ -36,7 +36,7 @@ struct PreKeyFrame {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   PreKeyFrame(KeyFrame *baseFrame, CameraBundle *cam,
-              Preprocessor *preprocessor, const cv::Mat3b coloredFrames[],
+              const Preprocessor *preprocessor, const cv::Mat3b coloredFrames[],
               int globalFrameNum, Timestamp timestamps[],
               const Settings::Pyramid &_pyrSettings = {});
   ~PreKeyFrame();
