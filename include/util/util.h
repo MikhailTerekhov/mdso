@@ -113,6 +113,8 @@ cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
 std::string fileInDir(const std::string &directoryName,
                       const std::string &fileName);
 
+std::string curTimeBrief();
+
 } // namespace fishdso
 
 #endif

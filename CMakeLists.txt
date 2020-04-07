@@ -66,6 +66,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/system/StereoGeometryEstimator.h
     ${PROJECT_SOURCE_DIR}/include/system/FrameTracker.h
     ${PROJECT_SOURCE_DIR}/include/system/BundleAdjuster.h
+    ${PROJECT_SOURCE_DIR}/include/system/serialization.h
 )
 
 set(dso_SOURCE_FILES
@@ -107,6 +108,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/system/StereoGeometryEstimator.cpp
     ${PROJECT_SOURCE_DIR}/source/system/FrameTracker.cpp
     ${PROJECT_SOURCE_DIR}/source/system/BundleAdjuster.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/serialization.cpp
 )
 
 set(dso_internal_HEADER_FILES
@@ -147,9 +149,9 @@ target_include_directories(dso
     ${PROJECT_SOURCE_DIR}/thirdparty/relative_pose_solver
 )
 
-
 target_link_libraries(dso 
   PUBLIC
+    stdc++fs
     ${OpenCV_LIBS}
     ${GLOG_LIBRARIES}
   PRIVATE

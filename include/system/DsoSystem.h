@@ -22,6 +22,8 @@ class DsoSystem {
 public:
   DsoSystem(CameraModel *cam, const Observers &observers = {},
             const Settings &settings = {});
+  DsoSystem(const SnapshotLoader &snapshotLoader, const Observers &observers,
+            const Settings &_settings);
   ~DsoSystem();
 
   std::shared_ptr<PreKeyFrame> addFrame(const cv::Mat &frame,
@@ -32,6 +34,8 @@ public:
                          std::vector<KeyFrame *> *kfs);
 
   void addFrameTrackerObserver(FrameTrackerObserver *observer);
+
+  void saveSnapshot(const std::string &snapshotDir) const;
 
   // output only
   KeyFrame *lastInitialized;
@@ -86,8 +90,6 @@ private:
   AffineLightTransform<double> lightKfToLast;
 
   double lastTrackRmse;
-
-  int firstFrameNum;
 
   Settings settings;
 

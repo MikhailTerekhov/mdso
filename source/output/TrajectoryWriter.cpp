@@ -32,6 +32,7 @@ void TrajectoryWriter::keyFramesMarginalized(
   int minKfNum = curKfNums.empty() ? INF : (*curKfNums.begin());
   auto it = frameToWorldPool.begin();
   while (it != frameToWorldPool.end() && it->first < minKfNum) {
+    mWrittenFrameToWorld.push_back(it->second);
     putInMatrixForm(matrixFormOfs, it->second);
     matrixFormOfs << '\n';
 

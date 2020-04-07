@@ -23,7 +23,9 @@ struct KeyFrame {
            PixelSelector &pixelSelector,
            const Settings::KeyFrame &_kfSettings = {},
            const PointTracerSettings tracingSettings = {});
-
+  KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame,
+           const Settings::KeyFrame &_kfSettings = {},
+           const PointTracerSettings &tracingSettings = {});
   KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame,
            PixelSelector &pixelSelector,
            const Settings::KeyFrame &_kfSettings = {},

@@ -1,15 +1,11 @@
 #include "util/util.h"
 #include "util/defs.h"
 #include "util/settings.h"
-#include <Eigen/Eigen>
-#include <RelativePoseEstimator.h>
 #include <algorithm>
 #include <glog/logging.h>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 #include <sophus/se3.hpp>
-#include <sophus/sim3.hpp>
-#include <utility>
 
 bool validateDepthsPart(const char *flagname, double value) {
   if (value >= 0 && value <= 1)
@@ -281,6 +277,15 @@ std::string fileInDir(const std::string &directoryName,
   return directoryName.size() > 1 && directoryName.back() == '/'
              ? directoryName + fileName
              : directoryName + "/" + fileName;
+}
+
+std::string curTimeBrief() {
+  constexpr int maxTimedOutputStringSize = 22;
+  char curTime[maxTimedOutputStringSize + 2];
+  std::time_t t = std::time(nullptr);
+  std::strftime(curTime, maxTimedOutputStringSize + 1, "%Y%m%d_%H%M%S",
+                std::localtime(&t));
+  return std::string(curTime);
 }
 
 } // namespace fishdso

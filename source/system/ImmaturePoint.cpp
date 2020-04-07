@@ -1,6 +1,7 @@
 #include "system/ImmaturePoint.h"
 #include "PreKeyFrameInternals.h"
 #include "system/KeyFrame.h"
+#include "system/serialization.h"
 #include "util/defs.h"
 #include "util/geometry.h"
 #include "util/util.h"
@@ -47,6 +48,30 @@ ImmaturePoint::ImmaturePoint(KeyFrame *baseFrame, const Vec2 &p,
                        baseFrame->preKeyFrame->gradY(curPCV));
     baseGradNorm[i] = baseGrad[i].normalized();
   }
+}
+
+ImmaturePoint::ImmaturePoint(KeyFrame *baseFrame,
+                             PointSerializer<LOAD> &pointSerializer)
+    : baseDirections(
+          baseFrame->tracingSettings.residualPattern.pattern().size())
+    , baseIntencities(
+          baseFrame->tracingSettings.residualPattern.pattern().size())
+    , baseGrad(baseFrame->tracingSettings.residualPattern.pattern().size())
+    , baseGradNorm(baseFrame->tracingSettings.residualPattern.pattern().size())
+    , settings(baseFrame->tracingSettings) {
+  cam = baseFrame->preKeyFrame->cam;
+  pointSerializer.process(*this);
+
+  if (maxDepth != INF) {
+    lastTraced = true;
+    numTraced = 1;
+  } else {
+    lastTraced = false;
+    numTraced = 0;
+  }
+  depthBeforeSubpixel = depth;
+  tracedPyrLevel = 0;
+  pyrChanged = false;
 }
 
 bool ImmaturePoint::isReady() {

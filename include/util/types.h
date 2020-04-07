@@ -1,6 +1,7 @@
 #ifndef INCLUDE_TYPES
 #define INCLUDE_TYPES
 
+#include "system/AffineLightTransform.h"
 #include <Eigen/Core>
 #include <Eigen/StdVector>
 #include <map>
@@ -42,6 +43,8 @@ typedef Eigen::Quaterniond Quaternion;
 typedef Sophus::Sim3d Sim3;
 typedef Sophus::SE3d SE3;
 typedef Sophus::SO3d SO3;
+
+typedef AffineLightTransform<double> AffLight;
 
 template <typename T>
 using StdVector = std::vector<T, Eigen::aligned_allocator<T>>;

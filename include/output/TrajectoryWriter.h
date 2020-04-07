@@ -16,9 +16,13 @@ public:
   void keyFramesMarginalized(const std::vector<const KeyFrame *> &marginalized);
   void destructed(const std::vector<const KeyFrame *> &lastKeyFrames);
 
+  const StdVector<SE3> &writtenFrameToWorld() { return mWrittenFrameToWorld; };
+
 private:
   std::set<int> curKfNums;
   StdMap<int, SE3> frameToWorldPool;
+
+  StdVector<SE3> mWrittenFrameToWorld;
 
   std::string outputFileName;
   std::string matrixFormOutputFileName;

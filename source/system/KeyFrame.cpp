@@ -24,7 +24,6 @@ KeyFrame::KeyFrame(CameraModel *cam, const cv::Mat &frameColored,
 }
 
 KeyFrame::KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame,
-                   PixelSelector &pixelSelector,
                    const Settings::KeyFrame &_kfSettings,
                    const PointTracerSettings &tracingSettings)
     : preKeyFrame(newPreKeyFrame)
@@ -41,7 +40,13 @@ KeyFrame::KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame,
     , optimizedPoints(reservedVector<std::unique_ptr<OptimizedPoint>>(
           _kfSettings.pointsNum))
     , kfSettings(_kfSettings)
-    , tracingSettings(tracingSettings) {
+    , tracingSettings(tracingSettings) {}
+
+KeyFrame::KeyFrame(std::shared_ptr<PreKeyFrame> newPreKeyFrame,
+                   PixelSelector &pixelSelector,
+                   const Settings::KeyFrame &_kfSettings,
+                   const PointTracerSettings &tracingSettings)
+    : KeyFrame(newPreKeyFrame, _kfSettings, tracingSettings) {
   std::vector<cv::Point> points =
       pixelSelector.select(newPreKeyFrame->frameColored, preKeyFrame->gradNorm,
                            kfSettings.pointsNum, nullptr);

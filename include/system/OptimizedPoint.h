@@ -2,6 +2,7 @@
 #define INCLUDE_INTERESTPOINT
 
 #include "system/ImmaturePoint.h"
+#include "system/serialization.h"
 #include "util/types.h"
 #include <Eigen/Core>
 #include <Eigen/StdVector>
@@ -24,6 +25,9 @@ struct OptimizedPoint {
       : p(immaturePoint.p)
       , stddev(immaturePoint.stddev) {
     activate(immaturePoint.depth);
+  }
+  OptimizedPoint(KeyFrame *baseFrame, PointSerializer<LOAD> &pointSerializer) {
+    pointSerializer.process(*this);
   }
 
   EIGEN_STRONG_INLINE void activate(double depth) {

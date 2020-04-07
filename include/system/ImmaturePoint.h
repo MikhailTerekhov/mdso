@@ -4,12 +4,15 @@
 #include "system/AffineLightTransform.h"
 #include "system/CameraModel.h"
 #include "system/PreKeyFrame.h"
+#include "system/SerializerMode.h"
 #include "util/settings.h"
 #include "util/types.h"
 
 namespace fishdso {
 
 struct KeyFrame;
+
+template <SerializerMode mode> class PointSerializer;
 
 struct ImmaturePoint {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -32,6 +35,7 @@ struct ImmaturePoint {
   // TODO create PointTracer!!!
   ImmaturePoint(KeyFrame *baseFrame, const Vec2 &p,
                 const PointTracerSettings &_settings = {});
+  ImmaturePoint(KeyFrame *baseFrame, PointSerializer<LOAD> &pointSerializer);
 
   TracingStatus traceOn(const KeyFrame &baseFrame, const PreKeyFrame &refFrame,
                         TracingDebugType debugType);

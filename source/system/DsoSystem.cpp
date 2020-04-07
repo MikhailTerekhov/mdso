@@ -4,6 +4,7 @@
 #include "system/AffineLightTransform.h"
 #include "system/DelaunayDsoInitializer.h"
 #include "system/StereoMatcher.h"
+#include "system/serialization.h"
 #include "util/defs.h"
 #include "util/geometry.h"
 #include "util/settings.h"
@@ -26,7 +27,6 @@ DsoSystem::DsoSystem(CameraModel *cam, const Observers &observers,
     , worldToFrame(_settings.initialMaxFrame)
     , worldToFramePredict(_settings.initialMaxFrame)
     , lastTrackRmse(INF)
-    , firstFrameNum(-1)
     , settings(_settings)
     , observers(observers) {
   LOG(INFO) << "create DsoSystem" << std::endl;
@@ -35,6 +35,78 @@ DsoSystem::DsoSystem(CameraModel *cam, const Observers &observers,
 
   for (DsoObserver *obs : observers.dso)
     obs->created(this, cam, settings);
+}
+
+DsoSystem::DsoSystem(const SnapshotLoader &snapshotLoader,
+                     const Observers &observers, const Settings &_settings)
+    : lastInitialized(nullptr)
+    , scaleGTToOur(1.0)
+    , cam(snapshotLoader.getCam())
+    , camPyr(cam->camPyr(_settings.pyramid.levelNum))
+    , pixelSelector(_settings.pixelSelector)
+    , isInitialized(true)
+    , worldToFrame(_settings.initialMaxFrame)
+    , worldToFramePredict(_settings.initialMaxFrame)
+    , lastTrackRmse(INF)
+    , settings(_settings)
+    , observers(observers) {
+  LOG(INFO) << "create DsoSystem" << std::endl;
+
+  frameNumbers.reserve(settings.initialMaxFrame);
+
+  for (DsoObserver *obs : observers.dso)
+    obs->created(this, cam, settings);
+
+  snapshotLoader.load(keyFrames);
+  CHECK_GE(keyFrames.size(), 2);
+
+  for (auto &[keyFrameNum, keyFrame] : keyFrames) {
+    frameNumbers.push_back(keyFrameNum);
+    adjustWorldToFrameSizes(keyFrameNum);
+    worldToFramePredict[keyFrameNum] = worldToFrame[keyFrameNum] =
+        keyFrame.thisToWorld.inverse();
+    for (DsoObserver *obs : observers.dso) {
+      obs->newKeyFrame(&keyFrame);
+      for (const auto &preKeyFrame : keyFrame.trackedFrames) {
+        obs->newFrame(preKeyFrame.get());
+        int preKeyFrameNum = preKeyFrame->globalFrameNum;
+        frameNumbers.push_back(preKeyFrameNum);
+        adjustWorldToFrameSizes(preKeyFrameNum);
+        worldToFramePredict[preKeyFrameNum] = worldToFrame[preKeyFrameNum] =
+            preKeyFrame->baseToThis * keyFrame.thisToWorld.inverse();
+      }
+    }
+  }
+
+  if (lastKeyFrame().trackedFrames.empty())
+    lightKfToLast = lboKeyFrame().trackedFrames.back()->lightBaseToThis;
+  else
+    lightKfToLast = lastKeyFrame().trackedFrames.back()->lightBaseToThis;
+
+  StdVector<Vec2> points;
+  std::vector<double> depths;
+  std::vector<double> weights(points.size());
+  if (keyFrames.size() == 2) {
+    std::vector<ImmaturePoint *> refs;
+    projectOntoBaseKf<ImmaturePoint>(&points, &depths, &refs, nullptr);
+    weights.resize(points.size());
+    for (int i = 0; i < points.size(); ++i)
+      weights[i] = 1.0 / refs[i]->stddev;
+  } else {
+    std::vector<OptimizedPoint *> refs;
+    projectOntoBaseKf<OptimizedPoint>(&points, &depths, &refs, nullptr);
+    weights.resize(points.size());
+    for (int i = 0; i < points.size(); ++i)
+      weights[i] = 1.0 / refs[i]->stddev;
+  }
+
+  std::unique_ptr<DepthedImagePyramid> baseForTrack(new DepthedImagePyramid(
+      baseKeyFrame().preKeyFrame->frame(), settings.pyramid.levelNum, points,
+      depths, weights));
+
+  frameTracker = std::unique_ptr<FrameTracker>(
+      new FrameTracker(camPyr, std::move(baseForTrack), observers.frameTracker,
+                       settings.getFrameTrackerSettings()));
 }
 
 DsoSystem::~DsoSystem() {
@@ -194,7 +266,8 @@ SE3 DsoSystem::purePredictBaseKfToCur() {
 }
 
 bool DsoSystem::doNeedKf(PreKeyFrame *lastFrame) {
-  int shift = lastFrame->globalFrameNum - firstFrameNum;
+  int shift =
+      lastFrame->globalFrameNum - lastKeyFrame().preKeyFrame->globalFrameNum;
   return shift > 0 && shift % settings.shiftBetweenKeyFrames == 0;
 }
 
@@ -361,8 +434,6 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
 
       lastInitialized = &keyFrames.rbegin()->second;
 
-      firstFrameNum = lastInitialized->preKeyFrame->globalFrameNum;
-
       for (DsoObserver *obs : observers.dso)
         obs->newKeyFrame(&baseKeyFrame());
 
@@ -459,7 +530,7 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
       for (auto &[num, kf] : keyFrames)
         bundleAdjuster.addKeyFrame(&kf);
       bundleAdjuster.adjust(settings.bundleAdjuster.maxIterations);
-      
+
       for (const auto &[num, kf] : keyFrames) {
         SE3 worldToKf = kf.thisToWorld.inverse();
         worldToFrame[kf.preKeyFrame->globalFrameNum] = worldToKf;
@@ -496,6 +567,16 @@ std::shared_ptr<PreKeyFrame> DsoSystem::addFrame(const cv::Mat &frame,
   }
 
   return preKeyFrame;
+}
+
+void DsoSystem::saveSnapshot(const std::string &snapshotDir) const {
+  SnapshotSaver snapshotSaver(snapshotDir,
+                              settings.residualPattern.pattern().size());
+  std::vector<const KeyFrame *> keyFramePtrs;
+  keyFramePtrs.reserve(keyFrames.size());
+  for (const auto &[frameNum, keyFrame] : keyFrames)
+    keyFramePtrs.push_back(&keyFrame);
+  snapshotSaver.save(keyFramePtrs.data(), keyFramePtrs.size());
 }
 
 } // namespace fishdso
