@@ -78,8 +78,8 @@ Residual::FrameFrameHessian::FrameFrameHessian()
     , abqt(Mat27t::Zero())
     , abab(Mat22t::Zero()) {}
 
-Residual::FrameFrameHessian &Residual::FrameFrameHessian::
-operator+=(const Residual::FrameFrameHessian &other) {
+Residual::FrameFrameHessian &Residual::FrameFrameHessian::operator+=(
+    const Residual::FrameFrameHessian &other) {
   qtqt += other.qtqt;
   qtab += other.qtab;
   abqt += other.abqt;
@@ -100,8 +100,8 @@ Residual::FramePointHessian::FramePointHessian()
     : qtd(Vec7t::Zero())
     , abd(Vec2t::Zero()) {}
 
-Residual::FramePointHessian &Residual::FramePointHessian::
-operator+=(const Residual::FramePointHessian &other) {
+Residual::FramePointHessian &Residual::FramePointHessian::operator+=(
+    const Residual::FramePointHessian &other) {
   qtd += other.qtd;
   abd += other.abd;
   return *this;
@@ -114,8 +114,8 @@ Residual::FrameGradient::FrameGradient()
     : qt(Vec7t::Zero())
     , ab(Vec2t::Zero()) {}
 
-Residual::FrameGradient &Residual::FrameGradient::
-operator+=(const FrameGradient &other) {
+Residual::FrameGradient &
+Residual::FrameGradient::operator+=(const FrameGradient &other) {
   qt += other.qt;
   ab += other.ab;
   return *this;

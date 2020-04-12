@@ -6,6 +6,8 @@
 namespace mdso {
 
 struct Reprojection {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
   int hostInd;
   int hostCamInd;
   int targetCamInd;

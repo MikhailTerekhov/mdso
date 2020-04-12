@@ -33,6 +33,15 @@ double Reprojector<OptimizedPoint>::getDepth(const OptimizedPoint &p) {
   return p.depth();
 }
 
+template <typename PointT> bool isUseful(const PointT &point);
+template <> bool isUseful<ImmaturePoint>(const ImmaturePoint &point) {
+  return point.state == ImmaturePoint::ACTIVE && point.hasDepth();
+}
+
+template <> bool isUseful<OptimizedPoint>(const OptimizedPoint &point) {
+  return point.state == OptimizedPoint::ACTIVE;
+}
+
 template <typename PointType>
 StdVector<Reprojection> Reprojector<PointType>::reproject() const {
   StdVector<Reprojection> reprojections;
@@ -51,6 +60,8 @@ StdVector<Reprojection> Reprojector<PointType>::reproject() const {
         const auto &points = getPoints(host);
         for (int pointInd = 0; pointInd < points.size(); ++pointInd) {
           const PointType &p = points[pointInd];
+          if (!isUseful(p))
+            continue;
           Vec3 vInTarget = hostCamToTargetCam * (getDepth(p) * p.dir);
           if (!targetCam.isMappable(vInTarget))
             continue;

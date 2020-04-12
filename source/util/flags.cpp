@@ -5,7 +5,11 @@ using namespace mdso;
 DEFINE_int32(num_threads, Settings::Threading::default_numThreads,
              "Number of threads for Ceres Solver to use.");
 
-DEFINE_int32(points_per_frame, 2000, "Number of points to trace per keyframe.");
+DEFINE_int32(points_per_frame, Settings::KeyFrame::default_immaturePointsNum,
+             "Number of points to trace per keyframe.");
+
+DEFINE_int32(max_opt_points, Settings::default_maxOptimizedPoints,
+             "Maximum number of points present in optimization.");
 
 DEFINE_int32(first_frames_skip,
              Settings::DelaunayDsoInitializer::default_firstFramesSkip,
@@ -123,6 +127,7 @@ Settings getFlaggedSettings() {
   settings.useRandomOptimizedChoice = FLAGS_use_random_optimized_choice;
   settings.disableMarginalization = FLAGS_disable_marginalization;
   settings.setKeyFrameDist(FLAGS_shift_between_keyframes);
+  settings.setMaxOptimizedPoints(FLAGS_max_opt_points);
   settings.optimization.lossType = FLAGS_trivial_loss
                                        ? Settings::Optimization::TRIVIAL
                                        : Settings::Optimization::HUBER;

@@ -82,8 +82,9 @@ DEFINE_bool(write_files, true,
 DEFINE_string(output_directory, "output/default",
               "DSO's output directory. This flag is disabled, whenever "
               "use_time_for_output is set to true.");
+DEFINE_string(dir_prefix, "", "The prefix added to distinguish the output");
 DEFINE_bool(
-    use_time_for_output, false,
+    use_time_for_output, true,
     "If set to true, output directory is created according to the current "
     "time, instead of using the output_directory flag. The precise format for "
     "the name is output/YYYYMMDD_HHMMSS");
@@ -157,6 +158,11 @@ int main(int argc, char **argv) {
 Where data_dir names a directory with MultiFoV fishseye dataset.
 It should contain "info" and "data" subdirectories.)abacaba";
 
+  std::vector<std::string> argsVec;
+  argsVec.reserve(argc);
+  for (int i = 0; i < argc; ++i)
+    argsVec.emplace_back(argv[i]);
+
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   gflags::SetUsageMessage(usage);
   google::InitGoogleLogging(argv[0]);
@@ -166,17 +172,23 @@ It should contain "info" and "data" subdirectories.)abacaba";
     return 1;
   }
 
-  fs::path outDir(FLAGS_use_time_for_output ? "output/" + curTimeBrief()
-                                            : FLAGS_output_directory);
+  fs::path outDir(FLAGS_use_time_for_output
+                      ? fs::path("output") / FLAGS_dir_prefix / curTimeBrief()
+                      : fs::path(FLAGS_output_directory));
   fs::path debugImgDir = outDir / fs::path(FLAGS_debug_img_dir);
   fs::path trackImgDir = outDir / fs::path(FLAGS_track_img_dir);
   fs::path pyrImgDir = outDir / fs::path(FLAGS_depth_pyramid_dir);
+
   if (FLAGS_write_files) {
     mkdir(outDir);
     mkdir(debugImgDir);
     mkdir(trackImgDir);
     if (FLAGS_draw_depth_pyramid)
       mkdir(pyrImgDir);
+
+    std::ofstream argsOfs(outDir / "args.txt");
+    for (const std::string &a : argsVec)
+      argsOfs << a << "\n";
   }
 
   MultiFovReader reader(argv[1]);

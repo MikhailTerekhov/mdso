@@ -66,6 +66,7 @@ ImmaturePoint::ImmaturePoint(KeyFrameEntry *host, const Vec2 &p,
     , stddev(INF)
     , state(ACTIVE)
     , host(host)
+    , mHasDepth(false)
     , mIsReady(false)
     , lastTraced(false)
     , numTraced(0)
@@ -102,10 +103,18 @@ ImmaturePoint::ImmaturePoint(KeyFrameEntry *host,
   camBase = &cam->bundle[host->ind].cam;
 }
 
+bool ImmaturePoint::hasDepth() const { return mHasDepth; }
 bool ImmaturePoint::isReady() const { return mIsReady; }
+
+void ImmaturePoint::setInitialDepth(double initialDepth) {
+  mHasDepth = true;
+  depth = initialDepth;
+  state = ACTIVE;
+}
 
 void ImmaturePoint::setTrueDepth(double trueDepth,
                                  const Settings::PointTracer &ptSettings) {
+  mHasDepth = true;
   depth = trueDepth;
   stddev = ptSettings.optimizedStddev / 2;
   double delta = depth * ptSettings.relTrueDepthDelta;
@@ -402,6 +411,7 @@ ImmaturePoint::traceOn(const PreKeyFrame::FrameEntry &refFrameEntry,
   } else
     depth = bestDepth;
 
+  mHasDepth = true;
   eAfterSubpixel = bestEnergy;
 
   // depth bounds

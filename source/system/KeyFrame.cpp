@@ -17,7 +17,7 @@ KeyFrameEntry::KeyFrameEntry(const InitializedFrame::FrameEntry &entry,
     if (preKeyFrameEntry->host->cam->bundle[ind].cam.isOnImage(
             p, tracingSettings.residualPattern.height)) {
       immaturePoints.emplace_back(this, p, tracingSettings);
-      immaturePoints.back().depth = d;
+      immaturePoints.back().setInitialDepth(d);
     }
   }
 }

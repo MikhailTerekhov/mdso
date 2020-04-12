@@ -100,14 +100,14 @@ FrameTracker::DepthPyramidSlice::DepthPyramidSlice(
   }
 }
 
-FrameTracker::DepthPyramidSlice::Entry &FrameTracker::DepthPyramidSlice::
-operator[](int ind) {
+FrameTracker::DepthPyramidSlice::Entry &
+    FrameTracker::DepthPyramidSlice::operator[](int ind) {
   CHECK(ind >= 0 && ind < entries.size());
   return entries[ind];
 }
 
-const FrameTracker::DepthPyramidSlice::Entry &FrameTracker::DepthPyramidSlice::
-operator[](int ind) const {
+const FrameTracker::DepthPyramidSlice::Entry &
+    FrameTracker::DepthPyramidSlice::operator[](int ind) const {
   CHECK(ind >= 0 && ind < entries.size());
   return entries[ind];
 }

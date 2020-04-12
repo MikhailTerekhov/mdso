@@ -43,12 +43,6 @@ public:
   AffLight affLightWorldToBody(int ind, int camInd) const override;
 
 private:
-  template <typename PointT>
-  void projectOntoFrame(int globalFrameNum, Vec2 *points[],
-                        const std::optional<PointT ***> &refs,
-                        const std::optional<int **> &pointIndices,
-                        const std::optional<double **> &depths, int sizes[]);
-
   using FramePointer =
       std::variant<MarginalizedKeyFrame *, MarginalizedPreKeyFrame *,
                    KeyFrame *, PreKeyFrame *>;

@@ -51,8 +51,10 @@ struct ImmaturePoint {
                           std::pair<Vec2, double> energiesFound[], int size,
                           int lineWidth);
 
+  bool hasDepth() const;
   bool isReady() const; // checks if the point is good enough to be optimized
 
+  void setInitialDepth(double initialDepth);
   void setTrueDepth(double trueDepth, const Settings::PointTracer &ptSettings);
 
   Vec2 p;
@@ -70,6 +72,7 @@ struct ImmaturePoint {
   CameraModel *camBase;
   State state;
   KeyFrameEntry *host;
+  bool mHasDepth;
   bool mIsReady;
 
   // output only

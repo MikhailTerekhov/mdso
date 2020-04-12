@@ -110,81 +110,6 @@ DsoSystem::~DsoSystem() {
     obs->destructed(lastKeyFrames.data(), keyFrames.size());
 }
 
-// returns reprojection + depth
-std::pair<Vec2, double> reproject(CameraModel *cam, const SE3 origToReprojected,
-                                  const Vec2 &p, double depth) {
-  Vec3 reprojectedDir =
-      origToReprojected * (depth * cam->unmap(p).normalized());
-  Vec2 reprojectedPos = cam->map(reprojectedDir);
-  return {reprojectedPos, reprojectedDir.norm()};
-}
-
-template <typename PointT> inline auto &getPoints(KeyFrameEntry &entry) {
-  if constexpr (std::is_same_v<PointT, ImmaturePoint>)
-    return entry.immaturePoints;
-  else if constexpr (std::is_same_v<PointT, OptimizedPoint>)
-    return entry.optimizedPoints;
-  else
-    CHECK(false) << "bad instantiation";
-}
-
-template <typename PointT> inline double getDepth(const PointT &p) {
-  if constexpr (std::is_same_v<PointT, ImmaturePoint>)
-    return p.depth;
-  else if constexpr (std::is_same_v<PointT, OptimizedPoint>)
-    return p.depth();
-  else
-    CHECK(false) << "bad instantiation";
-}
-
-template <typename PointT>
-void DsoSystem::projectOntoFrame(int globalFrameNum, Vec2 *points[],
-                                 const std::optional<PointT ***> &refs,
-                                 const std::optional<int **> &pointIndices,
-                                 const std::optional<double **> &depths,
-                                 int sizes[]) {
-  CHECK(globalFrameNum >= 0 && globalFrameNum < allFrames.size());
-
-  SE3 worldToFrame = bodyToWorld(globalFrameNum).inverse();
-
-  for (int i = 0; i < cam->bundle.size(); ++i)
-    sizes[i] = 0;
-
-  for (const auto &kf : keyFrames) {
-    SE3 refToFrameBody = worldToFrame * kf->thisToWorld();
-    for (int ri = 0; ri < cam->bundle.size(); ++ri) {
-      const CameraBundle::CameraEntry &refCam = cam->bundle[ri];
-      SE3 temp = refToFrameBody * refCam.thisToBody;
-      for (int bi = 0; bi < cam->bundle.size(); ++bi) {
-        CameraBundle::CameraEntry &baseCam = cam->bundle[bi];
-        SE3 refToFrame = baseCam.bodyToThis * temp;
-        auto &pointVec = getPoints<PointT>(kf->frames[ri]);
-        for (int pi = 0; pi < pointVec.size(); ++pi) {
-          PointT &pnt = pointVec[pi];
-          if (pnt.state != PointT::ACTIVE)
-            continue;
-
-          Vec3 baseDir = refToFrame * (getDepth(pnt) * pnt.dir);
-          Vec3 baseDirNormalized = baseDir.normalized();
-          if (baseDirNormalized[2] < baseCam.cam.getMinZ())
-            continue;
-          Vec2 proj = baseCam.cam.map(baseDir);
-          if (baseCam.cam.isOnImage(proj, PH)) {
-            points[bi][sizes[bi]] = proj;
-            if (refs)
-              refs.value()[bi][sizes[bi]] = &pnt;
-            if (pointIndices)
-              pointIndices.value()[bi][sizes[bi]] = pi;
-            if (depths)
-              depths.value()[bi][sizes[bi]] = baseDir.norm();
-            sizes[bi]++;
-          }
-        }
-      }
-    }
-  }
-}
-
 std::vector<const KeyFrame *> DsoSystem::getKeyFrames() const {
   std::vector<const KeyFrame *> result;
   result.reserve(keyFrames.size());
@@ -360,74 +285,61 @@ void DsoSystem::marginalizeFrames() {
 }
 
 void DsoSystem::activateOptimizedDist() {
-  std::vector<StdVector<Vec2>> optPoints(cam->bundle.size());
-  std::vector<Vec2 *> optPointsPtrs(cam->bundle.size());
-  std::vector<int> optSizes(cam->bundle.size(), 0);
-  for (int i = 0; i < cam->bundle.size(); ++i) {
-    optPoints[i].resize(settings.maxOptimizedPoints());
-    optPointsPtrs[i] = optPoints[i].data();
+  std::vector<const KeyFrame *> kfPtrs = getKeyFrames();
+  int numAvail = 0;
+  for (auto kf : kfPtrs)
+    for (const auto &f : kf->frames)
+      for (const auto &p : f.immaturePoints)
+        if (p.isReady())
+          numAvail++;
+  VLOG(1) << "num avail = " << numAvail;
+
+  Reprojector<OptimizedPoint> optimizedReprojector(
+      kfPtrs.data(), kfPtrs.size(), baseFrame().thisToWorld(), PH);
+  DepthedPoints optimizedReproj = optimizedReprojector.reprojectDepthed();
+
+  DistanceMap distMap(cam, optimizedReproj.points.data(), settings.distanceMap);
+
+  Reprojector<ImmaturePoint> immatureReprojector(kfPtrs.data(), kfPtrs.size(),
+                                                 baseFrame().thisToWorld(), PH);
+  StdVector<Reprojection> immatureReprojections =
+      immatureReprojector.reproject();
+
+  std::vector<StdVector<Vec2>> readyProjected(cam->bundle.size());
+  std::vector<std::vector<ImmaturePoint *>> readyPtrs(cam->bundle.size());
+  std::vector<std::vector<int>> readyInds(cam->bundle.size());
+  for (int camInd = 0; camInd < readyProjected.size(); ++camInd) {
+    readyProjected[camInd].reserve(immatureReprojections.size());
+    readyPtrs[camInd].reserve(immatureReprojections.size());
+    readyInds[camInd].reserve(immatureReprojections.size());
   }
-
-  projectOntoFrame<OptimizedPoint>(baseFrame().preKeyFrame->globalFrameNum,
-                                   optPointsPtrs.data(), std::nullopt,
-                                   std::nullopt, std::nullopt, optSizes.data());
-  for (int i = 0; i < cam->bundle.size(); ++i)
-    optPoints[i].resize(optSizes[i]);
-
-  DistanceMap distMap(cam, optPoints.data(), settings.distanceMap);
-
-  std::vector<StdVector<Vec2>> projImm(cam->bundle.size());
-  std::vector<std::vector<ImmaturePoint *>> refsImm(cam->bundle.size());
-  std::vector<std::vector<int>> pointIndicesImm(cam->bundle.size());
-  std::vector<Vec2 *> projImmPtrs(cam->bundle.size());
-  std::vector<ImmaturePoint **> refsImmPtrs(cam->bundle.size());
-  std::vector<int *> pointIndicesImmPtrs(cam->bundle.size());
-  std::vector<int> immSizes(cam->bundle.size(), 0);
-  int toResize =
-      settings.maxKeyFrames() * settings.keyFrame.immaturePointsNum();
-  for (int i = 0; i < cam->bundle.size(); ++i) {
-    projImm[i].resize(toResize);
-    refsImm[i].resize(toResize);
-    pointIndicesImm[i].resize(toResize);
-    projImmPtrs[i] = projImm[i].data();
-    refsImmPtrs[i] = refsImm[i].data();
-    pointIndicesImmPtrs[i] = pointIndicesImm[i].data();
-  }
-
-  projectOntoFrame<ImmaturePoint>(
-      baseFrame().preKeyFrame->globalFrameNum, projImmPtrs.data(),
-      std::make_optional(refsImmPtrs.data()),
-      std::make_optional(pointIndicesImmPtrs.data()), std::nullopt,
-      immSizes.data());
-  std::vector<std::vector<int>> chosenInds(cam->bundle.size());
-  for (int i = 0; i < cam->bundle.size(); ++i) {
-    int areReady = 0;
-    for (int j = 0; j < immSizes[i]; ++j)
-      if (refsImm[i][j]->isReady()) {
-        projImm[i][areReady] = projImm[i][j];
-        refsImm[i][areReady] = refsImm[i][j];
-        pointIndicesImm[i][areReady] = pointIndicesImm[i][j];
-        areReady++;
-      }
-
-    projImm[i].resize(areReady);
-    refsImm[i].resize(areReady);
-    pointIndicesImm[i].resize(areReady);
-    immSizes[i] = areReady;
-    chosenInds[i].reserve(areReady);
+  for (const auto &reproj : immatureReprojections) {
+    ImmaturePoint &p = keyFrames[reproj.hostInd]
+                           ->frames[reproj.hostCamInd]
+                           .immaturePoints[reproj.pointInd];
+    if (p.isReady()) {
+      readyProjected[reproj.targetCamInd].push_back(reproj.reprojected);
+      readyPtrs[reproj.targetCamInd].push_back(&p);
+      readyInds[reproj.targetCamInd].push_back(reproj.pointInd);
+    }
   }
 
   int curOptPoints = totalOptimized();
   int pointsNeeded = settings.maxOptimizedPoints() - curOptPoints;
 
+  for (int camInd = 0; camInd < readyProjected.size(); ++camInd)
+    VLOG(1) << "Available reprojected on cam #" << camInd << ": "
+            << readyProjected[camInd].size() << std::endl;
+
+  std::vector<std::vector<int>> chosenInds(cam->bundle.size());
   int chosenCount =
-      distMap.choose(projImm.data(), pointsNeeded, chosenInds.data());
+      distMap.choose(readyProjected.data(), pointsNeeded, chosenInds.data());
 
   std::vector<std::pair<ImmaturePoint *, int>> chosenPoints;
   chosenPoints.reserve(chosenCount);
   for (int ci = 0; ci < cam->bundle.size(); ++ci)
     for (int j : chosenInds[ci])
-      chosenPoints.push_back({refsImm[ci][j], pointIndicesImm[ci][j]});
+      chosenPoints.push_back({readyPtrs[ci][j], readyInds[ci][j]});
 
   int oldSize = chosenPoints.size();
   std::sort(chosenPoints.begin(), chosenPoints.end(),
@@ -500,6 +412,7 @@ void DsoSystem::traceOn(const PreKeyFrame &frame) {
   int retByStatus[ImmaturePoint::STATUS_COUNT];
   int totalPoints = 0;
   int becameReady = 0;
+  int totalReady = 0;
   std::fill(retByStatus, retByStatus + ImmaturePoint::STATUS_COUNT, 0);
   for (const auto &kf : keyFrames)
     // TODO inds in multicamera
@@ -510,13 +423,17 @@ void DsoSystem::traceOn(const PreKeyFrame &frame) {
                               pointTracerSettings);
       retByStatus[status]++;
       bool isReady = ip.isReady();
-      if (isReady && !wasReady)
-        becameReady++;
+      if (isReady) {
+        totalReady++;
+        if (!wasReady)
+          becameReady++;
+      }
     }
 
   LOG(INFO) << "POINT TRACING:";
   LOG(INFO) << "total points: " << totalPoints;
   LOG(INFO) << "became ready: " << becameReady;
+  LOG(INFO) << "total ready: " << totalReady;
   LOG(INFO) << "return by status:";
   for (int s = 0; s < ImmaturePoint::STATUS_COUNT; ++s)
     LOG(INFO) << ImmaturePoint::statusName(ImmaturePoint::TracingStatus(s))
@@ -584,38 +501,21 @@ void DsoSystem::addMultiFrame(const cv::Mat3b frames[],
       for (const auto &kf : keyFrames)
         for (const auto &e : kf->frames)
           curPoints += e.immaturePoints.size();
-      std::vector<StdVector<Vec2>> points(cam->bundle.size());
-      std::vector<std::vector<double>> depths(cam->bundle.size());
-      std::vector<int> sizes(cam->bundle.size());
-      std::vector<Vec2 *> pointPtrs(cam->bundle.size());
-      std::vector<double *> depthPtrs(cam->bundle.size());
-      for (int i = 0; i < cam->bundle.size(); ++i) {
-        points[i].resize(curPoints);
-        depths[i].resize(curPoints);
-        pointPtrs[i] = points[i].data();
-        depthPtrs[i] = depths[i].data();
-      }
 
-      projectOntoFrame<ImmaturePoint>(
-          baseFrame().preKeyFrame->globalFrameNum, pointPtrs.data(),
-          std::nullopt, std::nullopt, std::make_optional(depthPtrs.data()),
-          sizes.data());
+      std::vector<const KeyFrame *> kfPtrs = getKeyFrames();
+      Reprojector<ImmaturePoint> reprojector(kfPtrs.data(), kfPtrs.size(),
+                                             baseFrame().thisToWorld(), PH);
+      DepthedPoints reprojected = reprojector.reprojectDepthed();
+
       FrameTracker::DepthedMultiFrame baseForTrack;
       baseForTrack.reserve(cam->bundle.size());
       for (int i = 0; i < cam->bundle.size(); ++i) {
-        points[i].resize(sizes[i]);
-        depths[i].resize(sizes[i]);
-        std::vector<double> weights(points[i].size(), 1);
-        baseForTrack.emplace_back(baseFrame().preKeyFrame->image(i),
-                                  settings.pyramid.levelNum(), points[i].data(),
-                                  depths[i].data(), weights.data(),
-                                  points[i].size());
+        std::vector<double> weights(reprojected.points[i].size(), 1.0);
+        baseForTrack.emplace_back(
+            baseFrame().preKeyFrame->image(i), settings.pyramid.levelNum(),
+            reprojected.points[i].data(), reprojected.depths[i].data(),
+            weights.data(), reprojected.points[i].size());
       }
-
-      VLOG(1) << "baseForTrack size = " << baseForTrack.size()
-              << " imgages = " << baseForTrack[0].images.size()
-              << "Depths = " << baseForTrack[0].depths.size()
-              << "depths[0].size = " << baseForTrack[0].depths[0].size();
 
       frameTracker = std::unique_ptr<FrameTracker>(new FrameTracker(
           camPyr.data(), baseForTrack, baseFrame(), observers.frameTracker,
@@ -704,39 +604,18 @@ void DsoSystem::addMultiFrame(const cv::Mat3b frames[],
       }
     }
 
-    std::vector<StdVector<Vec2>> points(cam->bundle.size());
-    std::vector<std::vector<double>> depths(cam->bundle.size());
-    std::vector<std::vector<OptimizedPoint *>> refs(cam->bundle.size());
-    std::vector<Vec2 *> pointsPtrs(cam->bundle.size());
-    std::vector<double *> depthsPtrs(cam->bundle.size());
-    std::vector<OptimizedPoint **> refsPtrs(cam->bundle.size());
-    std::vector<int> sizes(cam->bundle.size());
-    for (int i = 0; i < cam->bundle.size(); ++i) {
-      points[i].resize(settings.maxOptimizedPoints());
-      refs[i].resize(settings.maxOptimizedPoints());
-      depths[i].resize(settings.maxOptimizedPoints());
-      pointsPtrs[i] = points[i].data();
-      refsPtrs[i] = refs[i].data();
-      depthsPtrs[i] = depths[i].data();
-    }
-
-    projectOntoFrame<OptimizedPoint>(
-        baseFrame().preKeyFrame->globalFrameNum, pointsPtrs.data(),
-        std::make_optional(refsPtrs.data()), std::nullopt,
-        std::make_optional(depthsPtrs.data()), sizes.data());
+    std::vector<const KeyFrame *> kfPtrs = getKeyFrames();
+    Reprojector<OptimizedPoint> reprojector(kfPtrs.data(), kfPtrs.size(),
+                                            baseFrame().thisToWorld(), PH);
+    DepthedPoints reprojected = reprojector.reprojectDepthed();
 
     FrameTracker::DepthedMultiFrame baseForTrack;
     baseForTrack.reserve(cam->bundle.size());
     for (int i = 0; i < cam->bundle.size(); ++i) {
-      points[i].resize(sizes[i]);
-      refs[i].resize(sizes[i]);
-      depths[i].resize(sizes[i]);
-      std::vector<double> weights(points[i].size());
-      for (int j = 0; j < points[i].size(); ++j)
-        weights[j] = 1.0 / refs[i][j]->stddev;
       baseForTrack.emplace_back(
           baseFrame().preKeyFrame->image(i), settings.pyramid.levelNum(),
-          points[i].data(), depths[i].data(), weights.data(), points[i].size());
+          reprojected.points[i].data(), reprojected.depths[i].data(),
+          reprojected.weights[i].data(), reprojected.points[i].size());
     }
 
     frameTracker = std::unique_ptr<FrameTracker>(new FrameTracker(
