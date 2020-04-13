@@ -4,7 +4,9 @@
 #include "util/settings.h"
 #include "util/types.h"
 #include <chrono>
+#include <fstream>
 #include <opencv2/opencv.hpp>
+#include <sstream>
 #include <vector>
 
 DECLARE_double(red_depths_part);

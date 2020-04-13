@@ -6,7 +6,6 @@
 #include "util/geometry.h"
 #include "util/util.h"
 #include <ceres/ceres.h>
-#include <ceres/cubic_interpolation.h>
 #include <ceres/local_parameterization.h>
 
 #define PS (settings.residualPattern.pattern().size())
@@ -19,15 +18,15 @@ BundleAdjusterCeres::~BundleAdjusterCeres() {}
 struct DirectResidual {
   DirectResidual(PreKeyFrameEntryInternals::Interpolator_t *hostFrame,
                  PreKeyFrameEntryInternals::Interpolator_t *targetFrame,
-                 const CameraModel *cam, const Vec2 &reprojPattern,
+                 const CameraModel *targetCam, const Vec2 &reprojPattern,
                  OptimizedPoint *optimizedPoint, const Vec2 &pos,
-                 const SE3 &hostToBody, const SE3 &bodyToTarget,
+                 const SE3 &hostFrameToBody, const SE3 &targetBodyToFrame,
                  KeyFrame *hostKf, KeyFrame *targetKf)
-      : cam(cam)
+      : targetCam(targetCam)
       , reprojPattern(reprojPattern)
-      , hostDirection(cam->unmap(pos).normalized())
-      , hostToBody(hostToBody)
-      , bodyToTarget(bodyToTarget)
+      , hostDirection(targetCam->unmap(pos).normalized())
+      , hostFrameToBody(hostFrameToBody)
+      , targetBodyToFrame(targetBodyToFrame)
       , targetFrame(targetFrame)
       , optimizedPoint(optimizedPoint)
       , hostKf(hostKf)
@@ -58,6 +57,9 @@ struct DirectResidual {
     Quatt targetRot(targetRotM);
     SE3t targetToWorld(targetRot, targetTrans);
 
+    SE3t targetBodyToFrameT = targetBodyToFrame.template cast<T>();
+    SE3t hostFrameToBodyT = hostFrameToBody.template cast<T>();
+
     const T *hostAffLightP = hostAffP;
     AffineLightTransform<T> lightWorldToHost(hostAffLightP[0],
                                              hostAffLightP[1]);
@@ -67,9 +69,11 @@ struct DirectResidual {
                                                targetAffLightP[1]);
 
     T depth = ceres::exp((*logDepthP));
-    Vec3t targetPos = (targetToWorld.inverse() * hostToWorld) *
-                      (hostDirection.cast<T>() * depth);
-    Vec2t targetPosMapped = cam->map(targetPos.data()).template cast<T>();
+    Vec3t targetPos = targetBodyToFrameT *
+                      (targetToWorld.inverse() *
+                       (hostToWorld * (hostFrameToBodyT *
+                                       (hostDirection.cast<T>() * depth))));
+    Vec2t targetPosMapped = targetCam->map(targetPos);
     targetPosMapped += reprojPattern.template cast<T>();
     T trackedIntensity;
     targetFrame->Evaluate(targetPosMapped[1], targetPosMapped[0],
@@ -81,11 +85,11 @@ struct DirectResidual {
     return true;
   }
 
-  const CameraModel *cam;
+  const CameraModel *targetCam;
   Vec2 reprojPattern;
   Vec3 hostDirection;
   double hostIntensity;
-  SE3 hostToBody, bodyToTarget;
+  SE3 hostFrameToBody, targetBodyToFrame;
   PreKeyFrameEntryInternals::Interpolator_t *targetFrame;
   OptimizedPoint *optimizedPoint;
   KeyFrame *hostKf;
@@ -100,8 +104,6 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
   StdVector<SE3> bodyToWorld;
 
   int pointsTotal = 0, pointsOOB = 0;
-
-  CameraModel &camera = cam->bundle[0].cam;
 
   std::shared_ptr<ceres::ParameterBlockOrdering> ordering(
       new ceres::ParameterBlockOrdering());
@@ -163,11 +165,16 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
     problem.SetParameterBlockConstant(bodyToWorld[1].so3().data());
   }
 
+  int numBadDepths = 0;
   for (int hostInd = 0; hostInd < numKeyFrames; ++hostInd) {
     KeyFrame *hostFrame = keyFrames[hostInd];
     for (int hostCamInd = 0; hostCamInd < cam->bundle.size(); ++hostCamInd) {
       KeyFrameEntry &hostEntry = hostFrame->frames[hostCamInd];
       for (auto &op : hostEntry.optimizedPoints) {
+        if (!std::isfinite(op.logDepth)) {
+          numBadDepths++;
+          continue;
+        }
         if (op.depth() <= settings.depth.min ||
             op.depth() >= settings.depth.max)
           continue;
@@ -185,6 +192,7 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
           for (int targetCamInd = 0; targetCamInd < cam->bundle.size();
                ++targetCamInd) {
 
+            CameraModel &targetCam = cam->bundle[targetCamInd].cam;
             KeyFrameEntry &targetEntry = targetFrame->frames[targetCamInd];
             if (targetFrame == hostFrame)
               continue;
@@ -194,8 +202,9 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
             SE3 baseToTarget = bodyToTarget * bodyToWorld[targetInd].inverse() *
                                bodyToWorld[hostInd] * baseToBody;
             pointsTotal++;
-            Vec2 curReproj = camera.map(baseToTarget * (op.depth() * op.dir));
-            if (!camera.isOnImage(curReproj, PH)) {
+            Vec2 curReproj =
+                targetCam.map(baseToTarget * (op.depth() * op.dir));
+            if (!targetCam.isOnImage(curReproj, PH)) {
               pointsOOB++;
               continue;
             }
@@ -204,10 +213,10 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
                 reprojPattern(PS);
 
             for (int i = 0; i < PS; ++i) {
-              Vec2 r = camera.map(
+              Vec2 r = targetCam.map(
                   baseToTarget *
                   (op.depth() *
-                   camera
+                   targetCam
                        .unmap((op.p + settings.residualPattern.pattern()[i])
                                   .eval())
                        .normalized()));
@@ -227,8 +236,8 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
                        .internals->interpolator(0),
                   &targetFrame->preKeyFrame->frames[targetCamInd]
                        .internals->interpolator(0),
-                  &camera, reprojPattern[i], &op, pos, baseToBody, bodyToTarget,
-                  hostFrame, targetFrame);
+                  &targetCam, reprojPattern[i], &op, pos, baseToBody,
+                  bodyToTarget, hostFrame, targetFrame);
 
               double gradNorm =
                   hostFrame->preKeyFrame->frames[hostCamInd].gradNorm(
@@ -256,6 +265,10 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
     }
   }
 
+  if (numBadDepths > 0)
+    LOG(WARNING) << "There are " << numBadDepths
+                 << " non-number depths in optimized points";
+
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_SCHUR;
   options.linear_solver_ordering = ordering;
@@ -269,4 +282,5 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
 
   LOG(INFO) << summary.FullReport() << std::endl;
 }
+
 } // namespace mdso

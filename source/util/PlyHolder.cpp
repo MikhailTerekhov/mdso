@@ -1,4 +1,5 @@
 #include "util/PlyHolder.h"
+#include <fstream>
 #include <glog/logging.h>
 
 namespace mdso {
@@ -10,9 +11,7 @@ PlyHolder::PlyHolder(const fs::path &fname)
     , pointCount(0) {
   std::ofstream fs(fname);
 
-  if (!fs.good())
-    throw std::runtime_error("File \"" + fname.native() +
-                             "\" could not be created.");
+  CHECK(fs.good()) << "File \"" + fname.native() + "\" could not be created.";
 
   fs << R"__(ply
 format ascii 1.0

@@ -9,6 +9,7 @@
 #include "util/BaseAndTangent.h"
 #include "util/types.h"
 #include <boost/math/special_functions/nonfinite_num_facets.hpp>
+#include <fstream>
 
 namespace mdso {
 

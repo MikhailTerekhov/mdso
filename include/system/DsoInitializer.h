@@ -7,8 +7,6 @@
 
 namespace mdso {
 
-class CameraModel;
-
 struct InitializedFrame {
   struct FrameEntry {
     FrameEntry(const cv::Mat &frame, Timestamp timestamp);
