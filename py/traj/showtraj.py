@@ -16,6 +16,8 @@ win_size = 10
 img_w = 12
 img_h = 12
 
+def color_gen():
+    return cycle(['blue', 'red', 'orange'])
 
 def set_invis(a):
     for x in a:
@@ -67,6 +69,8 @@ def set_axes_equal(ax):
 
 
 parser = argparse.ArgumentParser()
+parser.add_argument("traj", help="one or more files with trajectories "
+                    "(expects them to reside in one directory)", nargs='+')
 parser.add_argument("--gt", help="file with ground truth trajectory")
 parser.add_argument("-a", "--align", help="Align GT trajectory?",
                     action="store_true")
@@ -85,13 +89,13 @@ parser.add_argument("-l", "--last", help="truncate frames with nums bigger than 
                     type=int)
 parser.add_argument("-p", "--shown_plane", help="The plain that is shown in the "
                     "default orientation. Could be xy, xz or yz.", default="xz")
-parser.add_argument("traj", help="one or more files with trajectories "
-                    "(expects them to reside in one directory)", nargs='+')
 parser.add_argument("--labels", help="labels for trajectories, excluding"
                     "ground truth", nargs='+')
 parser.add_argument("-t", "--timestamps", help="File with timestamps of the poses "
                     "provided in trajectories. If set, --first and --last flags "
                     "are considered to be timestamps rather than frame numbers")
+parser.add_argument("-e", "--errors", help="plot errors of each trajectory. "
+                    "Only works if ground truth is provided", action="store_true")
 args = parser.parse_args()
 
 if args.timestamps is not None:
@@ -143,16 +147,18 @@ else:
 
 
 draw_proc = draw_arrowed if args.quiver else draw_track
-label_ours = 'полученная оценка' if args.russian else 'resultimg trajectory'
-label_prec = 'точная траектория' if args.russian else 'ground truth'
+label_gt = 'точная траектория' if args.russian else 'ground truth'
 
+traj_word = 'траектория' if args.russian else 'trajectory'
+labels = args.labels if args.labels \
+         else [f'{traj_word} #{i}' for i in range(len(args.traj))]
 
 if args.gt:
     ground_truth = extract_motions(args.gt)
     ground_truth = crop_roi(ground_truth)
     if args.align:
         ground_truth = align_to_zero(ground_truth)
-    draw_proc(ax, ground_truth, 'green', label_prec)
+    draw_proc(ax, ground_truth, 'green', label_gt)
     has_gt = True
 else:
     print('no ground truth provided')
@@ -160,10 +166,11 @@ else:
 
 
 artists = []
+trajs = []
 
-cycol = cycle(['blue', 'red', 'orange'])
+colors = color_gen()
 
-for ind, fname in enumerate(args.traj):
+for ind, (fname, label) in enumerate(zip(args.traj, labels)):
     print(f'processing {fname}...')
     traj = extract_motions(fname)
 
@@ -175,18 +182,15 @@ for ind, fname in enumerate(args.traj):
         print(f'too small num of positions: {len(traj)}')
         continue
 
-
     if has_gt and args.align:
         print(f'align, len={len(traj)} {len(ground_truth)}')
         traj = align(traj, ground_truth, need_scale_fix=args.scale_fix)
-    if args.labels:
-        label_ours = args.labels[ind]
-        col = next(cycol)
-    else:
-        col = 'orange'
-    artists.append(draw_proc(ax, traj, mpl.colors.to_rgba(col, alpha=alpha),
-                            label_ours))
 
+    col = next(colors)
+
+    artists.append(draw_proc(ax, traj, mpl.colors.to_rgba(col, alpha=alpha),
+                            label))
+    trajs.append(traj)
 
 ax.legend(loc='upper center', bbox_to_anchor=(0.5, 0.3), fontsize='large')
 
@@ -196,12 +200,25 @@ if args.video_dir:
     os.makedirs(args.video_dir, exist_ok=True)
     for a in artists[min(win_size,len(artists)):]:
         set_invis(a)
-    #  plt.show()
     fig.savefig(os.path.join(args.video_dir, '0.png'))
     for i in range(len(artists) - win_size):
         set_invis(artists[i])
         set_vis(artists[i + win_size])
         #  ax.legend(loc='upper center', bbox_to_anchor=(0.5, 0.3), fontsize='large')
         fig.savefig(os.path.join(args.video_dir, f'{i + 1}.png'))
-else:
-    plt.show();
+
+def err(m1, m2):
+    return norm((m1 * m2.inverse()).t)
+
+if args.errors:
+    assert args.gt
+    
+    colors = color_gen()
+
+    plt.figure()
+    for traj, label in zip(trajs, labels):
+        errors = [err(t, g) for t, g in zip(ground_truth, traj)]
+        plt.plot(errors, label=label, color=next(colors))
+    plt.legend()
+
+plt.show()
