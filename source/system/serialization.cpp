@@ -241,6 +241,12 @@ SnapshotLoader::SnapshotLoader(const DatasetReader *datasetReader,
     , snapshotDir(snapshotDir)
     , settings(settings) {}
 
+void SnapshotLoader::loadDepthColBounds() const {
+  fs::path depthCols = snapshotDir / "depth_col.txt";
+  std::ifstream ifs(depthCols);
+  ifs >> minDepthCol >> maxDepthCol;
+}
+
 std::vector<std::unique_ptr<KeyFrame>> SnapshotLoader::load() const {
   CHECK(fs::is_directory(snapshotDir));
 
@@ -253,6 +259,14 @@ std::vector<std::unique_ptr<KeyFrame>> SnapshotLoader::load() const {
         fname.stem().string().substr(0, 2) == "kf")
       keyFrames.push_back(keyFrameLoader.load(fname));
   }
+  std::sort(keyFrames.begin(), keyFrames.end(),
+            [](const auto &kf1, const auto &kf2) {
+              return kf1->preKeyFrame->frames[0].timestamp <
+                     kf2->preKeyFrame->frames[0].timestamp;
+            });
+
+  loadDepthColBounds();
+
   return keyFrames;
 }
 
@@ -260,12 +274,20 @@ SnapshotSaver::SnapshotSaver(const fs::path &snapshotDir, int patternSize)
     : snapshotDir(snapshotDir)
     , patternSize(patternSize) {}
 
+void SnapshotSaver::saveDepthColBounds() const {
+  fs::path depthCols = snapshotDir / "depth_col.txt";
+  std::ofstream ofs(depthCols);
+  ofs << minDepthCol << ' ' << maxDepthCol;
+}
+
 void SnapshotSaver::save(const KeyFrame *_keyFrames[], int numKeyFrames) const {
   fs::create_directories(snapshotDir);
   KeyFrameSaver keyFrameSaver(snapshotDir, patternSize);
   CHECK(fs::is_directory(snapshotDir));
   for (int j = 0; j < numKeyFrames; ++j)
     keyFrameSaver.store(*_keyFrames[j]);
+
+  saveDepthColBounds();
 }
 
 template class PointSerializer<LOAD>;

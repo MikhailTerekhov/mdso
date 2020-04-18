@@ -183,6 +183,8 @@ public:
   std::vector<std::unique_ptr<KeyFrame>> load() const;
 
 private:
+  void loadDepthColBounds() const;
+
   const DatasetReader *datasetReader;
   const Preprocessor *preprocessor;
   CameraBundle *cam;
@@ -197,6 +199,8 @@ public:
   void save(const KeyFrame *keyFrames[], int numKeyFrames) const;
 
 private:
+  void saveDepthColBounds() const;
+
   fs::path snapshotDir;
   int patternSize;
 };

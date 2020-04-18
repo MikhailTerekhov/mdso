@@ -14,7 +14,21 @@ namespace mdso {
 
 class DebugImageDrawer : public DsoObserver {
 public:
+  class DrawingSettings {
+  public:
+    DrawingSettings(int numCameras);
+
+    const std::vector<int> &drawingOrder() const { return mDrawingOrder; }
+    void setDrawingOrder(const std::vector<int> &newDrawingOrder);
+
+    bool useOldLayoutForSingleCamera = true;
+
+  private:
+    std::vector<int> mDrawingOrder;
+  };
+
   DebugImageDrawer(const std::vector<int> &drawingOrder);
+  DebugImageDrawer(const DrawingSettings &drawingSettings);
 
   void created(DsoSystem *newDso, CameraBundle *newCam,
                const Settings &newSettings) override;
@@ -36,14 +50,14 @@ private:
               const StdVector<Reprojection> &immatures,
               const StdVector<Reprojection> &optimized) const;
 
-  DsoSystem *dso;
-  CameraBundle *cam;
+  DsoSystem *dso = nullptr;
+  CameraBundle *cam = nullptr;
   CameraBundle::CamPyr camPyr;
   Settings settings;
-  const KeyFrame *baseFrame;
-  const PreKeyFrame *lastFrame;
+  const KeyFrame *baseFrame = nullptr;
+  const PreKeyFrame *lastFrame = nullptr;
   std::unique_ptr<TrackingDebugImageDrawer> residualsDrawer;
-  std::vector<int> drawingOrder;
+  DrawingSettings drawingSettings;
 };
 
 } // namespace mdso

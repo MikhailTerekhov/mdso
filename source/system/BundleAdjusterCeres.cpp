@@ -18,12 +18,11 @@ BundleAdjusterCeres::~BundleAdjusterCeres() {}
 struct DirectResidual {
   DirectResidual(PreKeyFrameEntryInternals::Interpolator_t *hostFrame,
                  PreKeyFrameEntryInternals::Interpolator_t *targetFrame,
-                 const CameraModel *targetCam, const Vec2 &reprojPattern,
-                 OptimizedPoint *optimizedPoint, const Vec2 &pos,
-                 const SE3 &hostFrameToBody, const SE3 &targetBodyToFrame,
-                 KeyFrame *hostKf, KeyFrame *targetKf)
+                 const CameraModel *targetCam, OptimizedPoint *optimizedPoint,
+                 const Vec2 &pos, const SE3 &hostFrameToBody,
+                 const SE3 &targetBodyToFrame, KeyFrame *hostKf,
+                 KeyFrame *targetKf)
       : targetCam(targetCam)
-      , reprojPattern(reprojPattern)
       , hostDirection(targetCam->unmap(pos).normalized())
       , hostFrameToBody(hostFrameToBody)
       , targetBodyToFrame(targetBodyToFrame)
@@ -74,7 +73,6 @@ struct DirectResidual {
                        (hostToWorld * (hostFrameToBodyT *
                                        (hostDirection.cast<T>() * depth))));
     Vec2t targetPosMapped = targetCam->map(targetPos);
-    targetPosMapped += reprojPattern.template cast<T>();
     T trackedIntensity;
     targetFrame->Evaluate(targetPosMapped[1], targetPosMapped[0],
                           &trackedIntensity);
@@ -86,7 +84,6 @@ struct DirectResidual {
   }
 
   const CameraModel *targetCam;
-  Vec2 reprojPattern;
   Vec3 hostDirection;
   double hostIntensity;
   SE3 hostFrameToBody, targetBodyToFrame;
@@ -154,8 +151,11 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
         bodyToWorld[1].translation().data(),
         new ceres::AutoDiffLocalParameterization<SphericalPlus, 3, 2>(
             new SphericalPlus(center, radius, secondToWorld.translation())));
-  else
+  else {
     problem.SetParameterBlockConstant(bodyToWorld[1].translation().data());
+    LOG(WARNING) << "FirstToSecond distance too small, spherical "
+                    "parametrization was not applied";
+  }
 
   if (settings.optimization.fixedRotationOnSecondKF)
     problem.SetParameterBlockConstant(bodyToWorld[1].so3().data());
@@ -209,22 +209,9 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
               continue;
             }
 
-            static_vector<Vec2, Settings::ResidualPattern::max_size>
-                reprojPattern(PS);
-
             for (int i = 0; i < PS; ++i) {
-              Vec2 r = targetCam.map(
-                  baseToTarget *
-                  (op.depth() *
-                   targetCam
-                       .unmap((op.p + settings.residualPattern.pattern()[i])
-                                  .eval())
-                       .normalized()));
-              reprojPattern[i] = r - curReproj;
-            }
-
-            for (int i = 0; i < PS; ++i) {
-              const Vec2 &pos = op.p + settings.residualPattern.pattern()[i];
+              const Vec2 &shiftedP =
+                  op.p + settings.residualPattern.pattern()[i];
 
               CHECK(cam->bundle[hostCamInd].cam.isOnImage(op.p, PH))
                   << "Optimized point is not on the image! p = "
@@ -236,12 +223,12 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
                        .internals->interpolator(0),
                   &targetFrame->preKeyFrame->frames[targetCamInd]
                        .internals->interpolator(0),
-                  &targetCam, reprojPattern[i], &op, pos, baseToBody,
-                  bodyToTarget, hostFrame, targetFrame);
+                  &targetCam, &op, shiftedP, baseToBody, bodyToTarget,
+                  hostFrame, targetFrame);
 
               double gradNorm =
                   hostFrame->preKeyFrame->frames[hostCamInd].gradNorm(
-                      toCvPoint(pos));
+                      toCvPoint(shiftedP));
               const double c = settings.residualWeighting.c;
               double weight = c / std::hypot(c, gradNorm);
               ceres::LossFunction *lossFunc = new ceres::ScaledLoss(

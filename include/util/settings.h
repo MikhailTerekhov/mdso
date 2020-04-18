@@ -165,7 +165,7 @@ struct Settings {
     static constexpr double default_imprFactor = 1.0;
     double imprFactor = default_imprFactor;
 
-    static constexpr double default_outlierEnergyFactor = 0.7;
+    static constexpr double default_outlierEnergyFactor = 0.444;
     double outlierEnergyFactor = default_outlierEnergyFactor;
 
     static constexpr double default_secondBestEnergyThresFactor = 0.004;

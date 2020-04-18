@@ -9,12 +9,34 @@ DEFINE_double(debug_max_stddev, 6.0,
 
 namespace mdso {
 
+DebugImageDrawer::DrawingSettings::DrawingSettings(int numCameras)
+    : mDrawingOrder(numCameras)
+    , useOldLayoutForSingleCamera(true) {
+  for (int i = 0; i < mDrawingOrder.size(); ++i)
+    mDrawingOrder[i] = i;
+}
+
+void DebugImageDrawer::DrawingSettings::setDrawingOrder(
+    const std::vector<int> &newDrawingOrder) {
+  std::vector<bool> check(mDrawingOrder.size(), false);
+  CHECK_EQ(newDrawingOrder.size(), mDrawingOrder.size());
+  for (int i = 0; i < newDrawingOrder.size(); ++i) {
+    CHECK_LT(newDrawingOrder[i], mDrawingOrder.size());
+    CHECK_GE(newDrawingOrder[i], 0);
+    check[newDrawingOrder[i]] = true;
+  }
+  for (int i = 0; i < check.size(); ++i)
+    CHECK(check[i]) << "camera #" << i
+                    << " is not present in the drawing order";
+}
+
 DebugImageDrawer::DebugImageDrawer(const std::vector<int> &drawingOrder)
-    : baseFrame(nullptr)
-    , lastFrame(nullptr)
-    , dso(nullptr)
-    , cam(nullptr)
-    , drawingOrder(drawingOrder) {}
+    : drawingSettings(drawingOrder.size()) {
+  drawingSettings.setDrawingOrder(drawingOrder);
+}
+
+DebugImageDrawer::DebugImageDrawer(const DrawingSettings &drawingSettings)
+    : drawingSettings(drawingSettings) {}
 
 bool DebugImageDrawer::isDrawable() const {
   return baseFrame && lastFrame && residualsDrawer->isDrawable();
@@ -24,11 +46,13 @@ void DebugImageDrawer::created(DsoSystem *newDso, CameraBundle *newCam,
                                const Settings &newSettings) {
   dso = newDso;
   cam = newCam;
+  CHECK_EQ(drawingSettings.drawingOrder().size(), cam->bundle.size());
   settings = newSettings;
   camPyr = cam->camPyr(settings.pyramid.levelNum());
-  residualsDrawer = std::unique_ptr<TrackingDebugImageDrawer>(
-      new TrackingDebugImageDrawer(camPyr.data(), settings.frameTracker,
-                                   settings.pyramid, drawingOrder));
+  residualsDrawer =
+      std::unique_ptr<TrackingDebugImageDrawer>(new TrackingDebugImageDrawer(
+          camPyr.data(), settings.frameTracker, settings.pyramid,
+          drawingSettings.drawingOrder()));
   dso->addFrameTrackerObserver(residualsDrawer.get());
 }
 
@@ -151,19 +175,27 @@ cv::Mat3b DebugImageDrawer::draw() {
   std::vector<cv::Mat3b> stddevs = drawStddevs(keyFrames, immatures, optimized);
   std::vector<cv::Mat3b> residuals = residualsDrawer->drawFinestLevel();
 
-  cv::Mat3b allDepths;
-  cv::vconcat(depths.data(), depths.size(), allDepths);
-  cv::Mat3b allUseful;
-  cv::vconcat(isUseful.data(), isUseful.size(), allUseful);
-  cv::Mat3b allStddevs;
-  cv::vconcat(stddevs.data(), stddevs.size(), allStddevs);
-  cv::Mat3b allResiduals;
-  cv::vconcat(residuals.data(), residuals.size(), allResiduals);
+  if (drawingSettings.useOldLayoutForSingleCamera && cam->bundle.size() == 1) {
+    cv::Mat3b up, down, everything;
+    cv::hconcat(depths[0], isUseful[0], up);
+    cv::hconcat(stddevs[0], residuals[0], down);
+    cv::vconcat(up, down, everything);
+    return everything;
+  } else {
+    cv::Mat3b allDepths;
+    cv::vconcat(depths.data(), depths.size(), allDepths);
+    cv::Mat3b allUseful;
+    cv::vconcat(isUseful.data(), isUseful.size(), allUseful);
+    cv::Mat3b allStddevs;
+    cv::vconcat(stddevs.data(), stddevs.size(), allStddevs);
+    cv::Mat3b allResiduals;
+    cv::vconcat(residuals.data(), residuals.size(), allResiduals);
 
-  cv::Mat3b everything;
-  cv::hconcat(std::vector{allDepths, allUseful, allStddevs, allResiduals},
-              everything);
-  return everything;
+    cv::Mat3b everything;
+    cv::hconcat(std::vector{allDepths, allUseful, allStddevs, allResiduals},
+                everything);
+    return everything;
+  }
 }
 
 } // namespace mdso

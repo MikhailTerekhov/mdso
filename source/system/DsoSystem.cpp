@@ -74,6 +74,9 @@ DsoSystem::DsoSystem(std::vector<std::unique_ptr<KeyFrame>> &restoredKeyFrames,
   marginalizedFrames.reserve(settings.expectedFramesCount);
   keyFrames.reserve(settings.maxKeyFrames() + 1);
 
+  for (DsoObserver *obs : observers.dso)
+    obs->created(this, cam, settings);
+
   for (auto &keyFrame : restoredKeyFrames) {
     keyFrames.push_back(std::move(keyFrame));
     for (DsoObserver *obs : observers.dso) {
@@ -82,9 +85,6 @@ DsoSystem::DsoSystem(std::vector<std::unique_ptr<KeyFrame>> &restoredKeyFrames,
         obs->newFrame(*preKeyFrame);
     }
   }
-
-  for (DsoObserver *obs : observers.dso)
-    obs->created(this, cam, settings);
 
   initializeAllFrames();
 
@@ -250,8 +250,9 @@ int DsoSystem::totalOptimized() const {
 }
 
 bool DsoSystem::doNeedKf(PreKeyFrame *lastFrame) {
-  return allFrames.size() % settings.keyFrameDist() ==
-         (settings.keyFrameDist() - 1);
+  int curTracked = baseFrame().trackedFrames.size();
+  return curTracked > 0 &&
+         curTracked % settings.keyFrameDist() == settings.keyFrameDist() - 1;
 }
 
 void DsoSystem::addFrameTrackerObserver(FrameTrackerObserver *observer) {
