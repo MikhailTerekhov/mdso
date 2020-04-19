@@ -36,8 +36,9 @@ void TrajectoryWriter::keyFramesMarginalized(const KeyFrame *marginalized[],
   PosesPool &pool = frameToWorldPool();
   while (!pool.empty() && pool.top().first < minKfTs) {
     const auto &top = pool.top();
-    mWrittenFrameToWorld.push_back(top.second);
-    putInMatrixForm(ofs, top.second);
+    SE3 frameToWorld = top.second * frameToBody;
+    mWrittenFrameToWorld.push_back(frameToWorld);
+    putInMatrixForm(ofs, frameToWorld);
     writtenKfTs.push_back(top.first);
     pool.pop();
   }
@@ -45,6 +46,10 @@ void TrajectoryWriter::keyFramesMarginalized(const KeyFrame *marginalized[],
 
 void TrajectoryWriter::destructed(const KeyFrame *lastKeyFrames[], int size) {
   keyFramesMarginalized(lastKeyFrames, size);
+}
+
+void TrajectoryWriter::outputModeFrameToWorld(const SE3 &frameToBody) {
+  this->frameToBody = frameToBody;
 }
 
 void TrajectoryWriter::saveTimestamps(const fs::path &timestampsFile) const {

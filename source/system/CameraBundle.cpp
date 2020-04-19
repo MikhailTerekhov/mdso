@@ -14,7 +14,15 @@ CameraBundle::CameraBundle(SE3 bodyToCam[], CameraModel cam[], int size) {
     bundle.emplace_back(bodyToCam[i], cam[i]);
 }
 
-CameraBundle::CamPyr CameraBundle::camPyr(int pyrLevels) {
+void CameraBundle::setCamToBody(int ind, const SE3 &camToBody) {
+  CHECK_GE(ind, 0);
+  CHECK_LT(ind, bundle.size());
+
+  bundle[ind].bodyToThis = camToBody.inverse();
+  bundle[ind].thisToBody = camToBody;
+}
+
+CameraBundle::CamPyr CameraBundle::camPyr(int pyrLevels) const {
   CHECK(pyrLevels > 0 && pyrLevels <= Settings::Pyramid::max_levelNum);
 
   std::vector<CameraModel::CamPyr> pyramids(bundle.size());

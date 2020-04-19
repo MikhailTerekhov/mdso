@@ -135,7 +135,7 @@ public:
   void setMapPolyCoeffs();
   void setUnmapPolyCoeffs();
 
-  CamPyr camPyr(int pyrLevels);
+  CamPyr camPyr(int pyrLevels) const;
 
 private:
   void readUnmap(std::istream &is);

@@ -18,6 +18,7 @@ void CloudWriter::keyFramesMarginalized(const KeyFrame *marginalized[],
     for (int j = 0; j < kf->frames.size(); ++j) {
       const KeyFrameEntry &e = kf->frames[j];
       SE3 thisToWorld = kf->thisToWorld() * cam->bundle[j].thisToBody;
+
       for (const auto &op : e.optimizedPoints) {
         points.push_back(
             thisToWorld *

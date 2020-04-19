@@ -11,6 +11,10 @@ DEFINE_int32(points_per_frame, Settings::KeyFrame::default_immaturePointsNum,
 DEFINE_int32(max_opt_points, Settings::default_maxOptimizedPoints,
              "Maximum number of points present in optimization.");
 
+DEFINE_int32(max_key_frames, Settings::default_maxKeyFrames,
+             "Maximum number of key frames to exist in the optimisation "
+             "simultaneously.");
+
 DEFINE_int32(first_frames_skip,
              Settings::DelaunayDsoInitializer::default_firstFramesSkip,
              "Number of frames to skip between two frames when initializing "
@@ -128,6 +132,7 @@ Settings getFlaggedSettings() {
   settings.disableMarginalization = FLAGS_disable_marginalization;
   settings.setKeyFrameDist(FLAGS_shift_between_keyframes);
   settings.setMaxOptimizedPoints(FLAGS_max_opt_points);
+  settings.setMaxKeyFrames(FLAGS_max_key_frames);
   settings.optimization.lossType = FLAGS_trivial_loss
                                        ? Settings::Optimization::TRIVIAL
                                        : Settings::Optimization::HUBER;

@@ -10,12 +10,12 @@ public:
   TrajectoryWriterPredict(const fs::path &outputDirectory,
                           const fs::path &fileName);
 
+private:
   void addToPool(const KeyFrame &keyFrame) override;
   void addToPool(const PreKeyFrame &frame) override;
   PosesPool &frameToWorldPool() override;
   const fs::path &outputFileName() const override;
 
-private:
   fs::path mOutputFileName;
   PosesPool mFrameToWorldPool;
 };

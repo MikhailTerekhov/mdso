@@ -13,14 +13,15 @@ struct CameraBundle {
 
     CameraEntry(const SE3 &_bodyToThis, const CameraModel &cam);
 
-    const SE3 bodyToThis;
-    const SE3 thisToBody;
+    SE3 bodyToThis;
+    SE3 thisToBody;
     CameraModel cam;
   };
 
   CameraBundle(SE3 bodyToCam[], CameraModel cam[], int size);
 
-  CamPyr camPyr(int levelNum);
+  void setCamToBody(int ind, const SE3 &camToBody);
+  CamPyr camPyr(int levelNum) const;
 
   StdVector<CameraEntry> bundle;
 };

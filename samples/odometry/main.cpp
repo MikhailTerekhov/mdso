@@ -89,6 +89,10 @@ DEFINE_bool(
     "time, instead of using the output_directory flag. The precise format for "
     "the name is output/YYYYMMDD_HHMMSS");
 
+DEFINE_bool(move_body_from_camera, false,
+            "If set to true, nontrivial motion between camera body and image "
+            "is added.");
+
 class TrackingErrorCollector : public FrameTrackerObserver {
 public:
   TrackingErrorCollector(int numLevels)
@@ -228,9 +232,6 @@ It should contain "info" and "data" subdirectories.)abacaba";
     std::cout << "mean int = " << int(meanDog);
   }
 
-  CameraBundle cam = reader.cam();
-  CameraBundle::CamPyr camPyr = cam.camPyr(settings.pyramid.levelNum());
-
   if (FLAGS_gen_gt_only) {
     std::vector<std::vector<Vec3>> pointsInFrameGT(reader.numFrames());
     std::vector<std::vector<cv::Vec3b>> colors(reader.numFrames());
@@ -250,12 +251,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
     return 0;
   }
 
-  std::vector<int> drawingOrder(1, 0);
-  DebugImageDrawer debugImageDrawer(drawingOrder);
-  TrackingDebugImageDrawer trackingDebugImageDrawer(
-      camPyr.data(), settings.frameTracker, settings.pyramid, drawingOrder);
   TrajectoryWriterDso trajectoryWriter(outDir / FLAGS_trajectory_filename);
-
   StdVector<SE3> frameToWorldGT(reader.numFrames());
   std::vector<Timestamp> timestamps(reader.numFrames());
   for (int i = 0; i < timestamps.size(); ++i) {
@@ -265,9 +261,24 @@ It should contain "info" and "data" subdirectories.)abacaba";
   TrajectoryWriterGT trajectoryWriterGT(frameToWorldGT.data(),
                                         timestamps.data(), timestamps.size(),
                                         outDir, FLAGS_gt_trajectory_filename);
-
   TrajectoryWriterPredict trajectoryWriterPredict(
       outDir, FLAGS_pred_trajectory_filename);
+
+  CameraBundle cam = reader.cam();
+  if (FLAGS_move_body_from_camera) {
+    CHECK_EQ(cam.bundle.size(), 1);
+    std::mt19937 mt;
+    SE3 camToBody = SE3::sampleUniform(mt);
+    cam.setCamToBody(0, camToBody);
+    trajectoryWriter.outputModeFrameToWorld(camToBody);
+    trajectoryWriterPredict.outputModeFrameToWorld(camToBody);
+  }
+  CameraBundle::CamPyr camPyr = cam.camPyr(settings.pyramid.levelNum());
+
+  std::vector<int> drawingOrder(1, 0);
+  DebugImageDrawer debugImageDrawer(drawingOrder);
+  TrackingDebugImageDrawer trackingDebugImageDrawer(
+      camPyr.data(), settings.frameTracker, settings.pyramid, drawingOrder);
 
   std::unique_ptr<CloudWriter> cloudWriter;
   if (FLAGS_gen_cloud)

@@ -66,7 +66,9 @@ DsoInitializer::InitializedVector DelaunayDsoInitializer::initialize() {
     initFrames.emplace_back(&frames[i], &timestamps[i], 1);
 
   initFrames[0].thisToWorld = SE3();
-  initFrames[1].thisToWorld = firstToSecond.inverse();
+  initFrames[1].thisToWorld = cam->bundle[0].thisToBody *
+                              firstToSecond.inverse() *
+                              cam->bundle[0].bodyToThis;
 
   if (settings.initializer.usePlainTriangulation) {
     Terrain terrains[2] = {Terrain(&cam->bundle[0].cam, keyPoints[0], depths[0],

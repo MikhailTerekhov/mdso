@@ -240,7 +240,7 @@ cv::Mat1b downsampleMask(const cv::Mat1b &mask, int lvl) {
   return result;
 }
 
-CameraModel::CamPyr CameraModel::camPyr(int pyrLevels) {
+CameraModel::CamPyr CameraModel::camPyr(int pyrLevels) const {
   CHECK(pyrLevels > 0 && pyrLevels <= Settings::Pyramid::max_levelNum);
   CamPyr result;
   for (int i = 0; i < pyrLevels; ++i) {
