@@ -16,22 +16,43 @@ namespace mdso {
 BundleAdjusterCeres::~BundleAdjusterCeres() {}
 
 struct DirectResidual {
-  DirectResidual(PreKeyFrameEntryInternals::Interpolator_t *hostFrame,
-                 PreKeyFrameEntryInternals::Interpolator_t *targetFrame,
-                 const CameraModel *targetCam, OptimizedPoint *optimizedPoint,
-                 const Vec2 &pos, const SE3 &hostFrameToBody,
-                 const SE3 &targetBodyToFrame, KeyFrame *hostKf,
-                 KeyFrame *targetKf, const Settings::Depth &depthSettings)
-      : targetCam(targetCam)
-      , hostDirection(targetCam->unmap(pos).normalized())
-      , hostFrameToBody(hostFrameToBody)
-      , targetBodyToFrame(targetBodyToFrame)
-      , targetFrame(targetFrame)
+  DirectResidual(CameraBundle *cameraBundle, KeyFrameEntry *hostKfEntry,
+                 KeyFrameEntry *targetKfEntry, OptimizedPoint *optimizedPoint,
+                 int numInPattern, const BundleAdjusterSettings &settings)
+      : cameraBundle(cameraBundle)
+      , hostCam(&cameraBundle->bundle[hostKfEntry->ind].cam)
+      , targetCam(&cameraBundle->bundle[targetKfEntry->ind].cam)
+      , hostKf(hostKfEntry->host)
+      , targetKf(targetKfEntry->host)
+      , hostImage(&hostKf->preKeyFrame->frames[hostKfEntry->ind]
+                       .internals->interpolator(0))
+      , targetImage(&targetKf->preKeyFrame->frames[targetKfEntry->ind]
+                         .internals->interpolator(0))
+      , hostFrameToBody(cameraBundle->bundle[hostKfEntry->ind].thisToBody)
+      , targetBodyToFrame(cameraBundle->bundle[targetKfEntry->ind].bodyToThis)
       , optimizedPoint(optimizedPoint)
-      , hostKf(hostKf)
-      , targetKf(targetKf)
-      , depthSettings(depthSettings) {
-    hostFrame->Evaluate(pos[1], pos[0], &hostIntensity);
+      , hostDirection(optimizedPoint->dir)
+      , numInPattern(numInPattern)
+      , settings(settings) {
+    Vec2 pixelPos =
+        optimizedPoint->p + settings.residualPattern.pattern()[numInPattern];
+    hostImage->Evaluate(pixelPos[1], pixelPos[0], &hostIntensity);
+    Vec3 hostPatternDir = hostCam->unmap(pixelPos).normalized();
+    SE3 hostToWorld = hostKf->thisToWorld();
+    SE3 targetToWorld = targetKf->thisToWorld();
+    double depth = optimizedPoint->depth();
+    SE3 hostFrameToTargetFrame = targetBodyToFrame * targetToWorld.inverse() *
+                                 hostToWorld * hostFrameToBody;
+    Vec3 targetPatternDir, targetPointDir;
+    if (depth > settings.depth.max) {
+      targetPatternDir = hostFrameToTargetFrame.so3() * hostPatternDir;
+      targetPointDir = hostFrameToTargetFrame.so3() * hostDirection;
+    } else {
+      targetPatternDir = hostFrameToTargetFrame * (depth * hostPatternDir);
+      targetPointDir = hostFrameToTargetFrame * (depth * hostDirection);
+    }
+    targetPatternDelta =
+        targetCam->map(targetPatternDir) - targetCam->map(targetPointDir);
   }
 
   template <typename T>
@@ -68,12 +89,12 @@ struct DirectResidual {
     AffineLightTransform<T> lightWorldToTarget(targetAffLightP[0],
                                                targetAffLightP[1]);
 
-    T depth = depthSettings.useMinPlusExpParametrization
-                  ? depthSettings.min + ceres::exp(*depthParamP)
+    T depth = settings.depth.useMinPlusExpParametrization
+                  ? settings.depth.min + ceres::exp(*depthParamP)
                   : ceres::exp(*depthParamP);
 
     Vec3t targetPos;
-    if (depth > T(depthSettings.max))
+    if (depth > T(settings.depth.max))
       targetPos = targetBodyToFrameT.so3() *
                   (targetToWorld.so3().inverse() *
                    (hostToWorld.so3() *
@@ -83,9 +104,10 @@ struct DirectResidual {
                   (targetToWorld.inverse() *
                    (hostToWorld *
                     (hostFrameToBodyT * (hostDirection.cast<T>() * depth))));
-    Vec2t targetPosMapped = targetCam->map(targetPos);
+    Vec2t targetPosMapped =
+        targetCam->map(targetPos) + targetPatternDelta.cast<T>();
     T trackedIntensity;
-    targetFrame->Evaluate(targetPosMapped[1], targetPosMapped[0],
+    targetImage->Evaluate(targetPosMapped[1], targetPosMapped[0],
                           &trackedIntensity);
     T transformedHostIntensity =
         lightWorldToTarget(lightWorldToHost.inverse()(T(hostIntensity)));
@@ -94,15 +116,20 @@ struct DirectResidual {
     return true;
   }
 
-  const CameraModel *targetCam;
-  Vec3 hostDirection;
-  double hostIntensity;
-  SE3 hostFrameToBody, targetBodyToFrame;
-  PreKeyFrameEntryInternals::Interpolator_t *targetFrame;
-  OptimizedPoint *optimizedPoint;
+  CameraBundle *cameraBundle;
+  CameraModel *hostCam;
+  CameraModel *targetCam;
   KeyFrame *hostKf;
   KeyFrame *targetKf;
-  Settings::Depth depthSettings;
+  PreKeyFrameEntryInternals::Interpolator_t *hostImage;
+  PreKeyFrameEntryInternals::Interpolator_t *targetImage;
+  SE3 hostFrameToBody, targetBodyToFrame;
+  OptimizedPoint *optimizedPoint;
+  Vec3 hostDirection;
+  int numInPattern;
+  double hostIntensity;
+  Vec2 targetPatternDelta;
+  const BundleAdjusterSettings &settings;
 };
 
 void logOobStatistics(const std::vector<DirectResidual *> &residuals,
@@ -272,24 +299,19 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
             }
 
             for (int i = 0; i < PS; ++i) {
-              const Vec2 &shiftedP =
-                  op.p + settings.residualPattern.pattern()[i];
-
               CHECK(cam->bundle[hostCamInd].cam.isOnImage(op.p, PH))
                   << "Optimized point is not on the image! p = "
                   << op.p.transpose() << "d = " << op.depth()
                   << " min = " << op.minDepth << " max = " << op.maxDepth;
 
               DirectResidual *newResidual = new DirectResidual(
-                  &hostFrame->preKeyFrame->frames[hostCamInd]
-                       .internals->interpolator(0),
-                  &targetFrame->preKeyFrame->frames[targetCamInd]
-                       .internals->interpolator(0),
-                  &targetCam, &op, shiftedP, baseToBody, bodyToTarget,
-                  hostFrame, targetFrame, settings.depth);
+                  cam, &hostFrame->frames[hostCamInd],
+                  &targetFrame->frames[targetCamInd], &op, i, settings);
 
               residuals.push_back(newResidual);
 
+              const Vec2 &shiftedP =
+                  op.p + settings.residualPattern.pattern()[i];
               double gradNorm =
                   hostFrame->preKeyFrame->frames[hostCamInd].gradNorm(
                       toCvPoint(shiftedP));

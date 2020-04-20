@@ -27,13 +27,15 @@ struct DepthedPoints {
 template <typename PointType> class Reprojector {
 public:
   Reprojector(const KeyFrame *const *keyFrames, int numKeyFrames,
-              const SE3 &targetBodyToWorld, int borderSize = 0)
+              const SE3 &targetBodyToWorld,
+              const Settings::Depth &depthSettings, int borderSize = 0)
       : targetWorldToBody(targetBodyToWorld.inverse())
       , keyFrames(keyFrames, keyFrames + numKeyFrames)
       , cam(numKeyFrames <= 0 ? nullptr : keyFrames[0]->preKeyFrame->cam)
       , borderSize(borderSize)
       , numCams(cam->bundle.size())
-      , numKeyFrames(numKeyFrames) {
+      , numKeyFrames(numKeyFrames)
+      , depthSettings(depthSettings) {
     CHECK_GE(numKeyFrames, 0);
   }
 
@@ -50,6 +52,7 @@ private:
   int borderSize;
   int numCams;
   int numKeyFrames;
+  Settings::Depth depthSettings;
 };
 
 } // namespace mdso

@@ -62,7 +62,10 @@ StdVector<Reprojection> Reprojector<PointType>::reproject() const {
           const PointType &p = points[pointInd];
           if (!isUseful(p))
             continue;
-          Vec3 vInTarget = hostCamToTargetCam * (getDepth(p) * p.dir);
+          double depth = getDepth(p);
+          Vec3 vInTarget = depth > depthSettings.max
+                               ? hostCamToTargetCam.so3() * p.dir
+                               : hostCamToTargetCam * (depth * p.dir);
           if (!targetCam.isMappable(vInTarget))
             continue;
           Vec2 reprojected = targetCam.map(vInTarget);

@@ -295,14 +295,16 @@ void DsoSystem::activateOptimizedDist() {
           numAvail++;
   VLOG(1) << "num avail = " << numAvail;
 
-  Reprojector<OptimizedPoint> optimizedReprojector(
-      kfPtrs.data(), kfPtrs.size(), baseFrame().thisToWorld(), PH);
+  Reprojector<OptimizedPoint> optimizedReprojector(kfPtrs.data(), kfPtrs.size(),
+                                                   baseFrame().thisToWorld(),
+                                                   settings.depth, PH);
   DepthedPoints optimizedReproj = optimizedReprojector.reprojectDepthed();
 
   DistanceMap distMap(cam, optimizedReproj.points.data(), settings.distanceMap);
 
   Reprojector<ImmaturePoint> immatureReprojector(kfPtrs.data(), kfPtrs.size(),
-                                                 baseFrame().thisToWorld(), PH);
+                                                 baseFrame().thisToWorld(),
+                                                 settings.depth, PH);
   StdVector<Reprojection> immatureReprojections =
       immatureReprojector.reproject();
 
@@ -449,7 +451,7 @@ FrameTracker::DepthedMultiFrame DsoSystem::getBaseForTrack() const {
     kfPtrs.push_back(keyFrame.get());
   DepthedPoints depthedPoints =
       Reprojector<PointT>(kfPtrs.data(), kfPtrs.size(),
-                          FrameToWorldExtractor()(&baseFrame()),
+                          FrameToWorldExtractor()(&baseFrame()), settings.depth,
                           settings.residualPattern.height)
           .reprojectDepthed();
 
@@ -505,7 +507,8 @@ void DsoSystem::addMultiFrame(const cv::Mat3b frames[],
 
       std::vector<const KeyFrame *> kfPtrs = getKeyFrames();
       Reprojector<ImmaturePoint> reprojector(kfPtrs.data(), kfPtrs.size(),
-                                             baseFrame().thisToWorld(), PH);
+                                             baseFrame().thisToWorld(),
+                                             settings.depth, PH);
       DepthedPoints reprojected = reprojector.reprojectDepthed();
 
       FrameTracker::DepthedMultiFrame baseForTrack;
@@ -607,7 +610,8 @@ void DsoSystem::addMultiFrame(const cv::Mat3b frames[],
 
     std::vector<const KeyFrame *> kfPtrs = getKeyFrames();
     Reprojector<OptimizedPoint> reprojector(kfPtrs.data(), kfPtrs.size(),
-                                            baseFrame().thisToWorld(), PH);
+                                            baseFrame().thisToWorld(),
+                                            settings.depth, PH);
     DepthedPoints reprojected = reprojector.reprojectDepthed();
 
     FrameTracker::DepthedMultiFrame baseForTrack;

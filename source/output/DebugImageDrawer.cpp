@@ -94,6 +94,7 @@ DebugImageDrawer::drawUseful(const std::vector<const KeyFrame *> &keyFrames,
   StdVector<Reprojection> reprojectionsOnLast =
       Reprojector<OptimizedPoint>(keyFrames.data(), keyFrames.size(),
                                   dso->bodyToWorld(lastFrame->globalFrameNum),
+                                  settings.depth,
                                   settings.residualPattern.height)
           .reproject();
 
@@ -162,12 +163,12 @@ cv::Mat3b DebugImageDrawer::draw() {
   std::vector<const KeyFrame *> keyFrames = dso->getKeyFrames();
   StdVector<Reprojection> immatures =
       Reprojector<ImmaturePoint>(keyFrames.data(), keyFrames.size(),
-                                 baseFrame->thisToWorld(),
+                                 baseFrame->thisToWorld(), settings.depth,
                                  settings.residualPattern.height)
           .reproject();
   StdVector<Reprojection> optimized =
       Reprojector<OptimizedPoint>(keyFrames.data(), keyFrames.size(),
-                                  baseFrame->thisToWorld(),
+                                  baseFrame->thisToWorld(), settings.depth,
                                   settings.residualPattern.height)
           .reproject();
   std::vector<cv::Mat3b> depths = drawProjDepths(immatures, optimized);
