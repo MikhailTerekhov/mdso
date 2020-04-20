@@ -6,6 +6,7 @@
 #include "system/SerializerMode.h"
 #include "util/types.h"
 #include <filesystem>
+#include <fstream>
 
 namespace fishdso {
 

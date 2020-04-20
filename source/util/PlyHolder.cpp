@@ -1,5 +1,6 @@
 #include "util/PlyHolder.h"
 #include <glog/logging.h>
+#include <fstream>
 
 namespace fishdso {
 

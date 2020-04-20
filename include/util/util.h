@@ -3,6 +3,7 @@
 
 #include "util/settings.h"
 #include "util/types.h"
+#include <fstream>
 #include <opencv2/opencv.hpp>
 #include <vector>
 
