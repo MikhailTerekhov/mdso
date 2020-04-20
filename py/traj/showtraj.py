@@ -4,6 +4,7 @@ from fnmatch import fnmatch
 import argparse
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import seaborn as sns
 from matplotlib.widgets import Slider
 from mpl_toolkits.mplot3d import Axes3D
 from traj import *
@@ -16,8 +17,9 @@ win_size = 10
 img_w = 12
 img_h = 12
 
-def color_gen():
-    return cycle(['blue', 'red', 'orange'])
+sns.reset_orig()
+def color_gen(num):
+    return cycle(sns.color_palette(n_colors=num))
 
 def set_invis(a):
     for x in a:
@@ -168,7 +170,7 @@ else:
 artists = []
 trajs = []
 
-colors = color_gen()
+colors = color_gen(len(args.traj))
 
 for ind, (fname, label) in enumerate(zip(args.traj, labels)):
     print(f'processing {fname}...')
@@ -213,7 +215,7 @@ def err(m1, m2):
 if args.errors:
     assert args.gt
     
-    colors = color_gen()
+    colors = color_gen(len(args.traj))
 
     plt.figure()
     for traj, label in zip(trajs, labels):
