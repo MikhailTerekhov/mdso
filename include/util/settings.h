@@ -239,6 +239,15 @@ struct Settings {
 
     static constexpr double default_max = 1e4;
     double max = default_max;
+
+    static constexpr bool default_setMinBound = true;
+    bool setMinBound = default_setMinBound;
+
+    static constexpr bool default_setMaxBound = true;
+    bool setMaxBound = default_setMaxBound;
+
+    static constexpr bool default_useMinPlusExpParametrization = false;
+    bool useMinPlusExpParametrization = default_useMinPlusExpParametrization;
   } depth;
 
   struct ResidualWeighting {
@@ -371,8 +380,9 @@ struct Settings {
   ResidualSettings getResidualSettings() const;
   EnergyFunctionSettings getEnergyFunctionSettings() const;
 
+  Settings getDsoLikeSettings() const;
   Settings getGradientAdjustedSettings(double intencityRequiredToThis,
-                                       double gradNormRequiredToThis);
+                                       double gradNormRequiredToThis) const;
 
 private:
   int mKeyFrameDist = default_keyFrameDist;

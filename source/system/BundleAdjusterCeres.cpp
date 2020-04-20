@@ -21,7 +21,7 @@ struct DirectResidual {
                  const CameraModel *targetCam, OptimizedPoint *optimizedPoint,
                  const Vec2 &pos, const SE3 &hostFrameToBody,
                  const SE3 &targetBodyToFrame, KeyFrame *hostKf,
-                 KeyFrame *targetKf)
+                 KeyFrame *targetKf, const Settings::Depth &depthSettings)
       : targetCam(targetCam)
       , hostDirection(targetCam->unmap(pos).normalized())
       , hostFrameToBody(hostFrameToBody)
@@ -29,12 +29,13 @@ struct DirectResidual {
       , targetFrame(targetFrame)
       , optimizedPoint(optimizedPoint)
       , hostKf(hostKf)
-      , targetKf(targetKf) {
+      , targetKf(targetKf)
+      , depthSettings(depthSettings) {
     hostFrame->Evaluate(pos[1], pos[0], &hostIntensity);
   }
 
   template <typename T>
-  bool operator()(const T *const logDepthP, const T *const hostTransP,
+  bool operator()(const T *const depthParamP, const T *const hostTransP,
                   const T *const hostRotP, const T *const targetTransP,
                   const T *const targetRotP, const T *const hostAffP,
                   const T *const targetAffP, T *res) const {
@@ -67,11 +68,21 @@ struct DirectResidual {
     AffineLightTransform<T> lightWorldToTarget(targetAffLightP[0],
                                                targetAffLightP[1]);
 
-    T depth = ceres::exp((*logDepthP));
-    Vec3t targetPos = targetBodyToFrameT *
-                      (targetToWorld.inverse() *
-                       (hostToWorld * (hostFrameToBodyT *
-                                       (hostDirection.cast<T>() * depth))));
+    T depth = depthSettings.useMinPlusExpParametrization
+                  ? depthSettings.min + ceres::exp(*depthParamP)
+                  : ceres::exp(*depthParamP);
+
+    Vec3t targetPos;
+    if (depth > T(depthSettings.max))
+      targetPos = targetBodyToFrameT.so3() *
+                  (targetToWorld.so3().inverse() *
+                   (hostToWorld.so3() *
+                    (hostFrameToBodyT.so3() * (hostDirection.cast<T>()))));
+    else
+      targetPos = targetBodyToFrameT *
+                  (targetToWorld.inverse() *
+                   (hostToWorld *
+                    (hostFrameToBodyT * (hostDirection.cast<T>() * depth))));
     Vec2t targetPosMapped = targetCam->map(targetPos);
     T trackedIntensity;
     targetFrame->Evaluate(targetPosMapped[1], targetPosMapped[0],
@@ -91,7 +102,32 @@ struct DirectResidual {
   OptimizedPoint *optimizedPoint;
   KeyFrame *hostKf;
   KeyFrame *targetKf;
+  Settings::Depth depthSettings;
 };
+
+void logOobStatistics(const std::vector<DirectResidual *> &residuals,
+                      const BundleAdjusterSettings &settings) {
+  int numOob = 0, numOobBigDepth = 0;
+  for (const DirectResidual *res : residuals) {
+    SE3 hostToWorld = res->hostKf->thisToWorld();
+    SE3 hostCamToBody = res->hostFrameToBody;
+    SE3 targetToWorld = res->targetKf->thisToWorld();
+    SE3 targetBodyToCam = res->targetBodyToFrame;
+    SE3 hostToTarget =
+        targetBodyToCam * targetToWorld.inverse() * hostToWorld * hostCamToBody;
+    double depth = res->optimizedPoint->depth();
+    Vec2 reproj =
+        res->targetCam->map(hostToTarget * (depth * res->optimizedPoint->dir));
+
+    if (!res->targetCam->isOnImage(reproj, PH)) {
+      numOob++;
+      if (depth > settings.depth.max)
+        numOobBigDepth++;
+    }
+  }
+  LOG(INFO) << "total resduals; total OOB; OOB with big depths:";
+  LOG(INFO) << residuals.size() << ' ' << numOob << ' ' << numOobBigDepth;
+}
 
 void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
                                  const BundleAdjusterSettings &settings) const {
@@ -99,6 +135,9 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
 
   CameraBundle *cam = keyFrames[0]->preKeyFrame->cam;
   StdVector<SE3> bodyToWorld;
+  std::vector<std::pair<OptimizedPoint *, double>> depthParams;
+  depthParams.reserve(Settings::max_maxOptimizedPoints);
+  auto oldDepthParamsBegin = depthParams.begin();
 
   int pointsTotal = 0, pointsOOB = 0;
 
@@ -165,27 +204,50 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
     problem.SetParameterBlockConstant(bodyToWorld[1].so3().data());
   }
 
-  int numBadDepths = 0;
+  std::vector<DirectResidual *> residuals;
+
+  int numPoints = 0;
+  int numBadDepths = 0, numOobSmallDepths = 0, numOobLargeDepths = 0;
   for (int hostInd = 0; hostInd < numKeyFrames; ++hostInd) {
     KeyFrame *hostFrame = keyFrames[hostInd];
     for (int hostCamInd = 0; hostCamInd < cam->bundle.size(); ++hostCamInd) {
       KeyFrameEntry &hostEntry = hostFrame->frames[hostCamInd];
       for (auto &op : hostEntry.optimizedPoints) {
-        if (!std::isfinite(op.logDepth)) {
+        numPoints++;
+        if ((settings.depth.setMinBound ||
+             settings.depth.useMinPlusExpParametrization) &&
+            op.depth() <= settings.depth.min) {
+          numOobSmallDepths++;
+          continue;
+        }
+        if (settings.depth.setMaxBound && op.depth() > settings.depth.max) {
+          numOobLargeDepths++;
+          continue;
+        }
+        if (op.depth() < 0 || !std::isfinite(op.depth())) {
           numBadDepths++;
           continue;
         }
-        if (op.depth() <= settings.depth.min ||
-            op.depth() >= settings.depth.max)
-          continue;
 
-        problem.AddParameterBlock(&op.logDepth, 1);
-        problem.SetParameterLowerBound(&op.logDepth, 0,
-                                       std::log(settings.depth.min));
-        problem.SetParameterUpperBound(&op.logDepth, 0,
-                                       std::log(settings.depth.max));
+        depthParams.emplace_back(&op, std::log(op.depth()));
+        double *depthParamPtr = &depthParams.back().second;
+        problem.AddParameterBlock(depthParamPtr, 1);
+        if (settings.depth.useMinPlusExpParametrization)
+          *depthParamPtr = std::log(op.depth() - settings.depth.min);
+        else if (settings.depth.setMinBound)
+          problem.SetParameterLowerBound(depthParamPtr, 0,
+                                         std::log(settings.depth.min));
+        if (settings.depth.setMaxBound) {
+          if (settings.depth.useMinPlusExpParametrization)
+            problem.SetParameterUpperBound(
+                depthParamPtr, 0,
+                std::log(settings.depth.max - settings.depth.min));
+          else
+            problem.SetParameterUpperBound(depthParamPtr, 0,
+                                           std::log(settings.depth.max));
+        }
 
-        ordering->AddElementToGroup(&op.logDepth, 0);
+        ordering->AddElementToGroup(depthParamPtr, 0);
 
         for (int targetInd = 0; targetInd < numKeyFrames; ++targetInd) {
           KeyFrame *targetFrame = keyFrames[targetInd];
@@ -215,7 +277,7 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
 
               CHECK(cam->bundle[hostCamInd].cam.isOnImage(op.p, PH))
                   << "Optimized point is not on the image! p = "
-                  << op.p.transpose() << "d = " << op.logDepth
+                  << op.p.transpose() << "d = " << op.depth()
                   << " min = " << op.minDepth << " max = " << op.maxDepth;
 
               DirectResidual *newResidual = new DirectResidual(
@@ -224,7 +286,9 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
                   &targetFrame->preKeyFrame->frames[targetCamInd]
                        .internals->interpolator(0),
                   &targetCam, &op, shiftedP, baseToBody, bodyToTarget,
-                  hostFrame, targetFrame);
+                  hostFrame, targetFrame, settings.depth);
+
+              residuals.push_back(newResidual);
 
               double gradNorm =
                   hostFrame->preKeyFrame->frames[hostCamInd].gradNorm(
@@ -238,7 +302,7 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
               problem.AddResidualBlock(
                   new ceres::AutoDiffCostFunction<DirectResidual, 1, 1, 3, 4, 3,
                                                   4, 2, 2>(newResidual),
-                  lossFunc, &op.logDepth,
+                  lossFunc, depthParamPtr,
                   bodyToWorld[hostInd].translation().data(),
                   bodyToWorld[hostInd].so3().data(),
                   bodyToWorld[targetInd].translation().data(),
@@ -252,9 +316,12 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
     }
   }
 
-  if (numBadDepths > 0)
-    LOG(WARNING) << "There are " << numBadDepths
-                 << " non-number depths in optimized points";
+  CHECK(oldDepthParamsBegin == depthParams.begin());
+
+  LOG(INFO) << "total points = " << numPoints
+            << " OOB small = " << numOobSmallDepths
+            << " OOB large = " << numOobLargeDepths
+            << " bad = " << numBadDepths;
 
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_SCHUR;
@@ -266,8 +333,17 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
 
   for (int kfInd = 0; kfInd < numKeyFrames; ++kfInd)
     keyFrames[kfInd]->thisToWorld.setValue(bodyToWorld[kfInd]);
+  for (auto [op, depthParam] : depthParams) {
+    double depth = settings.depth.useMinPlusExpParametrization
+                       ? settings.depth.min + std::exp(depthParam)
+                       : std::exp(depthParam);
+    if (depth > 0)
+      op->setDepth(depth);
+  }
 
   LOG(INFO) << summary.FullReport() << std::endl;
+
+  logOobStatistics(residuals, settings);
 }
 
 } // namespace mdso

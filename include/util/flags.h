@@ -10,6 +10,10 @@ DECLARE_int32(points_per_frame);
 DECLARE_int32(max_opt_points);
 DECLARE_int32(max_key_frames);
 
+DECLARE_bool(set_min_depth);
+DECLARE_bool(set_max_depth);
+DECLARE_bool(min_plus_exp_depth);
+
 DECLARE_int32(first_frames_skip);
 DECLARE_bool(run_max_RANSAC_iterations);
 DECLARE_bool(average_ORB_motion);
@@ -48,6 +52,8 @@ DECLARE_bool(deterministic);
 DECLARE_int32(shift_between_keyframes);
 
 DECLARE_bool(trivial_loss);
+
+DECLARE_bool(dso_like);
 
 namespace mdso {
 

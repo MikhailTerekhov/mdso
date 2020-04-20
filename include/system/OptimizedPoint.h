@@ -23,6 +23,10 @@ struct OptimizedPoint {
 
   void activate(double depth);
 
+  inline void setDepth(double depth) {
+    CHECK_GT(depth, 0);
+    logDepth = std::log(depth);
+  }
   inline double depth() const { return std::exp(logDepth); }
 
   Vec2 p;

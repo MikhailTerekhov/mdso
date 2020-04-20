@@ -15,6 +15,16 @@ DEFINE_int32(max_key_frames, Settings::default_maxKeyFrames,
              "Maximum number of key frames to exist in the optimisation "
              "simultaneously.");
 
+DEFINE_bool(set_min_depth, Settings::Depth::default_setMinBound,
+            "Do we need to set minimum depth in ceres? This flag is shadowed "
+            "if min_plus_exp_depth is enabled.");
+DEFINE_bool(set_max_depth, Settings::Depth::default_setMaxBound,
+            "Do we need to set maximum depth in ceres?");
+DEFINE_bool(min_plus_exp_depth,
+            Settings::Depth::default_useMinPlusExpParametrization,
+            "If set, depths are parameterized as d = d_{min} + exp(d_p) inside "
+            "of ceres, d_p being an actual parameter of optimization.");
+
 DEFINE_int32(first_frames_skip,
              Settings::DelaunayDsoInitializer::default_firstFramesSkip,
              "Number of frames to skip between two frames when initializing "
@@ -100,6 +110,10 @@ DEFINE_int32(shift_between_keyframes, Settings::default_keyFrameDist,
 
 DEFINE_bool(trivial_loss, false, "Use trivial loss function?");
 
+DEFINE_bool(
+    dso_like, false,
+    "If set, some settings wil be overwritten to resemble original DSO setup.");
+
 namespace mdso {
 
 Settings getFlaggedSettings() {
@@ -107,6 +121,9 @@ Settings getFlaggedSettings() {
 
   settings.threading.numThreads = FLAGS_num_threads;
   settings.keyFrame.setImmaturePointsNum(FLAGS_points_per_frame);
+  settings.depth.setMinBound = FLAGS_set_min_depth;
+  settings.depth.setMaxBound = FLAGS_set_max_depth;
+  settings.depth.useMinPlusExpParametrization = FLAGS_min_plus_exp_depth;
   settings.delaunayDsoInitializer.firstFramesSkip = FLAGS_first_frames_skip;
   settings.stereoMatcher.stereoGeometryEstimator.runMaxRansacIter =
       FLAGS_run_max_RANSAC_iterations;
@@ -136,6 +153,9 @@ Settings getFlaggedSettings() {
   settings.optimization.lossType = FLAGS_trivial_loss
                                        ? Settings::Optimization::TRIVIAL
                                        : Settings::Optimization::HUBER;
+
+  if (FLAGS_dso_like)
+    settings = settings.getDsoLikeSettings();
 
   return settings;
 }
