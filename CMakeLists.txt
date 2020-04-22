@@ -70,6 +70,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/optimize/DeltaParameterVector.h
     ${PROJECT_SOURCE_DIR}/include/optimize/Hessian.h
     ${PROJECT_SOURCE_DIR}/include/optimize/Gradient.h
+    ${PROJECT_SOURCE_DIR}/include/optimize/StepController.h
 
     ${PROJECT_SOURCE_DIR}/include/data/DatasetReader.h
     ${PROJECT_SOURCE_DIR}/include/data/RobotcarReader.h
@@ -146,6 +147,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/optimize/DeltaParameterVector.cpp
     ${PROJECT_SOURCE_DIR}/source/optimize/Hessian.cpp
     ${PROJECT_SOURCE_DIR}/source/optimize/Gradient.cpp
+    ${PROJECT_SOURCE_DIR}/source/optimize/StepController.cpp
 
     ${PROJECT_SOURCE_DIR}/source/data/DatasetReader.cpp
     ${PROJECT_SOURCE_DIR}/source/data/RobotcarReader.cpp

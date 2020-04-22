@@ -294,6 +294,29 @@ struct Settings {
   } threading;
 
   struct Optimization {
+    struct StepControl {
+      static constexpr double default_initialLambda = 1e-4;
+      double initialLambda = default_initialLambda;
+
+      static constexpr double default_failMultiplier = 2;
+      double failMultiplier = default_failMultiplier;
+
+      static constexpr double default_successMultiplier = 0.5;
+      double successMultiplier = default_successMultiplier;
+
+      static constexpr double default_minAbsPredictedDiff = 1e-6;
+      double minAbsPredictedDiff = default_minAbsPredictedDiff;
+
+      static constexpr double default_badRelDifference = 0.1;
+      double badRelDifference = default_badRelDifference;
+
+      static constexpr double default_goodRelDifference = 0.4;
+      double goodRelDifference = default_goodRelDifference;
+
+      static constexpr double default_acceptedRelDifference = 1e-3;
+      double acceptedRelDifference = default_acceptedRelDifference;
+    } stepControl;
+
     enum Loss { TRIVIAL, HUBER };
 
     static constexpr Loss default_lossType = HUBER;
@@ -310,15 +333,6 @@ struct Settings {
 
     static constexpr double default_minFirstToSecondRadius = 1e-2;
     double minFirstToSecondRadius = default_minFirstToSecondRadius;
-
-    static constexpr double default_initialLambda = 0.1;
-    double initialLambda = default_initialLambda;
-
-    static constexpr double default_failMultiplier = 2;
-    double failMultiplier = default_failMultiplier;
-
-    static constexpr double default_successMultiplier = 0.5;
-    double successMultiplier = default_successMultiplier;
 
     static constexpr double default_pointPointThres = 1e-7;
     double pointPointThres = default_pointPointThres;

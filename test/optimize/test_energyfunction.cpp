@@ -16,7 +16,6 @@ DEFINE_bool(profile_only, false,
 DEFINE_int32(num_evaluations, 1000,
              "Number of evaluations to perform for profiling (is only used "
              "when --profile_only is on).");
-DEFINE_double(init_lambda, 1, "Initial lambda for Levenberg-Marquardt.");
 
 using namespace mdso;
 using namespace mdso::optimize;
@@ -29,11 +28,13 @@ template <typename T> struct ErrorBounds;
 template <> struct ErrorBounds<float> {
   static constexpr float hessianRelErr = 1e-2;
   static constexpr float gradientRelErr = 2e-2;
+  static constexpr float predictionRelErr = 1e-2;
 };
 
 template <> struct ErrorBounds<double> {
   static constexpr double hessianRelErr = 1e-10;
   static constexpr double gradientRelErr = 1e-10;
+  static constexpr double predictionRelErr = 1e-10;
 };
 
 class EnergyFunctionTest : public ::testing::Test {
@@ -56,7 +57,6 @@ protected:
 
   void SetUp() override {
     settings = getFlaggedSettings();
-    settings.optimization.initialLambda = FLAGS_init_lambda;
     settings.setMaxOptimizedPoints(pointsPerFrame * keyFramesCount);
     settings.keyFrame.setImmaturePointsNum(pointsPerFrame);
     energyFunctionSettings = settings.getEnergyFunctionSettings();
@@ -165,12 +165,12 @@ protected:
           host->frames[0].lightWorldToThis.cast<T>(), lightHostToTarget,
           energyFunction->getLogDepth(res), cachedValues);
 
-      setFrame(expectedJacobian, ri, hi, hci, rj.dr_dq_host(PS),
-               rj.dr_dt_host(PS), rj.dr_daff_host(PS));
-      setFrame(expectedJacobian, ri, ti, tci, rj.dr_dq_target(PS),
-               rj.dr_dt_target(PS), rj.dr_daff_target(PS));
+      setFrame(expectedJacobian, ri, hi, hci, rj.dr_dq_host(), rj.dr_dt_host(),
+               rj.dr_daff_host());
+      setFrame(expectedJacobian, ri, ti, tci, rj.dr_dq_target(),
+               rj.dr_dt_target(), rj.dr_daff_target());
       int depthCol = frameParameterOrder->totalFrameParameters() + pi;
-      expectedJacobian.block(ri * PS, depthCol, PS, 1) = rj.dr_dlogd(PS);
+      expectedJacobian.block(ri * PS, depthCol, PS, 1) = rj.dr_dlogd();
 
       int oldPercent = percent;
       percent = double(ri + 1) / numResiduals * 100.0;
@@ -416,6 +416,43 @@ TEST_F(EnergyFunctionTest, isGradientCorrect) {
   LOG(INFO) << "relative point gradient err = " << relPointErr;
   EXPECT_LE(relFrameErr, ErrorBounds<T>::gradientRelErr);
   EXPECT_LE(relPointErr, ErrorBounds<T>::gradientRelErr);
+}
+
+TEST_F(EnergyFunctionTest, arePredictionsCorrect) {
+  const int PS = settings.residualPattern.pattern().size();
+  int numResiduals = energyFunction->getResiduals().size();
+  int numPoints = energyFunction->numPoints();
+
+  const auto &residuals = energyFunction->getResiduals();
+  MatXXt expectedJacobian = getExpectedJacobian();
+  DeltaParameterVector delta(frameParameterOrder->numKeyFrames(),
+                             frameParameterOrder->numCameras(),
+                             energyFunction->numPoints());
+
+  auto deltaF = delta.getFrame();
+  auto deltaP = delta.getPoint();
+  std::mt19937 mt;
+  std::uniform_real_distribution<double> d(-1, 1);
+  for (int i = 0; i < deltaF.size(); ++i)
+    deltaF[i] = d(mt);
+  for (int i = 0; i < deltaP.size(); ++i)
+    deltaP[i] = d(mt);
+  delta =
+      DeltaParameterVector(frameParameterOrder->numKeyFrames(),
+                           frameParameterOrder->numCameras(), deltaF, deltaP);
+  VecXt deltaVec(deltaF.size() + deltaP.size());
+  deltaVec << deltaF, deltaP;
+
+  VecXt expectedPrediction = expectedJacobian * deltaVec;
+  VecXt actualPrediction(PS * residuals.size());
+  for (int ri = 0; ri < residuals.size(); ++ri)
+    actualPrediction.segment(ri * PS, PS) =
+        energyFunction->getPredictedResidualIncrement(ri, delta);
+
+  double relPredictionErr = (expectedPrediction - actualPrediction).norm() /
+                            expectedPrediction.norm();
+  LOG(INFO) << "relative prediction err = " << relPredictionErr;
+  EXPECT_LE(relPredictionErr, ErrorBounds<T>::predictionRelErr);
 }
 
 TEST_F(EnergyFunctionTest, DoesOptimizationHelp) {

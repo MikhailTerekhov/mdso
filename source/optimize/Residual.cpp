@@ -70,7 +70,8 @@ Residual::Jacobian::Jacobian(int patternSize)
     , dtarget(patternSize)
     , dp_dlogd(Vec2t::Zero())
     , gradItarget(MatR2t::Zero(patternSize, 2))
-    , isInfDepth(false) {}
+    , isInfDepth(false)
+    , patternSize(patternSize) {}
 
 Residual::FrameFrameHessian::FrameFrameHessian()
     : qtqt(Mat77t::Zero())
@@ -179,7 +180,7 @@ VecRt Residual::getHessianWeights(const VecRt &values) const {
   return weights;
 }
 
-VecRt Residual::getGradientWeights(const optimize::VecRt &values) const {
+VecRt Residual::getGradientWeights(const VecRt &values) const {
   VecRt weights(settings.residualPattern.pattern().size());
   for (int i = 0; i < weights.size(); ++i) {
     double v = values[i];
@@ -343,40 +344,32 @@ std::ostream &operator<<(std::ostream &os, const Residual &res) {
   return os;
 }
 
-MatR4t Residual::Jacobian::dr_dq_host(int patternSize) const {
+MatR4t Residual::Jacobian::dr_dq_host() const {
   return gradItarget * dhost.dp_dq;
 }
 
-MatR3t Residual::Jacobian::dr_dt_host(int patternSize) const {
+MatR3t Residual::Jacobian::dr_dt_host() const {
   return gradItarget * dhost.dp_dt;
 }
 
-MatR4t Residual::Jacobian::dr_dq_target(int patternSize) const {
+MatR4t Residual::Jacobian::dr_dq_target() const {
   return gradItarget * dtarget.dp_dq;
 }
 
-MatR3t Residual::Jacobian::dr_dt_target(int patternSize) const {
+MatR3t Residual::Jacobian::dr_dt_target() const {
   return gradItarget * dtarget.dp_dt;
 }
 
-MatR2t Residual::Jacobian::dr_daff_host(int patternSize) const {
-  return dhost.dr_dab;
-}
+MatR2t Residual::Jacobian::dr_daff_host() const { return dhost.dr_dab; }
 
-MatR2t Residual::Jacobian::dr_daff_target(int patternSize) const {
-  return dtarget.dr_dab;
-}
+MatR2t Residual::Jacobian::dr_daff_target() const { return dtarget.dr_dab; }
 
-VecRt Residual::Jacobian::dr_dlogd(int patternSize) const {
-  return gradItarget * dp_dlogd;
-}
+VecRt Residual::Jacobian::dr_dlogd() const { return gradItarget * dp_dlogd; }
 
-MatRx19t Residual::Jacobian::dr_dparams(int patternSize) const {
+MatRx19t Residual::Jacobian::dr_dparams() const {
   MatRx19t result(patternSize, 19);
-  result << dr_dq_host(patternSize), dr_dt_host(patternSize),
-      dr_dq_target(patternSize), dr_dt_target(patternSize),
-      dr_daff_host(patternSize), dr_daff_target(patternSize),
-      dr_dlogd(patternSize);
+  result << dr_dq_host(), dr_dt_host(), dr_dq_target(), dr_dt_target(),
+      dr_daff_host(), dr_daff_target(), dr_dlogd();
   return result;
 }
 

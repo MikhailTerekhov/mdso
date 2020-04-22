@@ -7,7 +7,9 @@ namespace mdso::optimize {
 
 template <typename BlockT> class Accumulator {
 public:
-  Accumulator();
+  Accumulator()
+      : mWasUsed(false)
+      , mAccumulated(getZero()) {}
 
   Accumulator &operator+=(const BlockT &block) {
     mAccumulated += block;
@@ -19,16 +21,17 @@ public:
   const BlockT &accumulated() const { return mAccumulated; }
 
 private:
+  static BlockT getZero();
+
   BlockT mAccumulated;
   bool mWasUsed;
 };
 
-template <typename MatrixT>
-Accumulator<MatrixT>::Accumulator()
-    : mWasUsed(false)
-    , mAccumulated(MatrixT::Zero()) {}
-
-template <> Accumulator<T>::Accumulator();
+template <typename MatrixT> MatrixT Accumulator<MatrixT>::getZero() {
+  return MatrixT::Zero();
+}
+template <> float Accumulator<float>::getZero();
+template <> double Accumulator<double>::getZero();
 
 } // namespace mdso::optimize
 

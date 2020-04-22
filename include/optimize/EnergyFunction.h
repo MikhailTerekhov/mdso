@@ -21,6 +21,8 @@ public:
   int numPoints() const;
 
   VecRt getResidualValues(int residualInd);
+  VecRt getPredictedResidualIncrement(int residualInd,
+                                      const DeltaParameterVector &delta);
   inline const StdVector<Residual> &getResiduals() const { return residuals; }
   inline T getLogDepth(const Residual &res) {
     return parameters.logDepth(res.pointInd());
@@ -85,7 +87,7 @@ private:
 
     const VecRt &values(int residualInd) const;
     const Residual::CachedValues &cachedValues(int residualInd) const;
-    T totalEnergy() const;
+    double totalEnergy() const;
 
   private:
     const ceres::LossFunction *lossFunction;
@@ -107,18 +109,22 @@ private:
   PrecomputedMotionDerivatives precomputeMotionDerivatives() const;
   PrecomputedLightHostToTarget precomputeLightHostToTarget() const;
 
+  double predictEnergy(const DeltaParameterVector &delta);
+
   Values createValues(PrecomputedHostToTarget &hostToTarget,
                       PrecomputedLightHostToTarget &lightHostToTarget);
-  Values &getAllValues();
-  Values &getAllValues(PrecomputedHostToTarget &hostToTarget,
-                       PrecomputedLightHostToTarget &lightHostToTarget);
+  Values &computeValues(PrecomputedHostToTarget &hostToTarget,
+                        PrecomputedLightHostToTarget &lightHostToTarget);
+  Values &computeValues();
   Derivatives
   createDerivatives(const Values &values, PrecomputedHostToTarget &hostToTarget,
                     PrecomputedMotionDerivatives &motionDerivatives,
                     PrecomputedLightHostToTarget &lightHostToTarget);
-  Derivatives &getDerivatives(PrecomputedHostToTarget &hostToTarget,
-                              PrecomputedMotionDerivatives &motionDerivatives,
-                              PrecomputedLightHostToTarget &lightHostToTarget);
+  Derivatives &
+  computeDerivatives(PrecomputedHostToTarget &hostToTarget,
+                     PrecomputedMotionDerivatives &motionDerivatives,
+                     PrecomputedLightHostToTarget &lightHostToTarget);
+  Derivatives &computeDerivatives();
   Hessian getHessian(const Values &precomputedValues,
                      const Derivatives &precomputedDerivatives);
   Gradient getGradient(const Values &precomputedValues,

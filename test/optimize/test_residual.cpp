@@ -405,15 +405,15 @@ TEST_F(ResidualTestDriftedPoses, AreValuesAndJacobianCorrect) {
     end = now();
     timeEvalMy += secondsBetween(start, end);
 
-    auto actual_dr_dq_host = jacobian.dr_dq_host(patternSize);
+    auto actual_dr_dq_host = jacobian.dr_dq_host();
     MatR3t actual_dr_dq_host_tang(patternSize, 3);
-    auto actual_dr_dt_host = jacobian.dr_dt_host(patternSize);
-    auto actual_dr_dq_target = jacobian.dr_dq_target(patternSize);
+    auto actual_dr_dt_host = jacobian.dr_dt_host();
+    auto actual_dr_dq_target = jacobian.dr_dq_target();
     MatR3t actual_dr_dq_target_tang(patternSize, 3);
-    auto actual_dr_dt_target = jacobian.dr_dt_target(patternSize);
-    auto actual_dr_daff_host = jacobian.dr_daff_host(patternSize);
-    auto actual_dr_daff_target = jacobian.dr_daff_target(patternSize);
-    auto actual_dr_dlogd = jacobian.dr_dlogd(patternSize);
+    auto actual_dr_dt_target = jacobian.dr_dt_target();
+    auto actual_dr_daff_host = jacobian.dr_daff_host();
+    auto actual_dr_daff_target = jacobian.dr_daff_target();
+    auto actual_dr_dlogd = jacobian.dr_dlogd();
 
     double proximity = 0;
     ResidualCostFunctor *residualCostFunctor = new ResidualCostFunctor(
@@ -599,13 +599,13 @@ getExpectedDeltaHessian(const Residual::Jacobian &jacobian,
                         const WeightsVector &weights) {
   int PS = weights.size();
   Residual::DeltaHessian deltaHessian;
-  MatR4t dr_dq_host = jacobian.dr_dq_host(PS);
-  MatR3t dr_dt_host = jacobian.dr_dt_host(PS);
-  MatR2t dr_daff_host = jacobian.dr_daff_host(PS);
-  MatR4t dr_dq_target = jacobian.dr_dq_target(PS);
-  MatR3t dr_dt_target = jacobian.dr_dt_target(PS);
-  MatR2t dr_daff_target = jacobian.dr_daff_target(PS);
-  VecRt dr_dlogd = jacobian.dr_dlogd(PS);
+  MatR4t dr_dq_host = jacobian.dr_dq_host();
+  MatR3t dr_dt_host = jacobian.dr_dt_host();
+  MatR2t dr_daff_host = jacobian.dr_daff_host();
+  MatR4t dr_dq_target = jacobian.dr_dq_target();
+  MatR3t dr_dt_target = jacobian.dr_dt_target();
+  MatR2t dr_daff_target = jacobian.dr_daff_target();
+  VecRt dr_dlogd = jacobian.dr_dlogd();
 
   deltaHessian.hostHost =
       getFrameFrameHessian(dr_dq_host, dr_dt_host, dr_daff_host, dr_dq_host,
@@ -724,13 +724,13 @@ getExpectedDeltaGradient(const Residual::Jacobian &jacobian,
   int PS = values.size();
   Residual::DeltaGradient deltaGradient;
   deltaGradient.host =
-      getExpectedFrameGradient(jacobian.dr_dq_host(PS), jacobian.dr_dt_host(PS),
-                               jacobian.dr_daff_host(PS), values, weights);
-  deltaGradient.target = getExpectedFrameGradient(
-      jacobian.dr_dq_target(PS), jacobian.dr_dt_target(PS),
-      jacobian.dr_daff_target(PS), values, weights);
+      getExpectedFrameGradient(jacobian.dr_dq_host(), jacobian.dr_dt_host(),
+                               jacobian.dr_daff_host(), values, weights);
+  deltaGradient.target =
+      getExpectedFrameGradient(jacobian.dr_dq_target(), jacobian.dr_dt_target(),
+                               jacobian.dr_daff_target(), values, weights);
   deltaGradient.point =
-      jacobian.dr_dlogd(PS).transpose() * weights.asDiagonal() * values;
+      jacobian.dr_dlogd().transpose() * weights.asDiagonal() * values;
   return deltaGradient;
 }
 

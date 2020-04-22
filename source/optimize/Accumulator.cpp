@@ -2,9 +2,7 @@
 
 namespace mdso::optimize {
 
-template <>
-Accumulator<T>::Accumulator()
-    : mWasUsed(false)
-    , mAccumulated(0) {}
+template <> float Accumulator<float>::getZero() { return 0; }
+template <> double Accumulator<double>::getZero() { return 0; }
 
 } // namespace mdso::optimize

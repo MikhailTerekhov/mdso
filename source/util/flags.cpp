@@ -25,6 +25,10 @@ DEFINE_bool(min_plus_exp_depth,
             "If set, depths are parameterized as d = d_{min} + exp(d_p) inside "
             "of ceres, d_p being an actual parameter of optimization.");
 
+DEFINE_double(init_lambda,
+              Settings::Optimization::StepControl::default_initialLambda,
+              "Initial lambda for Levenberg-Marquardt.");
+
 DEFINE_int32(first_frames_skip,
              Settings::DelaunayDsoInitializer::default_firstFramesSkip,
              "Number of frames to skip between two frames when initializing "
@@ -124,6 +128,7 @@ Settings getFlaggedSettings() {
   settings.depth.setMinBound = FLAGS_set_min_depth;
   settings.depth.setMaxBound = FLAGS_set_max_depth;
   settings.depth.useMinPlusExpParametrization = FLAGS_min_plus_exp_depth;
+  settings.optimization.stepControl.initialLambda = FLAGS_init_lambda;
   settings.delaunayDsoInitializer.firstFramesSkip = FLAGS_first_frames_skip;
   settings.stereoMatcher.stereoGeometryEstimator.runMaxRansacIter =
       FLAGS_run_max_RANSAC_iterations;

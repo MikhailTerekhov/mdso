@@ -66,14 +66,17 @@ public:
 
     bool isInfDepth;
 
-    MatR4t dr_dq_host(int patternSize) const;
-    MatR3t dr_dt_host(int patternSize) const;
-    MatR4t dr_dq_target(int patternSize) const;
-    MatR3t dr_dt_target(int patternSize) const;
-    MatR2t dr_daff_host(int patternSize) const;
-    MatR2t dr_daff_target(int patternSize) const;
-    VecRt dr_dlogd(int patternSize) const;
-    MatRx19t dr_dparams(int patternSize) const;
+    MatR4t dr_dq_host() const;
+    MatR3t dr_dt_host() const;
+    MatR4t dr_dq_target() const;
+    MatR3t dr_dt_target() const;
+    MatR2t dr_daff_host() const;
+    MatR2t dr_daff_target() const;
+    VecRt dr_dlogd() const;
+    MatRx19t dr_dparams() const;
+
+  private:
+    int patternSize;
   };
 
   struct FrameFrameHessian {
