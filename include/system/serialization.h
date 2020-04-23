@@ -167,6 +167,8 @@ public:
   CameraModel *getCam() const { return cam; }
 
 private:
+  void loadDepthColBounds() const;
+
   const MultiFovReader *datasetReader;
   CameraModel *cam;
   fs::path snapshotDir;
@@ -180,6 +182,8 @@ public:
   void save(const KeyFrame *keyFrames[], int numKeyFrames) const;
 
 private:
+  void saveDepthColBounds() const;
+
   fs::path snapshotDir;
   int patternSize;
 };

@@ -170,8 +170,14 @@ void BundleAdjuster::adjust(int maxNumIterations) {
   StdVector<Vec2> oobPos;
   StdVector<Vec2> oobKf1;
 
+  int numNonfiniteDepths = 0;
   for (KeyFrame *baseFrame : keyFrames)
     for (const auto &op : baseFrame->optimizedPoints) {
+      if (!std::isfinite(op->logInvDepth)) {
+        numNonfiniteDepths++;
+        continue;
+      }
+
       problem.AddParameterBlock(&op->logInvDepth, 1);
       problem.SetParameterLowerBound(&op->logInvDepth, 0,
                                      -std::log(settings.depth.max));
@@ -221,6 +227,9 @@ void BundleAdjuster::adjust(int maxNumIterations) {
         }
       }
     }
+  
+  if (numNonfiniteDepths != 0)
+    LOG(WARNING) << "found " << numNonfiniteDepths << "nonfinite depths";
 
   ceres::Solver::Options options;
   options.linear_solver_type = ceres::DENSE_SCHUR;

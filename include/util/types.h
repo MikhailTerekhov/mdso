@@ -4,6 +4,7 @@
 #include "system/AffineLightTransform.h"
 #include <Eigen/Core>
 #include <Eigen/StdVector>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <queue>
@@ -45,6 +46,8 @@ typedef Sophus::SE3d SE3;
 typedef Sophus::SO3d SO3;
 
 typedef AffineLightTransform<double> AffLight;
+
+namespace fs = std::filesystem;
 
 template <typename T>
 using StdVector = std::vector<T, Eigen::aligned_allocator<T>>;

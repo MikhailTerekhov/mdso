@@ -236,7 +236,7 @@ struct Settings {
   static constexpr int default_maxOptimizedPoints = 2000;
   int maxOptimizedPoints = default_maxOptimizedPoints;
 
-  static constexpr int default_maxKeyFrames = 6;
+  static constexpr int default_maxKeyFrames = 7;
   int maxKeyFrames = default_maxKeyFrames;
 
   static constexpr bool default_trackFromLastKf = true;

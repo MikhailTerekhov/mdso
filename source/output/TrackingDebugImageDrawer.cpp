@@ -38,7 +38,7 @@ void TrackingDebugImageDrawer::levelTracked(
   for (const auto &[point, res] : pointResiduals)
     if (camPyr[levelNum].isOnImage(point, s))
       putSquare(residualsImg[levelNum], toCvPoint(point), s,
-                depthCol(res, 0, FLAGS_debug_max_residual), cv::FILLED);
+                depthCol(std::abs(res), 0, FLAGS_debug_max_residual), cv::FILLED);
 }
 
 cv::Mat3b TrackingDebugImageDrawer::drawAllLevels() {
