@@ -39,6 +39,7 @@ public:
     CHECK_GE(numKeyFrames, 0);
   }
 
+  void setSkippedFrame(int newSkippedFrameInd);
   StdVector<Reprojection> reproject() const;
   DepthedPoints reprojectDepthed() const;
 
@@ -53,6 +54,7 @@ private:
   int numCams;
   int numKeyFrames;
   Settings::Depth depthSettings;
+  std::optional<int> skippedFrameInd;
 };
 
 } // namespace mdso

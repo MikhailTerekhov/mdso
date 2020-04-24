@@ -50,6 +50,9 @@ StdVector<Reprojection> Reprojector<PointType>::reproject() const {
     SE3 worldToTargetCam =
         cam->bundle[targetCamInd].bodyToThis * targetWorldToBody;
     for (int hostInd = 0; hostInd < numKeyFrames; ++hostInd) {
+      if (skippedFrameInd && skippedFrameInd.value() == hostInd)
+        continue;
+
       SE3 hostBodyToTargetCam =
           worldToTargetCam * keyFrames[hostInd]->thisToWorld();
       for (int hostCamInd = 0; hostCamInd < numCams; ++hostCamInd) {
@@ -104,6 +107,13 @@ DepthedPoints Reprojector<PointType>::reprojectDepthed() const {
     depthedPoints.weights[ci].push_back(1 / point.stddev);
   }
   return depthedPoints;
+}
+template <typename PointType>
+void Reprojector<PointType>::setSkippedFrame(int newSkippedFrameInd) {
+  if (newSkippedFrameInd < 0 || newSkippedFrameInd >= keyFrames.size())
+    LOG(WARNING) << "newSkippedFrameInd = " << newSkippedFrameInd
+                 << " is out of bounds [0, " << keyFrames.size() << ")";
+  skippedFrameInd.emplace(newSkippedFrameInd);
 }
 
 template class Reprojector<ImmaturePoint>;

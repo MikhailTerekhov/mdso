@@ -1,6 +1,7 @@
 #include "optimize/EnergyFunction.h"
 #include "optimize/Accumulator.h"
 #include "optimize/StepController.h"
+#include "system/Reprojector.h"
 
 namespace mdso::optimize {
 
@@ -32,50 +33,59 @@ EnergyFunction::EnergyFunction(CameraBundle *camBundle, KeyFrame **keyFrames,
 
   PrecomputedHostToTarget hostToTarget(cam, &parameters);
   std::vector<OptimizedPoint *> optimizedPoints;
+  Array2d<std::vector<int>> globalPointInds(
+      boost::extents[numKeyFrames][cam->bundle.size()]);
+  for (int kfInd = 0; kfInd < numKeyFrames; ++kfInd)
+    for (int camInd = 0; camInd < cam->bundle.size(); ++camInd)
+      globalPointInds[kfInd][camInd].resize(
+          keyFrames[kfInd]->frames[camInd].optimizedPoints.size(), -1);
 
-  for (int hostInd = 0; hostInd < numKeyFrames; ++hostInd)
-    for (int hostCamInd = 0; hostCamInd < cam->bundle.size(); ++hostCamInd) {
-      for (OptimizedPoint &op :
-           keyFrames[hostInd]->frames[hostCamInd].optimizedPoints) {
-        if (op.state != OptimizedPoint::ACTIVE)
-          continue;
-        Vec3t ray = (op.depth() * op.dir).cast<T>();
-        bool hasResiduals = false;
-        for (int targetInd = 0; targetInd < numKeyFrames; ++targetInd) {
-          if (hostInd == targetInd)
-            continue;
-          for (int targetCamInd = 0; targetCamInd < cam->bundle.size();
-               ++targetCamInd) {
-            SE3t hostToTargetImage =
-                hostToTarget.get(hostInd, hostCamInd, targetInd, targetCamInd);
-            Vec3t rayTarget = hostToTargetImage * ray;
-            CameraModel &camTarget = cam->bundle[targetCamInd].cam;
-            if (!camTarget.isMappable(rayTarget))
-              continue;
-            Vec2t pointTarget = camTarget.map(rayTarget);
-            if (!camTarget.isOnImage(pointTarget.cast<double>(), PH))
-              continue;
+  for (int targetInd = 0; targetInd < numKeyFrames; ++targetInd) {
+    Reprojector<OptimizedPoint> reprojector(keyFrames, numKeyFrames,
+                                            keyFrames[targetInd]->thisToWorld(),
+                                            settings.residual.depth, PH);
+    reprojector.setSkippedFrame(targetInd);
+    StdVector<Reprojection> reprojections = reprojector.reproject();
 
-            if (!hasResiduals) {
-              hasResiduals = true;
-              optimizedPoints.push_back(&op);
-            }
+    for (int reprInd = 0; reprInd < reprojections.size(); ++reprInd) {
+      const auto &repr = reprojections[reprInd];
+      OptimizedPoint &op = keyFrames[repr.hostInd]
+                               ->frames[repr.hostCamInd]
+                               .optimizedPoints[repr.pointInd];
 
-            residuals.emplace_back(hostInd, hostCamInd, targetInd, targetCamInd,
-                                   optimizedPoints.size() - 1, cam,
-                                   &keyFrames[hostInd]->frames[hostCamInd],
-                                   &keyFrames[targetInd]->frames[targetCamInd],
-                                   &op, op.logDepth, hostToTargetImage,
-                                   lossFunction.get(), settings.residual);
-          }
-        }
+      if ((settings.residual.depth.setMinBound ||
+           settings.residual.depth.useMinPlusExpParametrization) &&
+          op.depth() <= settings.residual.depth.min)
+        continue;
+      if (settings.residual.depth.setMaxBound &&
+          op.depth() > settings.residual.depth.max)
+        continue;
+      if (op.depth() < 0 || !std::isfinite(op.depth()))
+        continue;
+
+      int &globalPointInd =
+          globalPointInds[repr.hostInd][repr.hostCamInd][repr.pointInd];
+      if (globalPointInd == -1) {
+        globalPointInd = optimizedPoints.size();
+        optimizedPoints.push_back(&op);
       }
+
+      SE3t hostToTargetImage = hostToTarget.get(repr.hostInd, repr.hostCamInd,
+                                                targetInd, repr.targetCamInd);
+
+      residuals.emplace_back(repr.hostInd, repr.hostCamInd, targetInd,
+                             repr.targetCamInd, globalPointInd, cam,
+                             &keyFrames[repr.hostInd]->frames[repr.hostCamInd],
+                             &keyFrames[targetInd]->frames[repr.targetCamInd],
+                             &op, op.logDepth, hostToTargetImage,
+                             lossFunction.get(), settings.residual);
     }
+  }
 
   parameters.setPoints(std::move(optimizedPoints));
 
   LOG(INFO) << "Created EnergyFunction with " << residuals.size()
-            << " residuals\n";
+            << " residuals and " << optimizedPoints.size() << " points";
 }
 
 int EnergyFunction::numPoints() const { return parameters.numPoints(); }

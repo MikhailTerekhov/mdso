@@ -251,6 +251,9 @@ struct Settings {
   } depth;
 
   struct ResidualWeighting {
+    static constexpr bool default_useGradientWeighting = true;
+    bool useGradientWeighting = default_useGradientWeighting;
+
     static constexpr double default_c = 50.0;
     double c = default_c;
 

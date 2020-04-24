@@ -3,8 +3,9 @@
 
 namespace mdso::optimize {
 
-Vec3t remapDepthed(const SE3t &frameToFrame, const Vec3t &ray, T depth) {
-  if (std::isfinite(depth))
+Vec3t remapDepthed(const SE3t &frameToFrame, const Vec3t &ray, T depth,
+                   T maxDepth) {
+  if (depth < maxDepth)
     return frameToFrame * (depth * ray);
   else
     return frameToFrame.so3() * ray;
@@ -32,8 +33,8 @@ Residual::Residual(int hostInd, int hostCamInd, int targetInd, int targetCamInd,
     , gradWeights(settings.residualPattern.pattern().size()) {
   CameraModel *camHost = &cam->bundle[hostCamInd].cam;
   T depth = exp(logDepth);
-  Vec2t reproj =
-      camTarget->map(remapDepthed(hostToTargetImage, hostDir, depth));
+  Vec2t reproj = camTarget->map(
+      remapDepthed(hostToTargetImage, hostDir, depth, settings.depth.max));
   for (int i = 0; i < reprojPattern.size(); ++i) {
     Vec2t r = camTarget->map(
         hostToTargetImage *
@@ -55,8 +56,12 @@ Residual::Residual(int hostInd, int hostCamInd, int targetInd, int targetCamInd,
                          &gradIhost[0]);
     hostIntensities[i] = T(hostIntensity);
     T normSq = T(gradIhost.squaredNorm());
-    T c = T(settings.residualWeighting.c);
-    gradWeights[i] = c / std::sqrt(c * c + normSq);
+    if (settings.residualWeighting.useGradientWeighting) {
+      T c = T(settings.residualWeighting.c);
+      gradWeights[i] = c / std::sqrt(c * c + normSq);
+    } else {
+      gradWeights[i] = 1;
+    }
   }
 }
 
@@ -138,8 +143,8 @@ VecRt Residual::getValues(const SE3t &hostToTargetImage,
   VecRt result(settings.residualPattern.pattern().size());
   T depth = exp(logDepth);
   double lightHostToTargetExpA = lightHostToTarget.ea();
-  Vec2t reproj =
-      camTarget->map(remapDepthed(hostToTargetImage, hostDir, depth));
+  Vec2t reproj = camTarget->map(
+      remapDepthed(hostToTargetImage, hostDir, depth, settings.depth.max));
   if (cachedValues) {
     cachedValues->depth = depth;
     cachedValues->reproj = reproj.cast<double>();
@@ -203,7 +208,7 @@ Residual::Jacobian Residual::getJacobian(
   T depth = cachedValues.depth;
 
   jacobian.isInfDepth = false;
-  if (!std::isfinite(depth)) {
+  if (depth > settings.depth.max) {
     jacobian.isInfDepth = true;
     depth = settings.depth.max;
   }

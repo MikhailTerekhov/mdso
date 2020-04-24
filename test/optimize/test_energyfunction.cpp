@@ -1,9 +1,8 @@
 #include "data/MultiFovReader.h"
 #include "optimize/EnergyFunction.h"
+#include "system/BundleAdjusterCeres.h"
 #include "system/IdentityPreprocessor.h"
 #include "util/flags.h"
-#include <Eigen/Eigen>
-#include <Eigen/Sparse>
 #include <gtest/gtest.h>
 
 DEFINE_string(mfov_dir, "/shared/datasets/mfov",
@@ -19,9 +18,6 @@ DEFINE_int32(num_evaluations, 1000,
 
 using namespace mdso;
 using namespace mdso::optimize;
-
-using Triplet = Eigen::Triplet<T>;
-using MatSp = Eigen::SparseMatrix<T>;
 
 template <typename T> struct ErrorBounds;
 
@@ -49,7 +45,7 @@ protected:
   static constexpr int sndFrameDoF = sndDoF + affDoF,
                        restFrameDoF = restDoF + affDoF;
 
-  static constexpr double transDrift = 0.02;
+  static constexpr double transDrift = 0.002;
   static constexpr double rotDrift = (M_PI / 180.0) * 0.004;
 
   EnergyFunctionTest()
@@ -57,6 +53,7 @@ protected:
 
   void SetUp() override {
     settings = getFlaggedSettings();
+    settings.residualWeighting.useGradientWeighting = false;
     settings.setMaxOptimizedPoints(pointsPerFrame * keyFramesCount);
     settings.keyFrame.setImmaturePointsNum(pointsPerFrame);
     energyFunctionSettings = settings.getEnergyFunctionSettings();
@@ -455,7 +452,7 @@ TEST_F(EnergyFunctionTest, arePredictionsCorrect) {
   EXPECT_LE(relPredictionErr, ErrorBounds<T>::predictionRelErr);
 }
 
-TEST_F(EnergyFunctionTest, DoesOptimizationHelp) {
+TEST_F(EnergyFunctionTest, doesOptimizationHelp) {
   constexpr int numIterations = 100;
 
   auto state = energyFunction->saveState();
@@ -494,6 +491,33 @@ TEST_F(EnergyFunctionTest, DoesOptimizationHelp) {
     std::cout << "rot err before: " << rotErrBefore << "\n";
     std::cout << "rot err after : " << rotErrAfter << "\n";
   }
+}
+
+TEST_F(EnergyFunctionTest, doesCeresOptimizationHelp) {
+  double transErrBefore = transError();
+  double rotErrBefore = rotError();
+
+  std::vector<KeyFrame *> kfPtrs;
+  kfPtrs.reserve(keyFrames.size());
+  for (auto &kf : keyFrames)
+    kfPtrs.push_back(kf.get());
+
+  BundleAdjusterCeres bundleAdjuster;
+  bundleAdjuster.adjust(kfPtrs.data(), kfPtrs.size(),
+                        settings.getBundleAdjusterSettings());
+
+  double transErrAfter = transError();
+  double rotErrAfter = rotError();
+
+  LOG(INFO) << "Ceres optimization quality:";
+  LOG(INFO) << "trans err before: " << transErrBefore;
+  LOG(INFO) << "trans err after : " << transErrAfter;
+  LOG(INFO) << "rot err before: " << rotErrBefore;
+  LOG(INFO) << "rot err after : " << rotErrAfter;
+  std::cout << "trans err before: " << transErrBefore << "\n";
+  std::cout << "trans err after : " << transErrAfter << "\n";
+  std::cout << "rot err before: " << rotErrBefore << "\n";
+  std::cout << "rot err after : " << rotErrAfter << "\n";
 }
 
 int main(int argc, char **argv) {

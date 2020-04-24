@@ -291,8 +291,10 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
             SE3 baseToTarget = bodyToTarget * bodyToWorld[targetInd].inverse() *
                                bodyToWorld[hostInd] * baseToBody;
             pointsTotal++;
-            Vec2 curReproj =
-                targetCam.map(baseToTarget * (op.depth() * op.dir));
+            Vec3 curInTarget = op.depth() > settings.depth.max
+                                   ? baseToTarget.so3() * op.dir
+                                   : baseToTarget * (op.depth() * op.dir);
+            Vec2 curReproj = targetCam.map(curInTarget);
             if (!targetCam.isOnImage(curReproj, PH)) {
               pointsOOB++;
               continue;
@@ -316,7 +318,9 @@ void BundleAdjusterCeres::adjust(KeyFrame **keyFrames, int numKeyFrames,
                   hostFrame->preKeyFrame->frames[hostCamInd].gradNorm(
                       toCvPoint(shiftedP));
               const double c = settings.residualWeighting.c;
-              double weight = c / std::hypot(c, gradNorm);
+              double weight = settings.residualWeighting.useGradientWeighting
+                                  ? c / std::hypot(c, gradNorm)
+                                  : 1;
               ceres::LossFunction *lossFunc = new ceres::ScaledLoss(
                   new ceres::HuberLoss(settings.intensity.outlierDiff), weight,
                   ceres::Ownership::TAKE_OWNERSHIP);
