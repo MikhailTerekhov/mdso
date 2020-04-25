@@ -3,20 +3,10 @@
 
 namespace mdso::optimize {
 
-Parameters::Jacobians::Jacobians(const State &state)
-    : dSecondFrame(state.secondFrame.diffPlus())
-    , dRestFrames(state.restFrames.size()) {
-  for (int i = 0; i < dRestFrames.size(); ++i)
-    dRestFrames[i] = state.restFrames[i].diffPlus();
-}
-
-Parameters::Jacobians::Jacobians(const Parameters &parameters)
-    : Jacobians(parameters.state) {}
-
 Parameters::State::State(KeyFrame **keyFrames, int newNumKeyFrames)
     : firstBodyToWorld(keyFrames[0]->thisToWorld().cast<T>())
     , secondFrame(keyFrames[0]->thisToWorld(), keyFrames[1]->thisToWorld())
-    , lightWorldToFrame(
+    , mLightWorldToFrame(
           boost::extents[newNumKeyFrames]
                         [keyFrames[0]->preKeyFrame->cam->bundle.size()]) {
   CHECK_GE(newNumKeyFrames, 2);
@@ -28,13 +18,27 @@ Parameters::State::State(KeyFrame **keyFrames, int newNumKeyFrames)
 
   for (int fi = 0; fi < newNumKeyFrames; ++fi)
     for (int ci = 0; ci < bundleSize; ++ci)
-      lightWorldToFrame[fi][ci] =
+      mLightWorldToFrame[fi][ci] =
           keyFrames[fi]->frames[ci].lightWorldToThis.cast<T>();
 }
 
 int Parameters::State::numKeyFrames() const { return restFrames.size() + 2; }
+
 int Parameters::State::numCameras() const {
-  return lightWorldToFrame.shape()[1];
+  return mLightWorldToFrame.shape()[1];
+}
+
+FrameParametrization &Parameters::State::frameParametrization(int frameInd) {
+  return const_cast<FrameParametrization &>(
+      const_cast<const Parameters::State *>(this)->frameParametrization(
+          frameInd));
+}
+
+const FrameParametrization &
+Parameters::State::frameParametrization(int frameInd) const {
+  CHECK_GE(frameInd, 2);
+  CHECK_LT(frameInd, numKeyFrames());
+  return restFrames[frameInd - 2];
 }
 
 void Parameters::State::applyUpdate(const DeltaParameterVector &delta) {
@@ -45,7 +49,47 @@ void Parameters::State::applyUpdate(const DeltaParameterVector &delta) {
 
   for (int fi = 1; fi < numKeyFrames(); ++fi)
     for (int ci = 0; ci < numCameras(); ++ci)
-      lightWorldToFrame[fi - 1][ci].applyUpdate(delta.affBlock(fi, ci));
+      lightWorldToFrame(fi, ci).applyUpdate(delta.affBlock(fi, ci));
+}
+
+AffLight &Parameters::State::lightWorldToFrame(int frameInd, int frameCamInd) {
+  // first frame affine light transformations should not be changed
+  CHECK_GE(frameInd, 1);
+  CHECK_LT(frameInd, numKeyFrames());
+  CHECK_GE(frameCamInd, 0);
+  CHECK_LT(frameCamInd, numCameras());
+  return mLightWorldToFrame[frameInd][frameCamInd];
+}
+
+const AffLight &Parameters::State::lightWorldToFrame(int frameInd,
+                                                     int frameCamInd) const {
+  CHECK_GE(frameInd, 0);
+  CHECK_LT(frameInd, numKeyFrames());
+  CHECK_GE(frameCamInd, 0);
+  CHECK_LT(frameCamInd, numCameras());
+  return mLightWorldToFrame[frameInd][frameCamInd];
+}
+
+Parameters::Jacobians::Jacobians(const State &state)
+    : mDSecondFrame(state.secondFrame.diffPlus())
+    , mDRestFrames(state.numKeyFrames() - 2) {
+  for (int fi = 2; fi < state.numKeyFrames(); ++fi)
+    mDRestFrames[fi - 2] = state.frameParametrization(fi).diffPlus();
+}
+
+Parameters::Jacobians::Jacobians(const Parameters &parameters)
+    : Jacobians(parameters.state) {}
+
+const SecondFrameParametrization::MatDiff &
+Parameters::Jacobians::dSecondFrame() const {
+  return mDSecondFrame;
+}
+
+const FrameParametrization::MatDiff &
+Parameters::Jacobians::dOtherFrame(int frameInd) const {
+  CHECK_GE(frameInd, 2);
+  CHECK_LT(frameInd, mDRestFrames.size() + 2);
+  return mDRestFrames[frameInd - 2];
 }
 
 Parameters::Parameters(CameraBundle *cam, KeyFrame **newKeyFrames,
@@ -55,26 +99,24 @@ Parameters::Parameters(CameraBundle *cam, KeyFrame **newKeyFrames,
 
 SE3t Parameters::getBodyToWorld(int frameInd) const {
   CHECK_GE(frameInd, 0);
-  CHECK_LT(frameInd, state.restFrames.size() + 2);
+  CHECK_LT(frameInd, state.numKeyFrames());
   if (frameInd == 0)
     return state.firstBodyToWorld;
   if (frameInd == 1)
     return state.secondFrame.value();
-  return state.restFrames[frameInd - 2].value();
+  return state.frameParametrization(frameInd).value();
 }
 
 AffLightT Parameters::getLightWorldToFrame(int frameInd,
                                            int frameCamInd) const {
-  return state.lightWorldToFrame[frameInd][frameCamInd];
+  return state.lightWorldToFrame(frameInd, frameCamInd);
 }
 
-int Parameters::numKeyFrames() const { return state.restFrames.size() + 2; }
+int Parameters::numKeyFrames() const { return state.numKeyFrames(); }
 
 int Parameters::numPoints() const { return state.logDepths.size(); }
 
-int Parameters::camBundleSize() const {
-  return state.lightWorldToFrame.shape()[1];
-}
+int Parameters::numCameras() const { return state.numCameras(); }
 
 T Parameters::logDepth(int i) const {
   CHECK_GE(i, 0);
@@ -93,7 +135,7 @@ Parameters::State Parameters::saveState() const { return state; }
 
 void Parameters::recoverState(State oldState) {
   state = std::move(oldState);
-  CHECK_EQ(state.restFrames.size() + 2, keyFrames.size());
+  CHECK_EQ(state.numKeyFrames(), keyFrames.size());
   CHECK_EQ(state.logDepths.size(), optimizedPoints.size());
 }
 
@@ -105,12 +147,12 @@ void Parameters::apply() const {
   keyFrames[1]->thisToWorld.setValue(state.secondFrame.value().cast<double>());
   for (int fi = 2; fi < keyFrames.size(); ++fi)
     keyFrames[fi]->thisToWorld.setValue(
-        state.restFrames[fi - 2].value().cast<double>());
+        state.frameParametrization(fi).value().cast<double>());
 
   for (int fi = 1; fi < keyFrames.size(); ++fi)
-    for (int ci = 0; ci < camBundleSize(); ++ci)
+    for (int ci = 0; ci < numCameras(); ++ci)
       keyFrames[fi]->frames[ci].lightWorldToThis =
-          state.lightWorldToFrame[fi - 1][ci].cast<double>();
+          state.lightWorldToFrame(fi, ci).cast<double>();
 
   for (int pi = 0; pi < optimizedPoints.size(); ++pi)
     optimizedPoints[pi]->logDepth = state.logDepths[pi];

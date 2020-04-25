@@ -4,58 +4,58 @@ namespace mdso::optimize {
 
 Hessian::AccumulatedBlocks::AccumulatedBlocks(int numKeyFrames, int numCameras,
                                               int numPoints)
-    : motionMotion(boost::extents[numKeyFrames - 1][numKeyFrames - 1])
-    , motionAff(boost::extents[numKeyFrames - 1][numKeyFrames - 1][numCameras])
-    , affAff(boost::extents[numKeyFrames - 1][numCameras][numKeyFrames - 1]
-                           [numCameras])
-    , motionPoint(boost::extents[numKeyFrames - 1][numPoints])
-    , affPoint(boost::extents[numKeyFrames - 1][numCameras][numPoints])
-    , pointPoint(numPoints) {}
+    : mMotionMotion(boost::extents[numKeyFrames - 1][numKeyFrames - 1])
+    , mMotionAff(boost::extents[numKeyFrames - 1][numKeyFrames - 1][numCameras])
+    , mAffAff(boost::extents[numKeyFrames - 1][numCameras][numKeyFrames - 1]
+                            [numCameras])
+    , mMotionPoint(boost::extents[numKeyFrames - 1][numPoints])
+    , mAffPoint(boost::extents[numKeyFrames - 1][numCameras][numPoints])
+    , mPointPoint(numPoints) {}
 
 int Hessian::AccumulatedBlocks::numKeyFrames() const {
-  return affPoint.shape()[0] + 1;
+  return mAffPoint.shape()[0] + 1;
 }
 
 int Hessian::AccumulatedBlocks::numCameras() const {
-  return affPoint.shape()[1];
+  return mAffPoint.shape()[1];
 }
 
 int Hessian::AccumulatedBlocks::numPoints() const {
-  return affPoint.shape()[2];
+  return mAffPoint.shape()[2];
 }
 
 void Hessian::AccumulatedBlocks::add(
     const Residual::FrameFrameHessian &frameFrameHessian, int f1i, int f1ci,
     int f2i, int f2ci) {
-  if (f1i < 0 || f2i < 0)
+  if (f1i < 1 || f2i < 1)
     return;
 
   if (f1i <= f2i) {
-    motionMotion[f1i][f2i] += frameFrameHessian.qtqt;
-    affAff[f1i][f1ci][f2i][f2ci] += frameFrameHessian.abab;
+    motionMotion(f1i, f2i) += frameFrameHessian.qtqt;
+    affAff(f1i, f1ci, f2i, f2ci) += frameFrameHessian.abab;
   } else {
-    motionMotion[f2i][f1i] += frameFrameHessian.qtqt.transpose();
-    affAff[f2i][f2ci][f1i][f1ci] += frameFrameHessian.abab.transpose();
+    motionMotion(f2i, f1i) += frameFrameHessian.qtqt.transpose();
+    affAff(f2i, f2ci, f1i, f1ci) += frameFrameHessian.abab.transpose();
   }
 
-  motionAff[f1i][f2i][f2ci] += frameFrameHessian.qtab;
+  motionAff(f1i, f2i, f2ci) += frameFrameHessian.qtab;
   if (f1i != f2i)
-    motionAff[f2i][f1i][f1ci] += frameFrameHessian.abqt.transpose();
+    motionAff(f2i, f1i, f1ci) += frameFrameHessian.abqt.transpose();
 }
 
 void Hessian::AccumulatedBlocks::add(
     const Residual::FramePointHessian &framePointHessian, int fi, int fci,
     int pi) {
-  if (fi < 0)
+  if (fi < 1)
     return;
-  motionPoint[fi][pi] += framePointHessian.qtd;
-  affPoint[fi][fci][pi] += framePointHessian.abd;
+  motionPoint(fi, pi) += framePointHessian.qtd;
+  affPoint(fi, fci, pi) += framePointHessian.abd;
 }
 
 void Hessian::AccumulatedBlocks::add(
     const Residual &residual, const Residual::DeltaHessian &deltaHessian) {
-  int hi = residual.hostInd() - 1, hci = residual.hostCamInd(),
-      ti = residual.targetInd() - 1, tci = residual.targetCamInd(),
+  int hi = residual.hostInd(), hci = residual.hostCamInd(),
+      ti = residual.targetInd(), tci = residual.targetCamInd(),
       pi = residual.pointInd();
 
   add(deltaHessian.hostHost, hi, hci, hi, hci);
@@ -65,7 +65,113 @@ void Hessian::AccumulatedBlocks::add(
   add(deltaHessian.hostPoint, hi, hci, pi);
   add(deltaHessian.targetPoint, ti, tci, pi);
 
-  pointPoint[pi] += deltaHessian.pointPoint;
+  pointPoint(pi) += deltaHessian.pointPoint;
+}
+const Accumulator<Mat77t> &
+Hessian::AccumulatedBlocks::motionMotion(int frameInd1, int frameInd2) const {
+  CHECK_GE(frameInd1, 1);
+  CHECK_LT(frameInd1, numKeyFrames());
+  CHECK_GE(frameInd2, 1);
+  CHECK_LT(frameInd2, numKeyFrames());
+  return mMotionMotion[frameInd1 - 1][frameInd2 - 1];
+}
+
+Accumulator<Mat77t> &Hessian::AccumulatedBlocks::motionMotion(int frameInd1,
+                                                              int frameInd2) {
+  return const_cast<Accumulator<Mat77t> &>(
+      const_cast<const Hessian::AccumulatedBlocks *>(this)->motionMotion(
+          frameInd1, frameInd2));
+}
+
+const Accumulator<Mat72t> &
+Hessian::AccumulatedBlocks::motionAff(int frameInd1, int frameInd2,
+                                      int frameCamInd2) const {
+  CHECK_GE(frameInd1, 1);
+  CHECK_LT(frameInd1, numKeyFrames());
+  CHECK_GE(frameInd2, 1);
+  CHECK_LT(frameInd2, numKeyFrames());
+  CHECK_GE(frameCamInd2, 0);
+  CHECK_LT(frameCamInd2, numCameras());
+  return mMotionAff[frameInd1 - 1][frameInd2 - 1][frameCamInd2];
+}
+
+Accumulator<Mat72t> &Hessian::AccumulatedBlocks::motionAff(int frameInd1,
+                                                           int frameInd2,
+                                                           int frameCamInd2) {
+  return const_cast<Accumulator<Mat72t> &>(
+      const_cast<const Hessian::AccumulatedBlocks *>(this)->motionAff(
+          frameInd1, frameInd2, frameCamInd2));
+}
+
+const Accumulator<Mat22t> &
+Hessian::AccumulatedBlocks::affAff(int frameInd1, int frameCamInd1,
+                                   int frameInd2, int frameCamInd2) const {
+  CHECK_GE(frameInd1, 1);
+  CHECK_LT(frameInd1, numKeyFrames());
+  CHECK_GE(frameCamInd1, 0);
+  CHECK_LT(frameCamInd1, numCameras());
+  CHECK_GE(frameInd2, 1);
+  CHECK_LT(frameInd2, numKeyFrames());
+  CHECK_GE(frameCamInd2, 0);
+  CHECK_LT(frameCamInd2, numCameras());
+  return mAffAff[frameInd1 - 1][frameCamInd1][frameInd2 - 1][frameCamInd2];
+}
+
+Accumulator<Mat22t> &Hessian::AccumulatedBlocks::affAff(int frameInd1,
+                                                        int frameCamInd1,
+                                                        int frameInd2,
+                                                        int frameCamInd2) {
+  return const_cast<Accumulator<Mat22t> &>(
+      const_cast<const Hessian::AccumulatedBlocks *>(this)->affAff(
+          frameInd1, frameCamInd1, frameInd2, frameCamInd2));
+}
+
+const Accumulator<Vec7t> &
+Hessian::AccumulatedBlocks::motionPoint(int frameInd, int pointInd) const {
+  CHECK_GE(frameInd, 1);
+  CHECK_LT(frameInd, numKeyFrames());
+  CHECK_GE(pointInd, 0);
+  CHECK_LT(pointInd, numPoints());
+  return mMotionPoint[frameInd - 1][pointInd];
+}
+
+Accumulator<Vec7t> &Hessian::AccumulatedBlocks::motionPoint(int frameInd,
+                                                            int pointInd) {
+  return const_cast<Accumulator<Vec7t> &>(
+      const_cast<const Hessian::AccumulatedBlocks *>(this)->motionPoint(
+          frameInd, pointInd));
+}
+
+const Accumulator<Vec2t> &
+Hessian::AccumulatedBlocks::affPoint(int frameInd, int frameCamInd,
+                                     int pointInd) const {
+  CHECK_GE(frameInd, 1);
+  CHECK_LT(frameInd, numKeyFrames());
+  CHECK_GE(frameCamInd, 0);
+  CHECK_LT(frameCamInd, numCameras());
+  CHECK_GE(pointInd, 0);
+  CHECK_LT(pointInd, numPoints());
+  return mAffPoint[frameInd - 1][frameCamInd][pointInd];
+}
+Accumulator<Vec2t> &Hessian::AccumulatedBlocks::affPoint(int frameInd,
+                                                         int frameCamInd,
+                                                         int pointInd) {
+  return const_cast<Accumulator<Vec2t> &>(
+      const_cast<const Hessian::AccumulatedBlocks *>(this)->affPoint(
+          frameInd, frameCamInd, pointInd));
+}
+
+const Accumulator<T> &
+Hessian::AccumulatedBlocks::pointPoint(int pointInd) const {
+  CHECK_GE(pointInd, 0);
+  CHECK_LT(pointInd, numPoints());
+  return mPointPoint[pointInd];
+}
+
+Accumulator<T> &Hessian::AccumulatedBlocks::pointPoint(int pointInd) {
+  return const_cast<Accumulator<T> &>(
+      const_cast<const Hessian::AccumulatedBlocks *>(this)->pointPoint(
+          pointInd));
 }
 
 Hessian::Hessian(const AccumulatedBlocks &accumulatedBlocks,
@@ -83,72 +189,70 @@ Hessian::Hessian(const AccumulatedBlocks &accumulatedBlocks,
   framePoint.setZero();
   pointPoint.setZero();
 
-  if (accumulatedBlocks.motionMotion[0][0].wasUsed())
-    sndSndBlock() = parameterJacobians.dSecondFrame.transpose() *
-                    accumulatedBlocks.motionMotion[0][0].accumulated() *
-                    parameterJacobians.dSecondFrame;
+  if (accumulatedBlocks.motionMotion(1, 1).wasUsed())
+    sndSndBlock() = parameterJacobians.dSecondFrame().transpose() *
+                    accumulatedBlocks.motionMotion(1, 1).accumulated() *
+                    parameterJacobians.dSecondFrame();
 
   for (int fi = 2; fi < accumulatedBlocks.numKeyFrames(); ++fi)
-    if (accumulatedBlocks.motionMotion[0][fi - 1].wasUsed())
-      sndRestBlock(fi) =
-          parameterJacobians.dSecondFrame.transpose() *
-          accumulatedBlocks.motionMotion[0][fi - 1].accumulated() *
-          parameterJacobians.dRestFrames[fi - 2];
+    if (accumulatedBlocks.motionMotion(1, fi).wasUsed())
+      sndRestBlock(fi) = parameterJacobians.dSecondFrame().transpose() *
+                         accumulatedBlocks.motionMotion(1, fi).accumulated() *
+                         parameterJacobians.dOtherFrame(fi);
 
   for (int fi = 1; fi < accumulatedBlocks.numKeyFrames(); ++fi)
     for (int ci = 0; ci < accumulatedBlocks.numCameras(); ++ci)
-      if (accumulatedBlocks.motionAff[0][fi - 1][ci].wasUsed())
+      if (accumulatedBlocks.motionAff(1, fi, ci).wasUsed())
         sndAffBlock(fi, ci) =
-            parameterJacobians.dSecondFrame.transpose() *
-            accumulatedBlocks.motionAff[0][fi - 1][ci].accumulated();
+            parameterJacobians.dSecondFrame().transpose() *
+            accumulatedBlocks.motionAff(1, fi, ci).accumulated();
 
   for (int fi1 = 2; fi1 < accumulatedBlocks.numKeyFrames(); ++fi1)
     for (int fi2 = 2; fi2 < accumulatedBlocks.numKeyFrames(); ++fi2)
-      if (accumulatedBlocks.motionMotion[fi1 - 1][fi2 - 1].wasUsed())
+      if (accumulatedBlocks.motionMotion(fi1, fi2).wasUsed())
         restRestBlock(fi1, fi2) =
-            parameterJacobians.dRestFrames[fi1 - 2].transpose() *
-            accumulatedBlocks.motionMotion[fi1 - 1][fi2 - 1].accumulated() *
-            parameterJacobians.dRestFrames[fi2 - 2];
+            parameterJacobians.dOtherFrame(fi1).transpose() *
+            accumulatedBlocks.motionMotion(fi1, fi2).accumulated() *
+            parameterJacobians.dOtherFrame(fi2);
 
   for (int fi1 = 2; fi1 < accumulatedBlocks.numKeyFrames(); ++fi1)
     for (int fi2 = 1; fi2 < accumulatedBlocks.numKeyFrames(); ++fi2)
       for (int ci = 0; ci < accumulatedBlocks.numCameras(); ++ci)
-        if (accumulatedBlocks.motionAff[fi1 - 1][fi2 - 1][ci].wasUsed())
+        if (accumulatedBlocks.motionAff(fi1, fi2, ci).wasUsed())
           restAffBlock(fi1, fi2, ci) =
-              parameterJacobians.dRestFrames[fi1 - 2].transpose() *
-              accumulatedBlocks.motionAff[fi1 - 1][fi2 - 1][ci].accumulated();
+              parameterJacobians.dOtherFrame(fi1).transpose() *
+              accumulatedBlocks.motionAff(fi1, fi2, ci).accumulated();
 
   for (int fi1 = 1; fi1 < accumulatedBlocks.numKeyFrames(); ++fi1)
     for (int ci1 = 0; ci1 < accumulatedBlocks.numCameras(); ++ci1)
       for (int fi2 = 1; fi2 < accumulatedBlocks.numKeyFrames(); ++fi2)
         for (int ci2 = 0; ci2 < accumulatedBlocks.numCameras(); ++ci2)
-          if (accumulatedBlocks.affAff[fi1 - 1][ci1][fi2 - 1][ci2].wasUsed())
+          if (accumulatedBlocks.affAff(fi1, ci1, fi2, ci2).wasUsed())
             affAffBlock(fi1, ci1, fi2, ci2) =
-                accumulatedBlocks.affAff[fi1 - 1][ci1][fi2 - 1][ci2]
-                    .accumulated();
+                accumulatedBlocks.affAff(fi1, ci1, fi2, ci2).accumulated();
 
   for (int pi = 0; pi < accumulatedBlocks.numPoints(); ++pi)
-    if (accumulatedBlocks.motionPoint[0][pi].wasUsed())
-      sndPointBlock(pi) = parameterJacobians.dSecondFrame.transpose() *
-                          accumulatedBlocks.motionPoint[0][pi].accumulated();
+    if (accumulatedBlocks.motionPoint(1, pi).wasUsed())
+      sndPointBlock(pi) = parameterJacobians.dSecondFrame().transpose() *
+                          accumulatedBlocks.motionPoint(1, pi).accumulated();
 
   for (int fi = 2; fi < accumulatedBlocks.numKeyFrames(); ++fi)
     for (int pi = 0; pi < accumulatedBlocks.numPoints(); ++pi)
-      if (accumulatedBlocks.motionPoint[fi - 1][pi].wasUsed())
+      if (accumulatedBlocks.motionPoint(fi, pi).wasUsed())
         restPointBlock(fi, pi) =
-            parameterJacobians.dRestFrames[fi - 2].transpose() *
-            accumulatedBlocks.motionPoint[fi - 1][pi].accumulated();
+            parameterJacobians.dOtherFrame(fi).transpose() *
+            accumulatedBlocks.motionPoint(fi, pi).accumulated();
 
   for (int fi = 1; fi < accumulatedBlocks.numKeyFrames(); ++fi)
     for (int ci = 0; ci < accumulatedBlocks.numCameras(); ++ci)
       for (int pi = 0; pi < accumulatedBlocks.numPoints(); ++pi)
-        if (accumulatedBlocks.affPoint[fi - 1][ci][pi].wasUsed())
+        if (accumulatedBlocks.affPoint(fi, ci, pi).wasUsed())
           affPointBlock(fi, ci, pi) =
-              accumulatedBlocks.affPoint[fi - 1][ci][pi].accumulated();
+              accumulatedBlocks.affPoint(fi, ci, pi).accumulated();
 
   for (int pi = 0; pi < accumulatedBlocks.numPoints(); ++pi)
-    if (accumulatedBlocks.pointPoint[pi].wasUsed())
-      pointPointBlock(pi) = accumulatedBlocks.pointPoint[pi].accumulated();
+    if (accumulatedBlocks.pointPoint(pi).wasUsed())
+      pointPointBlock(pi) = accumulatedBlocks.pointPoint(pi).accumulated();
 
   fillLowerBlocks();
 }

@@ -41,11 +41,11 @@ Gradient::Gradient(
     : DeltaParameterVector(accumulatedBlocks.numKeyFrames(),
                            accumulatedBlocks.numCameras(),
                            accumulatedBlocks.numPoints()) {
-  sndBlock() = parameterJacobians.dSecondFrame.transpose() *
+  sndBlock() = parameterJacobians.dSecondFrame().transpose() *
                accumulatedBlocks.motion[0].accumulated();
   for (int fi = 2; fi < accumulatedBlocks.numKeyFrames(); ++fi)
     if (accumulatedBlocks.motion[fi - 1].wasUsed())
-      restBlock(fi) = parameterJacobians.dRestFrames[fi - 2].transpose() *
+      restBlock(fi) = parameterJacobians.dOtherFrame(fi).transpose() *
                       accumulatedBlocks.motion[fi - 1].accumulated();
 
   for (int fi = 1; fi < accumulatedBlocks.numKeyFrames(); ++fi)

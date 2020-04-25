@@ -16,8 +16,6 @@ public:
   using VecPt = VecXt;
 
   class AccumulatedBlocks {
-    friend class Hessian;
-
   public:
     AccumulatedBlocks(int numKeyFrames, int numCameras, int numPoints);
 
@@ -28,19 +26,38 @@ public:
     void add(const Residual &residual,
              const Residual::DeltaHessian &deltaHessian);
 
+    const Accumulator<Mat77t> &motionMotion(int frameInd1, int frameInd2) const;
+    const Accumulator<Mat72t> &motionAff(int frameInd1, int frameInd2,
+                                         int frameCamInd2) const;
+    const Accumulator<Mat22t> &affAff(int frameInd1, int frameCamInd1,
+                                      int frameInd2, int frameCamInd2) const;
+    const Accumulator<Vec7t> &motionPoint(int frameInd, int pointInd) const;
+    const Accumulator<Vec2t> &affPoint(int frameInd, int frameCamInd,
+                                       int pointInd) const;
+    const Accumulator<T> &pointPoint(int pointInd) const;
+
   private:
+    Accumulator<Mat77t> &motionMotion(int frameInd1, int frameInd2);
+    Accumulator<Mat72t> &motionAff(int frameInd1, int frameInd2,
+                                   int frameCamInd2);
+    Accumulator<Mat22t> &affAff(int frameInd1, int frameCamInd1, int frameInd2,
+                                int frameCamInd2);
+    Accumulator<Vec7t> &motionPoint(int frameInd, int pointInd);
+    Accumulator<Vec2t> &affPoint(int frameInd, int frameCamInd, int pointInd);
+    Accumulator<T> &pointPoint(int pointInd);
+
     void add(const Residual::FrameFrameHessian &frameFrameHessian, int f1i,
              int f1ci, int f2i, int f2ci);
     void add(const Residual::FramePointHessian &framePointHessian, int fi,
              int fci, int pi);
 
-    Array2d<Accumulator<Mat77t>> motionMotion;
-    Array3d<Accumulator<Mat72t>> motionAff;
-    Array4d<Accumulator<Mat22t>> affAff;
-    Array2d<Accumulator<Vec7t>> motionPoint;
-    Array3d<Accumulator<Vec2t>> affPoint;
+    Array2d<Accumulator<Mat77t>> mMotionMotion;
+    Array3d<Accumulator<Mat72t>> mMotionAff;
+    Array4d<Accumulator<Mat22t>> mAffAff;
+    Array2d<Accumulator<Vec7t>> mMotionPoint;
+    Array3d<Accumulator<Vec2t>> mAffPoint;
 
-    std::vector<Accumulator<T>> pointPoint;
+    std::vector<Accumulator<T>> mPointPoint;
   };
 
   Hessian(const AccumulatedBlocks &accumulatedBlocks,

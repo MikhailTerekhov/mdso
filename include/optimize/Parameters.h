@@ -14,30 +14,45 @@ namespace optimize {
 
 class Parameters {
 public:
-  struct State {
+  class State {
+  public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
     State(KeyFrame **keyFrames, int newNumKeyFrames);
 
     int numKeyFrames() const;
     int numCameras() const;
+
+    const FrameParametrization &frameParametrization(int frameInd) const;
+    const AffLight &lightWorldToFrame(int frameInd, int frameCamInd) const;
+
     void applyUpdate(const DeltaParameterVector &delta);
 
     VecXt logDepths;
     SE3t firstBodyToWorld;
     SecondFrameParametrization secondFrame;
+
+  private:
+    FrameParametrization &frameParametrization(int frameInd);
+    AffLight &lightWorldToFrame(int frameInd, int frameCamInd);
+
     StdVector<FrameParametrization> restFrames;
-    Array2d<AffLightT> lightWorldToFrame;
+    Array2d<AffLightT> mLightWorldToFrame;
   };
 
-  struct Jacobians {
+  class Jacobians {
+  public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
     Jacobians(const State &state);
     Jacobians(const Parameters &parameters);
 
-    SecondFrameParametrization::MatDiff dSecondFrame;
-    StdVector<FrameParametrization::MatDiff> dRestFrames;
+    const SecondFrameParametrization::MatDiff &dSecondFrame() const;
+    const FrameParametrization::MatDiff &dOtherFrame(int frameInd) const;
+
+  private:
+    SecondFrameParametrization::MatDiff mDSecondFrame;
+    StdVector<FrameParametrization::MatDiff> mDRestFrames;
   };
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -48,7 +63,7 @@ public:
   AffLightT getLightWorldToFrame(int frameInd, int frameCamInd) const;
   int numKeyFrames() const;
   int numPoints() const;
-  int camBundleSize() const;
+  int numCameras() const;
   T logDepth(int i) const;
 
   void setPoints(std::vector<OptimizedPoint *> &&newOptimizedPoints);

@@ -113,12 +113,12 @@ VecRt EnergyFunction::getPredictedResidualIncrement(
     VecRt motionDeltaR(patternSize);
     if (frameInd == 1)
       motionDeltaR = dr_dqt *
-                     curDerivatives.parametrizationJacobians.dSecondFrame *
+                     curDerivatives.parametrizationJacobians.dSecondFrame() *
                      delta.sndBlock();
     else
       motionDeltaR =
           dr_dqt *
-          curDerivatives.parametrizationJacobians.dRestFrames[frameInd - 2] *
+          curDerivatives.parametrizationJacobians.dOtherFrame(frameInd) *
           delta.restBlock(frameInd);
 
     VecRt affDeltaR =
@@ -153,7 +153,7 @@ Hessian EnergyFunction::getHessian() {
 Hessian EnergyFunction::getHessian(const Values &precomputedValues,
                                    const Derivatives &precomputedDerivatives) {
   Hessian::AccumulatedBlocks accumulatedBlocks(parameters.numKeyFrames(),
-                                               parameters.camBundleSize(),
+                                               parameters.numCameras(),
                                                parameters.numPoints());
   for (int ri = 0; ri < residuals.size(); ++ri) {
     const Residual &residual = residuals[ri];
@@ -182,7 +182,7 @@ Gradient
 EnergyFunction::getGradient(const Values &precomputedValues,
                             const Derivatives &precomputedDerivatives) {
   Gradient::AccumulatedBlocks accumulatedBlocks(parameters.numKeyFrames(),
-                                                parameters.camBundleSize(),
+                                                parameters.numCameras(),
                                                 parameters.numPoints());
 
   for (int ri = 0; ri < residuals.size(); ++ri) {
@@ -407,10 +407,10 @@ const MotionDerivatives &EnergyFunction::PrecomputedMotionDerivatives::get(
 EnergyFunction::PrecomputedLightHostToTarget::PrecomputedLightHostToTarget(
     const Parameters *parameters)
     : parameters(parameters)
-    , lightHostToTarget(boost::extents[parameters->numKeyFrames()]
-                                      [parameters->camBundleSize()]
-                                      [parameters->numKeyFrames()]
-                                      [parameters->camBundleSize()]) {
+    , lightHostToTarget(
+          boost::extents[parameters->numKeyFrames()][parameters->numCameras()]
+                        [parameters->numKeyFrames()]
+                        [parameters->numCameras()]) {
   //  for (int hostInd = 0; hostInd < parameters->numKeyFrames(); ++hostInd)
   //    for (int hostCa)
 }
