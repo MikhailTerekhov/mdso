@@ -1,5 +1,5 @@
 #include "optimize/Residual.h"
-#include "PreKeyFrameEntryInternals.h"
+#include "internal/system/PreKeyFrameEntryInternals.h"
 
 namespace mdso::optimize {
 

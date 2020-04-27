@@ -1,5 +1,5 @@
 #include "system/PreKeyFrame.h"
-#include "PreKeyFrameEntryInternals.h"
+#include "internal/system/PreKeyFrameEntryInternals.h"
 #include "system/FrameTracker.h"
 #include "system/KeyFrame.h"
 #include "util/util.h"

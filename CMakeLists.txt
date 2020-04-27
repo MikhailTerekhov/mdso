@@ -182,11 +182,11 @@ set(dso_SOURCE_FILES
 )
 
 set(dso_internal_HEADER_FILES
-    ${PROJECT_SOURCE_DIR}/internal/include/PreKeyFrameEntryInternals.h
+        internal/include/internal/system/PreKeyFrameEntryInternals.h
 )
 
 set(dso_internal_SOURCE_FILES
-        ${PROJECT_SOURCE_DIR}/internal/source/PreKeyFrameEntryInternals.cpp
+        internal/source/internal/system/PreKeyFrameEntryInternals.cpp
 )
 
 

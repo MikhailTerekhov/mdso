@@ -1,5 +1,5 @@
-#ifndef INCLUDE_PREKEYFRAMEINTERNALS
-#define INCLUDE_PREKEYFRAMEINTERNALS
+#ifndef INCLUDE_PREKEYFRAMEENTRYINTERNALS
+#define INCLUDE_PREKEYFRAMEENTRYINTERNALS
 
 #include "util/BilinearInterpolator.h"
 #include "util/ImagePyramid.h"

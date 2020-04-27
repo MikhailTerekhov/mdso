@@ -1,5 +1,5 @@
 #include "system/BundleAdjusterCeres.h"
-#include "PreKeyFrameEntryInternals.h"
+#include "internal/system/PreKeyFrameEntryInternals.h"
 #include "system/AffineLightTransform.h"
 #include "system/SphericalPlus.h"
 #include "util/defs.h"

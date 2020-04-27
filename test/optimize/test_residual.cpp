@@ -1,5 +1,5 @@
-#include "PreKeyFrameEntryInternals.h"
 #include "data/MultiFovReader.h"
+#include "internal/system/PreKeyFrameEntryInternals.h"
 #include "optimize/Residual.h"
 #include "system/CameraBundle.h"
 #include "system/IdentityPreprocessor.h"

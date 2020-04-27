@@ -1,5 +1,5 @@
 #include "system/FrameTracker.h"
-#include "PreKeyFrameEntryInternals.h"
+#include "internal/system/PreKeyFrameEntryInternals.h"
 #include "output/FrameTrackerObserver.h"
 #include "util/util.h"
 #include <ceres/cubic_interpolation.h>
