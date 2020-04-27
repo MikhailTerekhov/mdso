@@ -15,6 +15,11 @@ DECLARE_bool(set_max_depth);
 DECLARE_bool(min_plus_exp_depth);
 
 DECLARE_double(init_lambda);
+DECLARE_double(bad_rho);
+DECLARE_double(good_rho);
+DECLARE_double(accepted_rho);
+
+DECLARE_bool(use_grad_weighting);
 
 DECLARE_int32(first_frames_skip);
 DECLARE_bool(run_max_RANSAC_iterations);

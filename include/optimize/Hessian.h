@@ -66,6 +66,7 @@ public:
 
   Hessian levenbergMarquardtDamp(double lambda) const;
   DeltaParameterVector solve(const Gradient &gradient) const;
+  T applyQuadraticForm(const DeltaParameterVector &delta) const;
 
   inline MatFFt getFrameFrame() const { return frameFrame; }
   inline MatFPt getFramePoint() const { return framePoint; }

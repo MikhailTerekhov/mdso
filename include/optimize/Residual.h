@@ -175,8 +175,10 @@ public:
   VecRt getValues(const SE3t &hostToTargetImage,
                   const AffLightT &lightHostToTarget, T logDepth,
                   CachedValues *cachedValues) const;
+  double getDeltaEnergy(const VecRt &values) const;
   VecRt getHessianWeights(const VecRt &values) const;
   VecRt getGradientWeights(const VecRt &values) const;
+  VecRt getPixelDependentWeights() const;
   Jacobian getJacobian(const SE3t &hostToTarget,
                        const MotionDerivatives &dHostToTarget,
                        const AffLightT &lightWorldToHost,

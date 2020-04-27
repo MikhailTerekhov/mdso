@@ -166,6 +166,19 @@ VecRt Residual::getValues(const SE3t &hostToTargetImage,
   return result;
 }
 
+double Residual::getDeltaEnergy(const VecRt &values) const {
+  CHECK_EQ(values.size(), reprojPattern.size());
+  double deltaEnergy = 0;
+  for (int i = 0; i < values.size(); ++i) {
+    double v = values[i];
+    double v2 = v * v;
+    double rho[3];
+    lossFunction->Evaluate(v2, rho);
+    deltaEnergy += gradWeights[i] * rho[0];
+  }
+  return deltaEnergy;
+}
+
 VecRt Residual::getHessianWeights(const VecRt &values) const {
   VecRt weights(settings.residualPattern.pattern().size());
   for (int i = 0; i < weights.size(); ++i) {
@@ -194,6 +207,8 @@ VecRt Residual::getGradientWeights(const VecRt &values) const {
   }
   return weights;
 }
+
+VecRt Residual::getPixelDependentWeights() const { return gradWeights; }
 
 Residual::Jacobian Residual::getJacobian(
     const SE3t &hostToTarget, const MotionDerivatives &dHostToTarget,

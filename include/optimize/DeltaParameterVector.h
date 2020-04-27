@@ -19,6 +19,16 @@ public:
   DeltaParameterVector(int numKeyFrames, int numCameras, const VecFt &frame,
                        const VecPt &point);
 
+  inline T &pointBlock(int pointInd) { return point[pointInd]; }
+  inline const T &pointBlock(int pointInd) const { return point[pointInd]; }
+
+  inline const VecXt &getFrame() const { return frame; }
+  inline const VecXt &getPoint() const { return point; }
+
+  T dot(const DeltaParameterVector &other) const;
+
+  void setAffineZero();
+
   inline Eigen::Block<VecFt, sndDoF, 1> sndBlock() {
     return frame.head<sndDoF>();
   }
@@ -41,11 +51,6 @@ public:
     return frame.segment<affDoF>(
         frameParameterOrder.lightWorldToFrame(frameInd, frameCamInd));
   }
-  inline T &pointBlock(int pointInd) { return point[pointInd]; }
-  inline const T &pointBlock(int pointInd) const { return point[pointInd]; }
-
-  inline const VecXt &getFrame() const { return frame; }
-  inline const VecXt &getPoint() const { return point; }
 
 private:
   FrameParameterOrder frameParameterOrder;

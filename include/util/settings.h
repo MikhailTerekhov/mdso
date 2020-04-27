@@ -437,12 +437,13 @@ struct ResidualSettings {
   Settings::ResidualPattern residualPattern = {};
   Settings::ResidualWeighting residualWeighting = {};
   Settings::Intensity intensity = {};
-  Settings::Depth depth;
+  Settings::Depth depth = {};
 };
 
 struct EnergyFunctionSettings {
-  ResidualSettings residual;
-  Settings::Optimization optimization;
+  ResidualSettings residual = {};
+  Settings::AffineLight affineLight = {};
+  Settings::Optimization optimization = {};
 };
 
 struct BundleAdjusterSettings {

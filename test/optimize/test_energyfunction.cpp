@@ -56,7 +56,6 @@ protected:
 
   void SetUp() override {
     settings = getFlaggedSettings();
-    settings.residualWeighting.useGradientWeighting = false;
     settings.setMaxOptimizedPoints(pointsPerFrame * keyFramesCount);
     settings.keyFrame.setImmaturePointsNum(pointsPerFrame);
     energyFunctionSettings = settings.getEnergyFunctionSettings();
@@ -466,9 +465,14 @@ TEST_F(EnergyFunctionTest, arePredictionsCorrect) {
 
   VecXt expectedPrediction = expectedJacobian * deltaVec;
   VecXt actualPrediction(PS * residuals.size());
-  for (int ri = 0; ri < residuals.size(); ++ri)
+  for (int ri = 0; ri < residuals.size(); ++ri) {
+    VecRt expectedBlock = expectedPrediction.segment(ri * PS, PS);
+    expectedBlock = expectedBlock.cwiseProduct(
+        residuals[ri].getPixelDependentWeights().cwiseSqrt());
+    expectedPrediction.segment(ri * PS, PS) = expectedBlock;
     actualPrediction.segment(ri * PS, PS) =
         energyFunction->getPredictedResidualIncrement(ri, delta);
+  }
 
   double relPredictionErr = (expectedPrediction - actualPrediction).norm() /
                             expectedPrediction.norm();

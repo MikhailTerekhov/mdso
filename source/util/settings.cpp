@@ -71,7 +71,7 @@ ResidualSettings Settings::getResidualSettings() const {
 }
 
 EnergyFunctionSettings Settings::getEnergyFunctionSettings() const {
-  return {getResidualSettings(), optimization};
+  return {getResidualSettings(), affineLight, optimization};
 }
 
 } // namespace mdso

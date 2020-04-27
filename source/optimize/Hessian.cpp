@@ -344,4 +344,13 @@ DeltaParameterVector Hessian::solve(const Gradient &gradient) const {
                               deltaPoint);
 }
 
+T Hessian::applyQuadraticForm(const DeltaParameterVector &delta) const {
+  const VecXt &deltaFrame = delta.getFrame();
+  const VecXt &deltaPoint = delta.getPoint();
+  return (deltaFrame.transpose() * frameFrame * deltaFrame +
+          2 * deltaFrame.transpose() * framePoint * deltaPoint)
+             .value() +
+         deltaPoint.dot(pointPoint.cwiseProduct(deltaPoint));
+}
+
 } // namespace mdso::optimize

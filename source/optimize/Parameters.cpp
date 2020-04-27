@@ -150,9 +150,12 @@ void Parameters::apply() const {
         state.frameParametrization(fi).value().cast<double>());
 
   for (int fi = 1; fi < keyFrames.size(); ++fi)
-    for (int ci = 0; ci < numCameras(); ++ci)
+    for (int ci = 0; ci < numCameras(); ++ci) {
       keyFrames[fi]->frames[ci].lightWorldToThis =
           state.lightWorldToFrame(fi, ci).cast<double>();
+      VLOG(1) << "kf #" << fi << ", cam #" << ci << ", new aff: \n"
+              << keyFrames[fi]->frames[ci].lightWorldToThis;
+    }
 
   for (int pi = 0; pi < optimizedPoints.size(); ++pi)
     optimizedPoints[pi]->logDepth = state.logDepths[pi];

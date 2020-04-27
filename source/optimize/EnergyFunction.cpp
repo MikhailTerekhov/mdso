@@ -135,8 +135,15 @@ VecRt EnergyFunction::getPredictedResidualIncrement(
       getFrameDeltaR(hi, hci, jacobian.gradItarget, jacobian.dhost);
   VecRt targetDeltaR =
       getFrameDeltaR(ti, tci, jacobian.gradItarget, jacobian.dtarget);
-  VecRt pointDeltaR = jacobian.dr_dlogd() * delta.pointBlock(pi);
-  return hostDeltaR + targetDeltaR + pointDeltaR;
+  double deltaPoint = delta.pointBlock(pi);
+  VecRt pointDeltaR(patternSize);
+  if (deltaPoint == 0)
+    pointDeltaR.setZero();
+  else
+    pointDeltaR = jacobian.dr_dlogd() * deltaPoint;
+  VecRt gradWeights = res.getPixelDependentWeights();
+  return gradWeights.cwiseSqrt().cwiseProduct(hostDeltaR + targetDeltaR +
+                                              pointDeltaR);
 }
 
 Hessian EnergyFunction::getHessian() {
@@ -234,7 +241,7 @@ void EnergyFunction::optimize(int maxIterations) {
     TimePoint start, end;
     start = now();
 
-    double curEnergy = curValues.totalEnergy();
+    double curEnergy = curValues.totalEnergy(residuals);
     LOG(INFO) << "cur energy = " << curEnergy << "\n";
 
     if (parametersUpdated) {
@@ -249,8 +256,14 @@ void EnergyFunction::optimize(int maxIterations) {
         hessian.levenbergMarquardtDamp(stepController.lambda());
 
     DeltaParameterVector delta = dampedHessian.solve(gradient);
+    if (!settings.affineLight.optimizeAffineLight)
+      delta.setAffineZero();
 
-    double predictedEnergy = predictEnergy(delta);
+    double predictedEnergy =
+        curEnergy + getPredictedDeltaEnergy(hessian, gradient, delta);
+    double predictedViaJacobian = predictEnergyViaJacobian(delta);
+    LOG(INFO) << "predicted via J = " << predictedViaJacobian
+              << ", diff = " << curEnergy - predictedViaJacobian;
 
     Parameters::State savedState = parameters.saveState();
     parameters.update(delta);
@@ -259,7 +272,7 @@ void EnergyFunction::optimize(int maxIterations) {
     auto newLightHostToTarget = precomputeLightHostToTarget();
     Values newValues = createValues(newHostToTarget, newLightHostToTarget);
 
-    double newEnergy = newValues.totalEnergy();
+    double newEnergy = newValues.totalEnergy(residuals);
 
     LOG(INFO) << "optimization step #" << it << ": curEnergy = " << curEnergy
               << " predictedEnergy = " << predictedEnergy
@@ -281,19 +294,6 @@ void EnergyFunction::optimize(int maxIterations) {
   }
 
   parameters.apply();
-}
-
-double deltaEnergy(const ceres::LossFunction *lossFunciton,
-                   const VecRt &residualValues) {
-  double result = 0;
-  for (int i = 0; i < residualValues.size(); ++i) {
-    double v = residualValues[i];
-    double v2 = v * v;
-    double rho[3];
-    lossFunciton->Evaluate(v2, rho);
-    result += rho[0];
-  }
-  return result;
 }
 
 EnergyFunction::Values::Values(const StdVector<Residual> &residuals,
@@ -328,12 +328,16 @@ EnergyFunction::Values::cachedValues(int residualInd) const {
   return valsAndCache[residualInd].second;
 }
 
-double EnergyFunction::Values::totalEnergy() const {
+double EnergyFunction::Values::totalEnergy(
+    const StdVector<Residual> &residuals) const {
   CHECK_GT(valsAndCache.size(), 0);
+  CHECK_EQ(residuals.size(), valsAndCache.size());
   int patternSize = valsAndCache[0].first.size();
   Accumulator<double> energy;
-  for (const auto &[vals, cache] : valsAndCache)
-    energy += deltaEnergy(lossFunction, vals);
+  for (int ri = 0; ri < residuals.size(); ++ri) {
+    const auto &[vals, cache] = valsAndCache[ri];
+    energy += residuals[ri].getDeltaEnergy(vals);
+  }
   return energy.accumulated();
 }
 
@@ -466,13 +470,14 @@ EnergyFunction::precomputeLightHostToTarget() const {
   return PrecomputedLightHostToTarget(&parameters);
 }
 
-double EnergyFunction::predictEnergy(const DeltaParameterVector &delta) {
+double
+EnergyFunction::predictEnergyViaJacobian(const DeltaParameterVector &delta) {
   Values &values = computeValues();
   Accumulator<double> predictedEnergy;
   for (int ri = 0; ri < residuals.size(); ++ri) {
     VecRt predictedR =
         values.values(ri) + getPredictedResidualIncrement(ri, delta);
-    predictedEnergy += deltaEnergy(lossFunction.get(), predictedR);
+    predictedEnergy += residuals[ri].getDeltaEnergy(predictedR);
   }
   return predictedEnergy.accumulated();
 }
@@ -534,6 +539,14 @@ EnergyFunction::Derivatives &EnergyFunction::computeDerivatives() {
   return derivatives.value();
 }
 
-double EnergyFunction::totalEnergy() { return computeValues().totalEnergy(); }
+double EnergyFunction::totalEnergy() {
+  return computeValues().totalEnergy(residuals);
+}
+
+T EnergyFunction::getPredictedDeltaEnergy(const Hessian &hessian,
+                                          const Gradient &gradient,
+                                          const DeltaParameterVector &delta) {
+  return hessian.applyQuadraticForm(delta) + 2 * gradient.dot(delta);
+}
 
 } // namespace mdso::optimize

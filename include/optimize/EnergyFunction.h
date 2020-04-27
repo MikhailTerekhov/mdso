@@ -23,6 +23,9 @@ public:
   VecRt getResidualValues(int residualInd);
   VecRt getPredictedResidualIncrement(int residualInd,
                                       const DeltaParameterVector &delta);
+  static T getPredictedDeltaEnergy(const Hessian &hessian,
+                                   const Gradient &gradient,
+                                   const DeltaParameterVector &delta);
   inline const StdVector<Residual> &getResiduals() const { return residuals; }
   inline T getLogDepth(const Residual &res) {
     return parameters.logDepth(res.pointInd());
@@ -88,7 +91,7 @@ private:
 
     const VecRt &values(int residualInd) const;
     const Residual::CachedValues &cachedValues(int residualInd) const;
-    double totalEnergy() const;
+    double totalEnergy(const StdVector<Residual> &residuals) const;
 
   private:
     const ceres::LossFunction *lossFunction;
@@ -110,7 +113,7 @@ private:
   PrecomputedMotionDerivatives precomputeMotionDerivatives() const;
   PrecomputedLightHostToTarget precomputeLightHostToTarget() const;
 
-  double predictEnergy(const DeltaParameterVector &delta);
+  double predictEnergyViaJacobian(const DeltaParameterVector &delta);
 
   Values createValues(PrecomputedHostToTarget &hostToTarget,
                       PrecomputedLightHostToTarget &lightHostToTarget);
