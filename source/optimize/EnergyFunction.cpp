@@ -47,8 +47,7 @@ EnergyFunction::EnergyFunction(CameraBundle *camBundle, KeyFrame **keyFrames,
     reprojector.setSkippedFrame(targetInd);
     StdVector<Reprojection> reprojections = reprojector.reproject();
 
-    for (int reprInd = 0; reprInd < reprojections.size(); ++reprInd) {
-      const auto &repr = reprojections[reprInd];
+    for (const auto &repr : reprojections) {
       OptimizedPoint &op = keyFrames[repr.hostInd]
                                ->frames[repr.hostCamInd]
                                .optimizedPoints[repr.pointInd];
@@ -534,5 +533,7 @@ EnergyFunction::Derivatives &EnergyFunction::computeDerivatives() {
   }
   return derivatives.value();
 }
+
+double EnergyFunction::totalEnergy() { return computeValues().totalEnergy(); }
 
 } // namespace mdso::optimize

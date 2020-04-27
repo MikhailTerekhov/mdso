@@ -1,5 +1,5 @@
 #include "system/StereoGeometryEstimator.h"
-#include "system/SphericalPlus.h"
+#include "optimize/SphericalPlus.h"
 #include "util/flags.h"
 #include "util/geometry.h"
 #include <RelativePoseEstimator.h>
@@ -9,6 +9,8 @@
 #include <random>
 
 namespace mdso {
+
+using optimize::SphericalPlus;
 
 const int inlierVectorsUsed = 5;
 const int motionInliers = 0;

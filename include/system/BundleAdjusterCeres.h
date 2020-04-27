@@ -9,7 +9,7 @@ class BundleAdjusterCeres : public BundleAdjuster {
 public:
   ~BundleAdjusterCeres();
 
-  void adjust(KeyFrame **keyFrames, int numKeyFrames,
+  void adjust(KeyFrame *keyFrames[], int numKeyFrames,
               const BundleAdjusterSettings &settings) const override;
 };
 

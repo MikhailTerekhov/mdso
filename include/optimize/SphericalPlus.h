@@ -5,7 +5,7 @@
 #include <Eigen/Core>
 #include <ceres/ceres.h>
 
-namespace mdso {
+namespace mdso::optimize {
 
 class SphericalPlus {
 public:
@@ -75,6 +75,6 @@ private:
   static Mat33 degenerateR;
 };
 
-} // namespace mdso
+} // namespace mdso::optimize
 
 #endif

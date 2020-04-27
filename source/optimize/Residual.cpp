@@ -50,15 +50,13 @@ Residual::Residual(int hostInd, int hostCamInd, int targetInd, int targetCamInd,
       &hostFrame->preKeyFrameEntry->internals->interpolator(0);
   for (int i = 0; i < hostIntensities.size(); ++i) {
     Vec2 p = optimizedPoint->p + settings.residualPattern.pattern()[i];
-    Vec2 gradIhost;
     double hostIntensity;
-    hostInterp->Evaluate(p[1], p[0], &hostIntensity, &gradIhost[1],
-                         &gradIhost[0]);
+    hostInterp->Evaluate(p[1], p[0], &hostIntensity);
     hostIntensities[i] = T(hostIntensity);
-    T normSq = T(gradIhost.squaredNorm());
+    double gradNorm = hostFrame->preKeyFrameEntry->gradNorm(toCvPoint(p));
     if (settings.residualWeighting.useGradientWeighting) {
       T c = T(settings.residualWeighting.c);
-      gradWeights[i] = c / std::sqrt(c * c + normSq);
+      gradWeights[i] = c / std::sqrt(c * c + gradNorm * gradNorm);
     } else {
       gradWeights[i] = 1;
     }

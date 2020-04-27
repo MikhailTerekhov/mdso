@@ -28,6 +28,7 @@ public:
     return parameters.logDepth(res.pointInd());
   }
 
+  double totalEnergy();
   Hessian getHessian();
   Gradient getGradient();
 

@@ -77,7 +77,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/data/MultiFovReader.h
 
     ${PROJECT_SOURCE_DIR}/include/system/AffineLightTransform.h
-    ${PROJECT_SOURCE_DIR}/include/system/SphericalPlus.h
+        include/optimize/SphericalPlus.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoSystem.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoInitializer.h
     ${PROJECT_SOURCE_DIR}/include/system/DelaunayDsoInitializer.h
@@ -182,11 +182,13 @@ set(dso_SOURCE_FILES
 )
 
 set(dso_internal_HEADER_FILES
-        internal/include/internal/system/PreKeyFrameEntryInternals.h
+    internal/include/internal/system/PreKeyFrameEntryInternals.h
+    internal/include/internal/optimize/EnergyFunctionCeres.h
 )
 
 set(dso_internal_SOURCE_FILES
-        internal/source/internal/system/PreKeyFrameEntryInternals.cpp
+    internal/source/internal/system/PreKeyFrameEntryInternals.cpp
+    internal/source/internal/optimize/EnergyFunctionCeres.cpp
 )
 
 

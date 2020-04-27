@@ -1,4 +1,5 @@
 #include "data/MultiFovReader.h"
+#include "internal/optimize/EnergyFunctionCeres.h"
 #include "optimize/EnergyFunction.h"
 #include "system/BundleAdjusterCeres.h"
 #include "system/IdentityPreprocessor.h"
@@ -25,12 +26,14 @@ template <> struct ErrorBounds<float> {
   static constexpr float hessianRelErr = 1e-2;
   static constexpr float gradientRelErr = 2e-2;
   static constexpr float predictionRelErr = 1e-2;
+  static constexpr float energyRelErr = 1e-4;
 };
 
 template <> struct ErrorBounds<double> {
   static constexpr double hessianRelErr = 1e-10;
   static constexpr double gradientRelErr = 1e-10;
   static constexpr double predictionRelErr = 1e-10;
+  static constexpr float energyRelErr = 1e-12;
 };
 
 class EnergyFunctionTest : public ::testing::Test {
@@ -279,6 +282,27 @@ double fillFactor(const MatXX &mat, double eps) {
 
 template <typename MatrixT> int countNaNs(const MatrixT &mat) {
   return (mat.array() != mat.array()).count();
+}
+
+TEST_F(EnergyFunctionTest, isEnergyCorrect) {
+  std::vector<KeyFrame *> kfPtrs;
+  kfPtrs.reserve(keyFrames.size());
+  for (auto &kf : keyFrames)
+    kfPtrs.push_back(kf.get());
+
+  EnergyFunctionCeres energyFunctionCeres(kfPtrs.data(), kfPtrs.size(),
+                                          settings.getBundleAdjusterSettings());
+  ceres::Problem &problem = energyFunctionCeres.problem();
+  ASSERT_EQ(problem.NumResidualBlocks(),
+            energyFunction->getResiduals().size() *
+                settings.residualPattern.pattern().size());
+
+  double myEnergy = energyFunction->totalEnergy();
+  double ceresEnergy;
+  problem.Evaluate(ceres::Problem::EvaluateOptions(), &ceresEnergy, nullptr,
+                   nullptr, nullptr);
+  EXPECT_NEAR(myEnergy / 2, ceresEnergy,
+              ceresEnergy * ErrorBounds<T>::energyRelErr);
 }
 
 TEST_F(EnergyFunctionTest, isHessianCorrect) {
