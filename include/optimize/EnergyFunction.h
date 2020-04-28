@@ -8,6 +8,7 @@
 #include "optimize/Hessian.h"
 #include "optimize/Parameters.h"
 #include "optimize/parametrizations.h"
+#include "optimize/precomputations.h"
 #include "util/types.h"
 #include <optional>
 
@@ -15,73 +16,6 @@ namespace mdso::optimize {
 
 class EnergyFunction {
 public:
-  EnergyFunction(CameraBundle *camBundle, KeyFrame *keyFrames[],
-                 int numKeyFrames, const EnergyFunctionSettings &settings);
-
-  int numPoints() const;
-
-  VecRt getResidualValues(int residualInd);
-  VecRt getPredictedResidualIncrement(int residualInd,
-                                      const DeltaParameterVector &delta);
-  static T getPredictedDeltaEnergy(const Hessian &hessian,
-                                   const Gradient &gradient,
-                                   const DeltaParameterVector &delta);
-  inline const StdVector<Residual> &getResiduals() const { return residuals; }
-  inline T getLogDepth(const Residual &res) {
-    return parameters.logDepth(res.pointInd());
-  }
-
-  double totalEnergy();
-  Hessian getHessian();
-  Gradient getGradient();
-
-  void precomputeValuesAndDerivatives();
-  void clearPrecomputations();
-
-  Parameters::State saveState() const;
-  void recoverState(const Parameters::State &oldState);
-
-  void optimize(int maxInterations);
-
-private:
-  class PrecomputedHostToTarget {
-  public:
-    PrecomputedHostToTarget(CameraBundle *cam, const Parameters *parameters);
-
-    SE3t get(int hostInd, int hostCamInd, int targetInd, int targetCamInd);
-
-  private:
-    const Parameters *parameters;
-    StdVector<SE3t> camToBody;
-    StdVector<SE3t> bodyToCam;
-    Array4d<SE3t> hostToTarget;
-  };
-
-  class PrecomputedMotionDerivatives {
-  public:
-    PrecomputedMotionDerivatives(CameraBundle *cam,
-                                 const Parameters *parameters);
-    const MotionDerivatives &get(int hostInd, int hostCamInd, int targetInd,
-                                 int targetCamInd);
-
-  private:
-    const Parameters *parameters;
-    StdVector<SE3t> camToBody;
-    StdVector<SE3t> bodyToCam;
-    Array4d<std::optional<MotionDerivatives>> hostToTargetDiff;
-  };
-
-  class PrecomputedLightHostToTarget {
-  public:
-    PrecomputedLightHostToTarget(const Parameters *parameters);
-
-    AffLightT get(int hostInd, int hostCamInd, int targetInd, int targetCamInd);
-
-  private:
-    const Parameters *parameters;
-    Array4d<std::optional<AffLightT>> lightHostToTarget;
-  };
-
   class Values {
   public:
     Values(const StdVector<Residual> &residuals, const Parameters &parameters,
@@ -109,21 +43,52 @@ private:
     Parameters::Jacobians parametrizationJacobians;
   };
 
+  EnergyFunction(CameraBundle *camBundle, KeyFrame *keyFrames[],
+                 int numKeyFrames, const EnergyFunctionSettings &settings);
+
+  int numPoints() const;
+
+  VecRt getResidualValues(int residualInd);
+  VecRt getPredictedResidualIncrement(int residualInd,
+                                      const DeltaParameterVector &delta);
+  static T getPredictedDeltaEnergy(const Hessian &hessian,
+                                   const Gradient &gradient,
+                                   const DeltaParameterVector &delta);
+  inline const StdVector<Residual> &getResiduals() const { return residuals; }
+  inline T getLogDepth(const Residual &res) {
+    return parameters->logDepth(res.pointInd());
+  }
+
   PrecomputedHostToTarget precomputeHostToTarget() const;
   PrecomputedMotionDerivatives precomputeMotionDerivatives() const;
   PrecomputedLightHostToTarget precomputeLightHostToTarget() const;
 
-  double predictEnergyViaJacobian(const DeltaParameterVector &delta);
-
   Values createValues(PrecomputedHostToTarget &hostToTarget,
                       PrecomputedLightHostToTarget &lightHostToTarget);
-  Values &computeValues(PrecomputedHostToTarget &hostToTarget,
-                        PrecomputedLightHostToTarget &lightHostToTarget);
-  Values &computeValues();
   Derivatives
   createDerivatives(const Values &values, PrecomputedHostToTarget &hostToTarget,
                     PrecomputedMotionDerivatives &motionDerivatives,
                     PrecomputedLightHostToTarget &lightHostToTarget);
+  double totalEnergy();
+  Hessian getHessian();
+  Gradient getGradient();
+
+  void precomputeValuesAndDerivatives();
+  void clearPrecomputations();
+
+  std::shared_ptr<Parameters> getParameters();
+
+  Parameters::State saveState() const;
+  void recoverState(const Parameters::State &oldState);
+
+  void optimize(int maxInterations);
+
+private:
+  double predictEnergyViaJacobian(const DeltaParameterVector &delta);
+
+  Values &computeValues(PrecomputedHostToTarget &hostToTarget,
+                        PrecomputedLightHostToTarget &lightHostToTarget);
+  Values &computeValues();
   Derivatives &
   computeDerivatives(PrecomputedHostToTarget &hostToTarget,
                      PrecomputedMotionDerivatives &motionDerivatives,
@@ -137,7 +102,7 @@ private:
   StdVector<Residual> residuals;
   std::optional<Values> values;
   std::optional<Derivatives> derivatives;
-  Parameters parameters;
+  std::shared_ptr<Parameters> parameters;
   std::unique_ptr<ceres::LossFunction> lossFunction;
   CameraBundle *cam;
   EnergyFunctionSettings settings;

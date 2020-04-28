@@ -124,6 +124,14 @@ T Parameters::logDepth(int i) const {
   return state.logDepths[i];
 }
 
+const std::vector<OptimizedPoint *> &Parameters::getOptimizedPoints() const {
+  return optimizedPoints;
+}
+
+const std::vector<KeyFrame *> &Parameters::getKeyFrames() const {
+  return keyFrames;
+}
+
 void Parameters::setPoints(
     const std::vector<OptimizedPoint *> &newOptimizedPoints) {
   optimizedPoints = newOptimizedPoints;

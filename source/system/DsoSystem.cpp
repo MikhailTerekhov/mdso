@@ -467,6 +467,17 @@ FrameTracker::DepthedMultiFrame DsoSystem::getBaseForTrack() const {
   return baseForTrack;
 }
 
+std::unique_ptr<BundleAdjuster> DsoSystem::createBundleAdjuster() const {
+  switch (settings.optimization.optimizationType) {
+  case Settings::Optimization::DISABLED:
+    return nullptr;
+  case Settings::Optimization::CERES:
+    return std::unique_ptr<BundleAdjuster>(new BundleAdjusterCeres());
+  default:
+    return std::unique_ptr<BundleAdjuster>(new BundleAdjusterSelfMade());
+  }
+}
+
 void DsoSystem::addMultiFrame(const cv::Mat3b frames[],
                               Timestamp timestamps[]) {
   if (!isInitialized) {
@@ -593,19 +604,13 @@ void DsoSystem::addMultiFrame(const cv::Mat3b frames[],
     for (DsoObserver *obs : observers.dso)
       obs->newBaseFrame(baseFrame());
 
-    if (settings.optimization.runBA) {
+    std::unique_ptr<BundleAdjuster> bundleAdjuster = createBundleAdjuster();
+    if (bundleAdjuster) {
       std::vector<KeyFrame *> kfPtrs(keyFrames.size());
       for (int i = 0; i < keyFrames.size(); ++i)
         kfPtrs[i] = keyFrames[i].get();
-      if (settings.optimization.useSelfWrittenOptimization) {
-        BundleAdjusterSelfMade bundleAdjuster;
-        bundleAdjuster.adjust(kfPtrs.data(), kfPtrs.size(),
-                              settings.getBundleAdjusterSettings());
-      } else {
-        BundleAdjusterCeres bundleAdjuster;
-        bundleAdjuster.adjust(kfPtrs.data(), kfPtrs.size(),
-                              settings.getBundleAdjusterSettings());
-      }
+      bundleAdjuster->adjust(kfPtrs.data(), kfPtrs.size(),
+                             settings.getBundleAdjusterSettings());
     }
 
     std::vector<const KeyFrame *> kfPtrs = getKeyFrames();

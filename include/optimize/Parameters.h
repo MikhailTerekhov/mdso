@@ -64,6 +64,8 @@ public:
   int numPoints() const;
   int numCameras() const;
   T logDepth(int i) const;
+  const std::vector<OptimizedPoint *> &getOptimizedPoints() const;
+  const std::vector<KeyFrame *> &getKeyFrames() const;
 
   void setPoints(const std::vector<OptimizedPoint *> &newOptimizedPoints);
 

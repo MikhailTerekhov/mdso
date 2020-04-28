@@ -1,5 +1,5 @@
 #include "system/BundleAdjusterSelfMade.h"
-
+#include "internal/optimize/EnergyFunctionCeres.h"
 #include "optimize/EnergyFunction.h"
 
 namespace mdso {
@@ -15,7 +15,18 @@ void BundleAdjusterSelfMade::adjust(
   CameraBundle *cam = keyFrames[0]->preKeyFrame->cam;
   EnergyFunction energyFunction(cam, keyFrames, numKeyFrames,
                                 settings.energyFunction);
-  energyFunction.optimize(settings.optimization.maxIterations);
+  switch (settings.optimization.optimizationType) {
+  case Settings::Optimization::DISABLED:
+  case Settings::Optimization::CERES:
+    LOG(ERROR) << "Unexpected optimization type";
+  case Settings::Optimization::SELF_WRITTEN:
+    energyFunction.optimize(settings.optimization.maxIterations);
+    break;
+  case Settings::Optimization::MIXED:
+    EnergyFunctionCeres energyFunctionCeres(energyFunction, settings);
+    energyFunctionCeres.optimize();
+    energyFunctionCeres.applyParameterUpdate();
+  }
 }
 
 } // namespace mdso

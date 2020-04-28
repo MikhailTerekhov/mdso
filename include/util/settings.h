@@ -340,11 +340,9 @@ struct Settings {
     static constexpr double default_pointPointThres = 1e-7;
     double pointPointThres = default_pointPointThres;
 
-    static constexpr bool default_useSelfWrittenOptimization = true;
-    bool useSelfWrittenOptimization = default_useSelfWrittenOptimization;
-
-    static constexpr bool default_runBA = true;
-    bool runBA = default_runBA;
+    enum OptimizationType { DISABLED, SELF_WRITTEN, CERES, MIXED };
+    static constexpr OptimizationType default_optimizationType = SELF_WRITTEN;
+    OptimizationType optimizationType = default_optimizationType;
   } optimization;
 
   static constexpr int default_maxOptimizedPoints = 2000;

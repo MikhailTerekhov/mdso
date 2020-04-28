@@ -2,6 +2,7 @@
 #define INCLUDE_DSOSYSTEM
 
 #include "output/Observers.h"
+#include "system/BundleAdjuster.h"
 #include "system/CameraModel.h"
 #include "system/DsoInitializer.h"
 #include "system/FrameTracker.h"
@@ -73,6 +74,7 @@ private:
   void initializeAllFrames();
   template <typename PointT>
   FrameTracker::DepthedMultiFrame getBaseForTrack() const;
+  std::unique_ptr<BundleAdjuster> createBundleAdjuster() const;
 
   CameraBundle *cam;
   CameraBundle::CamPyr camPyr;
