@@ -58,7 +58,8 @@ SO3xS2Parametrization::SO3xS2Parametrization(const SO3t &baseRot,
     , mS2(centerTrans, initialTrans) {}
 
 SO3xS2Parametrization::MatDiff SO3xS2Parametrization::diffPlus() const {
-  MatDiff result = MatDiff::Zero();
+  MatDiff result;
+  result.setZero();
   result.topLeftCorner<4, 3>() = mSo3.diffPlus();
   result.bottomRightCorner<3, 2>() = mS2.diffPlus();
   return result;
@@ -68,6 +69,23 @@ void SO3xS2Parametrization::addDelta(
     const SO3xS2Parametrization::Tangent &delta) {
   mSo3.addDelta(delta.head<3>());
   mS2.addDelta(delta.tail<2>());
+}
+
+SO3xR3Parametrization::SO3xR3Parametrization(const SE3t &frameToWorld)
+    : mSo3(frameToWorld.so3().cast<T>())
+    , mT(frameToWorld.translation().cast<T>()) {}
+
+SO3xR3Parametrization::MatDiff SO3xR3Parametrization::diffPlus() const {
+  MatDiff result;
+  result.setZero();
+  result.topLeftCorner<4, 3>() = mSo3.diffPlus();
+  result.bottomRightCorner<3, 3>().setIdentity();
+  return result;
+}
+
+void SO3xR3Parametrization::addDelta(const Tangent &delta) {
+  mSo3.addDelta(delta.head<3>());
+  mT += delta.tail<3>();
 }
 
 } // namespace mdso::optimize

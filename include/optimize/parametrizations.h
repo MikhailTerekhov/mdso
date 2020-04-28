@@ -83,6 +83,29 @@ private:
   S2Parametrization mS2;
 };
 
+class SO3xR3Parametrization {
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  static constexpr int DoF = 6;
+  static constexpr int num_parameters = SE3t::num_parameters;
+
+  using MatDiff = Eigen::Matrix<T, num_parameters, DoF>;
+  using Tangent = Vec6t;
+
+  SO3xR3Parametrization(const SE3t &frameToWorld);
+
+  MatDiff diffPlus() const;
+
+  void addDelta(const Tangent &delta);
+
+  inline SE3t value() const { return SE3t(mSo3.value(), mT); }
+
+private:
+  RightExpParametrization<SO3t> mSo3;
+  Vec3t mT;
+};
+
 using SecondFrameParametrization = SO3xS2Parametrization;
 using FrameParametrization = RightExpParametrization<SE3t>;
 

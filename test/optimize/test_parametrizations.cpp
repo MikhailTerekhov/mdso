@@ -32,6 +32,9 @@ template <> struct ErrorBounds<float>::OnManifold<S2Parametrization> {
 template <> struct ErrorBounds<float>::OnManifold<SO3xS2Parametrization> {
   static constexpr float value = 1e-6;
 };
+template <> struct ErrorBounds<float>::OnManifold<SO3xR3Parametrization> {
+  static constexpr float value = 1e-6;
+};
 
 template <> struct ErrorBounds<double> {
   static constexpr double zeroAddRelDelta = 1e-14;
@@ -63,6 +66,9 @@ template <> struct ErrorBounds<double>::OnManifold<S2Parametrization> {
   static constexpr float value = 1e-14;
 };
 template <> struct ErrorBounds<double>::OnManifold<SO3xS2Parametrization> {
+  static constexpr float value = 1e-14;
+};
+template <> struct ErrorBounds<double>::OnManifold<SO3xR3Parametrization> {
   static constexpr float value = 1e-14;
 };
 
@@ -98,6 +104,13 @@ sample<SO3xS2Parametrization, std::mt19937>(std::mt19937 &g) {
   return SO3xS2Parametrization(SO3t::sampleUniform(g), center, init);
 }
 
+template <>
+SO3xR3Parametrization
+sample<SO3xR3Parametrization, std::mt19937>(std::mt19937 &g) {
+  auto [center, init] = sampleSphere(g);
+  return SO3xR3Parametrization(SE3::sampleUniform(g));
+}
+
 template <typename Parametrization> T errOnManifold(const Parametrization &p);
 template <>
 T errOnManifold<RightExpParametrization<SO3t>>(
@@ -121,6 +134,11 @@ T errOnManifold<SO3xS2Parametrization>(const SO3xS2Parametrization &p) {
                     errOnManifold<S2Parametrization>(p.s2()));
 }
 
+template <>
+T errOnManifold<SO3xR3Parametrization>(const SO3xR3Parametrization &p) {
+  return std::abs(p.value().unit_quaternion().coeffs().norm() - 1);
+}
+
 template <typename TypeParam>
 class ParametrizationTest : public ::testing::Test {
 public:
@@ -140,7 +158,7 @@ public:
 using Parametrizations =
     ::testing::Types<RightExpParametrization<SO3t>,
                      RightExpParametrization<SE3t>, S2Parametrization,
-                     SO3xS2Parametrization>;
+                     SO3xS2Parametrization, SO3xR3Parametrization>;
 TYPED_TEST_CASE(ParametrizationTest, Parametrizations);
 
 template <typename Parametrization> class PlusFunctor {

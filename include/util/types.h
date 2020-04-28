@@ -24,6 +24,7 @@ using Vec2t = Eigen::Matrix<T, 2, 1>;
 using Vec3t = Eigen::Matrix<T, 3, 1>;
 using Vec4t = Eigen::Matrix<T, 4, 1>;
 using Vec5t = Eigen::Matrix<T, 5, 1>;
+using Vec6t = Eigen::Matrix<T, 6, 1>;
 using Vec7t = Eigen::Matrix<T, 7, 1>;
 using Vec8t = Eigen::Matrix<T, 8, 1>;
 using Vec9t = Eigen::Matrix<T, 9, 1>;
