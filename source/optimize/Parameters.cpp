@@ -124,7 +124,8 @@ T Parameters::logDepth(int i) const {
   return state.logDepths[i];
 }
 
-void Parameters::setPoints(std::vector<OptimizedPoint *> &&newOptimizedPoints) {
+void Parameters::setPoints(
+    const std::vector<OptimizedPoint *> &newOptimizedPoints) {
   optimizedPoints = newOptimizedPoints;
   state.logDepths = VecXt(optimizedPoints.size());
   for (int i = 0; i < optimizedPoints.size(); ++i)

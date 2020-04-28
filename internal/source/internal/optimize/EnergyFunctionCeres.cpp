@@ -1,5 +1,6 @@
 #include "internal/optimize/EnergyFunctionCeres.h"
 #include "optimize/SphericalPlus.h"
+#include "optimize/parametrizations.h"
 #include "system/KeyFrame.h"
 #include "system/Reprojector.h"
 
@@ -8,12 +9,10 @@
 
 namespace mdso::optimize {
 
-EnergyFunctionCeres::Residual::Residual(CameraBundle *cameraBundle,
-                                        KeyFrameEntry *hostKfEntry,
-                                        KeyFrameEntry *targetKfEntry,
-                                        OptimizedPoint *optimizedPoint,
-                                        int numInPattern,
-                                        const BundleAdjusterSettings &settings)
+EnergyFunctionCeres::ResidualCeres::ResidualCeres(
+    CameraBundle *cameraBundle, KeyFrameEntry *hostKfEntry,
+    KeyFrameEntry *targetKfEntry, OptimizedPoint *optimizedPoint,
+    int numInPattern, const BundleAdjusterSettings &settings)
     : cameraBundle(cameraBundle)
     , hostCam(&cameraBundle->bundle[hostKfEntry->ind].cam)
     , targetCam(&cameraBundle->bundle[targetKfEntry->ind].cam)
@@ -51,7 +50,7 @@ EnergyFunctionCeres::Residual::Residual(CameraBundle *cameraBundle,
 }
 
 void logOobStatistics(
-    const std::vector<EnergyFunctionCeres::Residual *> &residuals,
+    const std::vector<EnergyFunctionCeres::ResidualCeres *> &residuals,
     const BundleAdjusterSettings &settings) {
   int numOob = 0, numOobBigDepth = 0;
   for (const auto *res : residuals) {
@@ -76,33 +75,37 @@ void logOobStatistics(
 }
 
 EnergyFunctionCeres::EnergyFunctionCeres(
-    KeyFrame *newKeyFrames[], int numKeyFrames,
+    KeyFrame *keyFrames[], int numKeyFrames,
     const BundleAdjusterSettings &newSettings)
-    : keyFrames(newKeyFrames, newKeyFrames + numKeyFrames)
+    : constParameters(keyFrames[0])
+    , parameters(keyFrames[0]->preKeyFrame->cam, keyFrames, numKeyFrames)
     , ordering(new ceres::ParameterBlockOrdering())
     , settings(newSettings) {
+  static_assert(
+      std::is_same_v<T, double>,
+      "Ceres only works with double precision. Please, configure without "
+      "-DFLOAT_OPTIMIZATION");
+  static_assert(std::is_same_v<FrameParametrization, SO3xR3Parametrization>,
+                "Please, configure with -DSO3_X_R3_PARAMETRIZATION");
   CHECK_GE(numKeyFrames, 2);
 
   CameraBundle *cam = keyFrames[0]->preKeyFrame->cam;
-  pointParams.reserve(Settings::max_maxOptimizedPoints);
-  auto oldDepthParamsBegin = pointParams.begin();
 
   int pointsTotal = 0, pointsOOB = 0;
 
-  bodyToWorld.reserve(numKeyFrames);
-  for (int i = 0; i < numKeyFrames; ++i) {
-    KeyFrame *keyFrame = keyFrames[i];
-    bodyToWorld.push_back(keyFrame->thisToWorld());
+  for (int frameInd = 0; frameInd < numKeyFrames; ++frameInd) {
+    KeyFrame *keyFrame = keyFrames[frameInd];
 
-    mProblem.AddParameterBlock(bodyToWorld.back().translation().data(), 3);
-    mProblem.AddParameterBlock(bodyToWorld.back().so3().data(), 4,
+    auto [so3Data, tData] = getFrameData(frameInd);
+    mProblem.AddParameterBlock(so3Data, 4,
                                new ceres::EigenQuaternionParameterization());
+    mProblem.AddParameterBlock(tData, 3);
 
-    ordering->AddElementToGroup(bodyToWorld.back().translation().data(), 1);
-    ordering->AddElementToGroup(bodyToWorld.back().so3().data(), 1);
+    ordering->AddElementToGroup(so3Data, 1);
+    ordering->AddElementToGroup(tData, 1);
 
-    for (KeyFrameEntry &entry : keyFrame->frames) {
-      double *affLight = entry.lightWorldToThis.data;
+    for (int camInd = 0; camInd < parameters.numCameras(); ++camInd) {
+      double *affLight = getAffLightData(frameInd, camInd);
       mProblem.AddParameterBlock(affLight, 2);
       mProblem.SetParameterLowerBound(affLight, 0,
                                       settings.affineLight.minAffineLightA);
@@ -118,39 +121,34 @@ EnergyFunctionCeres::EnergyFunctionCeres(
     }
   }
 
-  mProblem.SetParameterBlockConstant(bodyToWorld[0].translation().data());
-  mProblem.SetParameterBlockConstant(bodyToWorld[0].so3().data());
-  for (KeyFrameEntry &entry : keyFrames[0]->frames)
-    mProblem.SetParameterBlockConstant(entry.lightWorldToThis.data);
+  mProblem.SetParameterBlockConstant(constParameters.firstToWorld.so3().data());
+  mProblem.SetParameterBlockConstant(
+      constParameters.firstToWorld.translation().data());
+  for (int camInd = 0; camInd < parameters.numCameras(); ++camInd)
+    mProblem.SetParameterBlockConstant(
+        constParameters.lightWorldToFirst[camInd].data);
 
-  SE3 firstToWorld = bodyToWorld[0];
-  SE3 secondToWorld = bodyToWorld[1];
-  double radius =
-      (secondToWorld.translation() - firstToWorld.translation()).norm();
-  Vec3 center = firstToWorld.translation();
-  if (radius > settings.optimization.minFirstToSecondRadius)
-    mProblem.SetParameterization(
-        bodyToWorld[1].translation().data(),
-        new ceres::AutoDiffLocalParameterization<SphericalPlus, 3, 2>(
-            new SphericalPlus(center, radius, secondToWorld.translation())));
-  else {
-    mProblem.SetParameterBlockConstant(bodyToWorld[1].translation().data());
-    LOG(WARNING) << "FirstToSecond distance too small, spherical "
-                    "parametrization was not applied";
-  }
+  auto &s2 = parameters.stateRef().secondFrame.s2();
+  mProblem.SetParameterization(
+      s2.data(), new ceres::AutoDiffLocalParameterization<SphericalPlus, 3, 2>(
+                     new SphericalPlus(s2.center(), s2.radius(), s2.value())));
 
   if (settings.optimization.fixedRotationOnSecondKF)
-    mProblem.SetParameterBlockConstant(bodyToWorld[1].so3().data());
+    mProblem.SetParameterBlockConstant(
+        parameters.stateRef().secondFrame.so3().data());
 
   if (settings.optimization.fixedMotionOnFirstAdjustent && numKeyFrames == 2) {
-    mProblem.SetParameterBlockConstant(bodyToWorld[1].translation().data());
-    mProblem.SetParameterBlockConstant(bodyToWorld[1].so3().data());
+    mProblem.SetParameterBlockConstant(
+        parameters.stateRef().secondFrame.so3().data());
+    mProblem.SetParameterBlockConstant(
+        parameters.stateRef().secondFrame.s2().data());
   }
 
   int numPoints = 0;
   int numBadDepths = 0, numOobSmallDepths = 0, numOobLargeDepths = 0;
+  std::vector<OptimizedPoint *> optimizedPoints;
   Array2d<std::vector<int>> globalPointInds(
-      boost::extents[keyFrames.size()][cam->bundle.size()]);
+      boost::extents[parameters.numKeyFrames()][parameters.numCameras()]);
   for (int frameInd = 0; frameInd < numKeyFrames; ++frameInd) {
     KeyFrame *keyFrame = keyFrames[frameInd];
     for (int camInd = 0; camInd < cam->bundle.size(); ++camInd) {
@@ -177,36 +175,22 @@ EnergyFunctionCeres::EnergyFunctionCeres(
           continue;
         }
 
-        globalPointInds[frameInd][camInd][pointInd] = pointParams.size();
-        pointParams.push_back({std::log(op.depth()), &op});
-
-        double *depthParamPtr = &pointParams.back().depthParam;
-        mProblem.AddParameterBlock(depthParamPtr, 1);
-        if (settings.depth.useMinPlusExpParametrization)
-          *depthParamPtr = std::log(op.depth() - settings.depth.min);
-        else if (settings.depth.setMinBound)
-          mProblem.SetParameterLowerBound(depthParamPtr, 0,
-                                          std::log(settings.depth.min));
-        if (settings.depth.setMaxBound) {
-          if (settings.depth.useMinPlusExpParametrization)
-            mProblem.SetParameterUpperBound(
-                depthParamPtr, 0,
-                std::log(settings.depth.max - settings.depth.min));
-          else
-            mProblem.SetParameterUpperBound(depthParamPtr, 0,
-                                            std::log(settings.depth.max));
-        }
-
-        ordering->AddElementToGroup(depthParamPtr, 0);
+        globalPointInds[frameInd][camInd][pointInd] = optimizedPoints.size();
+        optimizedPoints.push_back(&op);
       }
     }
   }
+  parameters.setPoints(optimizedPoints);
 
-  CHECK(oldDepthParamsBegin == pointParams.begin());
+  for (int pointInd = 0; pointInd < parameters.numPoints(); ++pointInd) {
+    double *depthParamPtr = &parameters.stateRef().logDepths[pointInd];
+    mProblem.AddParameterBlock(depthParamPtr, 1);
+    ordering->AddElementToGroup(depthParamPtr, 0);
+  }
 
   for (int targetInd = 0; targetInd < numKeyFrames; ++targetInd) {
     KeyFrame *targetFrame = keyFrames[targetInd];
-    Reprojector<OptimizedPoint> reprojector(keyFrames.data(), keyFrames.size(),
+    Reprojector<OptimizedPoint> reprojector(keyFrames, numKeyFrames,
                                             keyFrames[targetInd]->thisToWorld(),
                                             settings.depth, PH);
     reprojector.setSkippedFrame(targetInd);
@@ -223,21 +207,21 @@ EnergyFunctionCeres::EnergyFunctionCeres(
       if (globalPointInd == -1)
         continue;
       CHECK_GE(globalPointInd, 0);
-      CHECK_LT(globalPointInd, pointParams.size());
-      CHECK_EQ(pointParams[globalPointInd].op, &op);
+      CHECK_LT(globalPointInd, parameters.numPoints());
+      CHECK_EQ(optimizedPoints[globalPointInd], &op);
       CHECK(targetCam.isOnImage(repr.reprojected, PH));
       CHECK(cam->bundle[hostCamInd].cam.isOnImage(op.p, PH))
           << "Optimized point is not on the image! p = " << op.p.transpose()
           << "d = " << op.depth() << " min = " << op.minDepth
           << " max = " << op.maxDepth;
-      double *depthParamPtr = &pointParams[globalPointInd].depthParam;
+      double *depthParamPtr = &parameters.stateRef().logDepths[globalPointInd];
 
       for (int i = 0; i < PS; ++i) {
-        Residual *newResidual =
-            new Residual(cam, &hostFrame->frames[hostCamInd],
-                         &targetFrame->frames[targetCamInd], &op, i, settings);
+        auto newResidual = new ResidualCeres(
+            cam, &hostFrame->frames[hostCamInd],
+            &targetFrame->frames[targetCamInd], &op, i, settings);
 
-        residuals.push_back(newResidual);
+        residualsCeres.push_back(newResidual);
 
         const Vec2 &shiftedP = op.p + settings.residualPattern.pattern()[i];
         double gradNorm = hostFrame->preKeyFrame->frames[hostCamInd].gradNorm(
@@ -250,15 +234,15 @@ EnergyFunctionCeres::EnergyFunctionCeres(
             new ceres::HuberLoss(settings.intensity.outlierDiff), weight,
             ceres::Ownership::TAKE_OWNERSHIP);
 
+        MotionData hostBodyToWorld = getFrameData(hostInd);
+        MotionData targetBodyToWorld = getFrameData(targetInd);
         mProblem.AddResidualBlock(
-            new ceres::AutoDiffCostFunction<Residual, 1, 1, 3, 4, 3, 4, 2, 2>(
-                newResidual),
-            lossFunc, depthParamPtr, bodyToWorld[hostInd].translation().data(),
-            bodyToWorld[hostInd].so3().data(),
-            bodyToWorld[targetInd].translation().data(),
-            bodyToWorld[targetInd].so3().data(),
-            hostFrame->frames[hostCamInd].lightWorldToThis.data,
-            targetFrame->frames[targetCamInd].lightWorldToThis.data);
+            new ceres::AutoDiffCostFunction<ResidualCeres, 1, 1, 3, 4, 3, 4, 2,
+                                            2>(newResidual),
+            lossFunc, depthParamPtr, hostBodyToWorld.tData,
+            hostBodyToWorld.so3Data, targetBodyToWorld.tData,
+            targetBodyToWorld.so3Data, getAffLightData(hostInd, hostCamInd),
+            getAffLightData(targetInd, targetCamInd));
       }
     }
   }
@@ -268,8 +252,14 @@ EnergyFunctionCeres::EnergyFunctionCeres(
             << " OOB large = " << numOobLargeDepths
             << " bad = " << numBadDepths;
 
-  logOobStatistics(residuals, settings);
+  logOobStatistics(residualsCeres, settings);
 }
+
+// for (int pointInd = 0; pointInd < parameters.numPoints(); ++pointInd) {
+// double *depthParam = &parameters.stateRef().logDepths[pointInd];
+// mProblem.AddParameterBlock(depthParam, 1);
+// ordering->AddElementToGroup(depthParam, 0);
+//}
 
 void EnergyFunctionCeres::optimize() {
   ceres::Solver::Options options;
@@ -282,29 +272,55 @@ void EnergyFunctionCeres::optimize() {
   LOG(INFO) << summary.FullReport() << std::endl;
 }
 
-void EnergyFunctionCeres::applyParameterUpdate() {
-  for (int kfInd = 0; kfInd < keyFrames.size(); ++kfInd)
-    keyFrames[kfInd]->thisToWorld.setValue(bodyToWorld[kfInd]);
-  for (auto [depthParam, op] : pointParams) {
-    double depth = settings.depth.useMinPlusExpParametrization
-                       ? settings.depth.min + std::exp(depthParam)
-                       : std::exp(depthParam);
-    if (depth > 0)
-      op->setDepth(depth);
-  }
-}
+void EnergyFunctionCeres::applyParameterUpdate() { parameters.apply(); }
 
 ceres::Problem &EnergyFunctionCeres::problem() { return mProblem; }
 
-const EnergyFunctionCeres::Residual &
+const EnergyFunctionCeres::ResidualCeres &
 EnergyFunctionCeres::residual(int residualInd) const {
   CHECK_GE(residualInd, 0);
-  CHECK_LT(residualInd, residuals.size());
-  return *residuals[residualInd];
+  CHECK_LT(residualInd, residualsCeres.size());
+  return *residualsCeres[residualInd];
 }
 std::shared_ptr<ceres::ParameterBlockOrdering>
 EnergyFunctionCeres::parameterBlockOrdering() const {
   return ordering;
+}
+EnergyFunctionCeres::MotionData
+EnergyFunctionCeres::getFrameData(int frameInd) {
+  CHECK_GE(frameInd, 0);
+  CHECK_LT(frameInd, parameters.numKeyFrames());
+
+  if (frameInd == 0) {
+    SE3 &firstToWorld = constParameters.firstToWorld;
+    return {firstToWorld.so3().data(), firstToWorld.translation().data()};
+  } else if (frameInd == 1) {
+    auto &parametrization = parameters.stateRef().secondFrame;
+    return {parametrization.so3().data(), parametrization.s2().data()};
+  } else {
+    auto &parametrization =
+        parameters.stateRef().frameParametrization(frameInd);
+    return {parametrization.so3().data(), parametrization.t().data()};
+  }
+}
+
+double *EnergyFunctionCeres::getAffLightData(int frameInd, int camInd) {
+  CHECK_GE(frameInd, 0);
+  CHECK_LT(frameInd, parameters.numKeyFrames());
+  CHECK_GE(camInd, 0);
+  CHECK_LT(camInd, parameters.numCameras());
+  if (frameInd == 0)
+    return constParameters.lightWorldToFirst[camInd].data;
+  else
+    return parameters.stateRef().lightWorldToFrame(frameInd, camInd).data;
+}
+
+EnergyFunctionCeres::ConstParameters::ConstParameters(KeyFrame *firstFrame)
+    : firstToWorld(firstFrame->thisToWorld()) {
+  int numCams = firstFrame->preKeyFrame->cam->bundle.size();
+  lightWorldToFirst.reserve(numCams);
+  for (const KeyFrameEntry &entry : firstFrame->frames)
+    lightWorldToFirst.push_back(entry.lightWorldToThis);
 }
 
 } // namespace mdso::optimize

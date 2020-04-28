@@ -2,6 +2,8 @@
 #define INCLUDE_ENERGYFUNCTIONCERES
 
 #include "internal/system/PreKeyFrameEntryInternals.h"
+#include "optimize/Parameters.h"
+#include "optimize/Residual.h"
 #include "system/CameraBundle.h"
 #include "system/KeyFrame.h"
 #include <ceres/ceres.h>
@@ -13,10 +15,10 @@ namespace optimize {
 
 class EnergyFunctionCeres {
 public:
-  struct Residual {
-    Residual(CameraBundle *cameraBundle, KeyFrameEntry *hostKfEntry,
-             KeyFrameEntry *targetKfEntry, OptimizedPoint *optimizedPoint,
-             int numInPattern, const BundleAdjusterSettings &settings);
+  struct ResidualCeres {
+    ResidualCeres(CameraBundle *cameraBundle, KeyFrameEntry *hostKfEntry,
+                  KeyFrameEntry *targetKfEntry, OptimizedPoint *optimizedPoint,
+                  int numInPattern, const BundleAdjusterSettings &settings);
 
     template <typename T>
     bool operator()(const T *const depthParamP, const T *const hostTransP,
@@ -52,9 +54,7 @@ public:
       AffineLightTransform<T> lightWorldToTarget(targetAffLightP[0],
                                                  targetAffLightP[1]);
 
-      T depth = settings.depth.useMinPlusExpParametrization
-                    ? settings.depth.min + ceres::exp(*depthParamP)
-                    : ceres::exp(*depthParamP);
+      T depth = ceres::exp(*depthParamP);
 
       Vec3t targetPos;
       if (depth > T(settings.depth.max))
@@ -97,25 +97,35 @@ public:
 
   EnergyFunctionCeres(KeyFrame *newKeyFrames[], int numKeyFrames,
                       const BundleAdjusterSettings &newSettings);
+  //  EnergyFunctionCeres(const Parameters &parameters, Residual residuals[],
+  //                      int numResiduals);
 
   void optimize();
   void applyParameterUpdate();
 
   ceres::Problem &problem();
-  const Residual &residual(int residualInd) const;
+  const ResidualCeres &residual(int residualInd) const;
   std::shared_ptr<ceres::ParameterBlockOrdering> parameterBlockOrdering() const;
 
 private:
-  struct PointParam {
-    double depthParam;
-    OptimizedPoint *op;
+  struct ConstParameters {
+    ConstParameters(KeyFrame *firstFrame);
+
+    SE3 firstToWorld;
+    std::vector<AffLight> lightWorldToFirst;
   };
 
-  StdVector<SE3> bodyToWorld;
-  std::vector<PointParam> pointParams;
+  struct MotionData {
+    double *so3Data;
+    double *tData;
+  };
+  MotionData getFrameData(int frameInd);
+  double *getAffLightData(int frameInd, int camInd);
 
-  std::vector<KeyFrame *> keyFrames;
-  std::vector<Residual *> residuals;
+  ConstParameters constParameters;
+  Parameters parameters;
+  std::vector<Residual> residuals;
+  std::vector<ResidualCeres *> residualsCeres;
   ceres::Problem mProblem;
   std::shared_ptr<ceres::ParameterBlockOrdering> ordering;
   BundleAdjusterSettings settings;

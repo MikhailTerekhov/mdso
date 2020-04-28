@@ -24,7 +24,9 @@ public:
     int numCameras() const;
 
     const FrameParametrization &frameParametrization(int frameInd) const;
+    FrameParametrization &frameParametrization(int frameInd);
     const AffLight &lightWorldToFrame(int frameInd, int frameCamInd) const;
+    AffLight &lightWorldToFrame(int frameInd, int frameCamInd);
 
     void applyUpdate(const DeltaParameterVector &delta);
 
@@ -33,9 +35,6 @@ public:
     SecondFrameParametrization secondFrame;
 
   private:
-    FrameParametrization &frameParametrization(int frameInd);
-    AffLight &lightWorldToFrame(int frameInd, int frameCamInd);
-
     StdVector<FrameParametrization> restFrames;
     Array2d<AffLightT> mLightWorldToFrame;
   };
@@ -66,10 +65,11 @@ public:
   int numCameras() const;
   T logDepth(int i) const;
 
-  void setPoints(std::vector<OptimizedPoint *> &&newOptimizedPoints);
+  void setPoints(const std::vector<OptimizedPoint *> &newOptimizedPoints);
 
   void update(const DeltaParameterVector &delta);
   State saveState() const;
+  State &stateRef() { return state; }
   void recoverState(State oldState);
   void apply() const;
 
@@ -80,6 +80,7 @@ private:
 };
 
 } // namespace optimize
+
 } // namespace mdso
 
 #endif

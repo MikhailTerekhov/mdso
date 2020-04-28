@@ -81,7 +81,7 @@ EnergyFunction::EnergyFunction(CameraBundle *camBundle, KeyFrame **keyFrames,
     }
   }
 
-  parameters.setPoints(std::move(optimizedPoints));
+  parameters.setPoints(optimizedPoints);
 
   LOG(INFO) << "Created EnergyFunction with " << residuals.size()
             << " residuals and " << optimizedPoints.size() << " points";

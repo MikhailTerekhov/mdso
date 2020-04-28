@@ -220,8 +220,8 @@ protected:
   std::unique_ptr<FrameParameterOrder> frameParameterOrder;
   std::vector<std::unique_ptr<KeyFrame>> keyFrames;
   std::unique_ptr<EnergyFunction> energyFunction;
-  std::unique_ptr<SO3xS2Parametrization> secondFrameParam;
-  std::vector<RightExpParametrization<SE3t>> restFrameParams;
+  std::unique_ptr<SecondFrameParametrization> secondFrameParam;
+  std::vector<FrameParametrization> restFrameParams;
   Settings settings;
   EnergyFunctionSettings energyFunctionSettings;
   IdentityPreprocessor idPrep;
