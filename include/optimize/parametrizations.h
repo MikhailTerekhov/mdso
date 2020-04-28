@@ -107,7 +107,11 @@ private:
 };
 
 using SecondFrameParametrization = SO3xS2Parametrization;
+#ifdef SO3_X_R3_PARAMETRIZATION
+using FrameParametrization = SO3xR3Parametrization;
+#else
 using FrameParametrization = RightExpParametrization<SE3t>;
+#endif
 
 constexpr int sndDoF = SecondFrameParametrization::DoF;
 constexpr int restDoF = FrameParametrization::DoF;

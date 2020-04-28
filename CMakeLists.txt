@@ -71,13 +71,13 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/optimize/Hessian.h
     ${PROJECT_SOURCE_DIR}/include/optimize/Gradient.h
     ${PROJECT_SOURCE_DIR}/include/optimize/StepController.h
+    ${PROJECT_SOURCE_DIR}/include/optimize/SphericalPlus.h
 
     ${PROJECT_SOURCE_DIR}/include/data/DatasetReader.h
     ${PROJECT_SOURCE_DIR}/include/data/RobotcarReader.h
     ${PROJECT_SOURCE_DIR}/include/data/MultiFovReader.h
 
     ${PROJECT_SOURCE_DIR}/include/system/AffineLightTransform.h
-        include/optimize/SphericalPlus.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoSystem.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoInitializer.h
     ${PROJECT_SOURCE_DIR}/include/system/DelaunayDsoInitializer.h
@@ -196,10 +196,6 @@ set(essietial_5pt_estimator_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/thirdparty/relative_pose_solver/relativeposeestimator_double.cpp
 )
 
-set_source_files_properties(essietial_5pt_estimator_SOURCE_FILES
-                           PROPERTIES COMPILE_FLAGS -O3
-)
-
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native ")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -march=native")
 
@@ -207,15 +203,9 @@ set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -march=native")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g3 -DNDEBUG -march=native")
 
-if (FLOAT_OPTIMIZATION)
-  add_definitions(-DOPT_T=float)
-else()
-  add_definitions(-DOPT_T=double)
-endif()
-
-if (BICUBIC_INTERPOLATOR)
-    add_definitions(-DBICUBIC_INTERPOLATOR)
-endif()
+set_source_files_properties(essietial_5pt_estimator_SOURCE_FILES
+  PROPERTIES COMPILE_FLAGS -O3
+)
 
 add_library(dso ${dso_SOURCE_FILES} ${dso_HEADER_FILES}
     ${dso_internal_SOURCE_FILES} ${dso_internal_HEADER_FILES}
@@ -235,6 +225,21 @@ target_include_directories(dso
     ${PROJECT_SOURCE_DIR}/internal/include
     ${PROJECT_SOURCE_DIR}/thirdparty/relative_pose_solver
 )
+
+if (FLOAT_OPTIMIZATION)
+  target_compile_definitions(dso PUBLIC OPT_T=float)
+else()
+  target_compile_definitions(dso PUBLIC OPT_T=double)
+endif()
+
+if (BICUBIC_INTERPOLATOR)
+  target_compile_definitions(dso PUBLIC BICUBIC_INTERPOLATOR)
+endif()
+
+if (SO3_X_R3_PARAMETRIZATION)
+  target_compile_definitions(dso PUBLIC SO3_X_R3_PARAMETRIZATION)
+endif()
+
 
 
 target_link_libraries(dso
