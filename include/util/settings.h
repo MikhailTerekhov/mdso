@@ -328,6 +328,9 @@ struct Settings {
     static constexpr int default_maxIterations = 10;
     int maxIterations = default_maxIterations;
 
+    static constexpr int default_maxConsecutiveFailedIterations = 10;
+    int maxConsecutiveFailedIterations = default_maxConsecutiveFailedIterations;
+
     static constexpr bool default_fixedMotionOnFirstAdjustent = false;
     bool fixedMotionOnFirstAdjustent = default_fixedMotionOnFirstAdjustent;
 

@@ -25,6 +25,8 @@ public:
   inline const VecXt &getFrame() const { return frame; }
   inline const VecXt &getPoint() const { return point; }
 
+  friend DeltaParameterVector operator*(T factor,
+                                        const DeltaParameterVector &delta);
   T dot(const DeltaParameterVector &other) const;
 
   void setAffineZero();

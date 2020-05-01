@@ -50,6 +50,8 @@ void Parameters::State::applyUpdate(const DeltaParameterVector &delta) {
   for (int fi = 1; fi < numKeyFrames(); ++fi)
     for (int ci = 0; ci < numCameras(); ++ci)
       lightWorldToFrame(fi, ci).applyUpdate(delta.affBlock(fi, ci));
+
+  logDepths += delta.getPoint();
 }
 
 AffLight &Parameters::State::lightWorldToFrame(int frameInd, int frameCamInd) {

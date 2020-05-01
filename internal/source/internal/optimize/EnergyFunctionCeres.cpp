@@ -502,7 +502,6 @@ void EnergyFunctionCeres::fillProblemFrameParameters(KeyFrame *keyFrames[],
   mProblem->SetParameterization(
       s2.data(), new ceres::AutoDiffLocalParameterization<SphericalPlus, 3, 2>(
                      new SphericalPlus(s2.center(), s2.radius(), s2.value())));
-
   if (settings.optimization.fixedRotationOnSecondKF)
     mProblem->SetParameterBlockConstant(
         parameters->stateRef().secondFrame.so3().data());

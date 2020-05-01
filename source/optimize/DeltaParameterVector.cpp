@@ -18,6 +18,15 @@ DeltaParameterVector::DeltaParameterVector(int numKeyFrames, int numCameras,
     , frame(frame)
     , point(point) {}
 
+DeltaParameterVector operator*(double factor,
+                               const DeltaParameterVector &delta) {
+  int numKeyFrames = delta.frameParameterOrder.numKeyFrames(),
+      numCameras = delta.frameParameterOrder.numCameras();
+  return DeltaParameterVector(numKeyFrames, numCameras,
+                              factor * delta.getFrame(),
+                              factor * delta.getPoint());
+}
+
 T DeltaParameterVector::dot(const DeltaParameterVector &other) const {
   return frame.dot(other.frame) + point.dot(other.point);
 }

@@ -14,6 +14,7 @@ public:
 
 private:
   double mLambda;
+  double failMultiplier;
   Settings::Optimization::StepControl settings;
 };
 

@@ -27,6 +27,7 @@ template <> struct ErrorBounds<float> {
   static constexpr float gradientRelErr = 2e-2;
   static constexpr float predictionRelErr = 1e-2;
   static constexpr float energyRelErr = 1e-4;
+  static constexpr float jacobianRelErr = 1e-4;
 };
 
 template <> struct ErrorBounds<double> {
@@ -34,6 +35,7 @@ template <> struct ErrorBounds<double> {
   static constexpr double gradientRelErr = 1e-10;
   static constexpr double predictionRelErr = 1e-10;
   static constexpr float energyRelErr = 1e-12;
+  static constexpr float jacobianRelErr = 1e-4;
 };
 
 class EnergyFunctionTest : public ::testing::Test {
@@ -304,6 +306,111 @@ TEST_F(EnergyFunctionTest, isEnergyCorrect) {
               ceresEnergy * ErrorBounds<T>::energyRelErr);
 }
 
+DeltaParameterVector sampleDelta(const FrameParameterOrder &frameParameterOrder,
+                                 int numPoints, double scale = 1) {
+  DeltaParameterVector delta(frameParameterOrder.numKeyFrames(),
+                             frameParameterOrder.numCameras(), numPoints);
+
+  auto deltaF = delta.getFrame();
+  auto deltaP = delta.getPoint();
+  std::mt19937 mt;
+  std::uniform_real_distribution<double> d(-scale, scale);
+  for (int i = 0; i < deltaF.size(); ++i)
+    deltaF[i] = d(mt);
+  for (int i = 0; i < deltaP.size(); ++i)
+    deltaP[i] = d(mt);
+  delta =
+      DeltaParameterVector(frameParameterOrder.numKeyFrames(),
+                           frameParameterOrder.numCameras(), deltaF, deltaP);
+  return delta;
+}
+
+VecXt getResidualValues(EnergyFunction &energyFunction, int patternSize) {
+  const auto &residuals = energyFunction.getResiduals();
+  VecXt values(residuals.size() * patternSize);
+  for (int ri = 0; ri < residuals.size(); ++ri)
+    values.segment(ri * patternSize, patternSize) =
+        energyFunction.getResidualValues(ri);
+  return values;
+}
+
+VecXt getJacobianDelta(EnergyFunction &energyFunction,
+                       const DeltaParameterVector &delta, int patternSize) {
+  const auto &residuals = energyFunction.getResiduals();
+  VecXt values(residuals.size() * patternSize);
+  for (int ri = 0; ri < residuals.size(); ++ri)
+    values.segment(ri * patternSize, patternSize) =
+        energyFunction.getPredictedResidualIncrement(ri, delta);
+  return values;
+}
+
+TEST_F(EnergyFunctionTest, areDerivativesCorrect) {
+  constexpr double deltaScale = 1e-10;
+  int patternSize = settings.residualPattern.pattern().size();
+  std::shared_ptr<Parameters> parameters = energyFunction->getParameters();
+  Parameters::State state = parameters->saveState();
+  DeltaParameterVector delta = sampleDelta(
+      *frameParameterOrder, energyFunction->numPoints(), deltaScale);
+
+  VecXt framed = delta.getFrame(), pointd = delta.getPoint();
+  //  framed.setZero();
+  //  pointd.setZero();
+  delta =
+      DeltaParameterVector(frameParameterOrder->numKeyFrames(),
+                           frameParameterOrder->numCameras(), framed, pointd);
+
+  VecXt twoJDeltaX = 2 * getJacobianDelta(*energyFunction, delta, patternSize);
+  parameters->update(delta);
+  energyFunction->clearPrecomputations();
+  VecXt rxPlusDelta = getResidualValues(*energyFunction, patternSize);
+  parameters->recoverState(state);
+  delta = -1 * delta;
+  parameters->update(delta);
+  energyFunction->clearPrecomputations();
+  VecXt rxMinusDelta = getResidualValues(*energyFunction, patternSize);
+
+  VecXt diff = rxPlusDelta - rxMinusDelta;
+  VecXt errs = diff - twoJDeltaX;
+  double deltaNorm = std::sqrt(delta.getFrame().squaredNorm() +
+                               delta.getPoint().squaredNorm());
+  double err = errs.norm();
+  double relErr = err / diff.norm();
+  outputArray("errs.txt", errs.data(), errs.size());
+  outputArray("diff.txt", diff.data(), diff.size());
+  EXPECT_LE(relErr, ErrorBounds<T>::jacobianRelErr)
+      << "err=" << err << "deltaNorm=" << deltaNorm
+      << "diffNorm=" << diff.norm();
+}
+
+TEST_F(EnergyFunctionTest, arePredictionsCorrect) {
+  const int PS = settings.residualPattern.pattern().size();
+  int numResiduals = energyFunction->getResiduals().size();
+  int numPoints = energyFunction->numPoints();
+
+  DeltaParameterVector delta =
+      sampleDelta(*frameParameterOrder, energyFunction->numPoints());
+  const auto &residuals = energyFunction->getResiduals();
+  MatXXt expectedJacobian = getExpectedJacobian();
+  VecXt deltaVec(delta.getFrame().size() + delta.getPoint().size());
+  deltaVec << delta.getFrame(), delta.getPoint();
+
+  VecXt expectedPrediction = expectedJacobian * deltaVec;
+  VecXt actualPrediction(PS * residuals.size());
+  for (int ri = 0; ri < residuals.size(); ++ri) {
+    VecRt expectedBlock = expectedPrediction.segment(ri * PS, PS);
+    expectedBlock = expectedBlock.cwiseProduct(
+        residuals[ri].getPixelDependentWeights().cwiseSqrt());
+    expectedPrediction.segment(ri * PS, PS) = expectedBlock;
+    actualPrediction.segment(ri * PS, PS) =
+        energyFunction->getPredictedResidualIncrement(ri, delta);
+  }
+
+  double relPredictionErr = (expectedPrediction - actualPrediction).norm() /
+                            expectedPrediction.norm();
+  LOG(INFO) << "relative prediction err = " << relPredictionErr;
+  EXPECT_LE(relPredictionErr, ErrorBounds<T>::predictionRelErr);
+}
+
 TEST_F(EnergyFunctionTest, isHessianCorrect) {
   static_assert(keyFramesCount >= 2);
 
@@ -436,48 +543,6 @@ TEST_F(EnergyFunctionTest, isGradientCorrect) {
   LOG(INFO) << "relative point gradient err = " << relPointErr;
   EXPECT_LE(relFrameErr, ErrorBounds<T>::gradientRelErr);
   EXPECT_LE(relPointErr, ErrorBounds<T>::gradientRelErr);
-}
-
-TEST_F(EnergyFunctionTest, arePredictionsCorrect) {
-  const int PS = settings.residualPattern.pattern().size();
-  int numResiduals = energyFunction->getResiduals().size();
-  int numPoints = energyFunction->numPoints();
-
-  const auto &residuals = energyFunction->getResiduals();
-  MatXXt expectedJacobian = getExpectedJacobian();
-  DeltaParameterVector delta(frameParameterOrder->numKeyFrames(),
-                             frameParameterOrder->numCameras(),
-                             energyFunction->numPoints());
-
-  auto deltaF = delta.getFrame();
-  auto deltaP = delta.getPoint();
-  std::mt19937 mt;
-  std::uniform_real_distribution<double> d(-1, 1);
-  for (int i = 0; i < deltaF.size(); ++i)
-    deltaF[i] = d(mt);
-  for (int i = 0; i < deltaP.size(); ++i)
-    deltaP[i] = d(mt);
-  delta =
-      DeltaParameterVector(frameParameterOrder->numKeyFrames(),
-                           frameParameterOrder->numCameras(), deltaF, deltaP);
-  VecXt deltaVec(deltaF.size() + deltaP.size());
-  deltaVec << deltaF, deltaP;
-
-  VecXt expectedPrediction = expectedJacobian * deltaVec;
-  VecXt actualPrediction(PS * residuals.size());
-  for (int ri = 0; ri < residuals.size(); ++ri) {
-    VecRt expectedBlock = expectedPrediction.segment(ri * PS, PS);
-    expectedBlock = expectedBlock.cwiseProduct(
-        residuals[ri].getPixelDependentWeights().cwiseSqrt());
-    expectedPrediction.segment(ri * PS, PS) = expectedBlock;
-    actualPrediction.segment(ri * PS, PS) =
-        energyFunction->getPredictedResidualIncrement(ri, delta);
-  }
-
-  double relPredictionErr = (expectedPrediction - actualPrediction).norm() /
-                            expectedPrediction.norm();
-  LOG(INFO) << "relative prediction err = " << relPredictionErr;
-  EXPECT_LE(relPredictionErr, ErrorBounds<T>::predictionRelErr);
 }
 
 TEST_F(EnergyFunctionTest, doesOptimizationHelp) {

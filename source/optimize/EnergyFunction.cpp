@@ -236,8 +236,12 @@ void EnergyFunction::optimize(int maxIterations) {
   Gradient gradient = getGradient(curValues, curDerivatives);
   StepController stepController(settings.optimization.stepControl);
   bool parametersUpdated = false;
-  for (int it = 0; it < maxIterations; ++it) {
-    LOG(INFO) << "it = " << it << "\n";
+  int numSuccessfulIterations = 0, consecutiveFailedIterations = 0;
+  int curIteration = 0;
+  while (numSuccessfulIterations < maxIterations &&
+         consecutiveFailedIterations <
+             settings.optimization.maxConsecutiveFailedIterations) {
+    LOG(INFO) << "it = " << curIteration << "\n";
     TimePoint start, end;
     start = now();
 
@@ -274,7 +278,8 @@ void EnergyFunction::optimize(int maxIterations) {
 
     double newEnergy = newValues.totalEnergy(residuals);
 
-    LOG(INFO) << "optimization step #" << it << ": curEnergy = " << curEnergy
+    LOG(INFO) << "optimization step #" << curIteration
+              << ": curEnergy = " << curEnergy
               << " predictedEnergy = " << predictedEnergy
               << " newEnergy = " << newEnergy
               << " delta = " << newEnergy - curEnergy;
@@ -285,9 +290,13 @@ void EnergyFunction::optimize(int maxIterations) {
       curValues = std::move(newValues);
       hostToTarget = std::move(newHostToTarget);
       lightHostToTarget = std::move(newLightHostToTarget);
+      numSuccessfulIterations++;
+      consecutiveFailedIterations = 0;
     } else {
       parameters->recoverState(std::move(savedState));
+      consecutiveFailedIterations++;
     }
+    curIteration++;
 
     end = now();
     LOG(INFO) << "step took " << secondsBetween(start, end);
