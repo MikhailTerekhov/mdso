@@ -22,10 +22,6 @@ void BundleAdjusterSelfMade::adjust(
   case Settings::Optimization::SELF_WRITTEN:
     energyFunction.optimize(settings.optimization.maxIterations);
     break;
-  case Settings::Optimization::MIXED:
-    EnergyFunctionCeres energyFunctionCeres(energyFunction, settings);
-    energyFunctionCeres.optimize();
-    energyFunctionCeres.applyParameterUpdate();
   }
 }
 

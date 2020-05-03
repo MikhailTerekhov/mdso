@@ -28,19 +28,10 @@ DEFINE_bool(min_plus_exp_depth,
 DEFINE_double(init_lambda,
               Settings::Optimization::StepControl::default_initialLambda,
               "Initial lambda for Levenberg-Marquardt.");
-DEFINE_double(good_rho,
-              Settings::Optimization::StepControl::default_goodRelDifference,
+DEFINE_double(accepted_rho,
+              Settings::Optimization::StepControl::default_acceptedQuality,
               "If (real energy difference) / (predicted energy difference) > "
-              "good_rho, trust region is expanded.");
-DEFINE_double(bad_rho,
-              Settings::Optimization::StepControl::default_badRelDifference,
-              "If (real energy difference) / (predicted energy difference) < "
-              "bad_rho, trust region is contracted.");
-DEFINE_double(
-    accepted_rho,
-    Settings::Optimization::StepControl::default_acceptedRelDifference,
-    "If (real energy difference) / (predicted energy difference) > "
-    "accepted_rho, the step is taken.");
+              "accepted_rho, the step is taken.");
 
 DEFINE_bool(
     use_grad_weighting,
@@ -97,15 +88,15 @@ DEFINE_double(track_fail_factor,
 
 DEFINE_string(optimization_type, "self-written",
               "The optimization to use. Available options are \"disabled\", "
-              "\"self-written\", \"ceres\", \"mixed\".");
+              "\"self-written\", \"ceres\".");
 static bool validateOptimizationType(const char *flagname,
                                      const std::string &value) {
-  bool isOk = value == "disabled" || value == "self-written" ||
-              value == "ceres" || value == "mixed";
+  bool isOk =
+      value == "disabled" || value == "self-written" || value == "ceres";
   if (!isOk) {
     LOG(WARNING) << "Bad optimizeation_type: " << value
                  << "\nAvailable options are \"disabled\", "
-                    "\"self-written\", \"ceres\", \"mixed\".";
+                    "\"self-written\", \"ceres\".";
   }
   return isOk;
 }
@@ -155,8 +146,6 @@ optimizationTypeFromString(const std::string &type) {
     return Settings::Optimization::SELF_WRITTEN;
   else if (type == "ceres")
     return Settings::Optimization::CERES;
-  else if (type == "mixed")
-    return Settings::Optimization::MIXED;
   else {
     LOG(ERROR) << "Unknown optimization type: " << type;
     return Settings::Optimization::DISABLED;
@@ -172,9 +161,7 @@ Settings getFlaggedSettings() {
   settings.depth.setMaxBound = FLAGS_set_max_depth;
   settings.depth.useMinPlusExpParametrization = FLAGS_min_plus_exp_depth;
   settings.optimization.stepControl.initialLambda = FLAGS_init_lambda;
-  settings.optimization.stepControl.goodRelDifference = FLAGS_good_rho;
-  settings.optimization.stepControl.badRelDifference = FLAGS_bad_rho;
-  settings.optimization.stepControl.acceptedRelDifference = FLAGS_accepted_rho;
+  settings.optimization.stepControl.acceptedQuality = FLAGS_accepted_rho;
   settings.residualWeighting.useGradientWeighting = FLAGS_use_grad_weighting;
   settings.delaunayDsoInitializer.firstFramesSkip = FLAGS_first_frames_skip;
   settings.stereoMatcher.stereoGeometryEstimator.runMaxRansacIter =

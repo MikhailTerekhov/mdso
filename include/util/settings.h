@@ -301,23 +301,17 @@ struct Settings {
       static constexpr double default_initialLambda = 1e-4;
       double initialLambda = default_initialLambda;
 
-      static constexpr double default_failMultiplier = 2;
-      double failMultiplier = default_failMultiplier;
+      static constexpr double default_initialFailMultiplier = 2;
+      double initialFailMultiplier = default_initialFailMultiplier;
 
-      static constexpr double default_successMultiplier = 0.5;
-      double successMultiplier = default_successMultiplier;
+      static constexpr double default_failMultiplierMultiplier = 2;
+      double failMultiplierMultiplier = default_failMultiplierMultiplier;
 
-      static constexpr double default_minAbsPredictedDiff = 1e-6;
-      double minAbsPredictedDiff = default_minAbsPredictedDiff;
+      static constexpr double default_minLambdaMultiplier = 1.0 / 3.0;
+      double minLambdaMultiplier = default_minLambdaMultiplier;
 
-      static constexpr double default_badRelDifference = 0.1;
-      double badRelDifference = default_badRelDifference;
-
-      static constexpr double default_goodRelDifference = 0.4;
-      double goodRelDifference = default_goodRelDifference;
-
-      static constexpr double default_acceptedRelDifference = 1e-3;
-      double acceptedRelDifference = default_acceptedRelDifference;
+      static constexpr double default_acceptedQuality = 0;
+      double acceptedQuality = default_acceptedQuality;
     } stepControl;
 
     enum Loss { TRIVIAL, HUBER };
@@ -343,7 +337,7 @@ struct Settings {
     static constexpr double default_pointPointThres = 1e-7;
     double pointPointThres = default_pointPointThres;
 
-    enum OptimizationType { DISABLED, SELF_WRITTEN, CERES, MIXED };
+    enum OptimizationType { DISABLED, SELF_WRITTEN, CERES };
     static constexpr OptimizationType default_optimizationType = SELF_WRITTEN;
     OptimizationType optimizationType = default_optimizationType;
   } optimization;
@@ -357,7 +351,7 @@ struct Settings {
     mMaxOptimizedPoints = newMaxOptimizedPoints;
   }
 
-  static constexpr int default_maxKeyFrames = 6;
+  static constexpr int default_maxKeyFrames = 7;
   inline int maxKeyFrames() const { return mMaxKeyFrames; }
   inline void setMaxKeyFrames(int newMaxKeyFrames) {
     CHECK(newMaxKeyFrames > 0);
@@ -365,8 +359,8 @@ struct Settings {
   }
   int mMaxKeyFrames = default_maxKeyFrames;
 
-  static constexpr int default_keyFrameDist = 10;
-  static constexpr int max_keyFrameDist = 20;
+  static constexpr int default_keyFrameDist = 4;
+  static constexpr int max_keyFrameDist = 10;
   inline int keyFrameDist() const { return mKeyFrameDist; }
   inline void setKeyFrameDist(int newKeyFrameDist) {
     CHECK(newKeyFrameDist > 0 && newKeyFrameDist <= max_keyFrameDist);

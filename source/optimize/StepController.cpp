@@ -5,7 +5,7 @@ namespace mdso::optimize {
 StepController::StepController(
     const Settings::Optimization::StepControl &newSettings)
     : mLambda(newSettings.initialLambda)
-    , failMultiplier(2.0)
+    , failMultiplier(settings.initialFailMultiplier)
     , settings(newSettings) {}
 
 bool StepController::newStep(double oldEnergy, double newEnergy,
@@ -24,15 +24,15 @@ bool StepController::newStep(double oldEnergy, double newEnergy,
   double predictionQuality = actualDiff / predictedDiff;
   double q2m1 = 2 * predictionQuality - 1;
   if (predictionQuality > 0) {
-    mLambda *= std::max(1.0 / 3.0, q2m1 * q2m1 * q2m1);
-    failMultiplier = 2;
+    mLambda *= std::max(settings.minLambdaMultiplier, q2m1 * q2m1 * q2m1);
+    failMultiplier = settings.initialFailMultiplier;
   } else {
     mLambda *= failMultiplier;
-    failMultiplier *= 2;
+    failMultiplier *= settings.failMultiplierMultiplier;
   }
   LOG(INFO) << "lambda: " << oldLambda << " -> " << mLambda;
 
-  return predictionQuality > settings.acceptedRelDifference;
+  return predictionQuality > settings.acceptedQuality;
 }
 
 double StepController::lambda() const { return mLambda; }
