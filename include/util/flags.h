@@ -16,6 +16,7 @@ DECLARE_bool(min_plus_exp_depth);
 
 DECLARE_double(init_lambda);
 DECLARE_double(accepted_rho);
+DECLARE_int32(max_consecutive_failed_iter);
 
 DECLARE_bool(use_grad_weighting);
 

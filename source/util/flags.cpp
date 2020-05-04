@@ -32,6 +32,9 @@ DEFINE_double(accepted_rho,
               Settings::Optimization::StepControl::default_acceptedQuality,
               "If (real energy difference) / (predicted energy difference) > "
               "accepted_rho, the step is taken.");
+DEFINE_int32(max_consecutive_failed_iter,
+             Settings::Optimization::default_maxConsecutiveFailedIterations,
+             "Maximum number of failed attempts to decrease energy");
 
 DEFINE_bool(
     use_grad_weighting,
@@ -162,6 +165,8 @@ Settings getFlaggedSettings() {
   settings.depth.useMinPlusExpParametrization = FLAGS_min_plus_exp_depth;
   settings.optimization.stepControl.initialLambda = FLAGS_init_lambda;
   settings.optimization.stepControl.acceptedQuality = FLAGS_accepted_rho;
+  settings.optimization.maxConsecutiveFailedIterations =
+      FLAGS_max_consecutive_failed_iter;
   settings.residualWeighting.useGradientWeighting = FLAGS_use_grad_weighting;
   settings.delaunayDsoInitializer.firstFramesSkip = FLAGS_first_frames_skip;
   settings.stereoMatcher.stereoGeometryEstimator.runMaxRansacIter =

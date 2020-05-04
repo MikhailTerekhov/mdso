@@ -30,6 +30,7 @@ public:
   T dot(const DeltaParameterVector &other) const;
 
   void setAffineZero();
+  void constraintDepths(double maxAbsDeltaD);
 
   inline Eigen::Block<VecFt, sndDoF, 1> sndBlock() {
     return frame.head<sndDoF>();

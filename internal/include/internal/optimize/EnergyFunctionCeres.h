@@ -53,8 +53,8 @@ public:
                                                  targetAffLightP[1]);
 
       T depth = settings.depth.useMinPlusExpParametrization
-                ? settings.depth.min + ceres::exp(*depthParamP)
-                : ceres::exp(*depthParamP);
+                    ? settings.depth.min + ceres::exp(*depthParamP)
+                    : ceres::exp(*depthParamP);
 
       Vec3t targetPos;
       if (depth > T(settings.depth.max))

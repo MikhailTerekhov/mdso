@@ -378,8 +378,8 @@ TEST_F(EnergyFunctionTest, areDerivativesCorrect) {
   outputArray("errs.txt", errs.data(), errs.size());
   outputArray("diff.txt", diff.data(), diff.size());
   EXPECT_LE(relErr, ErrorBounds<T>::jacobianRelErr)
-      << "err=" << err << "deltaNorm=" << deltaNorm
-      << "diffNorm=" << diff.norm();
+      << "err=" << err << " deltaNorm=" << deltaNorm
+      << " diffNorm=" << diff.norm();
 }
 
 TEST_F(EnergyFunctionTest, arePredictionsCorrect) {

@@ -65,7 +65,9 @@ public:
           const Settings::Optimization &settings);
 
   Hessian levenbergMarquardtDamp(double lambda) const;
-  DeltaParameterVector solve(const Gradient &gradient) const;
+  DeltaParameterVector solve(const Gradient &gradient,
+                             const int *excluedPointInds = nullptr,
+                             int excludedPointIndsSize = 0) const;
   T applyQuadraticForm(const DeltaParameterVector &delta) const;
 
   inline MatFFt getFrameFrame() const { return frameFrame; }

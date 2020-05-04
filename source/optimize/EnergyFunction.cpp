@@ -225,7 +225,19 @@ void EnergyFunction::recoverState(const Parameters::State &oldState) {
   clearPrecomputations();
 }
 
+std::vector<int> oobDepthInds(const VecXt &logDepths, T minLogDepth,
+                              T maxLogDepth) {
+  std::vector<int> oobInds;
+  for (int i = 0; i < logDepths.size(); ++i)
+    if (logDepths[i] < minLogDepth || logDepths[i] > maxLogDepth)
+      oobInds.push_back(i);
+  return oobInds;
+}
+
 void EnergyFunction::optimize(int maxIterations) {
+  T minLogDepth = std::log(settings.depth.min);
+  T maxLogDepth = std::log(settings.depth.max);
+
   auto hostToTarget = precomputeHostToTarget();
   auto motionDerivatives = precomputeMotionDerivatives();
   auto lightHostToTarget = precomputeLightHostToTarget();
@@ -259,9 +271,20 @@ void EnergyFunction::optimize(int maxIterations) {
     Hessian dampedHessian =
         hessian.levenbergMarquardtDamp(stepController.lambda());
 
-    DeltaParameterVector delta = dampedHessian.solve(gradient);
+    Parameters::State savedState = parameters->saveState();
+    std::vector<int> oobInds =
+        oobDepthInds(savedState.logDepths, minLogDepth, maxLogDepth);
+    LOG(INFO) << "OOB depths count = " << oobInds.size()
+              << " (these were excluded from the current optimization step)";
+
+    DeltaParameterVector delta =
+        dampedHessian.solve(gradient, oobInds.data(), oobInds.size());
     if (!settings.affineLight.optimizeAffineLight)
       delta.setAffineZero();
+    delta.constraintDepths(settings.depth.maxAbsLogDelta);
+
+    LOG(INFO) << "delta : frame norm = " << delta.getFrame().norm()
+              << " point norm = " << delta.getPoint().norm();
 
     double predictedEnergy =
         curEnergy + getPredictedDeltaEnergy(hessian, gradient, delta);
@@ -269,7 +292,6 @@ void EnergyFunction::optimize(int maxIterations) {
     LOG(INFO) << "predicted via J = " << predictedViaJacobian
               << ", diff = " << curEnergy - predictedViaJacobian;
 
-    Parameters::State savedState = parameters->saveState();
     parameters->update(delta);
 
     auto newHostToTarget = precomputeHostToTarget();

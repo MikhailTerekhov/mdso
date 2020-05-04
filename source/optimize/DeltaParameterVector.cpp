@@ -38,4 +38,10 @@ void DeltaParameterVector::setAffineZero() {
       affBlock(frameInd, camInd).setZero();
 }
 
+void DeltaParameterVector::constraintDepths(double maxAbsDeltaD) {
+  for (T &d : point)
+    if (std::abs(d) > maxAbsDeltaD)
+      d = 0;
+}
+
 } // namespace mdso::optimize

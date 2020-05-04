@@ -20,9 +20,9 @@ EnergyFunctionCeres::Residual::Residual(CameraBundle *cameraBundle,
     , hostKf(hostKfEntry->host)
     , targetKf(targetKfEntry->host)
     , hostImage(&hostKf->preKeyFrame->frames[hostKfEntry->ind]
-        .internals->interpolator(0))
+                     .internals->interpolator(0))
     , targetImage(&targetKf->preKeyFrame->frames[targetKfEntry->ind]
-        .internals->interpolator(0))
+                       .internals->interpolator(0))
     , hostFrameToBody(cameraBundle->bundle[hostKfEntry->ind].thisToBody)
     , targetBodyToFrame(cameraBundle->bundle[targetKfEntry->ind].bodyToThis)
     , optimizedPoint(optimizedPoint)
@@ -227,9 +227,9 @@ EnergyFunctionCeres::EnergyFunctionCeres(
       CHECK_EQ(pointParams[globalPointInd].op, &op);
       CHECK(targetCam.isOnImage(repr.reprojected, PH));
       CHECK(cam->bundle[hostCamInd].cam.isOnImage(op.p, PH))
-      << "Optimized point is not on the image! p = " << op.p.transpose()
-      << "d = " << op.depth() << " min = " << op.minDepth
-      << " max = " << op.maxDepth;
+          << "Optimized point is not on the image! p = " << op.p.transpose()
+          << "d = " << op.depth() << " min = " << op.minDepth
+          << " max = " << op.maxDepth;
       double *depthParamPtr = &pointParams[globalPointInd].depthParam;
 
       for (int i = 0; i < PS; ++i) {
@@ -244,8 +244,8 @@ EnergyFunctionCeres::EnergyFunctionCeres(
             toCvPoint(shiftedP));
         const double c = settings.residualWeighting.c;
         double weight = settings.residualWeighting.useGradientWeighting
-                        ? c / std::hypot(c, gradNorm)
-                        : 1;
+                            ? c / std::hypot(c, gradNorm)
+                            : 1;
         ceres::LossFunction *lossFunc = new ceres::ScaledLoss(
             new ceres::HuberLoss(settings.intensity.outlierDiff), weight,
             ceres::Ownership::TAKE_OWNERSHIP);
@@ -287,8 +287,8 @@ void EnergyFunctionCeres::applyParameterUpdate() {
     keyFrames[kfInd]->thisToWorld.setValue(bodyToWorld[kfInd]);
   for (auto [depthParam, op] : pointParams) {
     double depth = settings.depth.useMinPlusExpParametrization
-                   ? settings.depth.min + std::exp(depthParam)
-                   : std::exp(depthParam);
+                       ? settings.depth.min + std::exp(depthParam)
+                       : std::exp(depthParam);
     if (depth > 0)
       op->setDepth(depth);
   }

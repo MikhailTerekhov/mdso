@@ -305,10 +305,31 @@ void extendWithZeros(VecXt &vec, const std::vector<int> &indsPresent,
   vec = extended;
 }
 
-DeltaParameterVector Hessian::solve(const Gradient &gradient) const {
+std::vector<int> subtractSet(const std::vector<int> &inds1,
+                             const std::vector<int> &inds2) {
+  std::vector<int> result(inds1.size());
+  auto newEnd = std::set_difference(inds1.begin(), inds1.end(), inds2.begin(),
+                                    inds2.end(), result.begin());
+  result.resize(newEnd - result.begin());
+  return result;
+}
+
+DeltaParameterVector Hessian::solve(const Gradient &gradient,
+                                    const int *excludedPointInds,
+                                    int excludedPointIndsSize) const {
   int totalPoints = pointPoint.size();
-  std::vector<int> pointIndsUsed =
+  std::vector<int> pointIndsBigger =
       indsBigger(pointPoint, settings.pointPointThres);
+  std::vector<int> pointIndsUsed;
+  if (excludedPointInds) {
+    CHECK_GE(excludedPointIndsSize, 0);
+    pointIndsUsed =
+        subtractSet(pointIndsBigger,
+                    std::vector(excludedPointInds,
+                                excludedPointInds + excludedPointIndsSize));
+  } else {
+    pointIndsUsed = pointIndsBigger;
+  }
   VecXt pointPointSliced = sliceInds(pointPoint, pointIndsUsed);
   MatXXt framePointSliced = sliceCols(framePoint, pointIndsUsed);
   VecXt gradPointSliced = sliceInds(gradient.getPoint(), pointIndsUsed);

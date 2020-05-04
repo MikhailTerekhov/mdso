@@ -240,6 +240,9 @@ struct Settings {
     static constexpr double default_max = 1e4;
     double max = default_max;
 
+    static constexpr double default_maxAbsLogDelta = 1e1;
+    double maxAbsLogDelta = default_maxAbsLogDelta;
+
     static constexpr bool default_setMinBound = true;
     bool setMinBound = default_setMinBound;
 
@@ -439,6 +442,7 @@ struct EnergyFunctionSettings {
   ResidualSettings residual = {};
   Settings::AffineLight affineLight = {};
   Settings::Optimization optimization = {};
+  Settings::Depth depth = {};
 };
 
 struct BundleAdjusterSettings {
