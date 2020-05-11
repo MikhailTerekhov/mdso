@@ -18,7 +18,7 @@ struct InitializedFrame {
     Timestamp timestamp;
   };
 
-  InitializedFrame(cv::Mat frame[], Timestamp timestamps[], int size);
+  InitializedFrame(const cv::Mat frame[], Timestamp timestamps[], int size);
 
   SE3 thisToWorld;
   std::vector<FrameEntry> frames;

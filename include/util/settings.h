@@ -9,16 +9,12 @@
 
 namespace mdso {
 
-struct InitializerSettings;
-
+struct InitializerDelaunaySettings;
+struct InitializerGroundTruthSettings;
 struct PointTracerSettings;
-
 struct FrameTrackerSettings;
-
 struct BundleAdjusterSettings;
-
 struct ResidualSettings;
-
 struct EnergyFunctionSettings;
 
 struct Settings {
@@ -117,12 +113,12 @@ struct Settings {
 
   struct DsoInitializer {
     static constexpr int max_initializedFrames = 2;
-  };
 
-  struct DelaunayDsoInitializer {
     static constexpr int default_firstFramesSkip = 15;
     int firstFramesSkip = default_firstFramesSkip;
+  } dsoInitializer;
 
+  struct DelaunayDsoInitializer {
     static constexpr bool default_usePlainTriangulation = false;
     bool usePlainTriangulation = default_usePlainTriangulation;
   } delaunayDsoInitializer;
@@ -354,6 +350,9 @@ struct Settings {
     mMaxOptimizedPoints = newMaxOptimizedPoints;
   }
 
+  static constexpr double default_optimizedOnReprojectionFactor = 0.8;
+  double optimizedOnReprojectionFactor = default_optimizedOnReprojectionFactor;
+
   static constexpr int default_maxKeyFrames = 7;
   inline int maxKeyFrames() const { return mMaxKeyFrames; }
   inline void setMaxKeyFrames(int newMaxKeyFrames) {
@@ -388,7 +387,8 @@ struct Settings {
   static constexpr bool default_disableMarginalization = false;
   int disableMarginalization = default_disableMarginalization;
 
-  InitializerSettings getInitializerSettings() const;
+  InitializerDelaunaySettings getInitializerDelaunaySettings() const;
+  InitializerGroundTruthSettings getInitializerGroundTruthSettings() const;
   PointTracerSettings getPointTracerSettings() const;
   FrameTrackerSettings getFrameTrackerSettings() const;
   BundleAdjusterSettings getBundleAdjusterSettings() const;
@@ -411,13 +411,18 @@ struct PointTracerSettings {
   Settings::Pyramid pyramid = {};
 };
 
-struct InitializerSettings {
-  Settings::DelaunayDsoInitializer initializer = {};
+struct InitializerDelaunaySettings {
+  Settings::DsoInitializer intializer = {};
+  Settings::DelaunayDsoInitializer delaunayInitializer = {};
   Settings::StereoMatcher stereoMatcher = {};
   Settings::Threading threading = {};
   Settings::Triangulation triangulation = {};
   Settings::KeyFrame keyFrame = {};
-  PointTracerSettings tracingSettings = {};
+};
+
+struct InitializerGroundTruthSettings {
+  Settings::DsoInitializer intializer;
+  Settings::KeyFrame keyFrame;
 };
 
 struct FrameTrackerSettings {

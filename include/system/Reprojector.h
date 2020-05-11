@@ -41,7 +41,10 @@ public:
 
   void setSkippedFrame(int newSkippedFrameInd);
   StdVector<Reprojection> reproject() const;
+  DepthedPoints
+  depthedPoints(const StdVector<Reprojection> &reprojections) const;
   DepthedPoints reprojectDepthed() const;
+  const PointType &getPoint(const Reprojection &reprojection) const;
 
 private:
   static const StdVector<PointType> &getPoints(const KeyFrameEntry &entry);

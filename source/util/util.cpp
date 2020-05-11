@@ -33,6 +33,7 @@ namespace mdso {
 
 cv::Mat dbg;
 double minDepthCol = 0, maxDepthCol = 1;
+bool isDepthColSet = false;
 
 void printInPly(std::ostream &out, const std::vector<Vec3> &points,
                 const std::vector<cv::Vec3b> &colors) {
@@ -79,6 +80,7 @@ end_header
 void setDepthColBounds(const std::vector<double> &depths) {
   if (depths.empty())
     return;
+  isDepthColSet = true;
   std::vector<double> sorted = depths;
   std::sort(sorted.begin(), sorted.end());
   int redInd = FLAGS_red_depths_part * int(sorted.size());
@@ -320,5 +322,33 @@ std::string curTimeBrief() {
 }
 
 TimePoint now() { return std::chrono::high_resolution_clock::now(); }
+
+std::string timeOfDay(TimePoint timePoint) {
+  using namespace std::chrono;
+  using days = duration<int64_t, std::ratio<86400>>;
+
+  TimePoint day = floor<days>(timePoint);
+  TimePoint hour = floor<hours>(timePoint);
+  TimePoint minute = floor<minutes>(timePoint);
+  TimePoint second = floor<seconds>(timePoint);
+
+  int h = duration_cast<hours>(hour - day).count();
+  int m = duration_cast<minutes>(minute - hour).count();
+  double s = duration_cast<seconds>(second - minute).count();
+  int mcs = duration_cast<microseconds>(timePoint - second).count();
+  return std::to_string(h) + ":" + std::to_string(m) + ":" +
+         std::to_string(s + mcs * 1e-6);
+}
+
+template <>
+double secondsBetween<Timestamp>(const Timestamp &start, const Timestamp &end) {
+  return (end - start) * 1e-6;
+}
+
+TimePoint toTimePoint(Timestamp timestamp) {
+  return std::chrono::time_point<std::chrono::high_resolution_clock,
+                                 std::chrono::microseconds>(
+      std::chrono::microseconds(timestamp));
+}
 
 } // namespace mdso

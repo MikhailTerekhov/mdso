@@ -261,7 +261,7 @@ inline Mat22t sum_gradab(const VecRt &weights, const MatR2t gradItarget,
 template <bool isSameFrame>
 inline Residual::FrameFrameHessian
 H_frameframe(const Mat27t &df1_dp_dqt, const Mat27t &df2_dp_dqt,
-             const MatR2t df1_dr_dab, const MatR2t df2_dr_dab,
+             const MatR2t &df1_dr_dab, const MatR2t &df2_dr_dab,
              const VecRt &weights, const Mat22t &sum_wgradgradT,
              const Mat22t &sum_gradab1, const Mat22t &sum_gradab2) {
   Residual::FrameFrameHessian H;

@@ -1,4 +1,5 @@
 #include "data/MultiFovReader.h"
+#include "data/RobotcarReader.h"
 #include "output/CloudWriter.h"
 #include "output/CloudWriterGT.h"
 #include "output/DebugImageDrawer.h"
@@ -9,6 +10,7 @@
 #include "output/TrajectoryWriterGT.h"
 #include "output/TrajectoryWriterPredict.h"
 #include "system/DoGPreprocessor.h"
+#include "system/DsoInitializerGroundTruth.h"
 #include "system/DsoSystem.h"
 #include "system/IdentityPreprocessor.h"
 #include "util/defs.h"
@@ -19,22 +21,43 @@
 
 using namespace mdso;
 
-DEFINE_int32(start, 1, "Number of the starting frame.");
+DEFINE_string(robotcar_chunk_dir, "2015-02-10-11-58-05",
+              "Chunk of the Oxford Robotcar dataset that is to be used.");
+DEFINE_string(robotcar_rtk_dir, "/shared/datasets/oxford-robotcar/rtk",
+              "Path to the RTK ground truth trajectories directory.");
+DEFINE_string(robotcar_models_dir, "data/models/robotcar",
+              "Directory with omnidirectional camera models. It is provided in "
+              "our repository. IT IS NOT THE \"models\" DIRECTORY FROM THE "
+              "ROBOTCAR DATASET SDK!");
+DEFINE_string(robotcar_extrinsics_dir,
+              "thirdparty/robotcar-dataset-sdk/extrinsics",
+              "Directory with RobotCar dataset sensor extrinsics, provided in "
+              "the dataset SDK.");
+DEFINE_string(robotcar_masks_dir, "data/masks/robotcar",
+              "Path to a directory with masks for the dataset.");
+
+DEFINE_int32(
+    start, 1,
+    "Number of the starting frame. This flag is disabled if start_ts is set.");
+DEFINE_int64(start_ts, -1,
+             "If set to a positive value, determines the closest timestamp to "
+             "the starting frame.");
+
 DEFINE_int32(count, 100, "Number of frames to process.");
+
+DEFINE_bool(gen_gt, false, "Do we need to generate GT pointcloud?");
 DEFINE_int32(gt_points, 1'000'000,
              "Number of GT points in the generated cloud.");
-
-DEFINE_bool(gen_gt, true, "Do we need to generate GT pointcloud?");
+DEFINE_bool(gen_gt_only, false, "Generate ground truth point cloud and exit.");
 DEFINE_bool(gen_cloud, true, "Do we need to save resulting pointcloud?");
-DEFINE_bool(draw_interpolation, true,
-            "Do we need to draw interpolation from initializer?");
+
+DEFINE_bool(draw_interpolation, false,
+            "Do we need to draw interpolation from delaunayInitializer?");
 
 DEFINE_bool(use_DoG, false, "Do we need to apply DoG preprocessing first?");
 DEFINE_double(sigma1, 0, "Smaller sigma in the DoG filter.");
 DEFINE_double(sigma2, 2, "Bigger sigma in  the DoG filter.");
 DEFINE_double(DoG_multiplier, 1, "Multiplier after the DoG filter.");
-
-DEFINE_bool(gen_gt_only, false, "Generate ground truth point cloud and exit.");
 
 DEFINE_string(debug_img_dir, "debug",
               "Directory for debug images to be put into.");
@@ -50,7 +73,7 @@ DEFINE_bool(gen_gt_trajectory, true,
             "Do we need to generate ground truth trajectories?");
 
 DEFINE_string(pred_trajectory_filename, "predicted.txt",
-              "Predicted trajectory filename (stored in 3x4 matrix form)");
+              "Predicted trajectory filename (stored in 3x4 matrix form).");
 DEFINE_bool(gen_pred_trajectory, true,
             "Do we need to generate predicted trajectory?");
 
@@ -60,7 +83,7 @@ DEFINE_string(
 DEFINE_bool(show_track_res, false,
             "Show tracking residuals on all levels of the pyramind?");
 DEFINE_bool(show_debug_image, true,
-            R"__(Show debug image? Structure of debug image:
+            R"__(Show debug image? Structure of the debug image:
 +---+---+
 | A | B |
 +---+---+
@@ -91,7 +114,28 @@ DEFINE_bool(
 
 DEFINE_bool(move_body_from_camera, false,
             "If set to true, nontrivial motion between camera body and image "
-            "is added.");
+            "in MultiFoV dataset is added.");
+
+std::unique_ptr<DatasetReader> createReader(const fs::path &datasetDir) {
+  if (MultiFovReader::isMultiFov(datasetDir))
+    return std::unique_ptr<DatasetReader>(new MultiFovReader(datasetDir));
+  else if (fs::path chunkDir = datasetDir / FLAGS_robotcar_chunk_dir;
+           RobotcarReader::isRobotcar(chunkDir)) {
+    std::optional<fs::path> rtkDir;
+    if (fs::exists(FLAGS_robotcar_rtk_dir))
+      rtkDir.emplace(FLAGS_robotcar_rtk_dir);
+    ReaderSettings readerSettings;
+    auto robotcarReader =
+        new RobotcarReader(chunkDir, FLAGS_robotcar_models_dir,
+                           FLAGS_robotcar_extrinsics_dir, rtkDir);
+    if (fs::exists(FLAGS_robotcar_masks_dir))
+      robotcarReader->provideMasks(FLAGS_robotcar_masks_dir);
+    return std::unique_ptr<DatasetReader>(robotcarReader);
+  } else {
+    LOG(FATAL) << "Unknown dataset on " << datasetDir << " was provided.";
+    return nullptr;
+  }
+}
 
 class TrackingErrorCollector : public FrameTrackerObserver {
 public:
@@ -124,11 +168,11 @@ private:
   std::vector<std::vector<double>> avgRes;
 };
 
-void readPointsInFrameGT(const MultiFovReader &reader,
+void readPointsInFrameGT(const DatasetReader *reader,
                          std::vector<std::vector<Vec3>> &pointsInFrameGT,
                          std::vector<std::vector<cv::Vec3b>> &colors,
                          int maxPoints) {
-  CameraModel cam = reader.cam().bundle[0].cam;
+  CameraModel cam = reader->cam().bundle[0].cam;
   std::cout << "filling GT points..." << std::endl;
   int w = cam.getWidth(), h = cam.getHeight();
   int step =
@@ -136,8 +180,8 @@ void readPointsInFrameGT(const MultiFovReader &reader,
   const double maxd = 1e10;
   for (int it = FLAGS_start; it < FLAGS_start + FLAGS_count; ++it) {
     pointsInFrameGT[it].reserve((h / step) * (w / step));
-    auto depths = reader.depths(it);
-    cv::Mat3b frame = reader.frame(it)[0].frame;
+    auto depths = reader->depths(it);
+    cv::Mat3b frame = reader->frame(it)[0].frame;
     for (int y = 0; y < h; y += step)
       for (int x = 0; x < w; x += step) {
         Vec3 p = cam.unmap(Vec2(x, y));
@@ -156,6 +200,18 @@ void readPointsInFrameGT(const MultiFovReader &reader,
 }
 
 void mkdir(const fs::path &dirname) { fs::create_directories(dirname); }
+
+std::pair<std::vector<cv::Mat3b>, std::vector<Timestamp>>
+cvtFrame(const std::vector<DatasetReader::FrameEntry> &frame) {
+  std::pair<std::vector<cv::Mat3b>, std::vector<Timestamp>> result;
+  result.first.reserve(frame.size());
+  result.second.reserve(frame.size());
+  for (int i = 0; i < frame.size(); ++i) {
+    result.first.push_back(frame[i].frame);
+    result.second.push_back(frame[i].timestamp);
+  }
+  return result;
+}
 
 int main(int argc, char **argv) {
   std::string usage = "Usage: " + std::string(argv[0]) + R"abacaba( data_dir
@@ -195,7 +251,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
       argsOfs << a << "\n";
   }
 
-  MultiFovReader reader(argv[1]);
+  std::unique_ptr<DatasetReader> reader = createReader(argv[1]);
 
   Settings settings = getFlaggedSettings();
 
@@ -207,7 +263,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
                     : static_cast<Preprocessor *>(&idPreprocessor);
 
   if (FLAGS_use_DoG) {
-    cv::Mat3b img = reader.frame(FLAGS_start)[0].frame;
+    cv::Mat3b img = reader->frame(FLAGS_start)[0].frame;
     cv::Mat1b imgGray = cvtBgrToGray(img);
     cv::Mat1d gradX, gradY, gradNorm;
     grad(imgGray, gradX, gradY, gradNorm);
@@ -233,9 +289,9 @@ It should contain "info" and "data" subdirectories.)abacaba";
   }
 
   if (FLAGS_gen_gt_only) {
-    std::vector<std::vector<Vec3>> pointsInFrameGT(reader.numFrames());
-    std::vector<std::vector<cv::Vec3b>> colors(reader.numFrames());
-    readPointsInFrameGT(reader, pointsInFrameGT, colors, FLAGS_gt_points);
+    std::vector<std::vector<Vec3>> pointsInFrameGT(reader->numFrames());
+    std::vector<std::vector<cv::Vec3b>> colors(reader->numFrames());
+    readPointsInFrameGT(reader.get(), pointsInFrameGT, colors, FLAGS_gt_points);
     std::vector<Vec3> allPoints;
     std::vector<cv::Vec3b> allColors;
     allPoints.reserve(FLAGS_gt_points);
@@ -243,7 +299,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
     for (int i = 0; i < pointsInFrameGT.size(); ++i)
       for (int j = 0; j < pointsInFrameGT[i].size(); ++j) {
         const Vec3 &p = pointsInFrameGT[i][j];
-        allPoints.push_back(reader.frameToWorld(i) * p);
+        allPoints.push_back(reader->frameToWorld(i) * p);
         allColors.push_back(colors[i][j]);
       }
     std::ofstream pointsGTOfs("pointsGT.ply");
@@ -252,19 +308,14 @@ It should contain "info" and "data" subdirectories.)abacaba";
   }
 
   TrajectoryWriterDso trajectoryWriter(outDir / FLAGS_trajectory_filename);
-  StdVector<SE3> frameToWorldGT(reader.numFrames());
-  std::vector<Timestamp> timestamps(reader.numFrames());
-  for (int i = 0; i < timestamps.size(); ++i) {
-    timestamps[i] = i;
-    frameToWorldGT[i] = reader.frameToWorld(i);
-  }
-  TrajectoryWriterGT trajectoryWriterGT(frameToWorldGT.data(),
-                                        timestamps.data(), timestamps.size(),
-                                        outDir, FLAGS_gt_trajectory_filename);
+  std::optional<TrajectoryWriterGT> trajectoryWriterGT;
+  if (FLAGS_gen_gt_trajectory)
+    trajectoryWriterGT.emplace(reader.get(), outDir,
+                               FLAGS_gt_trajectory_filename);
   TrajectoryWriterPredict trajectoryWriterPredict(
       outDir, FLAGS_pred_trajectory_filename);
 
-  CameraBundle cam = reader.cam();
+  CameraBundle cam = reader->cam();
   if (FLAGS_move_body_from_camera) {
     CHECK_EQ(cam.bundle.size(), 1);
     std::mt19937 mt;
@@ -275,7 +326,9 @@ It should contain "info" and "data" subdirectories.)abacaba";
   }
   CameraBundle::CamPyr camPyr = cam.camPyr(settings.pyramid.levelNum());
 
-  std::vector<int> drawingOrder(1, 0);
+  std::vector<int> drawingOrder(cam.bundle.size(), 0);
+  for (int i = 0; i < cam.bundle.size(); ++i)
+    drawingOrder[i] = i;
   DebugImageDrawer debugImageDrawer(drawingOrder);
   TrackingDebugImageDrawer trackingDebugImageDrawer(
       camPyr.data(), settings.frameTracker, settings.pyramid, drawingOrder);
@@ -286,14 +339,15 @@ It should contain "info" and "data" subdirectories.)abacaba";
         new CloudWriter(&cam, outDir, FLAGS_resulting_cloud_filename));
 
   std::unique_ptr<CloudWriterGT> cloudWriterGTPtr;
-  if (FLAGS_gen_gt) {
-    std::vector<std::vector<Vec3>> pointsInFrameGT(reader.numFrames());
-    std::vector<std::vector<cv::Vec3b>> colors(reader.numFrames());
-    readPointsInFrameGT(reader, pointsInFrameGT, colors, FLAGS_gt_points);
-    cloudWriterGTPtr.reset(new CloudWriterGT(
-        frameToWorldGT.data(), timestamps.data(), pointsInFrameGT.data(),
-        colors.data(), reader.numFrames(), outDir, FLAGS_gt_cloud_filename));
-  }
+  //  if (FLAGS_gen_gt) {
+  //    std::vector<std::vector<Vec3>> pointsInFrameGT(reader->numFrames());
+  //    std::vector<std::vector<cv::Vec3b>> colors(reader->numFrames());
+  //    readPointsInFrameGT(reader.get(), pointsInFrameGT, colors,
+  //    FLAGS_gt_points); cloudWriterGTPtr.reset(new CloudWriterGT(
+  //        frameToWorldGT.data(), timestamps.data(), pointsInFrameGT.data(),
+  //        colors.data(), reader->numFrames(), outDir,
+  //        FLAGS_gt_cloud_filename));
+  //  }
 
   InterpolationDrawer interpolationDrawer(&cam.bundle[0].cam);
 
@@ -303,8 +357,8 @@ It should contain "info" and "data" subdirectories.)abacaba";
   if (FLAGS_write_files || FLAGS_show_debug_image)
     observers.dso.push_back(&debugImageDrawer);
   observers.dso.push_back(&trajectoryWriter);
-  if (FLAGS_gen_gt_trajectory)
-    observers.dso.push_back(&trajectoryWriterGT);
+  if (FLAGS_gen_gt_trajectory && trajectoryWriterGT)
+    observers.dso.push_back(&*trajectoryWriterGT);
   if (FLAGS_gen_pred_trajectory)
     observers.dso.push_back(&trajectoryWriterPredict);
   if (FLAGS_gen_cloud)
@@ -321,6 +375,18 @@ It should contain "info" and "data" subdirectories.)abacaba";
   TrackingErrorCollector errorCollector(settings.pyramid.levelNum());
   observers.frameTracker.push_back(&errorCollector);
 
+  std::unique_ptr<DsoInitializer> dsoInitializer;
+  if (cam.bundle.size() > 1) {
+    LOG(INFO) << "using ground truth intializer";
+    dsoInitializer.reset(new DsoInitializerGroundTruth(
+        reader.get(), settings.getInitializerGroundTruthSettings()));
+  }
+
+  int startInd = FLAGS_start;
+  if (FLAGS_start_ts > 0) {
+    startInd = reader->firstTimestampToInd(FLAGS_start_ts);
+  }
+
   std::cout << "running DSO.." << std::endl;
 
   LOG(INFO) << "Total DSO observers: " << observers.dso.size()
@@ -328,13 +394,12 @@ It should contain "info" and "data" subdirectories.)abacaba";
             << "\nInit observers: " << observers.initializer.size();
 
   {
-    DsoSystem dso(&cam, preprocessor, observers, settings);
-    for (int it = FLAGS_start; it < FLAGS_start + FLAGS_count; ++it) {
+    DsoSystem dso(&cam, preprocessor, observers, settings,
+                  std::move(dsoInitializer));
+    for (int it = startInd; it < startInd + FLAGS_count; ++it) {
       std::cout << "add frame #" << it << std::endl;
-      cv::Mat3b frame = reader.frame(it)[0].frame;
-      Timestamp timestamp = it;
-      dso.addMultiFrame(&frame, &timestamp);
-
+      auto [frames, timestamps] = cvtFrame(reader->frame(it));
+      dso.addMultiFrame(frames.data(), timestamps.data());
       if (FLAGS_draw_interpolation && interpolationDrawer.didInitialize()) {
         cv::Mat3b interpolation = interpolationDrawer.draw();
         fs::path out = outDir / fs::path("interpolation.jpg");

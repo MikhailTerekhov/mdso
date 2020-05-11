@@ -25,7 +25,8 @@ namespace mdso {
 class DsoSystem : public TrajectoryHolder {
 public:
   DsoSystem(CameraBundle *cam, Preprocessor *preprocessor,
-            const Observers &observers = {}, const Settings &settings = {});
+            const Observers &observers = {}, const Settings &settings = {},
+            std::unique_ptr<DsoInitializer> newDsoInitializer = nullptr);
   DsoSystem(std::vector<std::unique_ptr<KeyFrame>> &restoredKeyFrames,
             CameraBundle *cam, Preprocessor *preprocessor,
             const Observers &observers, const Settings &_settings);
@@ -72,7 +73,6 @@ private:
   void activateNewOptimizedPoints();
   void traceOn(const PreKeyFrame &frame);
   void initializeAllFrames();
-  template <typename PointT>
   FrameTracker::DepthedMultiFrame getBaseForTrack() const;
   std::unique_ptr<BundleAdjuster> createBundleAdjuster() const;
 

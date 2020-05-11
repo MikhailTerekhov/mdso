@@ -6,7 +6,7 @@
 #include <filesystem>
 #include <opencv2/opencv.hpp>
 
-using namespace mdso;
+namespace mdso {
 
 struct ReaderSettings {
   Settings::CameraModel cam = {};
@@ -24,7 +24,7 @@ struct ReaderSettings {
   static constexpr int default_maxProjectedPoints = 20'000;
   int maxProjectedPoints = default_maxProjectedPoints;
 
-  static constexpr double default_boxFilterSize = 0.2;
+  static constexpr double default_boxFilterSize = 3;
   double boxFilterSize = default_boxFilterSize;
 };
 
@@ -47,9 +47,11 @@ public:
     std::array<Terrain, numCams> terrains;
   };
 
+  static bool isRobotcar(const fs::path &chunkDir);
+
   RobotcarReader(const fs::path &_chunkDir, const fs::path &modelsDir,
                  const fs::path &extrinsicsDir,
-                 const std::optional<fs::path> &rtkDir,
+                 const std::optional<fs::path> &rtkDir = std::nullopt,
                  const ReaderSettings &_settings = {});
   void provideMasks(const fs::path &masksDir);
 
@@ -61,6 +63,7 @@ public:
   CameraBundle cam() const override { return mCam; }
 
   std::unique_ptr<FrameDepths> depths(int frameInd) const override;
+  bool hasFrameToWorld(int frameInd) const override;
   SE3 frameToWorld(int frameInd) const override;
 
   SE3 tsToWorld(Timestamp ts, bool useVo = false) const;
@@ -127,5 +130,7 @@ private:
   bool mMasksProvided;
   ReaderSettings settings;
 };
+
+} // namespace mdso
 
 #endif

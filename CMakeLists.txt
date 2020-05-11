@@ -81,7 +81,8 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/system/AffineLightTransform.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoSystem.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoInitializer.h
-    ${PROJECT_SOURCE_DIR}/include/system/DelaunayDsoInitializer.h
+    ${PROJECT_SOURCE_DIR}/include/system/DsoInitializerDelaunay.h
+    ${PROJECT_SOURCE_DIR}/include/system/DsoInitializerGroundTruth.h
     ${PROJECT_SOURCE_DIR}/include/system/PreKeyFrame.h
     ${PROJECT_SOURCE_DIR}/include/system/KeyFrame.h
     ${PROJECT_SOURCE_DIR}/include/system/MarginalizedKeyFrame.h
@@ -158,7 +159,8 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/system/SphericalPlus.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoSystem.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoInitializer.cpp
-    ${PROJECT_SOURCE_DIR}/source/system/DelaunayDsoInitializer.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/DsoInitializerDelaunay.cpp
+    ${PROJECT_SOURCE_DIR}/source/system/DsoInitializerGroundTruth.cpp
     ${PROJECT_SOURCE_DIR}/source/system/PreKeyFrame.cpp
     ${PROJECT_SOURCE_DIR}/source/system/KeyFrame.cpp
     ${PROJECT_SOURCE_DIR}/source/system/MarginalizedKeyFrame.cpp

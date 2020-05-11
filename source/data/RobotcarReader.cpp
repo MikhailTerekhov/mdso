@@ -1,5 +1,22 @@
 #include "data/RobotcarReader.h"
 
+namespace mdso {
+
+bool RobotcarReader::isRobotcar(const fs::path &chunkDir) {
+  return fs::exists(chunkDir / "mono_left.timestamps") &&
+         fs::exists(chunkDir / "mono_left") &&
+         fs::exists(chunkDir / "mono_rear.timestamps") &&
+         fs::exists(chunkDir / "mono_rear") &&
+         fs::exists(chunkDir / "mono_right.timestamps") &&
+         fs::exists(chunkDir / "mono_right") &&
+         fs::exists(chunkDir / "lms_front.timestamps") &&
+         fs::exists(chunkDir / "lms_front") &&
+         fs::exists(chunkDir / "lms_rear.timestamps") &&
+         fs::exists(chunkDir / "lms_rear") &&
+         fs::exists(chunkDir / "ldmrs.timestamps") &&
+         fs::exists(chunkDir / "ldmrs");
+}
+
 // clang-format off
 const SE3 RobotcarReader::camToImage = 
     SE3((Mat44() <<
@@ -167,6 +184,11 @@ void readRtk(const fs::path &rtkFile, const SE3 &bodyToIns, bool correctRtk,
             << timeCovered / timestamps.size();
 }
 
+void logTimeInterval(Timestamp begin, Timestamp end, const std::string &name) {
+  LOG(INFO) << name << ": [" << timeOfDay(toTimePoint(begin)) << " -- "
+            << timeOfDay(toTimePoint(end)) << "]";
+}
+
 RobotcarReader::RobotcarReader(const fs::path &_chunkDir,
                                const fs::path &modelsDir,
                                const fs::path &extrinsicsDir,
@@ -224,6 +246,19 @@ RobotcarReader::RobotcarReader(const fs::path &_chunkDir,
   }
 
   syncTimestamps();
+
+  logTimeInterval(mLeftTs[0], mLeftTs.back(), "left cam ");
+  logTimeInterval(mRearTs[0], mRearTs.back(), "rear cam ");
+  logTimeInterval(mRightTs[0], mRightTs.back(), "right cam");
+  logTimeInterval(mLmsRearTs[0], mLmsRearTs.back(), "LMS rear ");
+  logTimeInterval(mLmsFrontTs[0], mLmsFrontTs.back(), "LMS front");
+  logTimeInterval(mLdmrsTs[0], mLdmrsTs.back(), "LDMRS    ");
+  if (isRtkFound) {
+    logTimeInterval(mGroundTruthTs[0], mGroundTruthTs.back(), "rtk      ");
+    logTimeInterval(mVoTs[0], mVoTs.back(), "vo       ");
+  } else {
+    logTimeInterval(mGroundTruthTs[0], mGroundTruthTs.back(), "vo       ");
+  }
 
   printVoAndRtk();
 }
@@ -328,7 +363,7 @@ void filterOutSameBox(StdVector<std::pair<Vec2, double>> &projected,
 }
 
 Timestamp avgTimestamp(const std::vector<Timestamp> &timestamps) {
-  return std::accumulate(timestamps.begin(), timestamps.end(), 0) /
+  return std::accumulate(timestamps.begin(), timestamps.end(), 0ll) /
          timestamps.size();
 }
 
@@ -348,6 +383,11 @@ std::unique_ptr<FrameDepths> RobotcarReader::depths(int frameInd) const {
     filterOutSameBox(projected[ci], settings.boxFilterSize,
                      mCam.bundle[ci].cam.getWidth(),
                      mCam.bundle[ci].cam.getHeight());
+
+  str << "sizes of the projected cloud (filtered): ";
+  for (int ci = 0; ci < projected.size(); ++ci)
+    str << projected[ci].size() << " ";
+  LOG(INFO) << str.str();
 
   std::unique_ptr<RobotcarReader::Depths> result(
       new RobotcarReader::Depths(mCam, projected, settings.triangulation));
@@ -405,6 +445,13 @@ cv::Mat3b RobotcarReader::Depths::draw(cv::Mat3b frames[]) {
   return result;
 }
 
+bool RobotcarReader::hasFrameToWorld(int frameInd) const {
+  if (frameInd < 0 || frameInd >= numFrames())
+    return false;
+  Timestamp ts = timestampsFromInd(frameInd)[0];
+  return ts >= mGroundTruthTs[0] && ts <= mGroundTruthTs.back();
+}
+
 SE3 RobotcarReader::frameToWorld(int frameInd) const {
   CHECK_GE(frameInd, 0);
   CHECK_LT(frameInd, numFrames());
@@ -450,6 +497,9 @@ void RobotcarReader::getPointCloudHelper(
                 timestamps.begin();
   int indTo = std::upper_bound(timestamps.begin(), timestamps.end(), to) -
               timestamps.begin();
+
+  LOG(INFO) << "index bounds of the cloud: [" << indFrom << ", " << indTo
+            << "]";
 
   int curPerc = 0;
   int totalScans = indTo - indFrom;
@@ -517,6 +567,8 @@ std::array<StdVector<std::pair<Vec2, double>>, RobotcarReader::numCams>
 RobotcarReader::project(Timestamp from, Timestamp to, Timestamp base,
                         bool useLmsFront, bool useLmsRear,
                         bool useLdmrs) const {
+  LOG(INFO) << "projection time window: [" << timeOfDay(toTimePoint(from))
+            << ", " << timeOfDay(toTimePoint(to)) << "]";
   std::vector<Vec3> lmsFrontCloud;
   if (useLmsFront)
     lmsFrontCloud = getLmsFrontCloud(from, to, base);
@@ -738,3 +790,5 @@ void RobotcarReader::syncTimestamps() {
   LOG(INFO) << "old avg tridist (s) = " << oldAvgTriDist / 1e6;
   LOG(INFO) << "new avg tridist (s) = " << newAvgTriDist / 1e6;
 }
+
+} // namespace mdso

@@ -16,6 +16,7 @@ namespace mdso {
 
 extern cv::Mat dbg;
 extern double minDepthCol, maxDepthCol;
+extern bool isDepthColSet;
 
 template <typename T> inline std::vector<T> reservedVector(int toReserve) {
   std::vector<T> res;
@@ -138,12 +139,19 @@ std::string curTimeBrief();
 
 TimePoint now();
 
+std::string timeOfDay(TimePoint timePoint);
+
 template <typename Time>
 double secondsBetween(const Time &start, const Time &end) {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
              .count() *
          1e-9;
 }
+
+template <>
+double secondsBetween<Timestamp>(const Timestamp &start, const Timestamp &end);
+
+TimePoint toTimePoint(Timestamp timestamp);
 
 template <typename T>
 inline void checkBounds(const cv::Mat_<T> &mat, const cv::Point &p) {

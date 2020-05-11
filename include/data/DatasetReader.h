@@ -28,6 +28,7 @@ public:
   virtual std::vector<FrameEntry> frame(int frameInd) const = 0;
   virtual CameraBundle cam() const = 0;
   virtual std::unique_ptr<FrameDepths> depths(int frameInd) const = 0;
+  virtual bool hasFrameToWorld(int frameInd) const = 0;
   virtual SE3 frameToWorld(int frameInd) const = 0;
 };
 

@@ -15,6 +15,14 @@ std::optional<double> MultiFovReader::Depths::depth(int camInd,
     return std::nullopt;
 }
 
+bool MultiFovReader::isMultiFov(const fs::path &datasetDir) {
+  fs::path infoDir = datasetDir / "info";
+  fs::path dataDir = datasetDir / "data";
+  return fs::exists(infoDir / "intrinsics.txt") &&
+         fs::exists(infoDir / "groundtruth.txt") &&
+         fs::exists(dataDir / "img") && fs::exists(dataDir / "depth");
+}
+
 CameraBundle getCam(const fs::path &datasetDir) {
   // Our CameraModel is partially compatible with the provided one (affine
   // transformation used in omni_cam is just scaling in our case, but no problem
@@ -113,6 +121,10 @@ std::unique_ptr<FrameDepths> MultiFovReader::depths(int frameInd) const {
       depthsIfs >> depths(y, x);
 
   return std::unique_ptr<FrameDepths>(new Depths(depths));
+}
+
+bool MultiFovReader::hasFrameToWorld(int frameInd) const {
+  return frameInd >= 0 && frameInd < numFrames();
 }
 
 SE3 MultiFovReader::frameToWorld(int frameInd) const {

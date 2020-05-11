@@ -37,13 +37,14 @@ Settings::getGradientAdjustedSettings(double inencityRequiredToThis,
   return result;
 }
 
-InitializerSettings Settings::getInitializerSettings() const {
-  return {delaunayDsoInitializer,
-          stereoMatcher,
-          threading,
-          triangulation,
-          keyFrame,
-          {pointTracer, intensity, residualPattern, pyramid}};
+InitializerDelaunaySettings Settings::getInitializerDelaunaySettings() const {
+  return {dsoInitializer, delaunayDsoInitializer, stereoMatcher,
+          threading,      triangulation,          keyFrame};
+}
+
+InitializerGroundTruthSettings
+Settings::getInitializerGroundTruthSettings() const {
+  return {dsoInitializer, keyFrame};
 }
 
 PointTracerSettings Settings::getPointTracerSettings() const {

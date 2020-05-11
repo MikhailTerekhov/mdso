@@ -75,6 +75,13 @@ std::vector<cv::Mat3b> DebugImageDrawer::drawProjDepths(
     projDepths[camInd] =
         cvtBgrToGray3(baseFrame->preKeyFrame->frames[camInd].frameColored);
 
+  if (!isDepthColSet) {
+    std::vector<double> depths;
+    for (const Reprojection &reproj : immatures)
+      depths.push_back(reproj.reprojectedDepth);
+    setDepthColBounds(depths);
+  }
+
   for (const Reprojection &reproj : immatures) {
     putSquare(projDepths[reproj.targetCamInd], toCvPoint(reproj.reprojected), s,
               depthCol(reproj.reprojectedDepth, minDepthCol, maxDepthCol),

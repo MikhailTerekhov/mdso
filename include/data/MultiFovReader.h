@@ -20,6 +20,8 @@ public:
     cv::Mat1d depths;
   };
 
+  static bool isMultiFov(const fs::path &datasetDir);
+
   MultiFovReader(const fs::path &newDatasetDir);
 
   int numFrames() const override;
@@ -28,6 +30,7 @@ public:
   std::vector<FrameEntry> frame(int frameInd) const override;
   CameraBundle cam() const override;
   std::unique_ptr<FrameDepths> depths(int frameInd) const override;
+  bool hasFrameToWorld(int frameInd) const override;
   SE3 frameToWorld(int frameInd) const override;
 
 private:

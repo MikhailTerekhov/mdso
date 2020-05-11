@@ -42,7 +42,7 @@ DEFINE_bool(
     "Do we need to turn gradient-dependent weighting on in bundle adjustment?");
 
 DEFINE_int32(first_frames_skip,
-             Settings::DelaunayDsoInitializer::default_firstFramesSkip,
+             Settings::DsoInitializer::default_firstFramesSkip,
              "Number of frames to skip between two frames when initializing "
              "from keypoints.");
 DEFINE_bool(
@@ -168,7 +168,7 @@ Settings getFlaggedSettings() {
   settings.optimization.maxConsecutiveFailedIterations =
       FLAGS_max_consecutive_failed_iter;
   settings.residualWeighting.useGradientWeighting = FLAGS_use_grad_weighting;
-  settings.delaunayDsoInitializer.firstFramesSkip = FLAGS_first_frames_skip;
+  settings.dsoInitializer.firstFramesSkip = FLAGS_first_frames_skip;
   settings.stereoMatcher.stereoGeometryEstimator.runMaxRansacIter =
       FLAGS_run_max_RANSAC_iterations;
   settings.stereoMatcher.stereoGeometryEstimator.runAveraging =

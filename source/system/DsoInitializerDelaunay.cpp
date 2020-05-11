@@ -1,4 +1,4 @@
-#include "system/DelaunayDsoInitializer.h"
+#include "system/DsoInitializerDelaunay.h"
 #include "util/SphericalTerrain.h"
 #include "util/defs.h"
 #include "util/util.h"
@@ -8,19 +8,18 @@
 
 namespace mdso {
 
-DelaunayDsoInitializer::DelaunayDsoInitializer(
-    DsoSystem *dsoSystem, CameraBundle *cam, PixelSelector pixelSelectors[],
+DsoInitializerDelaunay::DsoInitializerDelaunay(
+    CameraBundle *cam, PixelSelector pixelSelectors[],
     const std::vector<DelaunayInitializerObserver *> &observers,
-    const InitializerSettings &_settings)
+    const InitializerDelaunaySettings &_settings)
     : cam(cam)
-    , dsoSystem(dsoSystem)
     , pixelSelectors(pixelSelectors)
     , hasFirstFrame(false)
     , framesSkipped(0)
     , settings(_settings)
     , observers(observers) {}
 
-void DelaunayDsoInitializer::setImages() {
+void DsoInitializerDelaunay::setImages() {
   for (int i = 0; i < 2; ++i) {
     framesGray[i] = cvtBgrToGray(frames[i]);
     cv::Mat1d gradX, gradY;
@@ -28,7 +27,7 @@ void DelaunayDsoInitializer::setImages() {
   }
 }
 
-bool DelaunayDsoInitializer::addMultiFrame(const cv::Mat newFrames[],
+bool DsoInitializerDelaunay::addMultiFrame(const cv::Mat newFrames[],
                                            Timestamp newTimestamps[]) {
   if (!hasFirstFrame) {
     frames[0] = newFrames[0];
@@ -36,7 +35,7 @@ bool DelaunayDsoInitializer::addMultiFrame(const cv::Mat newFrames[],
     hasFirstFrame = true;
     return false;
   } else {
-    if (framesSkipped < settings.initializer.firstFramesSkip) {
+    if (framesSkipped < settings.intializer.firstFramesSkip) {
       ++framesSkipped;
       return false;
     }
@@ -50,8 +49,8 @@ bool DelaunayDsoInitializer::addMultiFrame(const cv::Mat newFrames[],
   }
 }
 
-DsoInitializer::InitializedVector DelaunayDsoInitializer::initialize() {
-  CHECK(cam->bundle.size() == 1) << "Multicamera case is NIY";
+DsoInitializer::InitializedVector DsoInitializerDelaunay::initialize() {
+  CHECK_EQ(cam->bundle.size(), 1) << "Multicamera case is NIY";
 
   StdVector<Vec2> keyPoints[2];
   std::vector<double> depths[2];
@@ -70,7 +69,7 @@ DsoInitializer::InitializedVector DelaunayDsoInitializer::initialize() {
                               firstToSecond.inverse() *
                               cam->bundle[0].bodyToThis;
 
-  if (settings.initializer.usePlainTriangulation) {
+  if (settings.delaunayInitializer.usePlainTriangulation) {
     Terrain terrains[2] = {Terrain(&cam->bundle[0].cam, keyPoints[0], depths[0],
                                    settings.triangulation),
                            Terrain(&cam->bundle[0].cam, keyPoints[1], depths[1],

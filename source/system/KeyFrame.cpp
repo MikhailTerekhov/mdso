@@ -47,6 +47,7 @@ KeyFrame::KeyFrame(const InitializedFrame &initializedFrame, CameraBundle *cam,
       new PreKeyFrame(this, cam, preprocessor, images.data(), globalFrameNum,
                       timestamps.data(), pyrSettings));
 
+  frames.reserve(cam->bundle.size());
   for (int i = 0; i < cam->bundle.size(); ++i)
     frames.emplace_back(initializedFrame.frames[i], this, i, tracingSettings);
 }
@@ -63,6 +64,7 @@ KeyFrame::KeyFrame(
                       : SE3())
     , kfSettings(_kfSettings) {
   int camNum = preKeyFrame->cam->bundle.size();
+  frames.reserve(camNum);
   for (int i = 0; i < camNum; ++i) {
     frames.emplace_back(this, i, preKeyFrame->frames[i].timestamp);
     addImmatures(newImmaturePoints[i].data(), newImmaturePoints[i].size(), i,

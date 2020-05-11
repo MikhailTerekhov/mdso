@@ -93,27 +93,41 @@ StdVector<Reprojection> Reprojector<PointType>::reproject() const {
 }
 
 template <typename PointType>
-DepthedPoints Reprojector<PointType>::reprojectDepthed() const {
-  auto reprojections = reproject();
-
-  DepthedPoints depthedPoints(numCams, reprojections.size());
+DepthedPoints Reprojector<PointType>::depthedPoints(
+    const StdVector<Reprojection> &reprojections) const {
+  DepthedPoints depthed(numCams, reprojections.size());
   for (const auto &reprojection : reprojections) {
     int ci = reprojection.targetCamInd;
-    depthedPoints.points[ci].push_back(reprojection.reprojected);
-    depthedPoints.depths[ci].push_back(reprojection.reprojectedDepth);
+    depthed.points[ci].push_back(reprojection.reprojected);
+    depthed.depths[ci].push_back(reprojection.reprojectedDepth);
     const PointType &point =
         getPoints(keyFrames[reprojection.hostInd]
                       ->frames[reprojection.hostCamInd])[reprojection.pointInd];
-    depthedPoints.weights[ci].push_back(1 / point.stddev);
+    depthed.weights[ci].push_back(1 / point.stddev);
   }
-  return depthedPoints;
+  return depthed;
 }
+
+template <typename PointType>
+DepthedPoints Reprojector<PointType>::reprojectDepthed() const {
+  auto reprojections = reproject();
+  return depthedPoints(reprojections);
+}
+
 template <typename PointType>
 void Reprojector<PointType>::setSkippedFrame(int newSkippedFrameInd) {
   if (newSkippedFrameInd < 0 || newSkippedFrameInd >= keyFrames.size())
     LOG(WARNING) << "newSkippedFrameInd = " << newSkippedFrameInd
                  << " is out of bounds [0, " << keyFrames.size() << ")";
   skippedFrameInd.emplace(newSkippedFrameInd);
+}
+
+template <typename PointType>
+const PointType &
+Reprojector<PointType>::getPoint(const Reprojection &reprojection) const {
+  return getPoints(
+      keyFrames[reprojection.hostInd]
+          ->frames[reprojection.hostCamInd])[reprojection.pointInd];
 }
 
 template class Reprojector<ImmaturePoint>;

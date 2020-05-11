@@ -3,7 +3,7 @@
 #include "output/FrameTrackerObserver.h"
 #include "system/BundleAdjusterCeres.h"
 #include "system/BundleAdjusterSelfMade.h"
-#include "system/DelaunayDsoInitializer.h"
+#include "system/DsoInitializerDelaunay.h"
 #include "system/Reprojector.h"
 #include "system/TrackingPredictorRot.h"
 #include "system/TrackingPredictorScrew.h"
@@ -18,14 +18,21 @@
 namespace mdso {
 
 DsoSystem::DsoSystem(CameraBundle *cam, Preprocessor *preprocessor,
-                     const Observers &observers, const Settings &_settings)
+                     const Observers &_observers, const Settings &_settings,
+                     std::unique_ptr<DsoInitializer> newDsoInitializer)
     : cam(cam)
     , camPyr(cam->camPyr(_settings.pyramid.levelNum()))
+    , dsoInitializer(
+          newDsoInitializer
+              ? std::move(newDsoInitializer)
+              : std::unique_ptr<DsoInitializer>(new DsoInitializerDelaunay(
+                    cam, pixelSelector.data(), _observers.initializer,
+                    _settings.getInitializerDelaunaySettings())))
     , isInitialized(false)
     , frameTracker(nullptr)
     , settings(_settings)
     , pointTracerSettings(_settings.getPointTracerSettings())
-    , observers(observers)
+    , observers(_observers)
     , preprocessor(preprocessor)
     , trackingPredictor(settings.predictUsingScrew
                             ? std::unique_ptr<TrackingPredictor>(
@@ -42,10 +49,6 @@ DsoSystem::DsoSystem(CameraBundle *cam, Preprocessor *preprocessor,
   pixelSelector.reserve(cam->bundle.size());
   for (int i = 0; i < cam->bundle.size(); ++i)
     pixelSelector.emplace_back(settings.pixelSelector);
-
-  dsoInitializer.reset(new DelaunayDsoInitializer(
-      this, cam, pixelSelector.data(), observers.initializer,
-      settings.getInitializerSettings()));
 
   for (DsoObserver *obs : observers.dso)
     obs->created(this, cam, settings);
@@ -92,11 +95,7 @@ DsoSystem::DsoSystem(std::vector<std::unique_ptr<KeyFrame>> &restoredKeyFrames,
   for (int i = 0; i < cam->bundle.size(); ++i)
     pixelSelector.emplace_back(settings.pixelSelector);
 
-  // If there are only 2 keyframes, we decide that the system was only recently
-  // initialized, thus tracking was done over immature points.
-  FrameTracker::DepthedMultiFrame baseForTrack =
-      keyFrames.size() == 2 ? getBaseForTrack<ImmaturePoint>()
-                            : getBaseForTrack<OptimizedPoint>();
+  FrameTracker::DepthedMultiFrame baseForTrack = getBaseForTrack();
   frameTracker = std::unique_ptr<FrameTracker>(new FrameTracker(
       camPyr.data(), baseForTrack, baseFrame(), observers.frameTracker,
       settings.getFrameTrackerSettings()));
@@ -410,31 +409,32 @@ void DsoSystem::activateNewOptimizedPoints() {
 }
 
 void DsoSystem::traceOn(const PreKeyFrame &frame) {
-  CHECK(cam->bundle.size() == 1) << "Multicamera case is NIY";
-
   int retByStatus[ImmaturePoint::STATUS_COUNT];
   int totalPoints = 0;
   int becameReady = 0;
   int totalReady = 0;
   std::fill(retByStatus, retByStatus + ImmaturePoint::STATUS_COUNT, 0);
-  for (const auto &kf : keyFrames)
-    // TODO inds in multicamera
-    for (ImmaturePoint &ip : kf->frames[0].immaturePoints) {
-      totalPoints++;
-      bool wasReady = ip.isReady();
-      int status = ip.traceOn(frame.frames[0], ImmaturePoint::NO_DEBUG,
-                              pointTracerSettings);
-      retByStatus[status]++;
-      bool isReady = ip.isReady();
-      if (isReady) {
-        totalReady++;
-        if (!wasReady)
-          becameReady++;
+  for (const auto &keyFrame : keyFrames)
+    for (auto &hostFrameEntry : keyFrame->frames)
+      for (ImmaturePoint &ip : hostFrameEntry.immaturePoints) {
+        totalPoints++;
+        bool wasReady = ip.isReady();
+        for (const auto &targetFrameEntry : frame.frames) {
+          int status = ip.traceOn(targetFrameEntry, ImmaturePoint::NO_DEBUG,
+                                  pointTracerSettings);
+          retByStatus[status]++;
+        }
+        bool isReady = ip.isReady();
+        if (isReady) {
+          totalReady++;
+          if (!wasReady)
+            becameReady++;
+        }
       }
-    }
 
   LOG(INFO) << "POINT TRACING:";
   LOG(INFO) << "total points: " << totalPoints;
+  LOG(INFO) << "total traces: " << totalPoints * cam->bundle.size();
   LOG(INFO) << "became ready: " << becameReady;
   LOG(INFO) << "total ready: " << totalReady;
   LOG(INFO) << "return by status:";
@@ -443,27 +443,62 @@ void DsoSystem::traceOn(const PreKeyFrame &frame) {
               << ": " << retByStatus[s];
 }
 
-template <typename PointT>
 FrameTracker::DepthedMultiFrame DsoSystem::getBaseForTrack() const {
   std::vector<const KeyFrame *> kfPtrs;
   kfPtrs.reserve(keyFrames.size());
   for (const auto &keyFrame : keyFrames)
     kfPtrs.push_back(keyFrame.get());
-  DepthedPoints depthedPoints =
-      Reprojector<PointT>(kfPtrs.data(), kfPtrs.size(),
-                          FrameToWorldExtractor()(&baseFrame()), settings.depth,
-                          settings.residualPattern.height)
-          .reprojectDepthed();
+
+  Reprojector<OptimizedPoint> reprojectorOptimized(
+      kfPtrs.data(), kfPtrs.size(), FrameToWorldExtractor()(&baseFrame()),
+      settings.depth, settings.residualPattern.height);
+  StdVector<Reprojection> reprojOptimized = reprojectorOptimized.reproject();
+  DepthedPoints pointsUsed =
+      reprojectorOptimized.depthedPoints(reprojOptimized);
+
+  if (reprojOptimized.size() <
+      settings.optimizedOnReprojectionFactor * settings.maxOptimizedPoints()) {
+    Reprojector<ImmaturePoint> reprojectorImmature(
+        kfPtrs.data(), kfPtrs.size(), FrameToWorldExtractor()(&baseFrame()),
+        settings.depth, settings.residualPattern.height);
+    StdVector<Reprojection> reprojImmature = reprojectorImmature.reproject();
+    auto newEnd =
+        std::remove_if(reprojImmature.begin(), reprojImmature.end(),
+                       [&](const Reprojection &r) {
+                         return reprojectorImmature.getPoint(r).hasDepth();
+                       });
+    reprojImmature.resize(newEnd - reprojImmature.begin());
+    std::sort(reprojImmature.begin(), reprojImmature.end(),
+              [&](const Reprojection &r1, const Reprojection &r2) {
+                return reprojectorImmature.getPoint(r1).stddev <
+                       reprojectorImmature.getPoint(r2).stddev;
+              });
+    size_t pointsNeeded =
+        settings.maxOptimizedPoints() - reprojOptimized.size();
+    reprojImmature.resize(std::min(pointsNeeded, reprojImmature.size()));
+    DepthedPoints pointsImmature =
+        reprojectorImmature.depthedPoints(reprojImmature);
+
+    for (int camInd = 0; camInd < cam->bundle.size(); ++camInd) {
+      pointsUsed.points.insert(pointsUsed.points.end(),
+                               pointsImmature.points.begin(),
+                               pointsImmature.points.end());
+      pointsUsed.depths.insert(pointsUsed.depths.end(),
+                               pointsImmature.depths.begin(),
+                               pointsImmature.depths.end());
+      pointsUsed.weights.insert(pointsUsed.weights.end(),
+                                pointsImmature.weights.begin(),
+                                pointsImmature.weights.end());
+    }
+  }
 
   FrameTracker::DepthedMultiFrame baseForTrack;
   baseForTrack.reserve(cam->bundle.size());
   for (int camInd = 0; camInd < cam->bundle.size(); ++camInd)
-    baseForTrack.emplace_back(baseFrame().preKeyFrame->image(camInd),
-                              settings.pyramid.levelNum(),
-                              depthedPoints.points[camInd].data(),
-                              depthedPoints.depths[camInd].data(),
-                              depthedPoints.weights[camInd].data(),
-                              depthedPoints.points[camInd].size());
+    baseForTrack.emplace_back(
+        baseFrame().preKeyFrame->image(camInd), settings.pyramid.levelNum(),
+        pointsUsed.points[camInd].data(), pointsUsed.depths[camInd].data(),
+        pointsUsed.weights[camInd].data(), pointsUsed.points[camInd].size());
   return baseForTrack;
 }
 
@@ -481,7 +516,7 @@ std::unique_ptr<BundleAdjuster> DsoSystem::createBundleAdjuster() const {
 void DsoSystem::addMultiFrame(const cv::Mat3b frames[],
                               Timestamp timestamps[]) {
   if (!isInitialized) {
-    LOG(INFO) << "put into initializer" << std::endl;
+    LOG(INFO) << "put into delaunayInitializer" << std::endl;
 
     isInitialized = dsoInitializer->addMultiFrame(frames, timestamps);
 
@@ -613,21 +648,7 @@ void DsoSystem::addMultiFrame(const cv::Mat3b frames[],
                              settings.getBundleAdjusterSettings());
     }
 
-    std::vector<const KeyFrame *> kfPtrs = getKeyFrames();
-    Reprojector<OptimizedPoint> reprojector(kfPtrs.data(), kfPtrs.size(),
-                                            baseFrame().thisToWorld(),
-                                            settings.depth, PH);
-    DepthedPoints reprojected = reprojector.reprojectDepthed();
-
-    FrameTracker::DepthedMultiFrame baseForTrack;
-    baseForTrack.reserve(cam->bundle.size());
-    for (int i = 0; i < cam->bundle.size(); ++i) {
-      baseForTrack.emplace_back(
-          baseFrame().preKeyFrame->image(i), settings.pyramid.levelNum(),
-          reprojected.points[i].data(), reprojected.depths[i].data(),
-          reprojected.weights[i].data(), reprojected.points[i].size());
-    }
-
+    FrameTracker::DepthedMultiFrame baseForTrack = getBaseForTrack();
     frameTracker = std::unique_ptr<FrameTracker>(new FrameTracker(
         camPyr.data(), baseForTrack, baseFrame(), observers.frameTracker,
         settings.getFrameTrackerSettings()));

@@ -242,8 +242,7 @@ ImmaturePoint::traceOn(const PreKeyFrame::FrameEntry &refFrameEntry,
       host->lightWorldToThis.inverse();
   SE3 baseToRef = cam->bundle[indRef].bodyToThis * refFrame.baseToThis() *
                   refFrame.baseFrame->thisToWorld().inverse() *
-                  baseFrame.thisToWorld() *
-                  cam->bundle[indBase].bodyToThis.inverse();
+                  baseFrame.thisToWorld() * cam->bundle[indBase].thisToBody;
 
   Vec3 dirMin = (baseToRef * (minDepth * baseDirections[0])).normalized();
   Vec3 dirMax = maxDepth == INF
