@@ -15,8 +15,6 @@ class se3:
     def __str__(self):
         return str(np.hstack((self.R, self.t.reshape((3, 1)))))
 
-arr_len = 0.05
-
 def to_motion(s):
     vals = np.array([float(x) for x in s.split()])
     mat3x4 = vals.reshape((3, 4))

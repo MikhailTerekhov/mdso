@@ -29,16 +29,20 @@ def set_vis(a):
     for x in a:
         x.set_visible(True)
 
-def draw_arrowed(axes, motions, color, label):
+def draw_arrowed(axes, motions, color, label, direction='z'):
     centers = np.array([mot.t for mot in motions])
-    dir_vects = np.array([mot.R[:, 2] for mot in motions])
+    cols = {'x':0, 'y':1, 'z':2}
+    dir_vects = np.array([mot.R[:, cols[direction]] for mot in motions])
+
+    arr_len = np.median([norm(centers[i + 1] - centers[i]) 
+                         for i in range(centers.shape[0] - 1)]) / 2
 
     return axes.quiver(centers[:, 0], centers[:, 1], centers[:, 2],
               dir_vects[:, 0], dir_vects[:, 1], dir_vects[:, 2], 
                 color=color, normalize=True, arrow_length_ratio=0.2, 
                 length=arr_len, label=label)
 
-def draw_track(axes, motions, color, label):
+def draw_track(axes, motions, color, label, axis='z'):
     centers = np.array([mot.t for mot in motions])
     return axes.plot(centers[:, 0], centers[:, 1], centers[:, 2],
                      color=color, label=label)
@@ -85,6 +89,10 @@ parser.add_argument("-r", "--russian", help="use russian legend",
 parser.add_argument("-q", "--quiver", help="plot camera directions"
                     " (if not specified, only draw position curve)", 
                     action="store_true")
+parser.add_argument("-d", "--direction", help="Direction axis of arrows."
+                    " Only useful when quiver is on.", 
+                    default='z', const='z', nargs='?',
+                    choices=['x', 'y', 'z'])
 parser.add_argument("-f", "--first", help="truncate frames with nums less than this", 
                     type=int)
 parser.add_argument("-l", "--last", help="truncate frames with nums bigger than this", 
@@ -160,7 +168,7 @@ if args.gt:
     ground_truth = crop_roi(ground_truth)
     if args.align:
         ground_truth = align_to_zero(ground_truth)
-    draw_proc(ax, ground_truth, 'green', label_gt)
+    draw_proc(ax, ground_truth, 'green', label_gt, direction=args.direction)
     has_gt = True
 else:
     print('no ground truth provided')
@@ -191,7 +199,7 @@ for ind, (fname, label) in enumerate(zip(args.traj, labels)):
     col = next(colors)
 
     artists.append(draw_proc(ax, traj, mpl.colors.to_rgba(col, alpha=alpha),
-                            label))
+                            label, direction=args.direction))
     trajs.append(traj)
 
 ax.legend(loc='upper center', bbox_to_anchor=(0.5, 0.3), fontsize='large')
