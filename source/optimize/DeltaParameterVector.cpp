@@ -39,9 +39,9 @@ void DeltaParameterVector::setAffineZero() {
 }
 
 void DeltaParameterVector::constraintDepths(double maxAbsDeltaD) {
-  for (T &d : point)
-    if (std::abs(d) > maxAbsDeltaD)
-      d = 0;
+  for (int i = 0; i < point.size(); ++i)
+    if (std::abs(point[i]) > maxAbsDeltaD)
+      point[i] = 0;
 }
 
 } // namespace mdso::optimize
