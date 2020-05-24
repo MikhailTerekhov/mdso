@@ -42,7 +42,7 @@ def draw_arrowed(axes, motions, color, label, direction='z'):
                 color=color, normalize=True, arrow_length_ratio=0.2, 
                 length=arr_len, label=label)
 
-def draw_track(axes, motions, color, label, axis='z'):
+def draw_track(axes, motions, color, label, direction='z'):
     centers = np.array([mot.t for mot in motions])
     return axes.plot(centers[:, 0], centers[:, 1], centers[:, 2],
                      color=color, label=label)

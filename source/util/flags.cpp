@@ -80,7 +80,7 @@ DEFINE_bool(
     predict_using_screw, Settings::default_predictUsingScrew,
     "Predict motion to the newest frame by dividing previous motion as a screw "
     "motion (use SLERP over the whole SE(3)? If set to false, SLERP is done "
-    "only on rotation, and trnslational part is simply divided");
+    "only on rotation, and translational part is simply divided");
 DEFINE_bool(use_grad_weights_on_tracking,
             Settings::FrameTracker::default_useGradWeighting,
             "Use gradient-dependent residual weights when tracking");

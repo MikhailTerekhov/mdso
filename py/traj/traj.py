@@ -12,8 +12,12 @@ class se3:
     def __mul__(self, other):
         return se3(np.matmul(self.R, other.R), np.matmul(self.R, other.t) + self.t)
 
+    def matrix3x4(self):
+        return np.hstack((self.R, self.t.reshape((3, 1))))
+
     def __str__(self):
-        return str(np.hstack((self.R, self.t.reshape((3, 1)))))
+        return ' '.join(map(str, self.matrix3x4().reshape((12))))
+
 
 def to_motion(s):
     vals = np.array([float(x) for x in s.split()])

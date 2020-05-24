@@ -1,4 +1,5 @@
 #include "data/MultiFovReader.h"
+#include "internal/data/getMfovCam.h"
 #include "util/types.h"
 
 namespace mdso {
@@ -9,6 +10,7 @@ MultiFovReader::Depths::Depths(const cv::Mat1d &depths)
 
 std::optional<double> MultiFovReader::Depths::depth(int camInd,
                                                     const Vec2 &point) const {
+  CHECK_EQ(camInd, 0);
   if (bound.contains(point))
     return std::make_optional(depths(toCvPoint(point)));
   else
@@ -24,28 +26,7 @@ bool MultiFovReader::isMultiFov(const fs::path &datasetDir) {
 }
 
 CameraBundle getCam(const fs::path &datasetDir) {
-  // Our CameraModel is partially compatible with the provided one (affine
-  // transformation used in omni_cam is just scaling in our case, but no problem
-  // raises since in this dataset no affine transformation is happening). We
-  // also compute the inverse polynomial ourselves instead of using the provided
-  // one.
-
-  fs::path camFName = datasetDir / fs::path("info/intrinsics.txt");
-  int width, height;
-  double unmapPolyCoeffs[5];
-  Vec2 center;
-  std::ifstream camIfs(camFName);
-  CHECK(camIfs.is_open()) << "could not open camera intrinsics file \""
-                          << camFName.native() << "\"";
-  camIfs >> width >> height;
-  for (int i = 0; i < 5; ++i)
-    camIfs >> unmapPolyCoeffs[i];
-  VecX ourCoeffs(4);
-  ourCoeffs << unmapPolyCoeffs[0], unmapPolyCoeffs[2], unmapPolyCoeffs[3],
-      unmapPolyCoeffs[4];
-  ourCoeffs *= -1;
-  camIfs >> center[0] >> center[1];
-  CameraModel cam(width, height, 1.0, center, ourCoeffs);
+  CameraModel cam = getMfovCam(datasetDir / "info" / "intrinsics.txt");
   SE3 id;
   return CameraBundle(&id, &cam, 1);
 }

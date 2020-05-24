@@ -178,6 +178,7 @@ cv::Mat3b DebugImageDrawer::draw() {
                                   baseFrame->thisToWorld(), settings.depth,
                                   settings.residualPattern.height)
           .reproject();
+
   std::vector<cv::Mat3b> depths = drawProjDepths(immatures, optimized);
   std::vector<cv::Mat3b> isUseful = drawUseful(keyFrames, optimized);
   std::vector<cv::Mat3b> stddevs = drawStddevs(keyFrames, immatures, optimized);

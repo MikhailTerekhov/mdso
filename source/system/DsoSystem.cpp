@@ -22,12 +22,6 @@ DsoSystem::DsoSystem(CameraBundle *cam, Preprocessor *preprocessor,
                      std::unique_ptr<DsoInitializer> newDsoInitializer)
     : cam(cam)
     , camPyr(cam->camPyr(_settings.pyramid.levelNum()))
-    , dsoInitializer(
-          newDsoInitializer
-              ? std::move(newDsoInitializer)
-              : std::unique_ptr<DsoInitializer>(new DsoInitializerDelaunay(
-                    cam, pixelSelector.data(), _observers.initializer,
-                    _settings.getInitializerDelaunaySettings())))
     , isInitialized(false)
     , frameTracker(nullptr)
     , settings(_settings)
@@ -49,6 +43,13 @@ DsoSystem::DsoSystem(CameraBundle *cam, Preprocessor *preprocessor,
   pixelSelector.reserve(cam->bundle.size());
   for (int i = 0; i < cam->bundle.size(); ++i)
     pixelSelector.emplace_back(settings.pixelSelector);
+
+  dsoInitializer =
+      newDsoInitializer
+          ? std::move(newDsoInitializer)
+          : std::unique_ptr<DsoInitializer>(new DsoInitializerDelaunay(
+                cam, pixelSelector.data(), _observers.initializer,
+                _settings.getInitializerDelaunaySettings()));
 
   for (DsoObserver *obs : observers.dso)
     obs->created(this, cam, settings);
@@ -116,6 +117,8 @@ std::vector<const KeyFrame *> DsoSystem::getKeyFrames() const {
     result.push_back(kf.get());
   return result;
 }
+
+bool DsoSystem::getIsInitialized() const { return isInitialized; }
 
 int DsoSystem::trajectorySize() const {
   if (allFrames.size() > 0 &&

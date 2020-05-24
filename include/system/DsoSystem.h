@@ -37,6 +37,7 @@ public:
   void saveSnapshot(const fs::path &snapshotDir) const;
 
   std::vector<const KeyFrame *> getKeyFrames() const;
+  bool getIsInitialized() const;
 
   int trajectorySize() const override;
   int camNumber() const override;

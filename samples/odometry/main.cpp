@@ -1,3 +1,4 @@
+#include "data/MultiCamReader.h"
 #include "data/MultiFovReader.h"
 #include "data/RobotcarReader.h"
 #include "output/CloudWriter.h"
@@ -117,10 +118,12 @@ DEFINE_bool(move_body_from_camera, false,
             "in MultiFoV dataset is added.");
 
 std::unique_ptr<DatasetReader> createReader(const fs::path &datasetDir) {
-  if (MultiFovReader::isMultiFov(datasetDir))
+  if (MultiFovReader::isMultiFov(datasetDir)) {
     return std::unique_ptr<DatasetReader>(new MultiFovReader(datasetDir));
-  else if (fs::path chunkDir = datasetDir / FLAGS_robotcar_chunk_dir;
-           RobotcarReader::isRobotcar(chunkDir)) {
+  } else if (MultiCamReader::isMultiCam(datasetDir)) {
+    return std::unique_ptr<DatasetReader>(new MultiCamReader(datasetDir));
+  } else if (fs::path chunkDir = datasetDir / FLAGS_robotcar_chunk_dir;
+             RobotcarReader::isRobotcar(chunkDir)) {
     std::optional<fs::path> rtkDir;
     if (fs::exists(FLAGS_robotcar_rtk_dir))
       rtkDir.emplace(FLAGS_robotcar_rtk_dir);
@@ -210,6 +213,64 @@ cvtFrame(const std::vector<DatasetReader::FrameEntry> &frame) {
     result.first.push_back(frame[i].frame);
     result.second.push_back(frame[i].timestamp);
   }
+  return result;
+}
+
+cv::Mat3b drawIntialization(const std::vector<const KeyFrame *> &keyFrames,
+                            const Settings::Depth &depthSettings,
+                            bool includeReproj = true,
+                            bool reprojOnOther = true) {
+
+  CameraBundle *cam = keyFrames[0]->preKeyFrame->cam;
+
+  Settings::Depth ds = depthSettings;
+  ds.max /= 1e2;
+  ds.min /= 1e2;
+  int numCameras = keyFrames[0]->preKeyFrame->cam->bundle.size();
+  std::vector<std::vector<cv::Mat3b>> frames(keyFrames.size());
+  for (int kfInd = 0; kfInd < keyFrames.size(); ++kfInd) {
+    frames[kfInd].resize(numCameras);
+    auto keyFrame = keyFrames[kfInd];
+    for (int camInd = 0; camInd < numCameras; ++camInd)
+      frames[kfInd][camInd] =
+          keyFrame->preKeyFrame->frames[camInd].frameColored.clone();
+
+    if (includeReproj) {
+      auto kfPtr = reprojOnOther ? keyFrames.data() : &keyFrames[kfInd];
+      int kfSize = reprojOnOther ? keyFrames.size() : 1;
+      Reprojector<ImmaturePoint> reprojector(kfPtr, kfSize,
+                                             keyFrame->thisToWorld(), ds);
+      auto reprojections = reprojector.reproject();
+      if (!isDepthColSet) {
+        std::vector<double> depths;
+        for (const Reprojection &r : reprojections)
+          depths.push_back(r.reprojectedDepth);
+        setDepthColBounds(depths);
+      }
+      for (const Reprojection &r : reprojections) {
+        cv::circle(frames[kfInd][r.targetCamInd], toCvPoint(r.reprojected), 3,
+                   depthCol(r.reprojectedDepth, minDepthCol, maxDepthCol),
+                   cv::FILLED);
+      }
+    } else {
+      if (!isDepthColSet) {
+        std::vector<double> depths;
+        for (int camInd = 0; camInd < numCameras; ++camInd)
+          for (const auto &ip : keyFrame->frames[camInd].immaturePoints)
+            depths.push_back(ip.depth);
+        setDepthColBounds(depths);
+      }
+      for (int camInd = 0; camInd < numCameras; ++camInd)
+        for (const auto &ip : keyFrame->frames[camInd].immaturePoints)
+          cv::circle(frames[kfInd][camInd], toCvPoint(ip.p), 3,
+                     depthCol(ip.depth, minDepthCol, maxDepthCol), cv::FILLED);
+    }
+  }
+  std::vector<cv::Mat3b> kfDrawn(keyFrames.size());
+  for (int kfInd = 0; kfInd < keyFrames.size(); ++kfInd)
+    cv::hconcat(frames[kfInd].data(), frames[kfInd].size(), kfDrawn[kfInd]);
+  cv::Mat result;
+  cv::vconcat(kfDrawn.data(), kfDrawn.size(), result);
   return result;
 }
 
@@ -396,6 +457,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
   {
     DsoSystem dso(&cam, preprocessor, observers, settings,
                   std::move(dsoInitializer));
+    bool wasInitialized = false;
     for (int it = startInd; it < startInd + FLAGS_count; ++it) {
       std::cout << "add frame #" << it << std::endl;
       auto [frames, timestamps] = cvtFrame(reader->frame(it));
@@ -404,6 +466,12 @@ It should contain "info" and "data" subdirectories.)abacaba";
         cv::Mat3b interpolation = interpolationDrawer.draw();
         fs::path out = outDir / fs::path("interpolation.jpg");
         cv::imwrite(out.native(), interpolation);
+      }
+      if (!wasInitialized && dso.getIsInitialized()) {
+        wasInitialized = true;
+        cv::Mat3b initialized =
+            drawIntialization(dso.getKeyFrames(), settings.depth, true, true);
+        cv::imwrite(outDir / "intialized.jpg", initialized);
       }
 
       if (FLAGS_write_files) {

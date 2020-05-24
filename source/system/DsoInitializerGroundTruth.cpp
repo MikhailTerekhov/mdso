@@ -46,9 +46,9 @@ DsoInitializer::InitializedVector DsoInitializerGroundTruth::initialize() {
         initializedMultiFrame.frames[0].timestamp);
     auto depths = datasetReader->depths(globalFrameInd);
     for (int camInd = 0; camInd < numCams; ++camInd) {
-      const cv::Mat &frame = initializedMultiFrame.frames[camInd].frame;
+      cv::Mat3b frame = initializedMultiFrame.frames[camInd].frame;
       cv::Mat1d gradX, gradY, gradNorm;
-      grad(frame, gradX, gradY, gradNorm);
+      grad(cvtBgrToGray(frame), gradX, gradY, gradNorm);
       PixelSelector::PointVector points =
           pixelSelectors[camInd].select(frame, gradNorm, pointsPerFrame);
       for (const cv::Point &pCv : points) {
@@ -57,6 +57,11 @@ DsoInitializer::InitializedVector DsoInitializerGroundTruth::initialize() {
           initializedMultiFrame.frames[camInd].depthedPoints.emplace_back(p,
                                                                           *d);
       }
+      int totalInitPoints =
+          initializedMultiFrame.frames[camInd].depthedPoints.size();
+      LOG(INFO) << "frame #" << frameInd << " cam #" << camInd
+                << " initialized " << totalInitPoints << " / " << points.size();
+      CHECK_GT(totalInitPoints, 0);
     }
   }
 

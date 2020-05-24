@@ -300,6 +300,13 @@ cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
   return res;
 }
 
+cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1f &depths,
+                           double minDepth, double maxDepth) {
+  cv::Mat1d depthsd;
+  depths.convertTo(depthsd, CV_64F);
+  return drawDepthedFrame(frame, depthsd, minDepth, maxDepth);
+}
+
 std::vector<double> readBin(const fs::path &filename) {
   CHECK(fs::is_regular_file(filename));
   std::ifstream ifs(filename, std::ios::binary);

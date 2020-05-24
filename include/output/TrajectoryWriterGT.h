@@ -11,6 +11,8 @@ public:
   TrajectoryWriterGT(const DatasetReader *datasetReader,
                      const fs::path &outputDirectory, const fs::path &fileName);
 
+  void setCamToBody(const SE3 &newCamToBody);
+
 private:
   void addToPool(const KeyFrame &keyFrame) override;
   void addToPool(const PreKeyFrame &frame) override;
@@ -22,6 +24,7 @@ private:
   fs::path mOutputFileName;
   const DatasetReader *datasetReader;
   PosesPool frameToWorldGTPool;
+  SE3 camToBody;
 };
 
 } // namespace mdso

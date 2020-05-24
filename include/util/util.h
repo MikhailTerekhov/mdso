@@ -132,6 +132,8 @@ cv::Mat1d pyrNUpDepth(const cv::Mat1d &integralWeightedDepths,
 
 cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1d &depths,
                            double minDepth, double maxDepth);
+cv::Mat3b drawDepthedFrame(const cv::Mat1b &frame, const cv::Mat1f &depths,
+                           double minDepth, double maxDepth);
 
 std::vector<double> readBin(const fs::path &filename);
 
