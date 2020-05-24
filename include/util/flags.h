@@ -61,6 +61,8 @@ DECLARE_bool(trivial_loss);
 
 DECLARE_bool(dso_like);
 
+DECLARE_string(center_shift);
+
 namespace mdso {
 
 Settings getFlaggedSettings();

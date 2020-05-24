@@ -92,6 +92,7 @@ DEFINE_double(track_fail_factor,
 DEFINE_string(optimization_type, "self-written",
               "The optimization to use. Available options are \"disabled\", "
               "\"self-written\", \"ceres\".");
+
 static bool validateOptimizationType(const char *flagname,
                                      const std::string &value) {
   bool isOk =
@@ -139,6 +140,10 @@ DEFINE_bool(
     dso_like, false,
     "If set, some settings wil be overwritten to resemble original DSO setup.");
 
+DEFINE_string(center_shift, "0",
+              "Apply a shift to the camera center. Available options: \"0\", "
+              "\"+0.5\", \"-0.5\"");
+
 namespace mdso {
 
 Settings::Optimization::OptimizationType
@@ -152,6 +157,19 @@ optimizationTypeFromString(const std::string &type) {
   else {
     LOG(ERROR) << "Unknown optimization type: " << type;
     return Settings::Optimization::DISABLED;
+  }
+}
+
+Settings::CameraModel::CenterShift centerShift(const std::string &type) {
+  if (type == "0")
+    return Settings::CameraModel::NO_SHIFT;
+  else if (type == "+0.5")
+    return Settings::CameraModel::PLUS_05;
+  if (type == "-0.5")
+    return Settings::CameraModel::MINUS_05;
+  else {
+    LOG(ERROR) << "Unknown center shift: " << type;
+    return Settings::CameraModel::NO_SHIFT;
   }
 }
 
@@ -197,7 +215,7 @@ Settings getFlaggedSettings() {
   settings.optimization.lossType = FLAGS_trivial_loss
                                        ? Settings::Optimization::TRIVIAL
                                        : Settings::Optimization::HUBER;
-
+  settings.cameraModel.centerShift = centerShift(FLAGS_center_shift);
   if (FLAGS_dso_like)
     settings = settings.getDsoLikeSettings();
 

@@ -13,6 +13,20 @@
 
 namespace mdso {
 
+void adjustPrincipal(Vec2 &principal,
+                     Settings::CameraModel::CenterShift centerMode) {
+  switch (centerMode) {
+  case Settings::CameraModel::NO_SHIFT:
+    break;
+  case Settings::CameraModel::MINUS_05:
+    principal -= Vec2(0.5, 0.5);
+    break;
+  case Settings::CameraModel::PLUS_05:
+    principal += Vec2(0.5, 0.5);
+    break;
+  }
+}
+
 CameraModel::CameraModel(int width, int height, double scale,
                          const Vec2 &center, VecX unmapPolyCoeffs,
                          const Settings::CameraModel &settings)
@@ -26,6 +40,7 @@ CameraModel::CameraModel(int width, int height, double scale,
     , skew(0)
     , settings(settings)
     , mMask(height, width, CV_WHITE_BYTE) {
+  adjustPrincipal(principalPoint, settings.centerShift);
   recalcBoundaries();
   setMapPolyCoeffs();
 }
@@ -45,11 +60,13 @@ CameraModel::CameraModel(int width, int height,
   switch (type) {
   case POLY_UNMAP:
     readUnmap(ifs);
+    adjustPrincipal(principalPoint, settings.centerShift);
     recalcBoundaries();
     setMapPolyCoeffs();
     break;
   case POLY_MAP:
     readMap(ifs);
+    adjustPrincipal(principalPoint, settings.centerShift);
     maxAngle = settings.magicMaxAngle;
     setUnmapPolyCoeffs();
     recalcBoundaries();
@@ -67,6 +84,7 @@ CameraModel::CameraModel(int width, int height, double f, double cx, double cy,
     , principalPoint(f * cx, f * cy)
     , settings(settings)
     , mMask(height, width, CV_WHITE_BYTE) {
+  adjustPrincipal(principalPoint, settings.centerShift);
   unmapPolyCoeffs.resize(1, 1);
   unmapPolyCoeffs[0] = f;
   recalcBoundaries();

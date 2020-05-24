@@ -33,6 +33,10 @@ struct Settings {
 
     static constexpr int default_magicMaxAngle = 100.0 * (M_PI / 180);
     int magicMaxAngle = default_magicMaxAngle;
+
+    enum CenterShift { NO_SHIFT, MINUS_05, PLUS_05 };
+    static constexpr CenterShift default_centerShift = NO_SHIFT;
+    CenterShift centerShift = default_centerShift;
   } cameraModel;
 
   struct PixelSelector {
