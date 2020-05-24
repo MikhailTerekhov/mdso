@@ -230,10 +230,10 @@ struct Settings {
   } affineLight;
 
   struct Depth {
-    static constexpr double default_min = 1e-3;
+    static constexpr double default_min = 1e-3; // TODO
     double min = default_min;
 
-    static constexpr double default_max = 1e4;
+    static constexpr double default_max = 1e4; // TODO
     double max = default_max;
 
     static constexpr double default_maxAbsLogDelta = 1e1;
@@ -330,10 +330,10 @@ struct Settings {
     static constexpr bool default_fixedRotationOnSecondKF = false;
     bool fixedRotationOnSecondKF = default_fixedRotationOnSecondKF;
 
-    static constexpr double default_minFirstToSecondRadius = 1e-2;
+    static constexpr double default_minFirstToSecondRadius = 1e-2; // TODO
     double minFirstToSecondRadius = default_minFirstToSecondRadius;
 
-    static constexpr double default_pointPointThres = 1e-7;
+    static constexpr double default_pointPointThres = 1e-7; // TODO
     double pointPointThres = default_pointPointThres;
 
     enum OptimizationType { DISABLED, SELF_WRITTEN, CERES };
@@ -378,7 +378,7 @@ struct Settings {
   static constexpr bool default_continueChoosingKeyFrames = true;
   bool continueChoosingKeyFrames = default_continueChoosingKeyFrames;
 
-  static constexpr int default_expectedFramesCount = 2500;
+  static constexpr int default_expectedFramesCount = 3000;
   int expectedFramesCount = default_expectedFramesCount;
 
   static constexpr bool default_useRandomOptimizedChoice = false;
@@ -398,6 +398,7 @@ struct Settings {
   Settings getDsoLikeSettings() const;
   Settings getGradientAdjustedSettings(double intencityRequiredToThis,
                                        double gradNormRequiredToThis) const;
+  Settings getScaleAdjustedSettings(double scaleFactor) const;
 
 private:
   int mKeyFrameDist = default_keyFrameDist;

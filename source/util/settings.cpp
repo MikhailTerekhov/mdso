@@ -37,6 +37,14 @@ Settings::getGradientAdjustedSettings(double inencityRequiredToThis,
   return result;
 }
 
+Settings Settings::getScaleAdjustedSettings(double scaleFactor) const {
+  Settings result = *this;
+  result.depth.min *= scaleFactor;
+  result.depth.max *= scaleFactor;
+  result.optimization.minFirstToSecondRadius *= scaleFactor;
+  return result;
+}
+
 InitializerDelaunaySettings Settings::getInitializerDelaunaySettings() const {
   return {dsoInitializer, delaunayDsoInitializer, stereoMatcher,
           threading,      triangulation,          keyFrame};

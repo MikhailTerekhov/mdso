@@ -1,6 +1,7 @@
 #include "data/MultiCamReader.h"
 #include "data/MultiFovReader.h"
 #include "data/RobotcarReader.h"
+#include "data/SingleCamProxyReader.h"
 #include "output/CloudWriter.h"
 #include "output/CloudWriterGT.h"
 #include "output/DebugImageDrawer.h"
@@ -116,6 +117,15 @@ DEFINE_bool(
 DEFINE_bool(move_body_from_camera, false,
             "If set to true, nontrivial motion between camera body and image "
             "in MultiFoV dataset is added.");
+
+DEFINE_int32(
+    only_camera, -1,
+    "If set to a non-negative value, this flag restricts the camera bundle to "
+    "a single camera. In that case, flag value is the index of this camera.");
+
+DEFINE_bool(gt_init, false, "Use ground-truth DSO initializer?");
+
+DEFINE_double(scale, 1, "Scale of the dataset used to adjust the settings.");
 
 std::unique_ptr<DatasetReader> createReader(const fs::path &datasetDir) {
   if (MultiFovReader::isMultiFov(datasetDir)) {
@@ -313,8 +323,16 @@ It should contain "info" and "data" subdirectories.)abacaba";
   }
 
   std::unique_ptr<DatasetReader> reader = createReader(argv[1]);
+  if (FLAGS_only_camera >= 0) {
+    CHECK_LT(FLAGS_only_camera, reader->cam().bundle.size());
+    std::unique_ptr<DatasetReader> restrictedReader(
+        new SingleCamProxyReader(std::move(reader), FLAGS_only_camera));
+    reader = std::move(restrictedReader);
+  }
 
   Settings settings = getFlaggedSettings();
+  CHECK_GT(FLAGS_scale, 0);
+  settings = settings.getScaleAdjustedSettings(FLAGS_scale);
 
   IdentityPreprocessor idPreprocessor;
   DoGPreprocessor dogPreprocessor(FLAGS_sigma1, FLAGS_sigma2,
@@ -437,7 +455,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
   observers.frameTracker.push_back(&errorCollector);
 
   std::unique_ptr<DsoInitializer> dsoInitializer;
-  if (cam.bundle.size() > 1) {
+  if (cam.bundle.size() > 1 || FLAGS_gt_init) {
     LOG(INFO) << "using ground truth intializer";
     dsoInitializer.reset(new DsoInitializerGroundTruth(
         reader.get(), settings.getInitializerGroundTruthSettings()));

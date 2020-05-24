@@ -78,6 +78,7 @@ set(dso_HEADER_FILES
     ${PROJECT_SOURCE_DIR}/include/data/RobotcarReader.h
     ${PROJECT_SOURCE_DIR}/include/data/MultiFovReader.h
     ${PROJECT_SOURCE_DIR}/include/data/MultiCamReader.h
+    ${PROJECT_SOURCE_DIR}/include/data/SingleCamProxyReader.h
 
     ${PROJECT_SOURCE_DIR}/include/system/AffineLightTransform.h
     ${PROJECT_SOURCE_DIR}/include/system/DsoSystem.h
@@ -157,6 +158,7 @@ set(dso_SOURCE_FILES
     ${PROJECT_SOURCE_DIR}/source/data/RobotcarReader.cpp
     ${PROJECT_SOURCE_DIR}/source/data/MultiFovReader.cpp
     ${PROJECT_SOURCE_DIR}/source/data/MultiCamReader.cpp
+    ${PROJECT_SOURCE_DIR}/source/data/SingleCamProxyReader.cpp
 
     ${PROJECT_SOURCE_DIR}/source/system/SphericalPlus.cpp
     ${PROJECT_SOURCE_DIR}/source/system/DsoSystem.cpp
