@@ -2,6 +2,7 @@
 #define INCLUDE_MULTICAMREADER
 
 #include "data/DatasetReader.h"
+#include "util/Terrain.h"
 
 namespace mdso {
 
@@ -12,6 +13,16 @@ class MultiCamReader : public DatasetReader {
   static const std::string camNames[numCams];
 
 public:
+  struct Settings {
+    Settings();
+
+    static constexpr bool default_useInterpoatedDepths = true;
+    bool useInterpolatedDepths = default_useInterpoatedDepths;
+
+    static constexpr int default_numKeyPoints = 200;
+    int numKeyPoints = default_numKeyPoints;
+  };
+
   class Depths : public FrameDepths {
   public:
     Depths(const fs::path &datasetDir, int frameInd);
@@ -23,9 +34,21 @@ public:
     Eigen::AlignedBox2d boundingBox;
   };
 
+  class InterpolatedDepths : public FrameDepths {
+  public:
+    InterpolatedDepths(const MultiCamReader *multiCamReader,
+                       const CameraBundle *cam, int frameInd, int numFeatures);
+
+    std::optional<double> depth(int camInd, const Vec2 &point) const override;
+
+  private:
+    std::vector<Terrain> depths;
+  };
+
   static bool isMultiCam(const fs::path &datasetDir);
 
-  MultiCamReader(const fs::path &datasetDir);
+  MultiCamReader(const fs::path &datasetDir,
+                 const MultiCamReader::Settings &settings = {});
 
   int numFrames() const override;
   int firstTimestampToInd(Timestamp timestamp) const override;
@@ -36,6 +59,9 @@ public:
   bool hasFrameToWorld(int frameInd) const override;
   SE3 frameToWorld(int frameInd) const override;
 
+  std::unique_ptr<Depths> groundTruthDepths(int frameInd) const;
+  std::unique_ptr<InterpolatedDepths> interpolatedDepths(int frameInd) const;
+
 private:
   static CameraBundle createCameraBundle(const fs::path &datasetDir);
   static StdVector<SE3> readBodyToWorld(const fs::path &datasetDir);
@@ -43,6 +69,7 @@ private:
   fs::path datasetDir;
   CameraBundle mCam;
   StdVector<SE3> bodyToWorld;
+  Settings settings;
 };
 
 } // namespace mdso

@@ -224,6 +224,8 @@ void insertDepths(cv::Mat &img, const Vec2 points[], const double depths[],
 
 Vec2 toVec2(cv::Point p) { return Vec2(double(p.x), double(p.y)); }
 
+Vec2 toVec2(cv::Point2f p) { return Vec2(double(p.x), double(p.y)); }
+
 Vec2i toVec2i(cv::Point p) { return Vec2i(p.x, p.y); }
 
 cv::Vec3b toCvVec3bDummy(cv::Scalar scalar) {

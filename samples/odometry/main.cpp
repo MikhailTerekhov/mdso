@@ -131,7 +131,10 @@ std::unique_ptr<DatasetReader> createReader(const fs::path &datasetDir) {
   if (MultiFovReader::isMultiFov(datasetDir)) {
     return std::unique_ptr<DatasetReader>(new MultiFovReader(datasetDir));
   } else if (MultiCamReader::isMultiCam(datasetDir)) {
-    return std::unique_ptr<DatasetReader>(new MultiCamReader(datasetDir));
+    MultiCamReader::Settings settings;
+    settings.numKeyPoints = 200;
+    return std::unique_ptr<DatasetReader>(
+        new MultiCamReader(datasetDir, settings));
   } else if (fs::path chunkDir = datasetDir / FLAGS_robotcar_chunk_dir;
              RobotcarReader::isRobotcar(chunkDir)) {
     std::optional<fs::path> rtkDir;

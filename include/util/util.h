@@ -83,6 +83,7 @@ void insertDepths(cv::Mat &img, const Vec2 points[], const double depths[],
                   bool areSolidPnts);
 
 Vec2 toVec2(cv::Point p);
+Vec2 toVec2(cv::Point2f p);
 Vec2i toVec2i(cv::Point p);
 cv::Point toCvPoint(Vec2 vec);
 cv::Point toCvPoint(Vec2i vec);

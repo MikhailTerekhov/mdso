@@ -1,10 +1,13 @@
 #include "data/MultiCamReader.h"
 #include "internal/data/getMfovCam.h"
+#include <opencv2/features2d.hpp>
 
 namespace mdso {
 
 const std::string MultiCamReader::camNames[] = {"front", "right", "rear",
                                                 "left"};
+
+MultiCamReader::Settings::Settings() = default;
 
 cv::Mat1f readBinMat(const fs::path &fname, int imgWidth, int imgHeight) {
   std::ifstream depthsIfs(fname, std::ios::binary);
@@ -28,25 +31,50 @@ MultiCamReader::Depths::Depths(const fs::path &datasetDir, int frameInd)
         datasetDir / "data" / "depth" / camNames[ci] / innerName;
     depths[ci] = readBinMat(depthPath, imgWidth, imgHeight);
   }
+}
 
-  //  std::vector<float> depthVec;
-  //  for (int ci = 0; ci < numCams; ++ci)
-  //    for (int y = 0; y < imgHeight; ++y)
-  //      for (int x = 0; x < imgWidth; ++x)
-  //        depthVec.push_back(depths[ci](y, x));
-  //
-  //  std::sort(depthVec.begin(), depthVec.end());
-  //  double minD = depthVec[0], maxD = depthVec[0.7 * depthVec.size()];
-  //
-  //  MultiCamReader r(datasetDir);
-  //  auto f = r.frame(frameInd);
-  //  for (int ci = 0; ci < numCams; ++ci) {
-  //    cv::Mat3b drawn =
-  //        drawDepthedFrame(cvtBgrToGray(f[ci].frame), depths[ci], minD, maxD);
-  //    cv::imwrite("depths_" + camNames[ci] + "_" + std::to_string(frameInd) +
-  //                    ".jpg",
-  //                drawn);
-  //  }
+MultiCamReader::InterpolatedDepths::InterpolatedDepths(
+    const MultiCamReader *multiCamReader, const CameraBundle *cam, int frameInd,
+    int numFeatures) {
+  auto orb = cv::ORB::create(numFeatures);
+  auto correctDepths = multiCamReader->groundTruthDepths(frameInd);
+  auto frame = multiCamReader->frame(frameInd);
+  depths.reserve(numCams);
+  for (int ci = 0; ci < numCams; ++ci) {
+    std::vector<cv::KeyPoint> keyPoints;
+    orb->detect(frame[ci].frame, keyPoints);
+    StdVector<Vec2> points;
+    std::vector<double> pointDepths;
+    points.reserve(keyPoints.size());
+    depths.reserve(keyPoints.size());
+    for (const auto &kp : keyPoints) {
+      Vec2 p = toVec2(kp.pt);
+      auto d = correctDepths->depth(ci, p);
+      if (!d)
+        LOG(WARNING) << "ORB outside of an image: " << p.transpose();
+      if (d && *d < 1e5) {
+        points.push_back(p);
+        pointDepths.push_back(*d);
+      }
+    }
+    mdso::Settings::Triangulation triSettings;
+    //    triSettings.epsSamePoints = 1e-5;
+    depths.emplace_back(&cam->bundle[ci].cam, points, pointDepths, triSettings);
+
+    cv::Mat3b img;
+    img = frame[ci].frame.clone();
+    depths.back().draw(img, CV_GREEN);
+    cv::imwrite("terrain_" + std::to_string(ci) + ".jpg", img);
+  }
+}
+
+std::optional<double>
+MultiCamReader::InterpolatedDepths::depth(int camInd, const Vec2 &point) const {
+  CHECK_GE(camInd, 0);
+  CHECK_LT(camInd, numCams);
+  double depth = 0;
+  bool hasDepth = depths[camInd](point, depth);
+  return hasDepth ? std::make_optional(depth) : std::nullopt;
 }
 
 std::optional<double> MultiCamReader::Depths::depth(int camInd,
@@ -118,10 +146,12 @@ StdVector<SE3> MultiCamReader::readBodyToWorld(const fs::path &datasetDir) {
   return bodyToWorld;
 }
 
-MultiCamReader::MultiCamReader(const fs::path &_datasetDir)
+MultiCamReader::MultiCamReader(const fs::path &_datasetDir,
+                               const Settings &settings)
     : datasetDir(_datasetDir)
     , mCam(createCameraBundle(_datasetDir))
-    , bodyToWorld(readBodyToWorld(_datasetDir)) {}
+    , bodyToWorld(readBodyToWorld(_datasetDir))
+    , settings(settings) {}
 
 int MultiCamReader::numFrames() const { return mNumFrames; }
 
@@ -158,8 +188,22 @@ MultiCamReader::frame(int frameInd) const {
 
 CameraBundle MultiCamReader::cam() const { return mCam; }
 
+std::unique_ptr<MultiCamReader::InterpolatedDepths>
+MultiCamReader::interpolatedDepths(int frameInd) const {
+  return std::unique_ptr<InterpolatedDepths>(
+      new InterpolatedDepths(this, &mCam, frameInd, settings.numKeyPoints));
+}
+
+std::unique_ptr<MultiCamReader::Depths>
+MultiCamReader::groundTruthDepths(int frameInd) const {
+  return std::unique_ptr<Depths>(new Depths(datasetDir, frameInd));
+}
+
 std::unique_ptr<FrameDepths> MultiCamReader::depths(int frameInd) const {
-  return std::unique_ptr<FrameDepths>(new Depths(datasetDir, frameInd));
+  if (settings.useInterpolatedDepths)
+    return interpolatedDepths(frameInd);
+  else
+    return groundTruthDepths(frameInd);
 }
 
 bool MultiCamReader::hasFrameToWorld(int frameInd) const {
