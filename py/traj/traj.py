@@ -10,10 +10,17 @@ class se3:
         return se3(self.R.T, -np.matmul(self.R.T, self.t))
     
     def __mul__(self, other):
-        return se3(np.matmul(self.R, other.R), np.matmul(self.R, other.t) + self.t)
+        if isinstance(other, se3):
+            return se3(np.matmul(self.R, other.R), np.matmul(self.R, other.t) + self.t)
+        else:
+            return self.R @ other + self.t
 
     def matrix3x4(self):
         return np.hstack((self.R, self.t.reshape((3, 1))))
+
+    def angle(self):
+        cosa = np.clip((self.R.trace() - 1) / 2, -1, 1)
+        return np.arccos(cosa)
 
     def __str__(self):
         return ' '.join(map(str, self.matrix3x4().reshape((12))))
@@ -40,7 +47,7 @@ def align(traj, gt, need_scale_fix=True):
     res = [se3(m.R, scale_fix * m.t) for m in traj]
     tg = gt[0] * res[0].inverse()
     res = [tg * m for m in res]
-    print(f'sf={scale_fix}\ntg=\n{tg}')
+    #  print(f'sf={scale_fix}\ntg=\n{tg}')
     return res
 
 

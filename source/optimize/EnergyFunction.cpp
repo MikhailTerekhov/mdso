@@ -158,6 +158,8 @@ Hessian EnergyFunction::getHessian() {
 
 Hessian EnergyFunction::getHessian(const Values &precomputedValues,
                                    const Derivatives &precomputedDerivatives) {
+  TimePointCpu start = nowCpu();
+
   Hessian::AccumulatedBlocks accumulatedBlocks(parameters->numKeyFrames(),
                                                parameters->numCameras(),
                                                parameters->numPoints());
@@ -168,6 +170,9 @@ Hessian EnergyFunction::getHessian(const Values &precomputedValues,
                                  precomputedDerivatives.residualJacobians[ri]);
     accumulatedBlocks.add(residual, deltaHessian);
   }
+
+  TimePointCpu end = nowCpu();
+  LOG(INFO) << "hessian evaluation time (sec) = " << secondsBetween(start, end);
 
   return Hessian(accumulatedBlocks,
                  precomputedDerivatives.parametrizationJacobians,
@@ -187,6 +192,8 @@ Gradient EnergyFunction::getGradient() {
 Gradient
 EnergyFunction::getGradient(const Values &precomputedValues,
                             const Derivatives &precomputedDerivatives) {
+  TimePointCpu start = nowCpu();
+
   Gradient::AccumulatedBlocks accumulatedBlocks(parameters->numKeyFrames(),
                                                 parameters->numCameras(),
                                                 parameters->numPoints());
@@ -198,6 +205,10 @@ EnergyFunction::getGradient(const Values &precomputedValues,
                                   precomputedDerivatives.residualJacobians[ri]);
     accumulatedBlocks.add(residual, deltaGradient);
   }
+
+  TimePointCpu end = nowCpu();
+  LOG(INFO) << "gradient evaluation time (sec) = "
+            << secondsBetween(start, end);
 
   return Gradient(accumulatedBlocks,
                   precomputedDerivatives.parametrizationJacobians);
@@ -235,9 +246,10 @@ std::vector<int> oobDepthInds(const VecXt &logDepths, T minLogDepth,
 }
 
 void EnergyFunction::optimize(int maxIterations) {
+  TimePointCpu overallStart = nowCpu();
+
   T minLogDepth = std::log(settings.depth.min);
   T maxLogDepth = std::log(settings.depth.max);
-
   auto hostToTarget = precomputeHostToTarget();
   auto motionDerivatives = precomputeMotionDerivatives();
   auto lightHostToTarget = precomputeLightHostToTarget();
@@ -254,8 +266,8 @@ void EnergyFunction::optimize(int maxIterations) {
          consecutiveFailedIterations <
              settings.optimization.maxConsecutiveFailedIterations) {
     LOG(INFO) << "it = " << curIteration << "\n";
-    TimePoint start, end;
-    start = now();
+
+    TimePointCpu startStep = nowCpu();
 
     double curEnergy = curValues.totalEnergy(residuals);
     LOG(INFO) << "cur energy = " << curEnergy << "\n";
@@ -320,11 +332,17 @@ void EnergyFunction::optimize(int maxIterations) {
     }
     curIteration++;
 
-    end = now();
-    LOG(INFO) << "step took " << secondsBetween(start, end);
+    TimePointCpu endStep = nowCpu();
+    LOG(INFO) << (parametersUpdated ? "" : "un")
+              << "successful step time (sec) = "
+              << secondsBetween(startStep, endStep);
   }
 
   parameters->apply();
+
+  TimePointCpu overallEnd = nowCpu();
+  LOG(INFO) << "overall optimization time (sec) = "
+            << secondsBetween(overallStart, overallEnd);
 }
 
 EnergyFunction::Values::Values(const StdVector<Residual> &residuals,

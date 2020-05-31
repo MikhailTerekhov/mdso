@@ -1,7 +1,7 @@
 #include "util/util.h"
+#include "util/PlyHolder.h"
 #include "util/defs.h"
 #include "util/settings.h"
-#include <Eigen/Eigen>
 #include <RelativePoseEstimator.h>
 #include <algorithm>
 #include <glog/logging.h>
@@ -75,6 +75,30 @@ end_header
     out << int(color[2]) << ' ' << int(color[1]) << ' ' << int(color[0])
         << '\n';
   }
+}
+
+void printInPly(const fs::path &fname, const std::vector<Vec3> &points,
+                const std::vector<cv::Vec3b> &colors,
+                const std::vector<double> &stddevs) {
+  PlyHolder plyHolder(fname, true);
+  plyHolder.putPoints(points, colors, stddevs);
+}
+
+void printInBinNx6(const fs::path &fname, const std::vector<Vec3> &points,
+                   const std::vector<cv::Vec3b> &colors) {
+  CHECK_EQ(points.size(), colors.size());
+  Eigen::Matrix<double, Eigen::Dynamic, 6, Eigen::RowMajor> data(points.size(),
+                                                                 6);
+  for (size_t pi = 0; pi < points.size(); ++pi) {
+    data.block<1, 3>(pi, 0) = points[pi].transpose();
+    cv::Vec3b c = colors[pi];
+    for (int coli = 0; coli < 3; ++coli)
+      data(pi, coli + 3) = double(c[coli]);
+  }
+
+  std::ofstream ofs(fname, std::ios::binary);
+  ofs.write(reinterpret_cast<const char *>(data.data()),
+            sizeof(double) * data.size());
 }
 
 void setDepthColBounds(const std::vector<double> &depths) {
@@ -332,6 +356,8 @@ std::string curTimeBrief() {
 
 TimePoint now() { return std::chrono::high_resolution_clock::now(); }
 
+TimePointCpu nowCpu() { return {std::clock()}; }
+
 std::string timeOfDay(TimePoint timePoint) {
   using namespace std::chrono;
   using days = duration<int64_t, std::ratio<86400>>;
@@ -352,6 +378,12 @@ std::string timeOfDay(TimePoint timePoint) {
 template <>
 double secondsBetween<Timestamp>(const Timestamp &start, const Timestamp &end) {
   return (end - start) * 1e-6;
+}
+
+template <>
+double secondsBetween<TimePointCpu>(const TimePointCpu &start,
+                                    const TimePointCpu &end) {
+  return double(end() - start()) / CLOCKS_PER_SEC;
 }
 
 TimePoint toTimePoint(Timestamp timestamp) {

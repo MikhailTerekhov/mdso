@@ -3,10 +3,11 @@
 namespace mdso {
 
 CloudWriter::CloudWriter(CameraBundle *cam, const fs::path &outputDirectory,
-                         const fs::path &fileName)
+                         const fs::path &fileName, bool newOutputStddev)
     : cam(cam)
     , outputDirectory(outputDirectory)
-    , cloudHolder(outputDirectory / fileName) {}
+    , cloudHolder(outputDirectory / fileName, newOutputStddev)
+    , outputStddev(newOutputStddev) {}
 
 void CloudWriter::keyFramesMarginalized(const KeyFrame *marginalized[],
                                         int size) {
@@ -14,6 +15,7 @@ void CloudWriter::keyFramesMarginalized(const KeyFrame *marginalized[],
     const KeyFrame *kf = marginalized[i];
     std::vector<Vec3> points;
     std::vector<cv::Vec3b> colors;
+    std::vector<double> stddevs;
 
     for (int j = 0; j < kf->frames.size(); ++j) {
       const KeyFrameEntry &e = kf->frames[j];
@@ -25,6 +27,7 @@ void CloudWriter::keyFramesMarginalized(const KeyFrame *marginalized[],
             (op.depth() * cam->bundle[j].cam.unmap(op.p).normalized()));
         colors.push_back(kf->preKeyFrame->frames[j].frameColored.at<cv::Vec3b>(
             toCvPoint(op.p)));
+        stddevs.push_back(op.stddev);
       }
       for (const auto &ip : e.immaturePoints) {
         if (ip.numTraced > 0) {
@@ -34,16 +37,21 @@ void CloudWriter::keyFramesMarginalized(const KeyFrame *marginalized[],
           colors.push_back(
               kf->preKeyFrame->frames[j].frameColored.at<cv::Vec3b>(
                   toCvPoint(ip.p)));
+          stddevs.push_back(ip.stddev);
         }
       }
     }
 
     Timestamp kfnum = kf->preKeyFrame->frames[0].timestamp;
-    std::ofstream kfOut(outputDirectory /
-                        fs::path("kf" + std::to_string(kfnum) + ".ply"));
-    printInPly(kfOut, points, colors);
-    kfOut.close();
-    cloudHolder.putPoints(points, colors);
+    fs::path kfCloudFname =
+        outputDirectory / fs::path("kf" + std::to_string(kfnum) + ".ply");
+    if (outputStddev) {
+      printInPly(kfCloudFname, points, colors, stddevs);
+      cloudHolder.putPoints(points, colors, stddevs);
+    } else {
+      std::ofstream kfOut(kfCloudFname);
+      printInPly(kfOut, points, colors);
+    }
   }
 
   cloudHolder.updatePointCount();

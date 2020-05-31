@@ -58,6 +58,11 @@ void outputMatrix(const fs::path &fname, const MatrixT &mat) {
 
 void printInPly(std::ostream &out, const std::vector<Vec3> &points,
                 const std::vector<cv::Vec3b> &colors);
+void printInPly(const fs::path &fname, const std::vector<Vec3> &points,
+                const std::vector<cv::Vec3b> &colors,
+                const std::vector<double> &stddevs);
+void printInBinNx6(const fs::path &fname, const std::vector<Vec3> &points,
+                   const std::vector<cv::Vec3b> &colors);
 
 void setDepthColBounds(const std::vector<double> &depths);
 
@@ -142,6 +147,8 @@ std::string curTimeBrief();
 
 TimePoint now();
 
+TimePointCpu nowCpu();
+
 std::string timeOfDay(TimePoint timePoint);
 
 template <typename Time>
@@ -153,6 +160,10 @@ double secondsBetween(const Time &start, const Time &end) {
 
 template <>
 double secondsBetween<Timestamp>(const Timestamp &start, const Timestamp &end);
+
+template <>
+double secondsBetween<TimePointCpu>(const TimePointCpu &start,
+                                    const TimePointCpu &end);
 
 TimePoint toTimePoint(Timestamp timestamp);
 

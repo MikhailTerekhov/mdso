@@ -12,14 +12,14 @@ from itertools import cycle
 from bisect import bisect_left, bisect_right
 
 
-alpha = 0.5
+alpha = 1
 win_size = 10
 img_w = 12
 img_h = 12
 
 sns.reset_orig()
 def color_gen(num):
-    return cycle(sns.color_palette(n_colors=num))
+    return cycle(['#33A02C', '#FC8D62', '#a860b3'])
 
 def set_invis(a):
     for x in a:
@@ -106,7 +106,27 @@ parser.add_argument("-t", "--timestamps", help="File with timestamps of the pose
                     "are considered to be timestamps rather than frame numbers")
 parser.add_argument("-e", "--errors", help="plot errors of each trajectory. "
                     "Only works if ground truth is provided", action="store_true")
+parser.add_argument("--axis_errors", help="plot errors for each trajectory and "
+                    "each axis independently. Only works when --errors is specified",
+                    action="store_true")
+parser.add_argument("--rot_errors", help="plot rotational errors for each trajectory."
+                    "Only works when --errors is specified", action="store_true")
 args = parser.parse_args()
+
+if args.russian:
+    xlabel     = 'Ось X (м)'
+    ylabel     = 'Ось Y (м)'
+    zlabel     = 'Ось Z (м)'
+    label_gt   = 'Точная траектория'
+    label_zerr = 'Ошибка по оси Z, м'
+    label_time = 'Время, с'
+else:
+    xlabel     = 'X axis (m)'
+    ylabel     = 'Y axis (m)'
+    zlabel     = 'Z axis (m)'
+    label_gt   = 'Ground truth'
+    label_zerr = 'Z axis error, m'
+    label_time = 'Time, s'
 
 if args.timestamps is not None:
     timestamps = np.loadtxt(args.timestamps, dtype=np.int64)
@@ -142,22 +162,33 @@ ax.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
 ax.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
 ax.zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
 
+tick_pad = 8
+ax.xaxis.set_tick_params(pad=tick_pad)
+ax.yaxis.set_tick_params(pad=tick_pad)
+ax.zaxis.set_tick_params(pad=tick_pad)
+
 #  ax.yaxis._axinfo["grid"]['color'] =  (1,1,1,0)
+labelpad = 15
 if args.shown_plane == "xy":
     ax.view_init(azim=-90, elev=-90)
     ax.set_zticks([])
+    ax.set_xlabel(xlabel, labelpad=labelpad)
+    ax.set_ylabel(ylabel, labelpad=labelpad)
 elif args.shown_plane == "xz":
     ax.set_yticks([])
+    ax.set_xlabel(xlabel, labelpad=labelpad)
+    ax.set_zlabel(zlabel, labelpad=labelpad)
     ax.view_init(azim=-90, elev=0)
 elif args.shown_plane == "yz":
     ax.set_xticks([])
+    ax.set_ylabel(ylabel, labelpad=labelpad)
+    ax.set_zlabel(zlabel, labelpad=labelpad)
     ax.view_init(azim=180, elev=0)
 else:
     print(f'unsupported value {args.shown_plane} for shown_pane')
 
 
 draw_proc = draw_arrowed if args.quiver else draw_track
-label_gt = 'точная траектория' if args.russian else 'ground truth'
 
 traj_word = 'траектория' if args.russian else 'trajectory'
 labels = args.labels if args.labels \
@@ -168,7 +199,6 @@ if args.gt:
     ground_truth = crop_roi(ground_truth)
     if args.align:
         ground_truth = align_to_zero(ground_truth)
-    draw_proc(ax, ground_truth, 'green', label_gt, direction=args.direction)
     has_gt = True
 else:
     print('no ground truth provided')
@@ -178,7 +208,9 @@ else:
 artists = []
 trajs = []
 
-colors = color_gen(len(args.traj))
+colors = color_gen(len(args.traj) + 1)
+
+mpl.rcParams.update({'font.size': 18})
 
 for ind, (fname, label) in enumerate(zip(args.traj, labels)):
     print(f'processing {fname}...')
@@ -202,9 +234,16 @@ for ind, (fname, label) in enumerate(zip(args.traj, labels)):
                             label, direction=args.direction))
     trajs.append(traj)
 
-ax.legend(loc='upper center', bbox_to_anchor=(0.5, 0.3), fontsize='large')
+#  next(colors)
+if has_gt:
+    draw_proc(ax, ground_truth, next(colors), label_gt, direction=args.direction)
+
+ax.legend(loc='lower left', bbox_to_anchor=(0.5, 0.6), fontsize='large')
 
 set_axes_equal(ax)
+
+if args.timestamps is not None:
+    timestamps = crop_roi(timestamps)
 
 if args.video_dir:
     os.makedirs(args.video_dir, exist_ok=True)
@@ -217,18 +256,58 @@ if args.video_dir:
         #  ax.legend(loc='upper center', bbox_to_anchor=(0.5, 0.3), fontsize='large')
         fig.savefig(os.path.join(args.video_dir, f'{i + 1}.png'))
 
+
+
+def axis_errs(m1, m2):
+    return [abs(v) for v in m1.t - m2.t]
+
 def err(m1, m2):
-    return norm((m1 * m2.inverse()).t)
+    return norm(m1.t - m2.t)
+
+def rot_err(m1, m2):
+    return (m1 * m2.inverse()).angle() * 180 / np.pi
+
+def azim_err(m1, m2):
+    dir1 = m1.R[:,0].reshape(3)
+    dir2 = m2.R[:,0].reshape(3)
+    dir1 = dir1[0:2]
+    dir2 = dir2[0:2]
+    dir1 /= norm(dir1)
+    dir2 /= norm(dir2)
+    sina = np.clip(np.cross(dir1, dir2), -1, 1)
+    return 180. / np.pi * np.arcsin(sina)
 
 if args.errors:
     assert args.gt
-    
-    colors = color_gen(len(args.traj))
 
     plt.figure()
-    for traj, label in zip(trajs, labels):
-        errors = [err(t, g) for t, g in zip(ground_truth, traj)]
-        plt.plot(errors, label=label, color=next(colors))
+    if args.axis_errors:
+        assert len(trajs) == 2
+        assert args.timestamps
+        ts = timestamps / 30
+        colors = color_gen(3)
+        ax_names = ['x', 'y', 'z']
+        for traj_ind, (traj, label) in enumerate(zip(trajs, labels)):
+            errors = np.array([axis_errs(t, g) for t, g in zip(ground_truth, traj)])
+            plt.plot(ts, errors[:, 2], label=label, color=next(colors))
+        plt.xlabel(label_time, labelpad=-15)
+        plt.ylabel(label_zerr)
+    else:
+        colors = color_gen(len(args.traj))
+        for traj, label in zip(trajs, labels):
+            errors = [err(t, g) for t, g in zip(ground_truth, traj)]
+            plt.plot(errors, label=label, color=next(colors))
+
+    
+    if args.rot_errors:
+        plt.figure()
+        colors = color_gen(len(args.traj))
+        plt.title('Азимутальные ошибки (°)')
+        for traj, label in zip(trajs, labels):
+            errors = [azim_err(t, g) for t, g in zip(traj, ground_truth)]
+            plt.plot(errors, label=label, color=next(colors))
+
+
     plt.legend()
 
 plt.show()

@@ -48,9 +48,11 @@ DEFINE_int64(start_ts, -1,
 DEFINE_int32(count, 100, "Number of frames to process.");
 
 DEFINE_bool(gen_gt, false, "Do we need to generate GT pointcloud?");
-DEFINE_int32(gt_points, 1'000'000,
+DEFINE_int64(gt_points, 1'000'000,
              "Number of GT points in the generated cloud.");
 DEFINE_bool(gen_gt_only, false, "Generate ground truth point cloud and exit.");
+DEFINE_bool(cloud_Nx6, false,
+            "Generate ground truth point cloud in Nx6 binary format.");
 DEFINE_bool(gen_cloud, true, "Do we need to save resulting pointcloud?");
 
 DEFINE_bool(draw_interpolation, false,
@@ -127,11 +129,16 @@ DEFINE_bool(gt_init, false, "Use ground-truth DSO initializer?");
 
 DEFINE_double(scale, 1, "Scale of the dataset used to adjust the settings.");
 
+DEFINE_bool(mcam_gt_depths, false,
+            "If set to false, in MultiCamReader depths are interpolated from "
+            "ORB keypoints.");
+
 std::unique_ptr<DatasetReader> createReader(const fs::path &datasetDir) {
   if (MultiFovReader::isMultiFov(datasetDir)) {
     return std::unique_ptr<DatasetReader>(new MultiFovReader(datasetDir));
   } else if (MultiCamReader::isMultiCam(datasetDir)) {
     MultiCamReader::Settings settings;
+    settings.useInterpolatedDepths = !FLAGS_mcam_gt_depths;
     settings.numKeyPoints = 200;
     return std::unique_ptr<DatasetReader>(
         new MultiCamReader(datasetDir, settings));
@@ -187,31 +194,36 @@ private:
 void readPointsInFrameGT(const DatasetReader *reader,
                          std::vector<std::vector<Vec3>> &pointsInFrameGT,
                          std::vector<std::vector<cv::Vec3b>> &colors,
-                         int maxPoints) {
-  CameraModel cam = reader->cam().bundle[0].cam;
+                         int64_t maxPoints) {
+  CameraBundle cam = reader->cam();
   std::cout << "filling GT points..." << std::endl;
-  int w = cam.getWidth(), h = cam.getHeight();
-  int step =
-      std::ceil(std::sqrt(double(FLAGS_count) * w * h / FLAGS_gt_points));
-  const double maxd = 1e10;
+  int w = cam.bundle[0].cam.getWidth(), h = cam.bundle[0].cam.getHeight();
+  int step = std::ceil(std::sqrt(double(FLAGS_count) * w * h *
+                                 cam.bundle.size() / FLAGS_gt_points));
+  std::cout << "step = " << step << std::endl;
+
+  const double maxd = 1e5;
   for (int it = FLAGS_start; it < FLAGS_start + FLAGS_count; ++it) {
     pointsInFrameGT[it].reserve((h / step) * (w / step));
     auto depths = reader->depths(it);
-    cv::Mat3b frame = reader->frame(it)[0].frame;
-    for (int y = 0; y < h; y += step)
-      for (int x = 0; x < w; x += step) {
-        Vec3 p = cam.unmap(Vec2(x, y));
-        p.normalize();
-        auto maybeD = depths->depth(0, Vec2(x, y));
-        if (maybeD) {
-          double d = maybeD.value();
-          if (d > maxd)
-            continue;
-          p *= d;
-          pointsInFrameGT[it].push_back(p);
-          colors[it].push_back(frame(y, x));
+    auto frame = reader->frame(it);
+    for (int ci = 0; ci < cam.bundle.size(); ++ci) {
+      for (int y = 0; y < h; y += step)
+        for (int x = 0; x < w; x += step) {
+          Vec3 p = cam.bundle[ci].cam.unmap(Vec2(x, y));
+          p.normalize();
+          auto maybeD = depths->depth(ci, Vec2(x, y));
+          if (maybeD) {
+            double d = maybeD.value();
+            if (d > maxd)
+              continue;
+            p *= d;
+            pointsInFrameGT[it].push_back(cam.bundle[ci].thisToBody * p);
+            colors[it].push_back(frame[ci].frame(y, x));
+          }
         }
-      }
+    }
+    std::cout << "processed frame #" << it << std::endl;
   }
 }
 
@@ -374,18 +386,27 @@ It should contain "info" and "data" subdirectories.)abacaba";
     std::vector<std::vector<Vec3>> pointsInFrameGT(reader->numFrames());
     std::vector<std::vector<cv::Vec3b>> colors(reader->numFrames());
     readPointsInFrameGT(reader.get(), pointsInFrameGT, colors, FLAGS_gt_points);
+
+    std::cout << "points read\n";
     std::vector<Vec3> allPoints;
     std::vector<cv::Vec3b> allColors;
     allPoints.reserve(FLAGS_gt_points);
     allColors.reserve(FLAGS_gt_points);
-    for (int i = 0; i < pointsInFrameGT.size(); ++i)
+    for (int i = 0; i < pointsInFrameGT.size(); ++i) {
       for (int j = 0; j < pointsInFrameGT[i].size(); ++j) {
         const Vec3 &p = pointsInFrameGT[i][j];
         allPoints.push_back(reader->frameToWorld(i) * p);
         allColors.push_back(colors[i][j]);
       }
-    std::ofstream pointsGTOfs("pointsGT.ply");
-    printInPly(pointsGTOfs, allPoints, allColors);
+      if (i % 100 == 0)
+        std::cout << "processed frame #" << i << std::endl;
+    }
+    if (FLAGS_cloud_Nx6) {
+      printInBinNx6(outDir / "pointsGT.bin", allPoints, allColors);
+    } else {
+      std::ofstream pointsGTOfs(outDir / "pointsGT.ply");
+      printInPly(pointsGTOfs, allPoints, allColors);
+    }
     return 0;
   }
 
@@ -492,7 +513,7 @@ It should contain "info" and "data" subdirectories.)abacaba";
         wasInitialized = true;
         cv::Mat3b initialized =
             drawIntialization(dso.getKeyFrames(), settings.depth, true, true);
-        cv::imwrite(outDir / "intialized.jpg", initialized);
+        cv::imwrite((outDir / "initialized.jpg").string(), initialized);
       }
 
       if (FLAGS_write_files) {
