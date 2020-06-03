@@ -21,13 +21,11 @@ def read_cloud(fname):
     f = open(fname, 'rb')
     cloud = PlyData.read(f).elements[0]
     points = np.vstack([cloud.data['x'], cloud.data['y'], cloud.data['z']]).T
-    print(points.shape)
-    #  colors = np.hstack([cloud.data['red'], cloud.data['green'], 
+    #  colors = np.hstack([cloud.data['red'], cloud.data['green'],
                         #  cloud.data['blue']])
     return points
 
 def closeness(base, ref):
-    print(base.shape, ref.shape)
     tree = scipy.spatial.KDTree(base)
     close_num = 0
     for pi in progressbar.progressbar(range(ref.shape[0])):

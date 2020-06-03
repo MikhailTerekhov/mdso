@@ -19,7 +19,8 @@ img_h = 12
 
 sns.reset_orig()
 def color_gen(num):
-    return cycle(['#33A02C', '#FC8D62', '#a860b3'])
+    return cycle(sns.color_palette())
+    #  return cycle(['#33A02C', '#FC8D62', '#a860b3'])
 
 def set_invis(a):
     for x in a:
@@ -238,7 +239,7 @@ for ind, (fname, label) in enumerate(zip(args.traj, labels)):
 if has_gt:
     draw_proc(ax, ground_truth, next(colors), label_gt, direction=args.direction)
 
-ax.legend(loc='lower left', bbox_to_anchor=(0.5, 0.6), fontsize='large')
+ax.legend(loc='lower left', bbox_to_anchor=(0.5, 0.6), fontsize='medium')
 
 set_axes_equal(ax)
 
