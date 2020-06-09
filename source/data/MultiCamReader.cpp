@@ -4,10 +4,16 @@
 
 namespace mdso {
 
-const std::string MultiCamReader::camNames[] = {"front", "right", "rear",
-                                                "left"};
+const std::vector<std::string> MultiCamReader::Settings::default_camNames = {
+    "front", "right", "rear", "left"};
+
+const Eigen::AlignedBox2d MultiCamReader::Depths::boundingBox(
+    Vec2::Zero(),
+    Vec2(MultiCamReader::imgWidth - 1, MultiCamReader::imgHeight - 1));
 
 MultiCamReader::Settings::Settings() = default;
+
+int MultiCamReader::Settings::numCams() const { return camNames.size(); }
 
 cv::Mat1f readBinMat(const fs::path &fname, int imgWidth, int imgHeight) {
   std::ifstream depthsIfs(fname, std::ios::binary);
@@ -19,28 +25,33 @@ cv::Mat1f readBinMat(const fs::path &fname, int imgWidth, int imgHeight) {
   return depths;
 }
 
-MultiCamReader::Depths::Depths(const fs::path &datasetDir, int frameInd)
-    : boundingBox(Vec2::Zero(), Vec2(imgWidth - 1, imgHeight - 1)) {
+MultiCamReader::Depths::Depths(const fs::path &datasetDir, int frameInd,
+                               const Settings &newSettings)
+    : settings(newSettings) {
   CHECK_GE(frameInd, 0);
   CHECK_LT(frameInd, mNumFrames);
 
-  for (int ci = 0; ci < numCams; ++ci) {
-    char innerName[15];
-    snprintf(innerName, 15, "%s_%04d.bin", camNames[ci].c_str(), frameInd);
+  depths.reserve(settings.numCams());
+  for (int ci = 0; ci < settings.numCams(); ++ci) {
+    constexpr int maxlen = 100;
+    char innerName[maxlen];
+    snprintf(innerName, maxlen, "%s_%04d.bin", settings.camNames[ci].c_str(),
+             frameInd);
     fs::path depthPath =
-        datasetDir / "data" / "depth" / camNames[ci] / innerName;
-    depths[ci] = readBinMat(depthPath, imgWidth, imgHeight);
+        datasetDir / "data" / "depth" / settings.camNames[ci] / innerName;
+    depths.push_back(readBinMat(depthPath, imgWidth, imgHeight));
   }
 }
 
 MultiCamReader::InterpolatedDepths::InterpolatedDepths(
     const MultiCamReader *multiCamReader, const CameraBundle *cam, int frameInd,
-    int numFeatures) {
+    int numFeatures, const Settings &newSettings)
+    : settings(newSettings) {
   auto orb = cv::ORB::create(numFeatures);
   auto correctDepths = multiCamReader->groundTruthDepths(frameInd);
   auto frame = multiCamReader->frame(frameInd);
-  depths.reserve(numCams);
-  for (int ci = 0; ci < numCams; ++ci) {
+  depths.reserve(settings.numCams());
+  for (int ci = 0; ci < settings.numCams(); ++ci) {
     std::vector<cv::KeyPoint> keyPoints;
     orb->detect(frame[ci].frame, keyPoints);
     StdVector<Vec2> points;
@@ -71,7 +82,7 @@ MultiCamReader::InterpolatedDepths::InterpolatedDepths(
 std::optional<double>
 MultiCamReader::InterpolatedDepths::depth(int camInd, const Vec2 &point) const {
   CHECK_GE(camInd, 0);
-  CHECK_LT(camInd, numCams);
+  CHECK_LT(camInd, settings.numCams());
   double depth = 0;
   bool hasDepth = depths[camInd](point, depth);
   return hasDepth ? std::make_optional(depth) : std::nullopt;
@@ -82,7 +93,7 @@ std::optional<double> MultiCamReader::Depths::depth(int camInd,
   if (!boundingBox.contains(point))
     return std::nullopt;
   CHECK_GE(camInd, 0);
-  CHECK_LT(camInd, numCams);
+  CHECK_LT(camInd, settings.numCams());
   return std::optional<double>(double(depths[camInd](toCvPoint(point))));
 }
 
@@ -94,7 +105,7 @@ bool MultiCamReader::isMultiCam(const fs::path &datasetDir) {
   fs::path imgDir = dataDir / "img";
   fs::path depthDir = dataDir / "depth";
   bool isMcam = fs::exists(infoDir / "body_to_world.txt");
-  for (const auto &camName : camNames) {
+  for (const auto &camName : Settings::default_camNames) {
     isMcam = isMcam && fs::exists(intrinsicsDir / (camName + ".txt"));
     isMcam = isMcam && fs::exists(extrinsicsDir / (camName + "_to_body.txt"));
     isMcam = isMcam && fs::exists(imgDir / camName);
@@ -119,14 +130,16 @@ SE3 readFromMatrix3x4(std::istream &istream) {
   return SE3(Rfixed, mat.col(3));
 }
 
-CameraBundle MultiCamReader::createCameraBundle(const fs::path &datasetDir) {
+CameraBundle
+MultiCamReader::createCameraBundle(const fs::path &datasetDir,
+                                   const std::vector<std::string> &camNames) {
   fs::path extrinsicsDir(datasetDir / "info" / "extrinsics");
   fs::path intrinsicsDir(datasetDir / "info" / "intrinsics");
 
   StdVector<CameraModel> cams;
   StdVector<SE3> bodyToCam;
-  cams.reserve(numCams);
-  bodyToCam.reserve(numCams);
+  cams.reserve(camNames.size());
+  bodyToCam.reserve(camNames.size());
   for (const auto &camName : camNames) {
     std::ifstream extrinsicsFile(extrinsicsDir / (camName + "_to_body.txt"));
     CHECK(extrinsicsFile.is_open());
@@ -134,7 +147,7 @@ CameraBundle MultiCamReader::createCameraBundle(const fs::path &datasetDir) {
     cams.push_back(getMfovCam(intrinsicsDir / (camName + ".txt")));
   }
 
-  return CameraBundle(bodyToCam.data(), cams.data(), numCams);
+  return CameraBundle(bodyToCam.data(), cams.data(), camNames.size());
 }
 
 StdVector<SE3> MultiCamReader::readBodyToWorld(const fs::path &datasetDir) {
@@ -148,10 +161,10 @@ StdVector<SE3> MultiCamReader::readBodyToWorld(const fs::path &datasetDir) {
 
 MultiCamReader::MultiCamReader(const fs::path &_datasetDir,
                                const Settings &settings)
-    : datasetDir(_datasetDir)
-    , mCam(createCameraBundle(_datasetDir))
-    , bodyToWorld(readBodyToWorld(_datasetDir))
-    , settings(settings) {}
+    : settings(settings)
+    , datasetDir(_datasetDir)
+    , mCam(createCameraBundle(_datasetDir, settings.camNames))
+    , bodyToWorld(readBodyToWorld(_datasetDir)) {}
 
 int MultiCamReader::numFrames() const { return mNumFrames; }
 
@@ -163,10 +176,10 @@ int MultiCamReader::firstTimestampToInd(Timestamp timestamp) const {
 
 std::vector<Timestamp> MultiCamReader::timestampsFromInd(int frameInd) const {
   if (frameInd < 0)
-    return std::vector<Timestamp>(numCams, 0);
+    return std::vector<Timestamp>(settings.numCams(), 0);
   if (frameInd >= mNumFrames)
-    return std::vector<Timestamp>(numCams, mNumFrames - 1);
-  return std::vector<Timestamp>(numCams, frameInd);
+    return std::vector<Timestamp>(settings.numCams(), mNumFrames - 1);
+  return std::vector<Timestamp>(settings.numCams(), frameInd);
 }
 
 std::vector<DatasetReader::FrameEntry>
@@ -174,13 +187,16 @@ MultiCamReader::frame(int frameInd) const {
   CHECK_GE(frameInd, 0);
   CHECK_LT(frameInd, mNumFrames);
   std::vector<DatasetReader::FrameEntry> frame;
-  frame.reserve(numCams);
-  for (int ci = 0; ci < numCams; ++ci) {
-    char innerName[15];
-    snprintf(innerName, 15, "%s_%04d.jpg", camNames[ci].c_str(), frameInd);
-    fs::path imagePath = datasetDir / "data" / "img" / camNames[ci] / innerName;
+  frame.reserve(settings.numCams());
+  for (int ci = 0; ci < settings.numCams(); ++ci) {
+    constexpr int maxlen = 100;
+    char innerName[maxlen];
+    snprintf(innerName, maxlen, "%s_%04d.jpg", settings.camNames[ci].c_str(),
+             frameInd);
+    fs::path imagePath =
+        datasetDir / "data" / "img" / settings.camNames[ci] / innerName;
     cv::Mat3b image = cv::imread(imagePath.string());
-    CHECK_NOTNULL(image.data);
+    CHECK_NE(image.data, nullptr) << "path: " << imagePath;
     frame.push_back({image, frameInd});
   }
   return frame;
@@ -190,13 +206,13 @@ CameraBundle MultiCamReader::cam() const { return mCam; }
 
 std::unique_ptr<MultiCamReader::InterpolatedDepths>
 MultiCamReader::interpolatedDepths(int frameInd) const {
-  return std::unique_ptr<InterpolatedDepths>(
-      new InterpolatedDepths(this, &mCam, frameInd, settings.numKeyPoints));
+  return std::unique_ptr<InterpolatedDepths>(new InterpolatedDepths(
+      this, &mCam, frameInd, settings.numKeyPoints, settings));
 }
 
 std::unique_ptr<MultiCamReader::Depths>
 MultiCamReader::groundTruthDepths(int frameInd) const {
-  return std::unique_ptr<Depths>(new Depths(datasetDir, frameInd));
+  return std::unique_ptr<Depths>(new Depths(datasetDir, frameInd, settings));
 }
 
 std::unique_ptr<FrameDepths> MultiCamReader::depths(int frameInd) const {

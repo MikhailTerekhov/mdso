@@ -38,6 +38,13 @@ DEFINE_string(robotcar_extrinsics_dir,
 DEFINE_string(robotcar_masks_dir, "data/masks/robotcar",
               "Path to a directory with masks for the dataset.");
 
+DEFINE_bool(mcam_lift_front, false,
+            "If set to true, in MultiCamReader height of the front camera is "
+            "aligned with that of the rear.");
+DEFINE_bool(mcam_gt_depths, false,
+            "If set to false, in MultiCamReader depths are interpolated from "
+            "ORB keypoints.");
+
 DEFINE_int32(
     start, 1,
     "Number of the starting frame. This flag is disabled if start_ts is set.");
@@ -129,10 +136,6 @@ DEFINE_bool(gt_init, false, "Use ground-truth DSO initializer?");
 
 DEFINE_double(scale, 1, "Scale of the dataset used to adjust the settings.");
 
-DEFINE_bool(mcam_gt_depths, false,
-            "If set to false, in MultiCamReader depths are interpolated from "
-            "ORB keypoints.");
-
 std::unique_ptr<DatasetReader> createReader(const fs::path &datasetDir) {
   if (MultiFovReader::isMultiFov(datasetDir)) {
     return std::unique_ptr<DatasetReader>(new MultiFovReader(datasetDir));
@@ -140,6 +143,8 @@ std::unique_ptr<DatasetReader> createReader(const fs::path &datasetDir) {
     MultiCamReader::Settings settings;
     settings.useInterpolatedDepths = !FLAGS_mcam_gt_depths;
     settings.numKeyPoints = 200;
+    if (FLAGS_mcam_lift_front)
+      settings.camNames = {"front_lifted", "right", "rear", "left"};
     return std::unique_ptr<DatasetReader>(
         new MultiCamReader(datasetDir, settings));
   } else if (fs::path chunkDir = datasetDir / FLAGS_robotcar_chunk_dir;

@@ -8,9 +8,7 @@ namespace mdso {
 
 class MultiCamReader : public DatasetReader {
   static constexpr int mNumFrames = 3000;
-  static constexpr int numCams = 4;
   static constexpr int imgWidth = 640, imgHeight = 480;
-  static const std::string camNames[numCams];
 
 public:
   struct Settings {
@@ -21,28 +19,38 @@ public:
 
     static constexpr int default_numKeyPoints = 200;
     int numKeyPoints = default_numKeyPoints;
+
+    static const std::vector<std::string> default_camNames;
+    std::vector<std::string> camNames = default_camNames;
+
+    int numCams() const;
   };
 
   class Depths : public FrameDepths {
   public:
-    Depths(const fs::path &datasetDir, int frameInd);
+    Depths(const fs::path &datasetDir, int frameInd,
+           const Settings &newSettings);
 
     std::optional<double> depth(int camInd, const Vec2 &point) const override;
 
   private:
-    std::array<cv::Mat1f, numCams> depths;
-    Eigen::AlignedBox2d boundingBox;
+    std::vector<cv::Mat1f> depths;
+    static const Eigen::AlignedBox2d boundingBox;
+
+    Settings settings;
   };
 
   class InterpolatedDepths : public FrameDepths {
   public:
     InterpolatedDepths(const MultiCamReader *multiCamReader,
-                       const CameraBundle *cam, int frameInd, int numFeatures);
+                       const CameraBundle *cam, int frameInd, int numFeatures,
+                       const Settings &newSettings);
 
     std::optional<double> depth(int camInd, const Vec2 &point) const override;
 
   private:
     std::vector<Terrain> depths;
+    Settings settings;
   };
 
   static bool isMultiCam(const fs::path &datasetDir);
@@ -63,13 +71,15 @@ public:
   std::unique_ptr<InterpolatedDepths> interpolatedDepths(int frameInd) const;
 
 private:
-  static CameraBundle createCameraBundle(const fs::path &datasetDir);
+  static CameraBundle
+  createCameraBundle(const fs::path &datasetDir,
+                     const std::vector<std::string> &camNames);
   static StdVector<SE3> readBodyToWorld(const fs::path &datasetDir);
 
+  Settings settings;
   fs::path datasetDir;
   CameraBundle mCam;
   StdVector<SE3> bodyToWorld;
-  Settings settings;
 };
 
 } // namespace mdso

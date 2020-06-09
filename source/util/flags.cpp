@@ -15,6 +15,9 @@ DEFINE_int32(max_key_frames, Settings::default_maxKeyFrames,
              "Maximum number of key frames to exist in the optimisation "
              "simultaneously.");
 
+DEFINE_string(pixel_selector_grad_thres, "20,8,5",
+              "Gradient thresholds for adaptive pixel selector.");
+
 DEFINE_bool(set_min_depth, Settings::Depth::default_setMinBound,
             "Do we need to set minimum depth in ceres? This flag is shadowed "
             "if min_plus_exp_depth is enabled.");
@@ -173,11 +176,32 @@ Settings::CameraModel::CenterShift centerShift(const std::string &type) {
   }
 }
 
+std::array<double, Settings::PixelSelector::gradThesholdCount>
+getGradThresholds(const std::string &thresList) {
+  constexpr int GTC = Settings::PixelSelector::gradThesholdCount;
+  std::stringstream ss(thresList);
+  std::string thresStr;
+  std::vector<double> thres;
+  std::stringstream logOut;
+  logOut << "Updated PixelSelector grad thresholds: ";
+  while (std::getline(ss, thresStr, ',')) {
+    thres.push_back(std::stod(thresStr));
+    logOut << thres.back() << ' ';
+  }
+  LOG(INFO) << logOut.str();
+  CHECK_EQ(thres.size(), GTC);
+  std::array<double, GTC> result;
+  std::copy(thres.begin(), thres.end(), result.begin());
+  return result;
+}
+
 Settings getFlaggedSettings() {
   Settings settings;
 
   settings.threading.numThreads = FLAGS_num_threads;
   settings.keyFrame.setImmaturePointsNum(FLAGS_points_per_frame);
+  settings.pixelSelector.gradThresholds =
+      getGradThresholds(FLAGS_pixel_selector_grad_thres);
   settings.depth.setMinBound = FLAGS_set_min_depth;
   settings.depth.setMaxBound = FLAGS_set_max_depth;
   settings.depth.useMinPlusExpParametrization = FLAGS_min_plus_exp_depth;

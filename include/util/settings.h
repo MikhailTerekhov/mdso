@@ -428,6 +428,7 @@ struct InitializerDelaunaySettings {
 struct InitializerGroundTruthSettings {
   Settings::DsoInitializer intializer;
   Settings::KeyFrame keyFrame;
+  Settings::PixelSelector pixelSelector;
 };
 
 struct FrameTrackerSettings {

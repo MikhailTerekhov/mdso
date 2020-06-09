@@ -283,11 +283,10 @@ if args.errors:
 
     plt.figure()
     if args.axis_errors:
-        assert len(trajs) == 2
+        #  assert len(trajs) == 2
         assert args.timestamps
         ts = timestamps / 30
         colors = color_gen(3)
-        ax_names = ['x', 'y', 'z']
         for traj_ind, (traj, label) in enumerate(zip(trajs, labels)):
             errors = np.array([axis_errs(t, g) for t, g in zip(ground_truth, traj)])
             plt.plot(ts, errors[:, 2], label=label, color=next(colors))

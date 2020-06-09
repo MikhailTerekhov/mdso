@@ -36,10 +36,13 @@ DsoInitializer::InitializedVector DsoInitializerGroundTruth::initialize() {
       << "intialize was called before the frames were set";
 
   int pointsPerFrame = settings.keyFrame.immaturePointsNum() / numCams;
-  std::vector<PixelSelector> pixelSelectors(numCams);
-  for (int camInd = 0; camInd < numCams; ++camInd)
-    pixelSelectors[camInd].initialize(initializedVector[0].frames[camInd].frame,
-                                      pointsPerFrame);
+  std::vector<PixelSelector> pixelSelectors;
+  pixelSelectors.reserve(numCams);
+  for (int camInd = 0; camInd < numCams; ++camInd) {
+    pixelSelectors.emplace_back(settings.pixelSelector);
+    pixelSelectors.back().initialize(initializedVector[0].frames[camInd].frame,
+                                     pointsPerFrame);
+  }
   for (int frameInd = 0; frameInd < numInitializedFrames; ++frameInd) {
     InitializedFrame &initializedMultiFrame = initializedVector[frameInd];
     int globalFrameInd = datasetReader->firstTimestampToInd(

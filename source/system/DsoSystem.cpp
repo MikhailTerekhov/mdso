@@ -447,22 +447,23 @@ void DsoSystem::traceOn(const PreKeyFrame &frame) {
 }
 
 FrameTracker::DepthedMultiFrame DsoSystem::getBaseForTrack() const {
-  std::vector<const KeyFrame *> kfPtrs;
-  kfPtrs.reserve(keyFrames.size());
-  for (const auto &keyFrame : keyFrames)
-    kfPtrs.push_back(keyFrame.get());
+  std::vector<const KeyFrame *> kfPtrs = getKeyFrames();
+  FrameToWorldExtractor frameToWorldExtractor;
 
   Reprojector<OptimizedPoint> reprojectorOptimized(
-      kfPtrs.data(), kfPtrs.size(), FrameToWorldExtractor()(&baseFrame()),
+      kfPtrs.data(), kfPtrs.size(), frameToWorldExtractor(&baseFrame()),
       settings.depth, settings.residualPattern.height);
   StdVector<Reprojection> reprojOptimized = reprojectorOptimized.reproject();
   DepthedPoints pointsUsed =
       reprojectorOptimized.depthedPoints(reprojOptimized);
 
+  LOG(INFO) << "base for track: reprojected " << reprojOptimized.size()
+            << " points";
+
   if (reprojOptimized.size() <
       settings.optimizedOnReprojectionFactor * settings.maxOptimizedPoints()) {
     Reprojector<ImmaturePoint> reprojectorImmature(
-        kfPtrs.data(), kfPtrs.size(), FrameToWorldExtractor()(&baseFrame()),
+        kfPtrs.data(), kfPtrs.size(), frameToWorldExtractor(&baseFrame()),
         settings.depth, settings.residualPattern.height);
     StdVector<Reprojection> reprojImmature = reprojectorImmature.reproject();
     auto newEnd =
@@ -493,6 +494,9 @@ FrameTracker::DepthedMultiFrame DsoSystem::getBaseForTrack() const {
                                 pointsImmature.weights.begin(),
                                 pointsImmature.weights.end());
     }
+
+    LOG(INFO) << "base for track: reprojected imm " << reprojImmature.size()
+              << " points";
   }
 
   FrameTracker::DepthedMultiFrame baseForTrack;

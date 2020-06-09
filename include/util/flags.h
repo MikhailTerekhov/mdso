@@ -10,6 +10,8 @@ DECLARE_int32(points_per_frame);
 DECLARE_int32(max_opt_points);
 DECLARE_int32(max_key_frames);
 
+DECLARE_string(pixel_selector_grad_thres);
+
 DECLARE_bool(set_min_depth);
 DECLARE_bool(set_max_depth);
 DECLARE_bool(min_plus_exp_depth);
